@@ -1,12 +1,23 @@
-# 🤖 MyCobot R6A - Résumé de Développement
+# 🤖 MyCobot 320 Pi - Résumé de Développement
 
 > **Date de dernière mise à jour:** 26 mars 2026  
-> **Branche:** `feature/bump-to-jazzy/gui-ik-dk-gz`  
-> **Repository:** `ABMI-software/Robot5A-Simulation`
+> **Version:** 1.0.0  
+> **Repository GitHub:** https://github.com/ABMI-software/mycobot_320pi_R6A  
+> **Branche:** `main`  
+> **Dernier commit:** `3e2333c`
+
+---
+
+## 📌 Point de Départ Rapide
+
+👉 **Pour démarrer une nouvelle session, consultez [`SESSION_RESUME.md`](SESSION_RESUME.md)**
 
 ---
 
 ## 📋 Vue d'ensemble du projet
+
+### Objectif
+Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 et une connexion TCP.
 
 ### Architecture distribuée Tour ↔ Raspberry Pi
 
