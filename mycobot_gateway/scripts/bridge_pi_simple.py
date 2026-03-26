@@ -242,17 +242,41 @@ class BridgePiSimple:
             return f"ECHO: {cmd} (robot non connecté)"
         
         try:
-            if cmd_lower == 'home':
+            if cmd_lower == 'home' or cmd_lower == 'go_home':
                 self.mc.send_angles(self.home_angles, 30)
                 return "OK: retour home"
                 
-            elif cmd_lower == 'zero':
+            elif cmd_lower == 'zero' or cmd_lower == 'go_zero':
                 self.mc.send_angles(self.zero_angles, 30)
                 return "OK: retour zero"
                 
-            elif cmd_lower == 'stop':
+            elif cmd_lower == 'stop' or cmd_lower == 'emergency_stop':
                 self.mc.release_all_servos()
                 return "OK: arrêt"
+            
+            elif cmd_lower == 'get_angles' or cmd_lower == 'angles':
+                angles = self.mc.get_angles()
+                return f"ANGLES: {angles}"
+            
+            elif cmd_lower == 'get_coords' or cmd_lower == 'coords':
+                coords = self.mc.get_coords()
+                return f"COORDS: {coords}"
+            
+            elif cmd_lower == 'power_on':
+                self.mc.power_on()
+                return "OK: moteurs allumés"
+            
+            elif cmd_lower == 'power_off':
+                self.mc.release_all_servos()
+                return "OK: moteurs relâchés"
+            
+            elif cmd_lower == 'gripper_open':
+                self.mc.set_gripper_state(0, 50)
+                return "OK: pince ouverte"
+            
+            elif cmd_lower == 'gripper_close':
+                self.mc.set_gripper_state(1, 50)
+                return "OK: pince fermée"
                 
             else:
                 return f"ECHO: {cmd}"

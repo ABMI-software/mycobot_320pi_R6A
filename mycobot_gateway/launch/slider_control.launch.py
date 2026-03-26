@@ -77,14 +77,18 @@ def generate_launch_description():
         output='screen',
     )
     
+    # Configuration RViz
+    rviz_config = os.path.join(description_pkg, 'config', 'mycobot_320_pi.rviz')
+    
     # RViz
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
         name='rviz2',
         output='screen',
+        arguments=['-d', rviz_config],
     )
-    
+
     return LaunchDescription([
         model_arg,
         pi_ip_arg,
