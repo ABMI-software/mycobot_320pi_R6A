@@ -1,0 +1,39 @@
+# Fichiers générés par colcon build
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+dist/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ROS2 specific
+*.bag
+*.db3
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Environment
+.env
+venv/
+.venv/

@@ -1,0 +1,234 @@
+╔════════════════════════════════════════════════════════════════════╗
+║                                                                    ║
+║  🤖 GUIDE COMPLET - TESTS SUR ROBOT MYCOBOT 320 PI               ║
+║                                                                    ║
+╚════════════════════════════════════════════════════════════════════╝
+
+
+📋 RÉSUMÉ RAPIDE
+═══════════════════════════════════════════════════════════════════════
+
+Vous êtes prêt à tester le bridge sur le robot réel !
+
+Trois façons de procéder :
+
+  1. 🚀 RAPIDE      → Lire ROBOT_QUICKSTART.md (4 étapes)
+  2. 🎮 INTERACTIF  → Lancer ./robot_test_interactive.sh (menu)
+  3. 📖 COMPLET     → Suivre TEST_ROBOT_PROCEDURE.md (détaillé)
+
+
+═══════════════════════════════════════════════════════════════════════
+🚀 MÉTHODE 1 : RAPIDE (Recommandé pour débuter)
+═══════════════════════════════════════════════════════════════════════
+
+1. Sur la Pi :
+   $ ssh er@10.10.0.218
+   $ cd ~/colcon_ws/src/.../mycobot_gateway
+   $ python3 bridge_pi.py
+
+2. Sur le PC Tour - Terminal 1 :
+   $ cd /home/genji/ros_jazzy/src/mycobot_R6A
+   $ conda deactivate
+   $ source install/setup.bash
+   $ ros2 run mycobot_gateway bridge_tour
+
+3. Sur le PC Tour - Terminal 2 :
+   $ cd /home/genji/ros_jazzy/src/mycobot_R6A
+   $ ./robot_test_interactive.sh
+
+4. Suivez le menu interactif !
+
+
+═══════════════════════════════════════════════════════════════════════
+🎮 MÉTHODE 2 : SCRIPT INTERACTIF (Le plus pratique)
+═══════════════════════════════════════════════════════════════════════
+
+Le script ./robot_test_interactive.sh offre un menu avec :
+
+  [1] Test de communication (ping)              ← Commencer par ça
+  [2] Demander les angles du robot              ← Sans danger
+  [3] Demander le statut                        ← Sans danger
+  [4] Test LED                                  ← Sans mouvement
+  [5] Position HOME                             ⚠️  Robot bouge
+  [6] Mouvement simple - Joint 1                ⚠️  Robot bouge
+  [7] Test séquence complète                    ⚠️  Robot bouge
+  [8] Commande personnalisée                    
+  [9] Monitorer les réponses du robot           
+
+Avantages :
+  ✅ Guidé étape par étape
+  ✅ Confirmations de sécurité pour les mouvements
+  ✅ Pas besoin de taper les commandes
+  ✅ Parfait pour débuter
+
+
+═══════════════════════════════════════════════════════════════════════
+📖 MÉTHODE 3 : PROCÉDURE COMPLÈTE (Pour les tests exhaustifs)
+═══════════════════════════════════════════════════════════════════════
+
+Fichier : TEST_ROBOT_PROCEDURE.md
+
+Contient :
+  ✅ Checklist de sécurité détaillée
+  ✅ 4 phases de test progressives
+  ✅ Procédures de dépannage
+  ✅ Grille de validation à remplir
+  ✅ Log de test structuré
+
+Utilisez cette méthode si :
+  • Vous voulez tester méthodiquement
+  • Vous documentez les tests
+  • Vous validez le système complet
+
+
+═══════════════════════════════════════════════════════════════════════
+⚠️  SÉCURITÉ - À LIRE AVANT DE COMMENCER
+═══════════════════════════════════════════════════════════════════════
+
+CHECKLIST SÉCURITÉ :
+  □ Zone de travail dégagée (50cm autour du robot)
+  □ Aucun objet fragile à proximité
+  □ Arrêt d'urgence accessible
+  □ Câbles bien fixés
+  □ Robot sur surface stable
+  □ Vous savez comment couper l'alimentation
+
+EN CAS DE PROBLÈME :
+  1. CTRL+C dans les terminaux → Arrêt logiciel
+  2. Bouton arrêt d'urgence → Arrêt mécanique
+  3. Débrancher alimentation → Arrêt total
+
+LIMITES RECOMMANDÉES :
+  • Vitesse max : 30 (pour les tests)
+  • Commencer par position HOME
+  • Mouvements progressifs (petit angle d'abord)
+
+
+═══════════════════════════════════════════════════════════════════════
+📊 ORDRE DE TESTS RECOMMANDÉ
+═══════════════════════════════════════════════════════════════════════
+
+Niveau 1 - COMMUNICATION (sans danger)
+  ✅ [1] Test ping
+  ✅ [2] Get angles
+  ✅ [3] Status
+
+Niveau 2 - VÉRIFICATION (sans mouvement)
+  ✅ [4] Test LED (si disponible)
+
+Niveau 3 - MOUVEMENT BASIQUE (moyen)
+  ⚠️  [5] Position HOME
+
+Niveau 4 - MOUVEMENT SIMPLE (moyen)
+  ⚠️  [6] Mouvement joint 1
+
+Niveau 5 - SÉQUENCE COMPLÈTE (avancé)
+  ⚠️  [7] Séquence de mouvements
+
+
+═══════════════════════════════════════════════════════════════════════
+🔍 VÉRIFICATIONS PRÉALABLES
+═══════════════════════════════════════════════════════════════════════
+
+Sur la Raspberry Pi :
+  $ ls /dev/ttyUSB* /dev/ttyAMA*
+  → Doit afficher le port série (ex: /dev/ttyUSB0)
+
+  $ python3 -c "from pymycobot import MyCobot; \
+    mc = MyCobot('/dev/ttyUSB0', 115200); \
+    print('Angles:', mc.get_angles())"
+  → Doit afficher les angles actuels
+
+Sur le PC Tour :
+  $ cd /home/genji/ros_jazzy/src/mycobot_R6A
+  $ source install/setup.bash
+  $ ./diagnose.sh
+  → Tout doit être ✅
+
+
+═══════════════════════════════════════════════════════════════════════
+💡 COMMANDES UTILES
+═══════════════════════════════════════════════════════════════════════
+
+Monitorer les messages du robot :
+  $ cd /home/genji/ros_jazzy/src/mycobot_R6A
+  $ conda deactivate
+  $ source install/setup.bash
+  $ ros2 topic echo /from_robot
+
+Envoyer une commande manuelle :
+  $ source quick_commands.sh
+  $ send_cmd "votre_commande"
+
+Lister les topics actifs :
+  $ ros2 topic list
+
+Vérifier la latence :
+  $ ros2 topic hz /to_robot
+  $ ros2 topic hz /from_robot
+
+
+═══════════════════════════════════════════════════════════════════════
+🐛 DÉPANNAGE RAPIDE
+═══════════════════════════════════════════════════════════════════════
+
+Le robot ne répond pas :
+  1. Vérifier le port série sur la Pi : ls /dev/ttyUSB*
+  2. Vérifier les permissions : sudo usermod -a -G dialout $USER
+  3. Tester pymycobot directement (voir commande ci-dessus)
+
+Le bridge ne se connecte pas :
+  1. Vérifier que bridge_pi.py tourne sur la Pi
+  2. Tester la connectivité : ping 10.10.0.218
+  3. Tester le port : nc -zv 10.10.0.218 5005
+
+Pas de topic /to_robot ou /from_robot :
+  1. Vérifier que bridge_tour est lancé
+  2. Vérifier l'environnement : source install/setup.bash
+  3. Désactiver conda : conda deactivate
+
+
+═══════════════════════════════════════════════════════════════════════
+📝 APRÈS LES TESTS
+═══════════════════════════════════════════════════════════════════════
+
+Si tous les tests passent ✅ :
+
+  1. Documenter les commandes qui fonctionnent
+  2. Noter les limites observées (vitesse max, angles, etc.)
+  3. Identifier les améliorations nécessaires
+  4. Implémenter des séquences plus complexes
+  5. Créer une interface de contrôle avancée
+
+Fichier de log à remplir :
+  → Voir TEST_ROBOT_PROCEDURE.md (section Log de test)
+
+
+═══════════════════════════════════════════════════════════════════════
+📚 DOCUMENTATION COMPLÈTE
+═══════════════════════════════════════════════════════════════════════
+
+  INDEX.md                    → Hub central de la documentation
+  ROBOT_QUICKSTART.md         → Démarrage rapide (ce que vous lisez)
+  TEST_ROBOT_PROCEDURE.md     → Procédure détaillée avec grilles
+  QUICKSTART.md               → Guide général (sans robot)
+  README.md                   → Documentation complète du package
+  SESSION_TEST.md             → Logs de test réseau (6 mars 2026)
+  SUMMARY.md                  → Résumé technique du projet
+
+  robot_test_interactive.sh   → Script de test interactif 🎮
+  diagnose.sh                 → Diagnostic automatique
+  quick_commands.sh           → Commandes rapides
+
+
+═══════════════════════════════════════════════════════════════════════
+
+🚀 Prêt à commencer ?
+
+  Option recommandée pour débuter :
+
+    $ ./robot_test_interactive.sh
+
+  Bonne chance ! 🤖✨
+
+═══════════════════════════════════════════════════════════════════════
