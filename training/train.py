@@ -1,17 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Training script for MyCobot 320 Pi pose estimation.
+"""Training script for MyCobot 320 Pi pose estimation (v2).
+
+Supports single-view, multi-view, and real-image fine-tuning.
 
 Usage
 -----
-Train::
+Single-view (backward compatible with v1 dataset)::
 
     python3 training/train.py --dataset /tmp/mycobot_synth_dataset --epochs 100
 
-Evaluate only::
+Multi-view (v2 dataset with 4 cameras)::
 
-    python3 training/train.py --dataset /tmp/mycobot_synth_dataset \\
-        --evaluate --checkpoint training/checkpoints/best_model.pth
+    python3 training/train.py --dataset /tmp/mycobot_synth_v2 \\
+        --multi-view --backbone resnet50 --epochs 150
+
+Fine-tune on real images::
+
+    python3 training/train.py --dataset /tmp/real_dataset \\
+        --checkpoint training/checkpoints/best_model.pth \\
+        --finetune --lr 1e-5 --freeze-epochs 10 --epochs 50
+
+Merge synthetic + real::
+
+    python3 training/train.py \\
+        --dataset /tmp/mycobot_synth_v2 \\
+        --real-dataset /tmp/real_dataset \\
+        --epochs 150
 
 See ``--help`` for all options.
 """
@@ -37,13 +52,15 @@ from torch.utils.data import DataLoader, Subset
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dataset import (
     MyCobotPoseDataset,
+    MyCobotMultiViewDataset,
+    MergedPoseDataset,
     denormalize_angles,
     normalize_angles,
     get_eval_transforms,
     get_train_transforms,
     JOINT_RANGE,
 )
-from model import PoseResNet
+from model import PoseResNet, MultiViewPoseResNet
 from PIL import Image
 
 
@@ -184,16 +201,26 @@ def plot_training_curves(log_path: str, out_path: str):
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(
-        description='Train MyCobot 320 Pi pose estimation model')
+        description='Train MyCobot 320 Pi pose estimation model (v2)')
     parser.add_argument('--dataset', required=True,
                         help='Path to dataset directory')
+    parser.add_argument('--real-dataset', default=None,
+                        help='Path to real-world dataset (merged with --dataset)')
     parser.add_argument('--checkpoint', default=None,
-                        help='Path to checkpoint to resume / evaluate')
+                        help='Path to checkpoint to resume / evaluate / finetune')
     parser.add_argument('--evaluate', action='store_true',
                         help='Evaluate only (requires --checkpoint)')
+    parser.add_argument('--finetune', action='store_true',
+                        help='Fine-tune from checkpoint (lower LR, more freezing)')
     # Model
     parser.add_argument('--backbone', default='resnet18',
                         choices=['resnet18', 'resnet34', 'resnet50'])
+    parser.add_argument('--multi-view', action='store_true',
+                        help='Use multi-view fusion model (requires v2 dataset)')
+    parser.add_argument('--num-views', type=int, default=4,
+                        help='Number of camera views for multi-view mode')
+    parser.add_argument('--camera-filter', default=None,
+                        help='Single camera to use from v2 CSV (e.g. "front")')
     parser.add_argument('--image-size', type=int, default=224)
     parser.add_argument('--dropout', type=float, default=0.3)
     # Training
@@ -228,24 +255,50 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     # ---------- Dataset ----------
-    full_dataset = MyCobotPoseDataset(
-        args.dataset,
-        transform=None,        # set per split below
-        normalize_targets=True,
-    )
-    n = len(full_dataset)
-    indices = list(range(n))
-    train_idx, val_idx = train_test_split(
-        indices, test_size=args.val_split,
-        random_state=args.seed,
-    )
-
-    # Wrap subsets with appropriate transforms
     train_tf = get_train_transforms(args.image_size)
     eval_tf = get_eval_transforms(args.image_size)
 
-    train_set = _TransformSubset(full_dataset, train_idx, train_tf)
-    val_set   = _TransformSubset(full_dataset, val_idx, eval_tf)
+    if args.multi_view:
+        # Multi-view mode
+        full_dataset = MyCobotMultiViewDataset(
+            args.dataset,
+            transform=None,
+            normalize_targets=True,
+        )
+        n = len(full_dataset)
+        indices = list(range(n))
+        train_idx, val_idx = train_test_split(
+            indices, test_size=args.val_split, random_state=args.seed,
+        )
+        train_set = _TransformSubsetMV(full_dataset, train_idx, train_tf)
+        val_set   = _TransformSubsetMV(full_dataset, val_idx, eval_tf)
+    else:
+        # Single-view mode (backward compatible)
+        full_dataset = MyCobotPoseDataset(
+            args.dataset,
+            transform=None,
+            normalize_targets=True,
+            camera_filter=args.camera_filter,
+        )
+
+        # Optionally merge with real dataset
+        if args.real_dataset:
+            real_dataset = MyCobotPoseDataset(
+                args.real_dataset,
+                transform=None,
+                normalize_targets=True,
+                camera_filter=args.camera_filter,
+            )
+            print(f'📂 Merging synthetic ({len(full_dataset)}) + real ({len(real_dataset)}) data')
+            full_dataset = MergedPoseDataset([full_dataset, real_dataset])
+
+        n = len(full_dataset)
+        indices = list(range(n))
+        train_idx, val_idx = train_test_split(
+            indices, test_size=args.val_split, random_state=args.seed,
+        )
+        train_set = _TransformSubset(full_dataset, train_idx, train_tf)
+        val_set   = _TransformSubset(full_dataset, val_idx, eval_tf)
 
     train_loader = DataLoader(
         train_set, batch_size=args.batch_size, shuffle=True,
@@ -258,11 +311,19 @@ def main():
     print(f'📂 Dataset: {n} samples  (train={len(train_set)}, val={len(val_set)})')
 
     # ---------- Model ----------
-    model = PoseResNet(
-        backbone=args.backbone,
-        pretrained=True,
-        dropout=args.dropout,
-    ).to(device)
+    if args.multi_view:
+        model = MultiViewPoseResNet(
+            backbone=args.backbone,
+            num_views=args.num_views,
+            pretrained=True,
+            dropout=args.dropout,
+        ).to(device)
+    else:
+        model = PoseResNet(
+            backbone=args.backbone,
+            pretrained=True,
+            dropout=args.dropout,
+        ).to(device)
     print(f'🧠 {model}')
 
     # ---------- Evaluate only ----------
@@ -280,6 +341,15 @@ def main():
             print(f'     Joint {i+1} : {m:.2f}°')
         return
 
+    # ---------- Fine-tune mode ----------
+    if args.finetune and args.checkpoint:
+        ckpt = torch.load(args.checkpoint, map_location=device, weights_only=True)
+        model.load_state_dict(ckpt['model_state_dict'], strict=False)
+        print(f'🔧 Fine-tuning from {args.checkpoint}')
+        if args.freeze_epochs == 5:  # default → bump for finetune
+            args.freeze_epochs = 10
+            print(f'   (auto-set freeze-epochs to {args.freeze_epochs})')
+
     # ---------- Optimiser & scheduler ----------
     criterion = nn.MSELoss()
     optimizer = torch.optim.AdamW(
@@ -295,10 +365,10 @@ def main():
         model.freeze_backbone()
         print(f'🔒 Backbone frozen for first {args.freeze_epochs} epochs')
 
-    # ---------- Resume from checkpoint ----------
+    # ---------- Resume from checkpoint (not finetune — that was handled above) ----------
     start_epoch = 0
     best_val_loss = float('inf')
-    if args.checkpoint and os.path.isfile(args.checkpoint):
+    if args.checkpoint and os.path.isfile(args.checkpoint) and not args.finetune:
         ckpt = torch.load(args.checkpoint, map_location=device, weights_only=True)
         model.load_state_dict(ckpt['model_state_dict'])
         optimizer.load_state_dict(ckpt['optimizer_state_dict'])
@@ -409,7 +479,7 @@ def main():
 class _TransformSubset:
     """A Subset that overrides the dataset's transform per sample."""
 
-    def __init__(self, dataset: MyCobotPoseDataset, indices, transform):
+    def __init__(self, dataset, indices, transform):
         self.dataset = dataset
         self.indices = indices
         self.transform = transform
@@ -419,17 +489,77 @@ class _TransformSubset:
 
     def __getitem__(self, idx):
         real_idx = self.indices[idx]
-        img_rel, angles = self.dataset.samples[real_idx]
-        img_path = os.path.join(self.dataset.dataset_dir, img_rel)
+        # Handle both MyCobotPoseDataset and MergedPoseDataset
+        ds = self.dataset
+        if hasattr(ds, 'samples'):
+            img_rel, angles = ds.samples[real_idx]
+            img_path = os.path.join(ds.dataset_dir, img_rel)
+        else:
+            # MergedPoseDataset — get item normally but override transform
+            item = ds[real_idx]
+            # item is already (tensor, tensor) from inner dataset
+            # We need raw access — fall back to inner datasets
+            return self._get_from_merged(ds, real_idx)
 
         image = Image.open(img_path).convert('RGB')
         image = self.transform(image)
 
-        if self.dataset.normalize_targets:
+        if hasattr(ds, 'normalize_targets') and ds.normalize_targets:
             angles = normalize_angles(angles)
 
         target = torch.from_numpy(angles)
         return image, target
+
+    def _get_from_merged(self, merged_ds, real_idx):
+        """Handle MergedPoseDataset by reaching into inner datasets."""
+        for i, cum in enumerate(merged_ds.cumulative):
+            if real_idx < cum:
+                inner_ds = merged_ds.datasets[i]
+                offset = cum - len(inner_ds)
+                inner_idx = real_idx - offset
+                img_rel, angles = inner_ds.samples[inner_idx]
+                img_path = os.path.join(inner_ds.dataset_dir, img_rel)
+
+                image = Image.open(img_path).convert('RGB')
+                image = self.transform(image)
+
+                if inner_ds.normalize_targets:
+                    angles = normalize_angles(angles)
+
+                return image, torch.from_numpy(angles)
+        raise IndexError(f'Index {real_idx} out of range')
+
+
+class _TransformSubsetMV:
+    """Transform subset for multi-view datasets."""
+
+    def __init__(self, dataset: MyCobotMultiViewDataset, indices, transform):
+        self.dataset = dataset
+        self.indices = indices
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        real_idx = self.indices[idx]
+        sample = self.dataset.samples[real_idx]
+
+        images = {}
+        angles = None
+        for view_name in self.dataset.views:
+            img_rel, ang = sample[view_name]
+            img_path = os.path.join(self.dataset.dataset_dir, img_rel)
+            img = Image.open(img_path).convert('RGB')
+            images[view_name] = self.transform(img)
+            angles = ang
+
+        if self.dataset.normalize_targets:
+            angles = normalize_angles(angles)
+
+        stacked = torch.stack([images[v] for v in self.dataset.views], dim=0)
+        target = torch.from_numpy(angles)
+        return stacked, target
 
 
 def _save_checkpoint(model, optimizer, epoch, best_val_loss, path):
