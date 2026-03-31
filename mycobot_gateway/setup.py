@@ -44,6 +44,9 @@ setup(
             'slider_control = mycobot_gateway.slider_control:main',
             'teleop_keyboard = mycobot_gateway.teleop_keyboard:main',
             'marker_follower = mycobot_gateway.marker_follower:main',
+            
+            # Synthetic data collection (Gazebo)
+            'synthetic_data_collector = mycobot_gateway.synthetic_data_collector:main',
         ],
     },
 )
