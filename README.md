@@ -126,7 +126,7 @@ Commandes textuelles : `home`, `zero`, `angles`, `open`, `close`, `stop`
 | Machine | IP (exemple) | Port |
 |---------|--------------|------|
 | PC Tour | 10.10.0.115 | - |
-| Raspberry Pi | 10.10.0.218 | 5005 |
+| Raspberry Pi | 10.10.0.225 | 5005 |
 
 Modifier l'IP dans les launch files :
 ```bash
