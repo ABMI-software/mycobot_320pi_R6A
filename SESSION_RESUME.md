@@ -143,7 +143,7 @@ env -i HOME=$HOME PATH="/usr/bin:/bin:/opt/ros/jazzy/bin" DISPLAY=$DISPLAY bash
 
 ```bash
 # SSH vers le Pi
-ssh er@10.10.0.218
+ssh er@10.10.0.225
 
 # Lancer le bridge
 python3 bridge_pi_simple.py
