@@ -1,0 +1,248 @@
+<?xml version="1.0"?>
+<!--
+  MyCobot 320 Pi - Gazebo-compatible URDF
+  
+  This file extends the original URDF with:
+  - <inertial> tags on every link  (required by Gazebo physics)
+  - <gazebo> colour hints
+  
+  Joint names, limits and kinematics are identical to
+  mycobot_pro_320_pi.urdf.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mycobot_320_pi">
+
+  <!-- ==================== LINKS ==================== -->
+
+  <link name="base">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/base.dae"/>
+      </geometry>
+      <origin xyz="0.0 0 0" rpy="0 0 3.1415926"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/base.dae"/>
+      </geometry>
+      <origin xyz="0.0 0 0" rpy="0 0 3.1415926"/>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <link name="link1">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link1.dae"/>
+      </geometry>
+      <origin xyz="0.115 -0.172 -0.086" rpy="0 0 3.1415926"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link1.dae"/>
+      </geometry>
+      <origin xyz="0.115 -0.172 -0.09" rpy="0 0 3.1415926"/>
+    </collision>
+    <inertial>
+      <mass value="0.3"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005"/>
+    </inertial>
+  </link>
+
+  <link name="link2">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link2.dae"/>
+      </geometry>
+      <origin xyz="-0.075 -0.115 -0.022" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link2.dae"/>
+      </geometry>
+      <origin xyz="-0.075 -0.115 -0.022" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.25"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0004" ixy="0" ixz="0" iyy="0.0004" iyz="0" izz="0.0004"/>
+    </inertial>
+  </link>
+
+  <link name="link3">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link3.dae"/>
+      </geometry>
+      <origin xyz="-0.22 -0.115 0.142" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link3.dae"/>
+      </geometry>
+      <origin xyz="-0.22 -0.115 0.142" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.2"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0003" ixy="0" ixz="0" iyy="0.0003" iyz="0" izz="0.0003"/>
+    </inertial>
+  </link>
+
+  <link name="link4">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link4.dae"/>
+      </geometry>
+      <origin xyz="-0.115 0.338 -0.1435" rpy="1.5708 0 0"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link4.dae"/>
+      </geometry>
+      <origin xyz="-0.115 0.338 -0.1435" rpy="1.5708 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.15"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002"/>
+    </inertial>
+  </link>
+
+  <link name="link5">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link5.dae"/>
+      </geometry>
+      <origin xyz="-0.1149 -0.0322 -0.482" rpy="0 0 0"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link5.dae"/>
+      </geometry>
+      <origin xyz="-0.1149 -0.0322 -0.482" rpy="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.1"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <link name="link6">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link6.dae"/>
+      </geometry>
+      <origin xyz="-0.11478 0.433 -0.15" rpy="1.5708 0 0"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link6.dae"/>
+      </geometry>
+      <origin xyz="-0.11478 0.433 -0.15" rpy="1.5708 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.08"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00008" ixy="0" ixz="0" iyy="0.00008" iyz="0" izz="0.00008"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== JOINTS ==================== -->
+
+  <joint name="joint2_to_joint1" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-2.96" upper="2.96" velocity="3.14"/>
+    <parent link="base"/>
+    <child link="link1"/>
+    <origin xyz="0 0 0.162" rpy="0 0 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <joint name="joint3_to_joint2" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-2.79" upper="2.79" velocity="3.14"/>
+    <parent link="link1"/>
+    <child link="link2"/>
+    <origin xyz="0 0 0" rpy="0 -1.5708 1.5708"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <joint name="joint4_to_joint3" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-2.79" upper="2.79" velocity="3.14"/>
+    <parent link="link2"/>
+    <child link="link3"/>
+    <origin xyz="0.13635 0 0" rpy="0 0 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <joint name="joint5_to_joint4" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-2.79" upper="2.79" velocity="3.14"/>
+    <parent link="link3"/>
+    <child link="link4"/>
+    <origin xyz="0.1205 0 0.082" rpy="0 0 1.57080"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <joint name="joint6_to_joint5" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-2.96" upper="2.96" velocity="3.14"/>
+    <parent link="link4"/>
+    <child link="link5"/>
+    <origin xyz="0 -0.084 0" rpy="1.5708 0 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <joint name="joint6output_to_joint6" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-3.05" upper="3.05" velocity="3.14"/>
+    <parent link="link5"/>
+    <child link="link6"/>
+    <origin xyz="0 0.06635 0" rpy="-1.5708 0 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <!-- ==================== GAZEBO EXTRAS ==================== -->
+
+  <!-- Fix base to world so robot doesn't fall -->
+  <link name="world"/>
+  <joint name="world_to_base" type="fixed">
+    <parent link="world"/>
+    <child link="base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Gazebo joint state publisher plugin -->
+  <gazebo>
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <joint_name>joint2_to_joint1</joint_name>
+      <joint_name>joint3_to_joint2</joint_name>
+      <joint_name>joint4_to_joint3</joint_name>
+      <joint_name>joint5_to_joint4</joint_name>
+      <joint_name>joint6_to_joint5</joint_name>
+      <joint_name>joint6output_to_joint6</joint_name>
+    </plugin>
+  </gazebo>
+
+  <!-- Gazebo joint position controller plugin -->
+  <gazebo>
+    <plugin filename="gz-sim-joint-position-controller-system"
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>joint2_to_joint1</joint_name>
+      <joint_name>joint3_to_joint2</joint_name>
+      <joint_name>joint4_to_joint3</joint_name>
+      <joint_name>joint5_to_joint4</joint_name>
+      <joint_name>joint6_to_joint5</joint_name>
+      <joint_name>joint6output_to_joint6</joint_name>
+    </plugin>
+  </gazebo>
+
+</robot>
