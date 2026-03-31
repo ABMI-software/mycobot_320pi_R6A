@@ -105,6 +105,15 @@ def generate_launch_description():
         ],
     )
 
+    # ---------- ros_gz_image bridge (camera) ----------
+    gz_image_bridge = Node(
+        package='ros_gz_image',
+        executable='image_bridge',
+        name='gz_image_bridge',
+        output='screen',
+        arguments=['/synth_camera/image'],
+    )
+
     # ---------- RViz (optional) ----------
     rviz_node = Node(
         package='rviz2',
@@ -122,5 +131,6 @@ def generate_launch_description():
         gz_sim_launch,
         spawn_entity,
         gz_bridge,
+        gz_image_bridge,
         rviz_node,
     ])

@@ -1,10 +1,10 @@
 # 📋 SESSION RESUME - MyCobot 320 Pi Gateway Bridge
 
-> **Date de dernière mise à jour :** 26 mars 2026  
-> **Version :** 1.0.0  
+> **Date de dernière mise à jour :** 31 mars 2026  
+> **Version :** 1.2.0  
 > **Repository GitHub :** https://github.com/ABMI-software/mycobot_320pi_R6A  
-> **Branche :** `main`  
-> **Dernier commit :** `3e2333c`
+> **Branche :** `main` | `feature/gazebo` | `feature/synthetic-data`  
+> **Dernier commit :** `837aec9` (feature/synthetic-data)
 
 ---
 
@@ -103,25 +103,33 @@ mycobot_R6A/
 │   │   ├── simple_gui.py          # GUI Tkinter
 │   │   ├── slider_control.py      # Contrôle sliders
 │   │   ├── teleop_keyboard.py     # Contrôle clavier
-│   │   └── marker_follower.py     # Suivi ArUco
+│   │   ├── marker_follower.py     # Suivi ArUco
+│   │   └── synthetic_data_collector.py  # 🆕 Collecte données Gazebo
 │   │
 │   ├── scripts/
 │   │   ├── bridge_pi_simple.py    # ⭐ Script Pi (serveur TCP)
-│   │   └── bridge_pi_standalone.py
+│   │   ├── bridge_pi_standalone.py
+│   │   └── synthetic_data_collector  # 🆕 Wrapper ros2 run
 │   │
 │   └── launch/
 │       ├── simple_gui.launch.py
 │       ├── slider_control.launch.py   # ⭐ Contrôle temps réel validé
 │       ├── teleop_keyboard.launch.py
 │       ├── rviz_sync.launch.py
-│       └── marker_follow_full.launch.py
+│       ├── marker_follow_full.launch.py
+│       └── synthetic_data.launch.py   # 🆕 Pipeline synthétique complet
 │
 ├── mycobot_description/           # 📦 Package URDF
 │   ├── urdf/320_pi/               # Modèle 3D robot
+│   │   └── mycobot_pro_320_pi_gazebo.urdf  # 🆕 URDF + caméra + contrôleurs
 │   ├── config/mycobot_320_pi.rviz # Config RViz
-│   └── launch/display.launch.py
+│   └── launch/
+│       ├── display.launch.py
+│       └── gazebo_sim.launch.py   # Lancement Gazebo + bridges
 │
 ├── docs/                          # Documentation détaillée
+│   ├── SYNTHETIC_DATA.md          # 🆕 Guide pipeline données synthétiques
+│   └── ...
 └── scripts/                       # Scripts shell utilitaires
 ```
 
@@ -163,6 +171,24 @@ ros2 launch mycobot_gateway simple_gui.launch.py
 
 # Option C : Contrôle clavier
 ros2 launch mycobot_gateway teleop_keyboard.launch.py
+```
+
+### 🆕 Données Synthétiques (Gazebo)
+
+```bash
+# Branche feature/synthetic-data
+# Collecter 1000 images + labels pour entraînement IA
+env -i HOME=$HOME PATH="/usr/bin:/bin:/opt/ros/jazzy/bin" DISPLAY=$DISPLAY bash -c '
+source /opt/ros/jazzy/setup.bash && 
+source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash && 
+ros2 launch mycobot_gateway synthetic_data.launch.py \
+  num_samples:=1000 \
+  output_dir:=/tmp/mycobot_synth_dataset \
+  settle_time:=2.0'
+
+# Résultat : /tmp/mycobot_synth_dataset/
+#   ├── images/000000.png ... 000999.png  (640x480 RGB)
+#   └── labels.csv  (index, j1-j6_rad, j1-j6_deg, image_path)
 ```
 
 ---
@@ -215,7 +241,7 @@ ros2 launch mycobot_gateway teleop_keyboard.launch.py
 | Machine | IP | Port | Rôle |
 |---------|-----|------|------|
 | PC Tour | 10.10.0.115 | - | Calcul, GUI, RViz |
-| Raspberry Pi | 10.10.0.218 | 5005 | Bridge robot |
+| Raspberry Pi | 10.10.0.225 | 5005 | Bridge robot |
 
 ---
 
@@ -230,6 +256,18 @@ ros2 launch mycobot_gateway teleop_keyboard.launch.py
 | RViz visualisation | ✅ Robot visible | Fixed Frame = base |
 | simple_gui | ✅ Fonctionnel | Interface Tkinter |
 | slider_control | ✅ Validé complet | Robot suit sliders |
+
+### Tests Validés (Session 31/03/2026)
+
+| Test | Résultat | Notes |
+|------|----------|-------|
+| Gazebo Harmonic spawn | ✅ Robot visible | `ros_gz_sim` + URDF avec inertials |
+| `robot_state_publisher` | ✅ Initialisé | Publie `/robot_description` |
+| `ros_gz_bridge` | ✅ Actif | Bridge `/joint_states` Gz → ROS2 |
+| Synthetic data pipeline | ✅ Fonctionnel | 5 samples test OK |
+| Camera Gz → ROS2 image | ✅ 640x480 RGB PNG | Via `ros_gz_image image_bridge` |
+| Joint cmd ROS2 → Gz | ✅ 6 axes bougent | Per-joint Float64 via `ros_gz_bridge` |
+| CSV labels export | ✅ rad + deg | Angles réels depuis `/joint_states` |
 
 ---
 
@@ -262,17 +300,22 @@ source install/setup.bash
 ## 🚧 TODO - Prochaines Étapes
 
 ### Priorité Haute
+- [ ] Lancer une collecte complète (1000+ samples) de données synthétiques
+- [ ] Vérifier visuellement les images (le robot change bien de pose à chaque capture)
+- [ ] Entraîner un modèle de prédiction de pose (CNN/ResNet)
 - [ ] Tester `teleop_keyboard` (contrôle clavier)
 - [ ] Tester `marker_follower` (suivi ArUco)
-- [ ] Améliorer gestion erreurs bridge
 
 ### Priorité Moyenne
-- [ ] Streaming caméra Pi → Tour
+- [ ] Domain randomization Gazebo (éclairage, textures, bruit caméra)
+- [ ] Augmenter résolution caméra et nombre de vues
+- [ ] Streaming caméra Pi → Tour (pour inférence en temps réel)
 - [ ] Interface web (option future)
 - [ ] Enregistrement/rejeu trajectoires
 
 ### Priorité Basse
-- [ ] Intégration Gazebo simulation
+- [x] Intégration Gazebo simulation ✅ (31/03/2026 — branche `feature/gazebo`)
+- [x] Pipeline données synthétiques ✅ (31/03/2026 — branche `feature/synthetic-data`)
 - [ ] Path planning MoveIt2
 - [ ] Multi-robot coordination
 
@@ -287,6 +330,7 @@ source install/setup.bash
 | `docs/QUICKSTART.md` | Guide démarrage rapide |
 | `docs/ARCHITECTURE.md` | Architecture système |
 | `docs/DEPLOYMENT.md` | Guide de déploiement |
+| `docs/SYNTHETIC_DATA.md` | 🆕 Pipeline données synthétiques |
 | `mycobot_gateway/README.md` | Documentation du package |
 
 ---
@@ -300,4 +344,4 @@ source install/setup.bash
 ---
 
 *Ce fichier est le point de départ pour les prochaines sessions de développement.*  
-*Dernière mise à jour : 26 mars 2026*
+*Dernière mise à jour : 31 mars 2026*
