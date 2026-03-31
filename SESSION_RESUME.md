@@ -1,10 +1,10 @@
 # 📋 SESSION RESUME - MyCobot 320 Pi Gateway Bridge
 
 > **Date de dernière mise à jour :** 31 mars 2026  
-> **Version :** 1.2.0  
+> **Version :** 1.3.0  
 > **Repository GitHub :** https://github.com/ABMI-software/mycobot_320pi_R6A  
-> **Branche :** `main` | `feature/gazebo` | `feature/synthetic-data`  
-> **Dernier commit :** `837aec9` (feature/synthetic-data)
+> **Branche :** `main` | `feature/gazebo` | `feature/synthetic-data` | `feature/pose-training`  
+> **Dernier commit :** `bdd63e7` (feature/pose-training)
 
 ---
 
@@ -120,6 +120,8 @@ mycobot_R6A/
 │       └── synthetic_data.launch.py   # 🆕 Pipeline synthétique complet
 │
 ├── mycobot_description/           # 📦 Package URDF
+│
+├── mycobot_description/           # 📦 Package URDF
 │   ├── urdf/320_pi/               # Modèle 3D robot
 │   │   └── mycobot_pro_320_pi_gazebo.urdf  # 🆕 URDF + caméra + contrôleurs
 │   ├── config/mycobot_320_pi.rviz # Config RViz
@@ -130,6 +132,16 @@ mycobot_R6A/
 ├── docs/                          # Documentation détaillée
 │   ├── SYNTHETIC_DATA.md          # 🆕 Guide pipeline données synthétiques
 │   └── ...
+│
+├── training/                      # 🆕 Pipeline entraînement IA (feature/pose-training)
+│   ├── __init__.py
+│   ├── dataset.py                 # MyCobotPoseDataset, normalisation angles
+│   ├── model.py                   # PoseResNet (ResNet18/34/50 + regression head)
+│   ├── train.py                   # Boucle entraînement (AMP, early stopping, logs)
+│   ├── predict.py                 # Inférence sur image(s)
+│   ├── README.md                  # Documentation pipeline
+│   └── requirements.txt           # Dépendances PyTorch
+│
 └── scripts/                       # Scripts shell utilitaires
 ```
 
@@ -189,6 +201,31 @@ ros2 launch mycobot_gateway synthetic_data.launch.py \
 # Résultat : /tmp/mycobot_synth_dataset/
 #   ├── images/000000.png ... 000999.png  (640x480 RGB)
 #   └── labels.csv  (index, j1-j6_rad, j1-j6_deg, image_path)
+```
+
+### 🆕 Entraînement IA (PyTorch)
+
+```bash
+# Branche feature/pose-training
+# ⚠️ Utiliser l'environnement Conda (Python 3.13 + PyTorch CUDA)
+cd ~/ros_jazzy/src/mycobot_R6A
+
+# Entraîner le modèle (ResNet18, 100 epochs, batch 32, RTX 4000 Ada)
+python3 training/train.py \
+  --dataset /tmp/mycobot_synth_dataset \
+  --epochs 100 --batch-size 32 --lr 1e-4 \
+  --freeze-epochs 5 --patience 15
+
+# Résultat : training/checkpoints/
+#   ├── best_model.pth          (meilleur modèle)
+#   ├── last_model.pth          (dernier modèle)
+#   ├── training_log.csv        (log par epoch)
+#   └── training_curves.png     (courbes loss + MAE)
+
+# Inférence sur une image
+python3 training/predict.py \
+  --image /tmp/mycobot_synth_dataset/images/000042.png \
+  --checkpoint training/checkpoints/best_model.pth
 ```
 
 ---
@@ -269,6 +306,17 @@ ros2 launch mycobot_gateway synthetic_data.launch.py \
 | Joint cmd ROS2 → Gz | ✅ 6 axes bougent | Per-joint Float64 via `ros_gz_bridge` |
 | CSV labels export | ✅ rad + deg | Angles réels depuis `/joint_states` |
 
+### Tests Validés (Session 31/03/2026 — Pose Training)
+
+| Test | Résultat | Notes |
+|------|----------|-------|
+| PyTorch + CUDA | ✅ torch 2.6.0+cu124 | RTX 4000 Ada 20GB VRAM |
+| Training pipeline (smoke) | ✅ 2 epochs OK | Pas d'erreur, loss décroissante |
+| Training complet 90 epochs | ✅ Early stop | ~3 min, best val loss 0.0348 |
+| Mean val MAE | ✅ 22.6° | J1:10.8° J2:15.4° J3:18.3° J4:25.0° J5:33.0° J6:33.2° |
+| Inférence `predict.py` | ✅ GPU | Prédictions cohérentes sur images test |
+| Git push | ✅ `feature/pose-training` | Commit `bdd63e7` |
+
 ---
 
 ## 🔑 Points Importants à Retenir
@@ -302,7 +350,8 @@ source install/setup.bash
 ### Priorité Haute
 - [x] Lancer une collecte complète (1000+ samples) de données synthétiques ✅ (31/03/2026)
 - [x] Vérifier visuellement les images (le robot change bien de pose à chaque capture) ✅ (31/03/2026)
-- [ ] Entraîner un modèle de prédiction de pose (CNN/ResNet)
+- [x] Entraîner un modèle de prédiction de pose (CNN/ResNet) ✅ (31/03/2026 — ResNet18, MAE 22.6°)
+- [ ] Améliorer la précision : plus de données, domain randomization, resnet50
 - [ ] Tester `teleop_keyboard` (contrôle clavier)
 - [ ] Tester `marker_follower` (suivi ArUco)
 
