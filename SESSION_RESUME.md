@@ -1,10 +1,10 @@
 # 📋 SESSION RESUME - MyCobot 320 Pi Gateway Bridge
 
-> **Date de dernière mise à jour :** 26 mars 2026  
-> **Version :** 1.0.0  
+> **Date de dernière mise à jour :** 31 mars 2026  
+> **Version :** 1.1.0  
 > **Repository GitHub :** https://github.com/ABMI-software/mycobot_320pi_R6A  
-> **Branche :** `main`  
-> **Dernier commit :** `3e2333c`
+> **Branche :** `main` | `feature/gazebo`  
+> **Dernier commit :** `a950966` (feature/gazebo)
 
 ---
 
@@ -215,7 +215,7 @@ ros2 launch mycobot_gateway teleop_keyboard.launch.py
 | Machine | IP | Port | Rôle |
 |---------|-----|------|------|
 | PC Tour | 10.10.0.115 | - | Calcul, GUI, RViz |
-| Raspberry Pi | 10.10.0.218 | 5005 | Bridge robot |
+| Raspberry Pi | 10.10.0.225 | 5005 | Bridge robot |
 
 ---
 
@@ -230,6 +230,14 @@ ros2 launch mycobot_gateway teleop_keyboard.launch.py
 | RViz visualisation | ✅ Robot visible | Fixed Frame = base |
 | simple_gui | ✅ Fonctionnel | Interface Tkinter |
 | slider_control | ✅ Validé complet | Robot suit sliders |
+
+### Tests Validés (Session 31/03/2026)
+
+| Test | Résultat | Notes |
+|------|----------|-------|
+| Gazebo Harmonic spawn | ✅ Robot visible | `ros_gz_sim` + URDF avec inertials |
+| `robot_state_publisher` | ✅ Initialisé | Publie `/robot_description` |
+| `ros_gz_bridge` | ✅ Actif | Bridge `/joint_states` Gz → ROS2 |
 
 ---
 
@@ -272,7 +280,7 @@ source install/setup.bash
 - [ ] Enregistrement/rejeu trajectoires
 
 ### Priorité Basse
-- [ ] Intégration Gazebo simulation
+- [x] Intégration Gazebo simulation ✅ (31/03/2026 — branche `feature/gazebo`)
 - [ ] Path planning MoveIt2
 - [ ] Multi-robot coordination
 
@@ -300,4 +308,4 @@ source install/setup.bash
 ---
 
 *Ce fichier est le point de départ pour les prochaines sessions de développement.*  
-*Dernière mise à jour : 26 mars 2026*
+*Dernière mise à jour : 31 mars 2026*
