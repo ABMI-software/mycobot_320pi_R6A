@@ -37,3 +37,8 @@ Thumbs.db
 .env
 venv/
 .venv/
+
+# Training checkpoints & artifacts
+training/checkpoints/
+*.pth
+*.onnx
