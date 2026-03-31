@@ -300,8 +300,8 @@ source install/setup.bash
 ## 🚧 TODO - Prochaines Étapes
 
 ### Priorité Haute
-- [ ] Lancer une collecte complète (1000+ samples) de données synthétiques
-- [ ] Vérifier visuellement les images (le robot change bien de pose à chaque capture)
+- [x] Lancer une collecte complète (1000+ samples) de données synthétiques ✅ (31/03/2026)
+- [x] Vérifier visuellement les images (le robot change bien de pose à chaque capture) ✅ (31/03/2026)
 - [ ] Entraîner un modèle de prédiction de pose (CNN/ResNet)
 - [ ] Tester `teleop_keyboard` (contrôle clavier)
 - [ ] Tester `marker_follower` (suivi ArUco)
