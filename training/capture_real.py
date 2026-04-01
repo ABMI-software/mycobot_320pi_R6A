@@ -248,6 +248,19 @@ def main():
     cam_names = list(cam_client.camera_names.values())
     print(f'\n  🎥 Using cameras: {cam_names}')
 
+    # --- Test capture before starting ---
+    print('  🧪 Test capture…')
+    test_imgs = cam_client.capture_all(quality=args.quality)
+    for cname, data in test_imgs.items():
+        sz = len(data) if data else 0
+        print(f'     {cname}: {sz} bytes ({sz // 1024} KB)')
+    if not test_imgs or all(v is None or len(v) == 0 for v in test_imgs.values()):
+        print('  ❌ Test capture failed — no valid frames. Check cameras on Pi.')
+        bridge.close()
+        cam_client.close()
+        return
+    print('  ✅ Test capture OK')
+
     # --- Setup output dirs ---
     for cname in cam_names:
         os.makedirs(os.path.join(args.output, 'images', cname), exist_ok=True)
@@ -313,17 +326,23 @@ def main():
                 continue
 
             # 5. Save images and CSV rows
+            saved_any = False
             with open(csv_path, 'a', newline='') as f:
                 writer = csv.writer(f)
                 for cname, jpeg_data in images.items():
-                    if jpeg_data is None:
+                    if jpeg_data is None or len(jpeg_data) == 0:
+                        print(f'  [{i}] ⚠️  Empty frame from {cname}')
                         continue
                     img_filename = f'{i:06d}.png'
                     img_rel = f'images/{cname}/{img_filename}'
                     img_path = os.path.join(args.output, img_rel)
 
                     # Decode JPEG and save as PNG for consistency with synthetic data
-                    _save_jpeg_as_png(jpeg_data, img_path)
+                    ok = _save_jpeg_as_png(jpeg_data, img_path)
+                    if not ok:
+                        print(f'  [{i}] ⚠️  Failed to save {cname} '
+                              f'({len(jpeg_data)} bytes JPEG)')
+                        continue
 
                     writer.writerow([
                         i,
@@ -332,11 +351,19 @@ def main():
                         cname,
                         img_rel,
                     ])
+                    saved_any = True
+
+            if not saved_any:
+                print(f'  [{i}] ⚠️  No images saved for this pose')
+                continue
 
             collected += 1
             if collected % 10 == 0 or collected == 1:
+                sizes_kb = {k: (len(v) // 1024 if v else 0)
+                            for k, v in images.items()}
                 print(f'  📸 [{collected}/{total_to_collect}] '
                       f'cameras={list(images.keys())} '
+                      f'jpeg_kb={sizes_kb} '
                       f'angles={[round(a, 1) for a in actual_deg]}')
 
     except KeyboardInterrupt:
@@ -370,18 +397,28 @@ def main():
         print(f'     --camera-filter {cam_names[0]}')
 
 
-def _save_jpeg_as_png(jpeg_bytes: bytes, out_path: str):
-    """Decode JPEG bytes and save as PNG."""
+def _save_jpeg_as_png(jpeg_bytes: bytes, out_path: str) -> bool:
+    """Decode JPEG bytes and save as PNG. Returns True on success."""
     import io
     try:
         from PIL import Image
         img = Image.open(io.BytesIO(jpeg_bytes))
+        img.load()  # force decode
         img.save(out_path)
+        return True
     except ImportError:
         # Fallback: save as JPEG directly if Pillow not available
-        jpg_path = out_path.replace('.png', '.jpg')
-        with open(jpg_path, 'wb') as f:
-            f.write(jpeg_bytes)
+        try:
+            jpg_path = out_path.replace('.png', '.jpg')
+            with open(jpg_path, 'wb') as f:
+                f.write(jpeg_bytes)
+            return True
+        except Exception as e:
+            print(f'    ❌ Save fallback failed: {e}')
+            return False
+    except Exception as e:
+        print(f'    ❌ Image decode/save failed: {e}')
+        return False
 
 
 if __name__ == '__main__':
