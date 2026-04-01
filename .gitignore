@@ -39,6 +39,6 @@ venv/
 .venv/
 
 # Training checkpoints & artifacts
-training/checkpoints/
+training/checkpoints*/
 *.pth
 *.onnx

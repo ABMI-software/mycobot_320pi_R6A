@@ -1,10 +1,10 @@
 # 📋 SESSION RESUME - MyCobot 320 Pi Gateway Bridge
 
-> **Date de dernière mise à jour :** 31 mars 2026  
-> **Version :** 1.3.0  
+> **Date de dernière mise à jour :** 1 avril 2026  
+> **Version :** 1.4.0  
 > **Repository GitHub :** https://github.com/ABMI-software/mycobot_320pi_R6A  
 > **Branche :** `main` | `feature/gazebo` | `feature/synthetic-data` | `feature/pose-training`  
-> **Dernier commit :** `bdd63e7` (feature/pose-training)
+> **Dernier commit :** (feature/pose-training)
 
 ---
 
@@ -104,12 +104,14 @@ mycobot_R6A/
 │   │   ├── slider_control.py      # Contrôle sliders
 │   │   ├── teleop_keyboard.py     # Contrôle clavier
 │   │   ├── marker_follower.py     # Suivi ArUco
-│   │   └── synthetic_data_collector.py  # 🆕 Collecte données Gazebo
+│   │   ├── synthetic_data_collector.py      # Collecte données Gazebo v1
+│   │   └── synthetic_data_collector_v2.py   # 🆕 Collecte v2 (multi-cam + domain rand)
 │   │
 │   ├── scripts/
 │   │   ├── bridge_pi_simple.py    # ⭐ Script Pi (serveur TCP)
 │   │   ├── bridge_pi_standalone.py
-│   │   └── synthetic_data_collector  # 🆕 Wrapper ros2 run
+│   │   ├── synthetic_data_collector  # Wrapper ros2 run v1
+│   │   └── synthetic_data_collector_v2  # 🆕 Wrapper ros2 run v2
 │   │
 │   └── launch/
 │       ├── simple_gui.launch.py
@@ -117,13 +119,16 @@ mycobot_R6A/
 │       ├── teleop_keyboard.launch.py
 │       ├── rviz_sync.launch.py
 │       ├── marker_follow_full.launch.py
-│       └── synthetic_data.launch.py   # 🆕 Pipeline synthétique complet
+│       ├── synthetic_data.launch.py       # Pipeline synthétique v1
+│       └── synthetic_data_v2.launch.py    # 🆕 Pipeline v2 (4 caméras + randomized.sdf)
 │
 ├── mycobot_description/           # 📦 Package URDF
 │
 ├── mycobot_description/           # 📦 Package URDF
 │   ├── urdf/320_pi/               # Modèle 3D robot
-│   │   └── mycobot_pro_320_pi_gazebo.urdf  # 🆕 URDF + caméra + contrôleurs
+│   │   └── mycobot_pro_320_pi_gazebo.urdf  # URDF + 4 caméras + contrôleurs
+│   ├── worlds/
+│   │   └── randomized.sdf         # 🆕 Monde Gazebo avec domain randomization
 │   ├── config/mycobot_320_pi.rviz # Config RViz
 │   └── launch/
 │       ├── display.launch.py
@@ -135,10 +140,11 @@ mycobot_R6A/
 │
 ├── training/                      # 🆕 Pipeline entraînement IA (feature/pose-training)
 │   ├── __init__.py
-│   ├── dataset.py                 # MyCobotPoseDataset, normalisation angles
-│   ├── model.py                   # PoseResNet (ResNet18/34/50 + regression head)
-│   ├── train.py                   # Boucle entraînement (AMP, early stopping, logs)
+│   ├── dataset.py                 # MyCobotPoseDataset, MultiView, Merged, normalisation
+│   ├── model.py                   # PoseResNet + MultiViewPoseResNet (fusion 4 vues)
+│   ├── train.py                   # v2: multi-view, domain rand, finetune, camera filter
 │   ├── predict.py                 # Inférence sur image(s)
+│   ├── capture_real.py            # 🆕 Capture images réelles via bridge Pi + OpenCV
 │   ├── README.md                  # Documentation pipeline
 │   └── requirements.txt           # Dépendances PyTorch
 │
@@ -188,8 +194,8 @@ ros2 launch mycobot_gateway teleop_keyboard.launch.py
 ### 🆕 Données Synthétiques (Gazebo)
 
 ```bash
+# === v1 (single camera, 1000 samples) ===
 # Branche feature/synthetic-data
-# Collecter 1000 images + labels pour entraînement IA
 env -i HOME=$HOME PATH="/usr/bin:/bin:/opt/ros/jazzy/bin" DISPLAY=$DISPLAY bash -c '
 source /opt/ros/jazzy/setup.bash && 
 source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash && 
@@ -198,9 +204,20 @@ ros2 launch mycobot_gateway synthetic_data.launch.py \
   output_dir:=/tmp/mycobot_synth_dataset \
   settle_time:=2.0'
 
-# Résultat : /tmp/mycobot_synth_dataset/
-#   ├── images/000000.png ... 000999.png  (640x480 RGB)
-#   └── labels.csv  (index, j1-j6_rad, j1-j6_deg, image_path)
+# === v2 (4 cameras, domain randomization, 5000 samples) ===
+# Branche feature/pose-training
+env -i HOME=$HOME PATH="/usr/bin:/bin:/opt/ros/jazzy/bin" DISPLAY=$DISPLAY bash -c '
+source /opt/ros/jazzy/setup.bash && 
+source ~/ros_jazzy/install/setup.bash && 
+ros2 launch mycobot_gateway synthetic_data_v2.launch.py \
+  num_samples:=5000'
+
+# Résultat v2 : /tmp/mycobot_synth_v2/
+#   ├── images/front/000000.png ... 004999.png
+#   ├── images/right/000000.png ... 004999.png
+#   ├── images/left/000000.png ... 004999.png
+#   ├── images/top/000000.png ... 004999.png  (4×5000 = 20,000 images)
+#   └── labels.csv  (index, j1-j6_rad, j1-j6_deg, camera, image_path)
 ```
 
 ### 🆕 Entraînement IA (PyTorch)
@@ -210,22 +227,28 @@ ros2 launch mycobot_gateway synthetic_data.launch.py \
 # ⚠️ Utiliser l'environnement Conda (Python 3.13 + PyTorch CUDA)
 cd ~/ros_jazzy/src/mycobot_R6A
 
-# Entraîner le modèle (ResNet18, 100 epochs, batch 32, RTX 4000 Ada)
+# === Single-view ResNet50 (front only, 5000 samples) ===
 python3 training/train.py \
-  --dataset /tmp/mycobot_synth_dataset \
-  --epochs 100 --batch-size 32 --lr 1e-4 \
-  --freeze-epochs 5 --patience 15
+  --dataset /tmp/mycobot_synth_v2 \
+  --camera-filter front \
+  --backbone resnet50 --epochs 150 --batch-size 32 --lr 1e-4
 
-# Résultat : training/checkpoints/
-#   ├── best_model.pth          (meilleur modèle)
-#   ├── last_model.pth          (dernier modèle)
-#   ├── training_log.csv        (log par epoch)
-#   └── training_curves.png     (courbes loss + MAE)
+# === Multi-view ResNet50 (4 cameras, 5000 samples) — MEILLEUR RÉSULTAT ===
+python3 training/train.py \
+  --dataset /tmp/mycobot_synth_v2 \
+  --multi-view --backbone resnet50 \
+  --epochs 150 --batch-size 16 --lr 1e-4
+
+# === Fine-tune sur données réelles ===
+python3 training/train.py \
+  --dataset /tmp/real_dataset \
+  --checkpoint training/checkpoints_mv_resnet50/best_model.pth \
+  --finetune --lr 1e-5 --epochs 50
 
 # Inférence sur une image
 python3 training/predict.py \
-  --image /tmp/mycobot_synth_dataset/images/000042.png \
-  --checkpoint training/checkpoints/best_model.pth
+  --image /tmp/mycobot_synth_v2/images/front/000042.png \
+  --checkpoint training/checkpoints_mv_resnet50/best_model.pth
 ```
 
 ---
@@ -317,6 +340,28 @@ python3 training/predict.py \
 | Inférence `predict.py` | ✅ GPU | Prédictions cohérentes sur images test |
 | Git push | ✅ `feature/pose-training` | Commit `bdd63e7` |
 
+### Tests Validés (Session 31/03-01/04/2026 — Pipeline v2)
+
+| Test | Résultat | Notes |
+|------|----------|-------|
+| URDF 4 caméras | ✅ front/right/left/top | Toutes publient en Gazebo |
+| World randomized.sdf | ✅ Chargé | 3 lights, clutter, table |
+| Domain randomization (gz service) | ✅ Active | Light direction/color randomisés |
+| Collecte v2 5000 samples | ✅ 20,000 images | 4 vues × 5000 poses, 8.3 GB, ~2.5h |
+| Gaussian pixel noise | ✅ σ aléatoire 0–5 | Appliqué à chaque image |
+| Multi-view smoke test | ✅ 2 epochs OK | 4 vues fusionnées, loss décroissante |
+| **Multi-view ResNet50 (150 ep)** | ✅ **12.97° MAE** | 139 epochs (early stop), 121 min |
+| Single-view ResNet50 (5k data) | ✅ 16.49° MAE | 89 epochs, front camera only, 20 min |
+
+### 📊 Comparaison des Modèles
+
+| Configuration | Données | MAE moyenne | J1 | J2 | J3 | J4 | J5 | J6 |
+|---|---|---|---|---|---|---|---|---|
+| ResNet18, single-view | 1000 (v1) | 22.6° | 10.8° | 15.4° | 18.3° | 25.0° | 33.0° | 33.2° |
+| ResNet50, single-view | 1000 (v1) | 20.9° | — | — | — | — | — | — |
+| ResNet50, single-view (front) | 5000 (v2) | 16.5° | 7.2° | 9.6° | 11.3° | 16.0° | 28.4° | 26.4° |
+| **ResNet50, multi-view (4 cam)** | **5000 (v2)** | **12.97°** | **6.4°** | **9.1°** | **8.5°** | **10.8°** | **17.1°** | **25.9°** |
+
 ---
 
 ## 🔑 Points Importants à Retenir
@@ -351,21 +396,24 @@ source install/setup.bash
 - [x] Lancer une collecte complète (1000+ samples) de données synthétiques ✅ (31/03/2026)
 - [x] Vérifier visuellement les images (le robot change bien de pose à chaque capture) ✅ (31/03/2026)
 - [x] Entraîner un modèle de prédiction de pose (CNN/ResNet) ✅ (31/03/2026 — ResNet18, MAE 22.6°)
-- [ ] Améliorer la précision : plus de données, domain randomization, resnet50
+- [x] Améliorer la précision : plus de données, domain randomization, resnet50 ✅ (01/04/2026)
+- [x] Domain randomization Gazebo (éclairage, textures, bruit caméra) ✅ (01/04/2026)
+- [x] Augmenter nombre de vues (4 caméras multi-view) ✅ (01/04/2026 — MAE 12.97°)
+- [ ] Streaming caméra Pi → Tour (pour inférence en temps réel)
+- [ ] Capturer images réelles + fine-tune (nécessite Pi + caméra connectés)
 - [ ] Tester `teleop_keyboard` (contrôle clavier)
 - [ ] Tester `marker_follower` (suivi ArUco)
 
 ### Priorité Moyenne
-- [ ] Domain randomization Gazebo (éclairage, textures, bruit caméra)
-- [ ] Augmenter résolution caméra et nombre de vues
-- [ ] Streaming caméra Pi → Tour (pour inférence en temps réel)
+- [ ] Nœud ROS2 d'inférence temps réel (camera → predict → joint angles)
 - [ ] Interface web (option future)
 - [ ] Enregistrement/rejeu trajectoires
+- [ ] Path planning MoveIt2
 
 ### Priorité Basse
 - [x] Intégration Gazebo simulation ✅ (31/03/2026 — branche `feature/gazebo`)
 - [x] Pipeline données synthétiques ✅ (31/03/2026 — branche `feature/synthetic-data`)
-- [ ] Path planning MoveIt2
+- [x] Pipeline v2 multi-view + domain rand ✅ (01/04/2026 — branche `feature/pose-training`)
 - [ ] Multi-robot coordination
 
 ---
@@ -393,4 +441,4 @@ source install/setup.bash
 ---
 
 *Ce fichier est le point de départ pour les prochaines sessions de développement.*  
-*Dernière mise à jour : 31 mars 2026*
+*Dernière mise à jour : 1 avril 2026*
