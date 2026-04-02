@@ -63,17 +63,35 @@ def denormalize_angles(normed: np.ndarray) -> np.ndarray:
 
 
 # ---------- Image transforms ----------
+
+class PerImageNormalize:
+    """Normalize each image individually to zero-mean / unit-std.
+
+    This removes global brightness & contrast drift (e.g. changing
+    ambient light during a multi-hour capture session) so the model
+    focuses on shape/pose cues rather than illumination level.
+    Applied *after* ToTensor, *before* ImageNet Normalize.
+    """
+
+    def __call__(self, tensor: torch.Tensor) -> torch.Tensor:
+        # tensor: (C, H, W)
+        mean = tensor.mean()
+        std = tensor.std() + 1e-6
+        return (tensor - mean) / std
+
+
 def get_train_transforms(image_size: int = 224) -> transforms.Compose:
-    """Augmented transforms for training (heavier than v1)."""
+    """Augmented transforms for training."""
     return transforms.Compose([
         transforms.Resize((image_size, image_size)),
-        transforms.ColorJitter(brightness=0.3, contrast=0.3,
+        transforms.ColorJitter(brightness=0.4, contrast=0.4,
                                saturation=0.3, hue=0.08),
         transforms.RandomGrayscale(p=0.05),
         transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0)),
         transforms.RandomAffine(degrees=3, translate=(0.02, 0.02),
                                 scale=(0.95, 1.05)),
         transforms.ToTensor(),
+        PerImageNormalize(),
         transforms.RandomErasing(p=0.1, scale=(0.02, 0.08)),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
@@ -85,6 +103,7 @@ def get_eval_transforms(image_size: int = 224) -> transforms.Compose:
     return transforms.Compose([
         transforms.Resize((image_size, image_size)),
         transforms.ToTensor(),
+        PerImageNormalize(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
     ])
@@ -162,11 +181,23 @@ class MyCobotMultiViewDataset(Dataset):
         normalize_targets: bool = True,
     ):
         self.dataset_dir = dataset_dir
-        self.views = views or CAMERA_VIEWS
         self.transform = transform or get_eval_transforms()
         self.normalize_targets = normalize_targets
 
         csv_path = os.path.join(dataset_dir, 'labels.csv')
+
+        # Auto-detect camera views from CSV if not explicitly provided
+        if views is None:
+            with open(csv_path, 'r') as f:
+                reader = csv.DictReader(f)
+                found = sorted(set(row.get('camera', 'front') for row in reader))
+            if found and found != sorted(CAMERA_VIEWS):
+                self.views = found
+            else:
+                self.views = CAMERA_VIEWS
+        else:
+            self.views = views
+
         grouped: Dict[int, Dict[str, Tuple[str, np.ndarray]]] = {}
         with open(csv_path, 'r') as f:
             reader = csv.DictReader(f)

@@ -50,25 +50,107 @@ import numpy as np
 # Joint limits (same as dataset.py / collector)
 # ---------------------------------------------------------------------------
 JOINT_LIMITS = [
-    (-2.96, 2.96),   # J1
-    (-2.79, 2.79),   # J2
-    (-2.79, 2.79),   # J3
-    (-2.79, 2.79),   # J4
-    (-2.96, 2.96),   # J5
-    (-3.05, 3.05),   # J6
+    (-2.96, 2.96),   # J1  base rotation
+    (-2.79, 2.79),   # J2  shoulder
+    (-2.79, 2.79),   # J3  elbow
+    (-2.79, 2.79),   # J4  wrist pitch
+    (-2.96, 2.96),   # J5  wrist roll
+    (-3.05, 3.05),   # J6  flange
 ]
 
+# ---------------------------------------------------------------------------
+# Kinematic safety — proper FK from real URDF dimensions (metres)
+# ---------------------------------------------------------------------------
+# From mycobot_description/urdf/mycobot_320_pi_2022.urdf:
+#   joint2_to_joint1: xyz="0 0 0.162"        → base height
+#   joint3_to_joint2: rpy="0 -π/2 π/2"       → frame rotation (no translation)
+#   joint4_to_joint3: xyz="0.13635 0 0"       → upper arm
+#   joint5_to_joint4: xyz="0.1205 0 0.082"    → forearm + Z-offset
+#   joint6_to_joint5: xyz="0 -0.084 0"        → wrist
+#   joint6output_to_joint6: xyz="0 0.06635 0" → end-effector
+_BASE_H   = 162.0    # base to shoulder (mm)
+_L_UPPER  = 136.35   # shoulder to elbow (mm)
+_L_FORE   = 120.5    # elbow to wrist (mm)
+_L_FORE_Z = 82.0     # forearm Z-offset (mm)
+_L_WRIST  = 84.0     # wrist length (mm)
+_L_EE     = 66.35    # end-effector length (mm)
 
-def random_joint_angles(limit_fraction: float = 0.6) -> List[float]:
-    """Generate random safe joint angles in degrees."""
-    angles_deg = []
-    for lo, hi in JOINT_LIMITS:
-        lo_d, hi_d = math.degrees(lo), math.degrees(hi)
-        span = (hi_d - lo_d) * limit_fraction
-        mid = (hi_d + lo_d) / 2.0
-        a = random.uniform(mid - span / 2, mid + span / 2)
-        angles_deg.append(round(a, 1))
-    return angles_deg
+# Safety thresholds
+_TABLE_Z_MIN   = 60.0   # minimum Z above the table for any arm point (mm)
+_BASE_R_MIN    = 90.0   # minimum radial distance from base axis (mm)
+                         # — protects power / USB / HDMI cables behind the base
+
+
+def _fk_key_points(j2_deg: float, j3_deg: float,
+                    j4_deg: float) -> List[Tuple[float, float]]:
+    """Compute (z_mm, r_mm) for elbow, wrist, and end-effector.
+
+    Uses planar forward kinematics in the arm's sagittal plane.
+    J2, J3, J4 are cumulative pitch angles from vertical.
+    Returns list of (z_height, radial_distance) tuples.
+    """
+    a2 = math.radians(j2_deg)
+    a3 = math.radians(j2_deg + j3_deg)
+    a4 = math.radians(j2_deg + j3_deg + j4_deg)
+
+    # Elbow (end of upper arm)
+    z_elbow = _BASE_H + _L_UPPER * math.cos(a2)
+    r_elbow = _L_UPPER * math.sin(a2)
+
+    # Wrist (end of forearm — includes the 82 mm perpendicular offset)
+    z_wrist = z_elbow + _L_FORE * math.cos(a3) - _L_FORE_Z * math.sin(a3)
+    r_wrist = r_elbow + _L_FORE * math.sin(a3) + _L_FORE_Z * math.cos(a3)
+
+    # End-effector (wrist + EE combined ≈ 150 mm)
+    l_ee_total = _L_WRIST + _L_EE
+    z_ee = z_wrist + l_ee_total * math.cos(a4)
+    r_ee = r_wrist + l_ee_total * math.sin(a4)
+
+    return [
+        (z_elbow, abs(r_elbow)),
+        (z_wrist, abs(r_wrist)),
+        (z_ee,    abs(r_ee)),
+    ]
+
+
+def _pose_is_safe(angles_deg: List[float]) -> bool:
+    """Return True if the pose keeps the entire arm above the table
+    and away from the base column (cable protection)."""
+    pts = _fk_key_points(angles_deg[1], angles_deg[2], angles_deg[3])
+    for z, r in pts:
+        # Must be above the table
+        if z < _TABLE_Z_MIN:
+            return False
+        # Must not be too close to the base axis (cable protection)
+        # Only enforce when the point is low (below shoulder height)
+        # — high poses close to base axis are fine (arm pointing up)
+        if z < _BASE_H and r < _BASE_R_MIN:
+            return False
+    return True
+
+
+def random_joint_angles(limit_fraction: float = 0.5,
+                        max_attempts: int = 500) -> List[float]:
+    """Generate random safe joint angles in degrees.
+
+    Rejects poses where any arm segment (elbow, wrist, or end-effector):
+      - goes below the table surface (Z < TABLE_Z_MIN)
+      - comes too close to the base column when low (R < BASE_R_MIN)
+    """
+    for _ in range(max_attempts):
+        angles_deg = []
+        for lo, hi in JOINT_LIMITS:
+            lo_d, hi_d = math.degrees(lo), math.degrees(hi)
+            span = (hi_d - lo_d) * limit_fraction
+            mid = (hi_d + lo_d) / 2.0
+            a = random.uniform(mid - span / 2, mid + span / 2)
+            angles_deg.append(round(a, 1))
+
+        if _pose_is_safe(angles_deg):
+            return angles_deg
+
+    # Fallback: safe upright pose
+    return [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 
 # ---------------------------------------------------------------------------
@@ -90,10 +172,13 @@ class RobotBridge:
         print(f'  ✅ Robot bridge connected ({self.host}:{self.port})')
 
     def send_command(self, cmd: dict) -> str:
-        data = json.dumps(cmd).encode() + b'\n'
-        self.sock.sendall(data)
-        response = self.sock.recv(4096).decode().strip()
-        return response
+        try:
+            data = json.dumps(cmd).encode() + b'\n'
+            self.sock.sendall(data)
+            response = self.sock.recv(4096).decode().strip()
+            return response
+        except (TimeoutError, OSError) as e:
+            return f'ERROR: {e}'
 
     def send_angles(self, angles_deg: List[float], speed: int = 30):
         cmd = {'action': 'send_angles', 'angles': angles_deg, 'speed': speed}
@@ -213,8 +298,8 @@ def main():
                         help='Robot movement speed (1-100)')
     parser.add_argument('--settle-time', type=float, default=3.0,
                         help='Seconds to wait after commanding a pose')
-    parser.add_argument('--limit-fraction', type=float, default=0.6,
-                        help='Fraction of joint range to use (safety)')
+    parser.add_argument('--limit-fraction', type=float, default=0.5,
+                        help='Fraction of joint range to use (safety, default 0.5)')
     parser.add_argument('--quality', type=int, default=95,
                         help='JPEG quality for captured images (1-100)')
     parser.add_argument('--go-home-first', action='store_true', default=True,
@@ -299,7 +384,10 @@ def main():
 
     total_to_collect = args.num_samples - start_idx
     print(f'\n🚀 Collecting {total_to_collect} real samples '
-          f'({len(cam_names)} cameras each)…\n')
+          f'({len(cam_names)} cameras each)…')
+    print(f'   Safety: table clearance ≥ {_TABLE_Z_MIN} mm, '
+          f'base distance ≥ {_BASE_R_MIN} mm (when low)')
+    print(f'   Joint range fraction: {args.limit_fraction}\n')
 
     collected = 0
     try:

@@ -219,6 +219,9 @@ def main():
                         help='Use multi-view fusion model (requires v2 dataset)')
     parser.add_argument('--num-views', type=int, default=4,
                         help='Number of camera views for multi-view mode')
+    parser.add_argument('--views', nargs='+', default=None,
+                        help='Camera view names to use (e.g. --views cam0 cam2). '
+                             'If unset, uses dataset defaults.')
     parser.add_argument('--camera-filter', default=None,
                         help='Single camera to use from v2 CSV (e.g. "front")')
     parser.add_argument('--image-size', type=int, default=224)
@@ -260,12 +263,30 @@ def main():
 
     if args.multi_view:
         # Multi-view mode
+        mv_views = args.views  # None → dataset auto-detects or uses defaults
         full_dataset = MyCobotMultiViewDataset(
             args.dataset,
+            views=mv_views,
             transform=None,
             normalize_targets=True,
         )
+        # Auto-set num_views from actual dataset views
+        actual_num_views = len(full_dataset.views)
+        if args.views:
+            args.num_views = actual_num_views
         n = len(full_dataset)
+        if n == 0:
+            print(f'❌ No multi-view samples found!')
+            print(f'   Expected views: {full_dataset.views}')
+            csv_path = os.path.join(args.dataset, 'labels.csv')
+            if os.path.exists(csv_path):
+                import csv as _csv
+                with open(csv_path) as _f:
+                    reader = _csv.DictReader(_f)
+                    cams = set(r.get('camera', '?') for r in reader)
+                print(f'   Cameras in CSV: {sorted(cams)}')
+                print(f'   → Use --views {" ".join(sorted(cams))}')
+            return
         indices = list(range(n))
         train_idx, val_idx = train_test_split(
             indices, test_size=args.val_split, random_state=args.seed,
@@ -344,8 +365,25 @@ def main():
     # ---------- Fine-tune mode ----------
     if args.finetune and args.checkpoint:
         ckpt = torch.load(args.checkpoint, map_location=device, weights_only=True)
-        model.load_state_dict(ckpt['model_state_dict'], strict=False)
-        print(f'🔧 Fine-tuning from {args.checkpoint}')
+        ckpt_state = ckpt['model_state_dict']
+        model_state = model.state_dict()
+        # Filter out layers with incompatible shapes (e.g. fusion head
+        # when changing num_views from 4 → 2)
+        compatible = {}
+        skipped = []
+        for k, v in ckpt_state.items():
+            if k in model_state and v.shape == model_state[k].shape:
+                compatible[k] = v
+            else:
+                skipped.append(k)
+        model.load_state_dict(compatible, strict=False)
+        if skipped:
+            print(f'🔧 Fine-tuning from {args.checkpoint}')
+            print(f'   Loaded {len(compatible)} layers, '
+                  f'skipped {len(skipped)} incompatible: '
+                  f'{", ".join(skipped[:5])}{"…" if len(skipped) > 5 else ""}')
+        else:
+            print(f'🔧 Fine-tuning from {args.checkpoint} (full load)')
         if args.freeze_epochs == 5:  # default → bump for finetune
             args.freeze_epochs = 10
             print(f'   (auto-set freeze-epochs to {args.freeze_epochs})')

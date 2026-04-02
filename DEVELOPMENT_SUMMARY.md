@@ -1,10 +1,9 @@
 # 🤖 MyCobot 320 Pi - Résumé de Développement
 
-> **Date de dernière mise à jour:** 26 mars 2026  
-> **Version:** 1.0.0  
+> **Date de dernière mise à jour:** 2 avril 2026  
+> **Version:** 1.5.0  
 > **Repository GitHub:** https://github.com/ABMI-software/mycobot_320pi_R6A  
-> **Branche:** `main`  
-> **Dernier commit:** `3e2333c`
+> **Branche:** `main`
 
 ---
 
@@ -17,44 +16,50 @@
 ## 📋 Vue d'ensemble du projet
 
 ### Objectif
-Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 et une connexion TCP.
+Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 et une connexion TCP, avec un **pipeline vision-IA complet** : simulation Gazebo → données synthétiques → entraînement CNN (pose estimation) → capture et entraînement sur données réelles.
 
 ### Architecture distribuée Tour ↔ Raspberry Pi
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              TOUR (PC)                                       │
-│                         Ubuntu 24.04 / ROS2 Jazzy                           │
-│                              Python 3.12                                     │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐              │
-│  │  bridge_tour    │  │   joint_sync    │  │     RViz2       │              │
-│  │  (TCP Client)   │  │ (Synchronisation│  │ (Visualisation) │              │
-│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘              │
-│           │                    │                    │                        │
-│           │         ROS2 Topics: /to_robot, /from_robot, /joint_states      │
-│           │                    │                    │                        │
-└───────────┼────────────────────┼────────────────────┼────────────────────────┘
-            │                    │                    │
-            │              TCP Port 5005              │
-            │                    │                    │
-┌───────────┼────────────────────┼────────────────────┼────────────────────────┐
-│           │                    │                    │                        │
-│           ▼                    │                    │                        │
-│  ┌─────────────────┐          │                    │                        │
-│  │  bridge_pi      │          │                    │                        │
-│  │  (TCP Server)   │──────────┘                    │                        │
-│  └────────┬────────┘                               │                        │
-│           │                                        │                        │
-│           ▼                                        │                        │
-│  ┌─────────────────┐                               │                        │
-│  │   MyCobot 320   │                               │                        │
-│  │  /dev/ttyAMA0   │                               │                        │
-│  └─────────────────┘                               │                        │
-│                                                                              │
-│                         RASPBERRY PI                                         │
-│                     Ubuntu 20.04 / ROS2 Galactic                            │
-│                           Python 3.8                                         │
-└──────────────────────────────────────────────────────────────────────────────┘
+│                              PC TOUR (10.10.0.115)                          │
+│                         ROS2 Jazzy / Ubuntu 24.04 / Python 3.12             │
+│                         Conda: Python 3.13 / PyTorch 2.6 + CUDA 12.4       │
+│                         GPU: NVIDIA RTX 4000 Ada (20 GB VRAM)               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐       │
+│  │ simple_gui  │  │slider_control│  │teleop_keyb. │  │ training/    │       │
+│  │  (Tkinter)  │  │(joint_states)│  │  (clavier)  │  │ train.py     │       │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  │ predict.py   │       │
+│         │                │                │          │ capture_real  │       │
+│         └────────────────┴────────────────┘          └──────┬───────┘       │
+│                          │                                  │               │
+│                   /to_robot (JSON)                   TCP:5005 + 5006        │
+│                          ▼                                  ▼               │
+│                ┌─────────────────┐                                          │
+│                │   bridge_tour   │                                          │
+│                └────────┬────────┘                                          │
+├─────────────────────────┼───────────────────────────────────────────────────┤
+│                   RÉSEAU ETHERNET (10.10.0.x)                              │
+├─────────────────────────┼───────────────────────────────────────────────────┤
+│                         ▼                                                   │
+│           ┌─────────────────┐       ┌─────────────────┐                    │
+│           │bridge_pi_simple │       │pi_camera_server │                    │
+│           │  TCP:5005       │       │  TCP:5006       │                    │
+│           └────────┬────────┘       └────────┬────────┘                    │
+│                    │                         │                             │
+│                    ▼                         ▼                             │
+│           ┌─────────────────┐       ┌─────────────────┐                    │
+│           │    pymycobot    │       │ Arducam USB ×2  │                    │
+│           │  /dev/ttyAMA0   │       │  cam0 + cam3    │                    │
+│           └────────┬────────┘       └─────────────────┘                    │
+│                    ▼                                                       │
+│           ┌─────────────────┐                                              │
+│           │  MyCobot 320 Pi │                                              │
+│           └─────────────────┘                                              │
+│                                                                            │
+│                     RASPBERRY PI (10.10.0.225)                             │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Principe
@@ -273,21 +278,81 @@ Ce fichier:
 
 ## 🔮 Développements futurs prévus
 
-### Court terme
-- [ ] Stabiliser la connexion TCP (timeout, retry, heartbeat)
-- [ ] Réduire la fréquence de synchronisation par défaut
-- [ ] Ajouter un mode "debug" avec logs détaillés
+### Court terme (PRIORITAIRE)
+- [ ] **Résoudre le problème d'images réelles** : recapturer avec exposition fixée, caméras plus proches
+- [ ] Finir l'ablation (expériences CLAHE, Crop, Grayscale) — script prêt dans `/tmp/experiment_ablation.py`
+- [ ] Fine-tune du modèle synthétique (12.97°) sur données réelles de meilleure qualité
 
 ### Moyen terme
-- [ ] **Détection ArUco** sur la Pi avec caméra USB
-- [ ] **Mode Follow** - robot suit le marqueur automatiquement
-- [ ] **Interface GUI** sur la Tour (rqt ou PyQt)
-- [ ] **Simulation Gazebo** du robot
+- [ ] Path planning avec MoveIt2
+- [ ] Intégration de la prédiction de pose dans la boucle de contrôle ROS2
+- [ ] Interface GUI améliorée (simple_gui + prédiction temps réel)
 
 ### Long terme
-- [ ] Path planning avec MoveIt2
-- [ ] Intégration IA pour tâches complexes
+- [ ] Segmentation (SAM) pour isoler le robot avant régression
 - [ ] Multi-robot coordination
+
+---
+
+## 🧠 Pipeline Vision / IA - Pose Estimation
+
+### Architecture du pipeline
+
+```
+Simulation Gazebo (4 caméras) → Données Synthétiques (5000 poses × 4 vues)
+                                        ↓
+                               train.py (Multi-view ResNet50)
+                                        ↓
+                              Modèle synthétique : 12.97° MAE ✅
+                                        ↓
+                              Fine-tune sur données réelles
+                                        ↓
+Capture réelle (2 caméras Pi) → Données Réelles (2000 poses × 2 vues)
+                                        ↓
+                               train.py (transfer learning)
+                                        ↓
+                              ❌ BLOQUÉ : stagne à 32.76° (baseline)
+```
+
+### Résultats d'entraînement
+
+#### Données synthétiques (Gazebo) ✅
+| Configuration | Dataset | MAE |
+|---|---|---|
+| ResNet18 single-view | 1000 (v1) | 22.6° |
+| ResNet50 single-view (front) | 5000 (v2) | 16.5° |
+| **ResNet50 multi-view (4 cam)** | **5000 (v2)** | **12.97°** |
+
+#### Données réelles (Pi Arducam) ❌
+| Approche | Best MAE | vs Baseline (32.76°) |
+|---|---|---|
+| Multi-view ResNet50, lr=1e-3 | 32.7° | -0.06° |
+| Single-view ResNet18, lr=3e-3 | 32.8° | +0.04° |
+| SmoothL1 + OneCycleLR | 31.75° | -1.01° |
+| PerImageNormalize + SmoothL1 | 31.69° | -1.07° |
+| Overfit 10 samples | **0.01°** | — (prouve que le modèle fonctionne) |
+
+### Diagnostic du problème données réelles
+
+**Cause racine identifiée** : le signal visuel est insuffisant dans les images.
+
+- **Corrélation pose ↔ pixel = 0.004** (quasi-nulle), même entre paires consécutives
+- Robot = 15.4% (cam0) / 5.7% (cam3) des pixels — le reste est du fond statique
+- Dérive d'éclairage massive pendant les 2h de capture (luminosité 140 → 82 → 143)
+- Même entre poses extrêmes (J1 : ±83°), seulement 9.1% des pixels changent
+
+**Solution recommandée** : recapturer avec exposition caméra fixe, caméras plus proches (robot > 50% du frame), éclairage artificiel constant.
+
+### Fichiers du pipeline training/
+
+| Fichier | Rôle |
+|---|---|
+| `training/model.py` | PoseResNet (single) + MultiViewPoseResNet (multi) |
+| `training/dataset.py` | MyCobotDataset + MyCobotMultiViewDataset + PerImageNormalize |
+| `training/train.py` | Script complet : fine-tune, multi-view, --views, auto num_views |
+| `training/capture_real.py` | Capture réelle avec FK safety (dimensions URDF) |
+| `training/predict.py` | Inférence sur image(s) |
+| `training/preview_cameras.py` | Prévisualisation caméras Pi |
 
 ---
 
@@ -296,15 +361,17 @@ Ce fichier:
 | Test | Date | Statut |
 |------|------|--------|
 | Connexion TCP Tour → Pi | 26/03/2026 | ✅ OK |
-| Commande `ping` | 26/03/2026 | ✅ OK |
-| Commande `status` | 26/03/2026 | ✅ OK |
-| Commande `get_angles` | 26/03/2026 | ✅ OK |
-| Commande `go_home` | 26/03/2026 | ✅ OK |
-| Commande `set_led` | 26/03/2026 | ✅ OK |
-| Commande `set_angle` | 26/03/2026 | ✅ OK |
-| Commande `set_angles` | 26/03/2026 | ✅ OK |
+| Commandes robot (ping, status, angles, etc.) | 26/03/2026 | ✅ OK |
 | RViz visualisation standalone | 26/03/2026 | ✅ OK |
 | RViz synchronisé avec robot | 26/03/2026 | ⚠️ Instable (freq trop haute) |
+| Simulation Gazebo 4 caméras | 31/03/2026 | ✅ OK |
+| Collecte données synthétiques (5000 poses) | 31/03/2026 | ✅ OK |
+| Training multi-view synthétique → 12.97° | 31/03/2026 | ✅ OK |
+| Camera server Pi (cam0 + cam3 TCP:5006) | 01/04/2026 | ✅ OK |
+| Capture réelle 2000 poses (0 collisions) | 02/04/2026 | ✅ OK |
+| FK safety capture (table + câbles) | 02/04/2026 | ✅ OK |
+| Training données réelles | 02/04/2026 | ❌ Bloqué à baseline |
+| Diagnostic corrélation pose/pixel | 02/04/2026 | ✅ Cause identifiée |
 
 ---
 
@@ -340,7 +407,9 @@ pkill -f bridge_pi
 
 ## 👥 Contributeurs
 
-- **Développement initial:** Session du 26 mars 2026
+- **Développement initial (bridge ROS2):** 26 mars 2026
+- **Simulation Gazebo + données synthétiques:** 31 mars 2026
+- **Pipeline IA + capture réelle + diagnostic:** 1-2 avril 2026
 
 ---
 
