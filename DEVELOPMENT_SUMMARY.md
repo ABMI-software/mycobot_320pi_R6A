@@ -1,9 +1,9 @@
 # 🤖 MyCobot 320 Pi - Résumé de Développement
 
-> **Date de dernière mise à jour:** 2 avril 2026  
-> **Version:** 1.5.0  
+> **Date de dernière mise à jour:** 3 avril 2026  
+> **Version:** 1.6.0  
 > **Repository GitHub:** https://github.com/ABMI-software/mycobot_320pi_R6A  
-> **Branche:** `main`
+> **Branche:** `feature/pose-training`
 
 ---
 
@@ -279,18 +279,19 @@ Ce fichier:
 ## 🔮 Développements futurs prévus
 
 ### Court terme (PRIORITAIRE)
-- [ ] **Résoudre le problème d'images réelles** : recapturer avec exposition fixée, caméras plus proches
-- [ ] Finir l'ablation (expériences CLAHE, Crop, Grayscale) — script prêt dans `/tmp/experiment_ablation.py`
-- [ ] Fine-tune du modèle synthétique (12.97°) sur données réelles de meilleure qualité
+- [ ] **Réduire le domain gap sim-to-real** : domain randomization avancée ou self-supervised labeling sur images réelles
+- [ ] **Pick-and-place en simulation** : intégrer DREAM inference dans un nœud ROS2 + MoveIt2 dans Gazebo
+- [ ] Fine-tuning VGG-aug sur données réelles annotées automatiquement (FK + caméra calibrée)
 
 ### Moyen terme
+- [ ] **Bench test robot réel** : confronter les résultats simulation vs robot réel pour pick-and-place
+- [ ] Nœud ROS2 d'inférence DREAM temps réel (caméra → keypoints → PnP → pose)
+- [ ] Intégration de la pose estimée dans la boucle de contrôle ROS2
 - [ ] Path planning avec MoveIt2
-- [ ] Intégration de la prédiction de pose dans la boucle de contrôle ROS2
-- [ ] Interface GUI améliorée (simple_gui + prédiction temps réel)
 
 ### Long terme
-- [ ] Segmentation (SAM) pour isoler le robot avant régression
 - [ ] Multi-robot coordination
+- [ ] Interface GUI améliorée (prédiction keypoints en temps réel)
 
 ---
 
@@ -299,6 +300,10 @@ Ce fichier:
 ### Architecture du pipeline
 
 ```
+═══════════════════════════════════════════════════════════════════════
+  Phase 1 : Régression directe (image → angles)    [ABANDONNÉ]
+═══════════════════════════════════════════════════════════════════════
+
 Simulation Gazebo (4 caméras) → Données Synthétiques (5000 poses × 4 vues)
                                         ↓
                                train.py (Multi-view ResNet50)
@@ -312,6 +317,21 @@ Capture réelle (2 caméras Pi) → Données Réelles (2000 poses × 2 vues)
                                train.py (transfer learning)
                                         ↓
                               ❌ BLOQUÉ : stagne à 32.76° (baseline)
+                              Cause : robot trop petit (15% pixels)
+
+═══════════════════════════════════════════════════════════════════════
+  Phase 2 : DREAM Keypoint Detection (image → keypoints → PnP)  [ACTIF]
+═══════════════════════════════════════════════════════════════════════
+
+Données Synthétiques → convert_to_ndds.py → Format NDDS (20K frames)
+                                                    ↓
+                                         train_dream.py (VGG-19)
+                                                    ↓
+                                         Modèle VGG-aug : 97% détection,
+                                         3.1px médiane sur synthétique ✅
+                                                    ↓
+                                         Transfert sim-to-real : ~26% détection
+                                         ❌ Domain gap à réduire
 ```
 
 ### Résultats d'entraînement
@@ -356,6 +376,152 @@ Capture réelle (2 caméras Pi) → Données Réelles (2000 poses × 2 vues)
 
 ---
 
+## 🎯 DREAM — Keypoint-Based Pose Estimation (Phase 2)
+
+### Motivation du changement d'approche
+
+L'approche directe (image → angles par régression CNN) a **échoué sur données réelles** car le robot est trop petit dans l'image (15% des pixels). L'approche DREAM résout ce problème en détectant les **positions 2D des articulations** (keypoints) via des belief maps, puis en résolvant la pose caméra par **PnP** (Perspective-n-Point).
+
+**Avantage clé :** DREAM est agnostique à la taille du robot dans l'image — il suffit que les keypoints soient visibles.
+
+### Pipeline DREAM
+
+```
+Image 640×480 → Resize 400×400 → VGG-19 backbone → 6 stages cascadés → 7 belief maps (100×100)
+                                                                              ↓
+                                                                      Peak Detection (argmax)
+                                                                              ↓
+                                                                      7 keypoints 2D (pixels)
+                                                                              ↓
+                        3D keypoints (FK URDF) → PnP (Levenberg-Marquardt) → Pose caméra [R|t]
+```
+
+### Architecture testées
+
+#### VGG-Q (✅ Recommandé)
+- **Backbone :** VGG-19 (ImageNet, **sans BatchNorm**)
+- **Head :** 6 stages de raffinement cascadés (style DOPE)
+- **Entrée :** 400×400 RGB → **Sortie :** 7 belief maps 100×100
+- **Paramètres :** 28.2M
+- **Entraînement :** Stable, convergence régulière
+
+#### ResNet-H (❌ Instable)
+- **Backbone :** ResNet-101 (ImageNet, **avec BatchNorm**)
+- **Head :** Hourglass decoder avec deconvolutions
+- **Entrée :** 400×400 RGB → **Sortie :** 7 belief maps 208×208
+- **Paramètres :** 54.0M
+- **Problème :** BatchNorm avec `batch_size < 64` → statistiques running corrompues → val loss oscillante (0.0003 → 96.0)
+
+### 7 Keypoints (correspondance URDF)
+
+| Keypoint | Frame URDF | Description |
+|----------|-----------|-------------|
+| `mycobot320_base` | `base` | Base du robot (fixe) |
+| `mycobot320_link1` | `link1` | Après joint 1 (yaw) |
+| `mycobot320_link2` | `link2` | Après joint 2 |
+| `mycobot320_link3` | `link3` | Après joint 3 |
+| `mycobot320_link4` | `link4` | Après joint 4 |
+| `mycobot320_link5` | `link5` | Après joint 5 |
+| `mycobot320_link6` | `link6` | Effecteur (end-effector) |
+
+### Résultats d'entraînement
+
+#### Comparaison des 3 modèles (données synthétiques, 20K frames)
+
+| Modèle | Époques | Meilleur Val Loss | Stabilité | Détection | Erreur moyenne | Erreur médiane | <10px |
+|--------|---------|-------------------|-----------|-----------|----------------|----------------|-------|
+| ResNet-H | 10/25 (tué) | 0.000305 (E1 seul) | ❌ Oscillation sauvage | N/A | N/A | N/A | N/A |
+| VGG-base | 25 ✅ | 0.000438 (E8) | ✅ Stable | 96.1% | 14.1px | 3.1px | 75% |
+| **VGG-aug** | **25** ✅ | **0.000667** (E22) | ✅ **Stable** | **96.6%** | **13.1px** | **3.1px** | **78%** |
+
+**Hyperparamètres :** batch_size=32, lr=0.0001, Adam, 25 époques, MSE loss sur belief maps.
+
+#### Précision par keypoint (VGG-aug, meilleur modèle, keypoints détectés uniquement)
+
+| Keypoint | Détection | Moyenne | Médiane | P90 | <5px | <10px | <20px |
+|----------|-----------|---------|---------|-----|------|-------|-------|
+| base | 100% | 2.9px | 2.8px | 3.1px | 100% | 100% | 100% |
+| link1 | 100% | 2.7px | 2.6px | 3.0px | 100% | 100% | 100% |
+| link2 | 100% | 2.7px | 2.6px | 3.0px | 100% | 100% | 100% |
+| link3 | 99% | 11.0px | 5.6px | 23.9px | 45% | 74% | 88% |
+| link4 | 96% | 19.2px | 6.4px | 50.5px | 39% | 65% | 80% |
+| link5 | 95% | 27.4px | 8.8px | 77.2px | 26% | 53% | 70% |
+| link6 | 86% | 28.9px | 10.1px | 77.4px | 19% | 50% | 69% |
+| **TOTAL** | **97%** | **13.1px** | **3.1px** | **26.9px** | **63%** | **78%** | **87%** |
+
+**Observation :** La précision se dégrade de la base vers l'effecteur (gradient base→link6). Les joints proximaux (base, link1, link2) sont quasi-parfaits (~2.7px), tandis que les joints distaux (link5, link6) sont plus difficiles (~10px médiane). C'est attendu : les joints distaux ont plus de variation positionnelle.
+
+#### Instabilité ResNet-H — Détail
+
+```
+Epoch 1 : val_loss = 0.000305 ← seul bon résultat
+Epoch 2 : val_loss = 0.152    ← BN stats corrompues
+Epoch 3 : val_loss = 12.19    ← explosion
+Epoch 5 : val_loss = 0.0017   ← récupération temporaire
+Epoch 7 : val_loss = 95.97    ← explosion massive
+→ Tué à epoch 10 (inutilisable)
+```
+
+**Cause racine :** `BatchNorm2d(momentum=0.1)` avec batch_size=16 produit des running mean/var non-représentatives. L'analyse per-batch montre que les 250 batchs de validation sont affectés dans les mauvaises époques (loss minimale par batch = 0.53 à epoch 7).
+
+### Transfert Sim-to-Real
+
+| Métrique | Synthétique | Réel |
+|----------|-------------|------|
+| Taux de détection | 97% | ~26% |
+| Pics belief maps | 0.5–1.0 | 0.02–0.25 |
+| Amélioration avec augmentation | — | 22.9% → 25.7% (marginal) |
+
+**Le domain gap reste le problème principal.** Les belief maps ont des pics 10× plus faibles sur images réelles, ce qui empêche la détection fiable des keypoints. L'augmentation agressive (HueSaturation, GaussianBlur, MotionBlur, CLAHE, CoarseDropout, ImageCompression) n'apporte qu'une amélioration marginale.
+
+**Pistes pour réduire le domain gap :**
+1. **Domain Randomization avancée** dans Gazebo (textures aléatoires, éclairage variable, backgrounds photo-réalistes)
+2. **Fine-tuning sur données réelles annotées** (auto-labeling via FK + caméra calibrée)
+3. **Self-supervised labeling** : utiliser les angles lus du robot + FK + intrinsèques caméra pour générer les keypoints GT sur images réelles
+4. **Style transfer** (CycleGAN) entre images Gazebo et réelles
+
+### Fichiers du module DREAM
+
+| Fichier | Rôle |
+|---|---|
+| `training/dream/__init__.py` | Init module |
+| `training/dream/mycobot_fk.py` | Forward kinematics + projection caméra (7 keypoints) |
+| `training/dream/convert_to_ndds.py` | Conversion dataset → format NDDS (DREAM) |
+| `training/dream/train_dream.py` | Wrapper d'entraînement DREAM |
+| `training/dream/train_dream_augmented.py` | Entraînement avec augmentation agressive |
+| `training/dream/evaluate_dream.py` | Évaluation complète avec métriques par keypoint |
+| `training/dream/infer_dream.py` | Inférence : détection keypoints + résolution PnP |
+| `training/dream/visualize_ndds.py` | Visualisation des annotations keypoints sur images |
+| `training/dream/manip_configs/mycobot320.yaml` | Configuration des 7 keypoints (noms, frames URDF) |
+
+### Checkpoints DREAM (dans .gitignore)
+
+| Répertoire | Contenu |
+|------------|---------|
+| `checkpoints_dream/resnet_synthetic_e25/` | ResNet-H (tué à epoch 10, inutilisable) |
+| `checkpoints_dream/vgg_synthetic_e25/` | VGG base (25 époques, meilleur E8, val=0.000438) |
+| `checkpoints_dream/vgg_augmented_e25/` | VGG augmenté (25 époques, meilleur E22, val=0.000667) |
+
+### Données NDDS converties
+
+| Répertoire | Contenu |
+|------------|---------|
+| `/tmp/dream_data/synthetic/` | 20K frames (5000 poses × 4 caméras Gazebo) |
+| `/tmp/dream_data/real_cam0/` | 2000 frames (cam0 → front mapping) |
+
+### Dépendances DREAM
+
+```bash
+# Installation DREAM (NVlabs)
+git clone https://github.com/NVlabs/DREAM.git /tmp/DREAM
+cd /tmp/DREAM && pip install -e . -r requirements.txt
+
+# Environnement Conda
+# Python 3.13.5, PyTorch 2.6.0+cu124, NVIDIA RTX 4000 Ada 20GB
+```
+
+---
+
 ## 🧪 Tests validés
 
 | Test | Date | Statut |
@@ -370,8 +536,16 @@ Capture réelle (2 caméras Pi) → Données Réelles (2000 poses × 2 vues)
 | Camera server Pi (cam0 + cam3 TCP:5006) | 01/04/2026 | ✅ OK |
 | Capture réelle 2000 poses (0 collisions) | 02/04/2026 | ✅ OK |
 | FK safety capture (table + câbles) | 02/04/2026 | ✅ OK |
-| Training données réelles | 02/04/2026 | ❌ Bloqué à baseline |
+| Training données réelles (régression directe) | 02/04/2026 | ❌ Bloqué à baseline |
 | Diagnostic corrélation pose/pixel | 02/04/2026 | ✅ Cause identifiée |
+| DREAM — Conversion NDDS (20K frames, 0 skip) | 03/04/2026 | ✅ OK |
+| DREAM — FK + projection caméra (4 caméras) | 03/04/2026 | ✅ OK |
+| DREAM — Training ResNet-H (25 époques) | 03/04/2026 | ❌ BN instable, tué epoch 10 |
+| DREAM — Training VGG-base (25 époques) | 03/04/2026 | ✅ Stable, val=0.000438 |
+| DREAM — Training VGG-aug (25 époques) | 03/04/2026 | ✅ Stable, val=0.000667 |
+| DREAM — Évaluation synthétique (97% détection) | 03/04/2026 | ✅ OK |
+| DREAM — Test sim-to-real (~26% détection) | 03/04/2026 | ⚠️ Domain gap trop large |
+| Git commit DREAM (`0e452ece`) | 03/04/2026 | ✅ OK |
 
 ---
 
@@ -410,6 +584,7 @@ pkill -f bridge_pi
 - **Développement initial (bridge ROS2):** 26 mars 2026
 - **Simulation Gazebo + données synthétiques:** 31 mars 2026
 - **Pipeline IA + capture réelle + diagnostic:** 1-2 avril 2026
+- **DREAM keypoint pose estimation:** 3 avril 2026
 
 ---
 
