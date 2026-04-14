@@ -44,6 +44,20 @@ from std_msgs.msg import Float64MultiArray, String
 # Add dream module path
 DREAM_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, DREAM_DIR)
+
+# Add training/dream directory for mycobot_fk imports
+_TRAINING_DREAM = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    'training', 'dream',
+)
+if os.path.isdir(_TRAINING_DREAM):
+    sys.path.insert(0, _TRAINING_DREAM)
+
+# Also try well-known workspace location
+_WORKSPACE_DREAM = '/home/genji/ros_jazzy/src/mycobot_R6A/training/dream'
+if os.path.isdir(_WORKSPACE_DREAM) and _WORKSPACE_DREAM not in sys.path:
+    sys.path.insert(0, _WORKSPACE_DREAM)
+
 DREAM_REPO = '/tmp/DREAM'
 if os.path.isdir(DREAM_REPO):
     sys.path.insert(0, DREAM_REPO)
@@ -69,11 +83,14 @@ class DreamInferenceNode(Node):
         super().__init__('dream_inference_node')
 
         # ── Parameters ──
+        _ckpt_dir = os.path.join(
+            _WORKSPACE_DREAM, 'checkpoints_dream', 'vgg_augmented_e25',
+        )
         self.declare_parameter('model_path', os.path.join(
-            DREAM_DIR, 'checkpoints_dream', 'vgg_augmented_e25', 'best_network.pth'
+            _ckpt_dir, 'best_network.pth'
         ))
         self.declare_parameter('config_path', os.path.join(
-            DREAM_DIR, 'checkpoints_dream', 'vgg_augmented_e25', 'best_network.yaml'
+            _ckpt_dir, 'best_network.yaml'
         ))
         self.declare_parameter('camera_topic', '/synth_camera/image')
         self.declare_parameter('publish_rate', 5.0)
@@ -154,7 +171,13 @@ class DreamInferenceNode(Node):
                 config_path = self.model_path.replace('.pth', '.yaml')
 
             self.get_logger().info(f'Loading DREAM config: {config_path}')
-            dream_config = dream.utilities.load_yaml(config_path)
+            from ruamel.yaml import YAML
+            yaml_parser = YAML(typ='safe')
+            with open(config_path, 'r') as f:
+                dream_config = yaml_parser.load(f)
+
+            # Force CPU-friendly config (will move to GPU later if available)
+            dream_config['training']['platform']['gpu_ids'] = [0]
 
             # Create network
             arch_type = dream_config['architecture']['type']
@@ -168,8 +191,9 @@ class DreamInferenceNode(Node):
             )
 
             self.dream_network = dream.create_network_from_config_data(dream_config)
+            map_loc = 'cuda:0' if torch.cuda.is_available() else 'cpu'
             self.dream_network.model.load_state_dict(
-                torch.load(self.model_path, map_location='cpu', weights_only=True)
+                torch.load(self.model_path, map_location=map_loc, weights_only=True)
             )
             self.dream_network.enable_evaluation()
 
@@ -242,11 +266,12 @@ class DreamInferenceNode(Node):
             # Convert to PIL for DREAM
             pil_image = PILImage.fromarray(image_rgb)
 
-            # Run DREAM inference
-            image_raw_resolution = (image_rgb.shape[1], image_rgb.shape[0])  # (w, h)
-            detected_kp, belief_maps, _ = self.dream_network.keypoints_from_image(
-                pil_image, image_raw_resolution
+            # Run DREAM inference (debug=True to get belief maps)
+            result = self.dream_network.keypoints_from_image(
+                pil_image, debug=True
             )
+            detected_kp = result["detected_keypoints"]
+            belief_maps = result.get("belief_maps", None)
 
             self.inference_count += 1
 
