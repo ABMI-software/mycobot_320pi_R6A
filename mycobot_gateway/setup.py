@@ -47,6 +47,10 @@ setup(
             
             # Synthetic data collection (Gazebo)
             'synthetic_data_collector = mycobot_gateway.synthetic_data_collector:main',
+            
+            # DREAM inference + Pick-and-place (Gazebo)
+            'dream_inference = mycobot_gateway.dream_inference_node:main',
+            'pick_and_place = mycobot_gateway.pick_and_place_node:main',
         ],
     },
 )
