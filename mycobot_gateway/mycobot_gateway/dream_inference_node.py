@@ -83,22 +83,20 @@ class DreamInferenceNode(Node):
         super().__init__('dream_inference_node')
 
         # ── Parameters ──
-        _ckpt_dir = os.path.join(
-            _WORKSPACE_DREAM, 'checkpoints_dream', 'vgg_augmented_e25',
-        )
-        self.declare_parameter('model_path', os.path.join(
-            _ckpt_dir, 'best_network.pth'
-        ))
-        self.declare_parameter('config_path', os.path.join(
-            _ckpt_dir, 'best_network.yaml'
-        ))
+        self.declare_parameter('model_name', 'vgg_weighted_e50')
         self.declare_parameter('camera_topic', '/synth_camera/image')
         self.declare_parameter('publish_rate', 5.0)
         self.declare_parameter('visualize', True)
         self.declare_parameter('min_keypoints_pnp', 4)
 
-        self.model_path = self.get_parameter('model_path').value
-        self.config_path = self.get_parameter('config_path').value
+        _model_name = self.get_parameter('model_name').value
+        _ckpt_dir = os.path.join(
+            _WORKSPACE_DREAM, 'checkpoints_dream', _model_name,
+        )
+        self.model_path = os.path.join(_ckpt_dir, 'best_network.pth')
+        self.config_path = os.path.join(_ckpt_dir, 'best_network.yaml')
+        self.get_logger().info(f'🔧 Model name: {_model_name}')
+        self.get_logger().info(f'   Checkpoint dir: {_ckpt_dir}')
         self.camera_topic = self.get_parameter('camera_topic').value
         self.publish_rate = self.get_parameter('publish_rate').value
         self.visualize = self.get_parameter('visualize').value

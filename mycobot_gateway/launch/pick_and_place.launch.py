@@ -38,25 +38,11 @@ def generate_launch_description():
     )
     world_path = os.path.join(desc_pkg, 'worlds', 'pick_and_place.sdf')
 
-    # DREAM model paths
-    dream_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(
-            os.path.abspath(desc_pkg)
-        ))),
-        'training', 'dream'
-    )
-    # Fallback to known absolute path
-    if not os.path.isdir(dream_dir):
-        dream_dir = '/home/genji/ros_jazzy/src/mycobot_R6A/training/dream'
-
-    model_path = os.path.join(
-        dream_dir, 'checkpoints_dream', 'vgg_augmented_e25', 'best_network.pth'
-    )
-    config_path = os.path.join(
-        dream_dir, 'checkpoints_dream', 'vgg_augmented_e25', 'best_network.yaml'
-    )
-
     # ── Launch arguments ──
+    model_name_arg = DeclareLaunchArgument(
+        'dream_model', default_value='vgg_weighted_e50',
+        description='DREAM checkpoint directory name (under checkpoints_dream/)',
+    )
     use_vision_arg = DeclareLaunchArgument(
         'use_vision', default_value='true',
         description='Use DREAM vision feedback (false = open-loop IK only)',
@@ -166,8 +152,7 @@ def generate_launch_description():
                 executable='dream_inference',
                 name='dream_inference_node',
                 parameters=[{
-                    'model_path': model_path,
-                    'config_path': config_path,
+                    'model_name': LaunchConfiguration('dream_model'),
                     'camera_topic': '/synth_camera/image',
                     'publish_rate': 5.0,
                     'visualize': True,
@@ -206,6 +191,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         # Arguments
+        model_name_arg,
         use_vision_arg,
         target_x_arg, target_y_arg, target_z_arg,
         place_x_arg, place_y_arg, place_z_arg,
