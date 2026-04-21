@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+from mycobot_gateway.synthetic_data_collector import main
+
+if __name__ == '__main__':
+    main()

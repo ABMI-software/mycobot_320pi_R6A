@@ -1,0 +1,25 @@
+!!omap
+- manipulator: !!omap
+  - name: mycobot320
+  - keypoints:
+    - name: mycobot320_base
+      friendly_name: Base
+      ros_frame: base
+    - name: mycobot320_link1
+      friendly_name: Joint1
+      ros_frame: link1
+    - name: mycobot320_link2
+      friendly_name: Joint2
+      ros_frame: link2
+    - name: mycobot320_link3
+      friendly_name: Joint3
+      ros_frame: link3
+    - name: mycobot320_link4
+      friendly_name: Joint4
+      ros_frame: link4
+    - name: mycobot320_link5
+      friendly_name: Joint5
+      ros_frame: link5
+    - name: mycobot320_link6
+      friendly_name: EndEffector
+      ros_frame: link6
