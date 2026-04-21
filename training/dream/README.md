@@ -66,21 +66,43 @@ Two architectures were tested:
 
 ### Sim-to-Real Transfer
 
-Tested on 2000 real camera images — detection rates are low (0–55%) due to the
-large visual domain gap between Gazebo renders and real camera images. Domain
-randomization or real-data fine-tuning is needed for production real-robot use.
+| Model | Synthetic | Real |
+|-------|-----------|------|
+| VGG synth-only (20K) | 97% det, 3.1px | ~26% det |
+| VGG synth-only (50K) | 98.3% det, 3.15px | 13.2% det, 172px |
+| VGG-aug + augmentation | ~97% det | 25.7% det (marginal improvement) |
+| **VGG mixed (18K)** | — | **À évaluer** |
+
+**Belief maps are 10× weaker on real images** (peaks 0.02–0.25) vs synthetic (0.5–1.0).
+Aggressive augmentation (HueSaturation, GaussianBlur, CLAHE, CoarseDropout) gave only
+marginal improvement (22.9% → 25.7%).
+
+**Recommended next steps to close the domain gap:**
+1. **Self-supervised labeling** — use robot joint angles + FK + calibrated camera intrinsics
+   to auto-generate 2D keypoint GT on real images, then fine-tune
+2. **Domain randomization v2** — collect with `randomized_v2.sdf` (6 lights, 12 clutter objects)
+3. **Style transfer** (CycleGAN) — translate Gazebo renders to real-camera style
+
+**What NOT to do:**
+- Do not fine-tune DREAM manually with custom loss (MSE on near-empty belief maps → all-zeros)
+- Do not use `sigma=4` (DREAM native uses `sigma=2`)
+- Always use `train_network.py` from NVlabs/DREAM for training
 
 ## Files
 
 | File | Description |
 |------|-------------|
 | `mycobot_fk.py` | Forward kinematics — computes 3D joint positions from angles |
+| `mycobot_ik.py` | Inverse kinematics (Jacobian-based numerical solver) |
 | `convert_to_ndds.py` | Converts our datasets to DREAM's NDDS format |
+| `merge_and_convert.py` | Merges real + synthetic datasets with oversampling → NDDS |
 | `train_dream.py` | Training wrapper (calls DREAM's train_network.py) |
 | `train_dream_augmented.py` | Training with aggressive augmentation for sim-to-real |
+| `train_dream_weighted.py` | Training with per-keypoint loss weighting (link6 × 5.0) |
 | `evaluate_dream.py` | Comprehensive evaluation with per-keypoint metrics |
 | `infer_dream.py` | Inference — keypoint detection + PnP solving |
 | `visualize_ndds.py` | Sanity check — overlays keypoint annotations on images |
+| `finetune_real.py` | Custom fine-tuning (⚠️ non-functional — see Lessons Learned) |
 | `manip_configs/mycobot320.yaml` | Manipulator keypoint configuration |
 
 ## Quick Start
