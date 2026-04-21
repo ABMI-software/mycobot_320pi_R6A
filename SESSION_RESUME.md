@@ -1,303 +1,332 @@
-# 📋 SESSION RESUME - MyCobot 320 Pi Gateway Bridge
+# SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 26 mars 2026  
-> **Version :** 1.0.0  
-> **Repository GitHub :** https://github.com/ABMI-software/mycobot_320pi_R6A  
-> **Branche :** `main`  
-> **Dernier commit :** `3e2333c`
-
----
-
-## 🎯 POINT DE DÉPART - Session Précédente
-
-### ✅ Ce qui a été accompli
-
-| Tâche | Statut | Détails |
-|-------|--------|---------|
-| Création repo GitHub | ✅ Complété | `ABMI-software/mycobot_320pi_R6A` |
-| Architecture TCP Tour ↔ Pi | ✅ Validé | Connexion stable |
-| bridge_tour (PC) | ✅ Fonctionnel | Client TCP ROS2 |
-| bridge_pi_simple (Pi) | ✅ Fonctionnel | Serveur TCP + pymycobot |
-| simple_gui | ✅ Testé | Interface Tkinter |
-| slider_control | ✅ Testé | Robot suit les sliders en temps réel |
-| RViz visualisation | ✅ Corrigé | Config avec Fixed Frame = base |
-| Commandes JSON | ✅ Validé | send_angles, get_angles, go_home... |
-
-### 🔧 Dernières modifications
-
-1. **`slider_control.launch.py`** - Ajout du chemin config RViz
-2. **`bridge_pi_simple.py`** - Ajout commandes texte (get_angles, power_on/off, gripper)
+> **Date de dernière mise à jour :** 21 avril 2026
+> **Version :** 1.9.0
+> **Branche active :** `feature/pose-training`
+> **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 
 ---
 
-## �️ Architecture du Système
+## Point de départ rapide
+
+```bash
+# TOUJOURS exécuter avant ROS2
+conda deactivate
+
+source /opt/ros/jazzy/setup.bash
+source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+```
+
+---
+
+## État actuel (21 avril 2026)
+
+### Problème principal : Domain gap sim-to-real
+
+Le modèle DREAM VGG atteint **97% de détection à 3.1px médiane** sur les données synthétiques, mais seulement **~26% de détection sur les images réelles**. Les pics des belief maps sont 10× plus faibles sur les images réelles que sur les synthétiques.
+
+### Ce qui est fait
+
+| Session | Tâche | Statut |
+|---------|-------|--------|
+| 26/03/2026 | Bridge TCP Tour ↔ Pi, GUI, RViz | ✅ |
+| 31/03/2026 | Simulation Gazebo Harmonic 4 caméras | ✅ |
+| 31/03/2026 | Collecte 5000 poses synthétiques × 4 vues (20K images) | ✅ |
+| 31/03/2026 | Domain randomization (éclairage, matériaux) | ✅ |
+| 31/03/2026 | Training multi-view ResNet50 → 12.97° MAE | ✅ |
+| 01/04/2026 | Camera server Pi (cam0+cam3, TCP:5006) | ✅ |
+| 02/04/2026 | Capture 2000 poses réelles (0 collisions) | ✅ |
+| 02/04/2026 | FK safety capture (protection table+câbles) | ✅ |
+| 02/04/2026 | Training régression directe sur données réelles | ❌ Bloqué à 32.76° baseline |
+| 02/04/2026 | Diagnostic : corrélation pose/pixel = 0.004 | ✅ Cause identifiée |
+| 03/04/2026 | Intégration DREAM (NVlabs) + FK 7 keypoints | ✅ |
+| 03/04/2026 | Conversion 20K frames NDDS | ✅ |
+| 03/04/2026 | Training VGG-base (25 époques) | ✅ val=0.000438 |
+| 03/04/2026 | Training VGG-aug (25 époques) | ✅ val=0.000667 |
+| 03/04/2026 | Évaluation synthétique : 97% détection, 3.1px | ✅ |
+| 03/04/2026 | Test sim-to-real : ~26% détection | ⚠️ Domain gap |
+| 15/04/2026 | Intégration gripper adaptatif (pro_adaptive_gripper) | ✅ |
+| 15/04/2026 | Correction mesh link6 → link6_2022.dae | ✅ |
+| 15/04/2026 | Limites articulaires corrigées (URDF officiel) | ✅ |
+| 15/04/2026 | Anti-collision FK dans collecteur (rejet ~35% poses) | ✅ |
+| 15/04/2026 | Training VGG 50K synth (98.3% det synth, 13.2% réel) | ✅ |
+| 15/04/2026 | Fine-tune custom v1 (σ=4, 0% det) | ❌ Bug sigma |
+| 16/04/2026 | Fine-tune custom v2 (σ=2, 0% det) | ❌ Belief maps effondrées |
+| 16/04/2026 | Script merge_and_convert.py | ✅ |
+| 16/04/2026 | Script train_pipeline.sh + monitor_collection.sh | ✅ |
+| 16/04/2026 | Monde Gazebo v2 (randomized_v2.sdf — 6 lights, 12 objets) | ✅ |
+| 16/04/2026 | Collecte 7500 poses × 4 vues (30K images) synth v2 | 🔄 À vérifier |
+| 16/04/2026 | Training mixte natif (18K frames) — epoch 1: val=0.000474 | ✅ Terminé |
+
+### Ce qui reste à faire
+
+1. **[ROUGE] Évaluer le modèle mixte** sur données réelles :
+   ```bash
+   source ~/ros_jazzy/venv_dream/bin/activate
+   python training/dream/evaluate_dream.py \
+     --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
+     --data /tmp/dream_data/real_cam0 --split all
+   ```
+
+2. **[ROUGE] Si detection < 50%** sur réel → implémentation self-supervised labeling :
+   - FK + angles joints lus → keypoints 3D → projection 2D → annotations GT automatiques
+   - Fine-tune sur ces données réelles auto-annotées
+
+3. **[JAUNE] Vérifier collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/`
+
+4. **[JAUNE] Pick-and-place Gazebo** : tester le pipeline complet (`pick_and_place.launch.py`)
+
+5. **[VERT] Bench test robot réel** une fois detection > 50%
+
+---
+
+## Résultats DREAM par keypoint (VGG-aug, synthétique)
+
+| Keypoint | Détection | Médiane px | Médiane mm | Erreur angulaire |
+|----------|-----------|------------|------------|------------------|
+| base | 100% | 2.8 px | 4.0 mm | ~0.7° |
+| link1 | 100% | 2.6 px | 3.7 mm | ~0.7° |
+| link2 | 100% | 2.6 px | 3.7 mm | ~0.7° |
+| link3 | 99% | 5.6 px | 8.1 mm | ~2.1° |
+| link4 | 96% | 6.4 px | 9.2 mm | ~3.4° |
+| link5 | 95% | 8.8 px | 12.7 mm | ~8.7° |
+| link6 | 86% | 10.1 px | 14.6 mm | ~18.3° |
+| **TOTAL** | **97%** | **3.1 px** | **4.5 mm** | **~0.8°** |
+
+> 1 px = 1.44 mm (caméra à 0.8m, fx=554.38)
+
+### Comparaison approches
+
+| Approche | Erreur angulaire (synthétique) |
+|----------|-------------------------------|
+| Phase 1 — ResNet50 multi-view | 12.97° MAE |
+| **Phase 2 — DREAM VGG-aug** | **~0.8° médiane / ~3.4° moyenne** |
+
+### Adéquation pick-and-place (exigence ±5mm)
+
+| Zone | Erreur | Statut |
+|------|--------|--------|
+| Joints proximaux (base→link2) | 3.9 mm | ✅ OK |
+| Joints intermédiaires (link3–link4) | 8–9 mm | ⚠️ Limite |
+| End-effector (link6) | 14.6 mm | ❌ Insuffisant (besoin ~3×) |
+
+---
+
+## Chemins importants
+
+| Ressource | Chemin |
+|-----------|--------|
+| Projet | `/home/genji/ros_jazzy/src/mycobot_R6A/` |
+| Venv DREAM | `/home/genji/ros_jazzy/venv_dream/` |
+| DREAM lib | `/tmp/DREAM/` |
+| Data synth 50K | `/tmp/dream_data/synthetic_50k/` |
+| Data réel | `/tmp/dream_data/real_cam0/` |
+| Data mixte | `/tmp/dream_data/mixed_real_synth/` |
+| Meilleur modèle (synth) | `training/checkpoints_dream/vgg_weighted_50k_e50/best_network.pth` |
+| Modèle mixte | `training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth` |
+
+---
+
+## Commandes utiles
+
+### Prérequis
+
+```bash
+# Éviter conflit Conda ↔ ROS2 (Python 3.13 vs 3.12)
+conda deactivate
+```
+
+### Démarrage bridge Pi
+
+```bash
+ssh er@10.10.0.225
+# Terminal 1 : robot
+python3 bridge_pi_simple.py
+# Terminal 2 : caméras
+python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
+```
+
+### Évaluation DREAM
+
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+
+# Sur données réelles
+python training/dream/evaluate_dream.py \
+  --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
+  --data /tmp/dream_data/real_cam0 --split all
+
+# Sur données synthétiques (vérification de régression)
+python training/dream/evaluate_dream.py \
+  --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
+  --data /tmp/dream_data/synthetic_50k --split val
+```
+
+### Collecte données synthétiques v3
+
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash
+source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+
+# Monde randomized_v2 (6 lights, 12 objets clutter)
+ros2 launch mycobot_gateway synthetic_data_v3.launch.py num_samples:=7500
+```
+
+### Merge + conversion NDDS + pipeline d'entraînement
+
+```bash
+# Script automatisé complet
+bash scripts/train_pipeline.sh
+
+# Ou manuellement :
+source ~/ros_jazzy/venv_dream/bin/activate
+python training/dream/merge_and_convert.py \
+  --real /tmp/dream_data/real_cam0 \
+  --synth /tmp/dream_data/synthetic_50k \
+  --output /tmp/dream_data/mixed_v2 \
+  --real-oversample 5
+
+python /tmp/DREAM/scripts/train_network.py \
+  -i /tmp/dream_data/mixed_v2 \
+  -m /tmp/DREAM/manip_configs/mycobot320.yaml \
+  -ar /tmp/DREAM/arch_configs/dream_vgg_q.yaml \
+  -e 25 -b 32 -lr 0.0001 \
+  -o training/checkpoints_dream/vgg_mixed_v2 -f
+```
+
+### Pick-and-place simulation
+
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash
+source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+
+ros2 launch mycobot_gateway pick_and_place.launch.py
+```
+
+---
+
+## Architecture du système
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              PC TOUR (10.10.0.115)                          │
 │                         ROS2 Jazzy / Ubuntu 24.04 / Python 3.12             │
+│                         Conda: Python 3.13 / PyTorch 2.6 + CUDA 12.4       │
+│                         GPU: NVIDIA RTX 4000 Ada (20 GB VRAM)               │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │ simple_gui  │  │slider_control│  │teleop_keyb. │  │marker_follow│        │
-│  │  (Tkinter)  │  │(joint_states)│  │  (clavier)  │  │   (ArUco)   │        │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘        │
-│         │                │                │                │               │
-│         └────────────────┴────────────────┴────────────────┘               │
-│                                   │                                         │
-│                          /to_robot (JSON)                                   │
-│                                   ▼                                         │
-│                         ┌─────────────────┐                                │
-│                         │   bridge_tour   │◄─── /from_robot                │
-│                         │   (TCP Client)  │                                │
-│                         └────────┬────────┘                                │
-│                                  │ TCP:5005                                │
-├──────────────────────────────────┼──────────────────────────────────────────┤
-│                                  │                                          │
-│                    RÉSEAU ETHERNET (10.10.0.x)                             │
-│                                  │                                          │
-├──────────────────────────────────┼──────────────────────────────────────────┤
-│                                  ▼                                          │
-│                         ┌─────────────────┐                                │
-│                         │bridge_pi_simple │                                │
-│                         │  (TCP Server)   │                                │
-│                         └────────┬────────┘                                │
-│                                  │                                          │
-│                                  ▼                                          │
-│                         ┌─────────────────┐                                │
-│                         │    pymycobot    │                                │
-│                         │  /dev/ttyAMA0   │                                │
-│                         └────────┬────────┘                                │
-│                                  │                                          │
-│                         ┌────────▼────────┐                                │
-│                         │  MyCobot 320 Pi │                                │
-│                         │     (Robot)     │                                │
-│                         └─────────────────┘                                │
-│                                                                             │
-│                     RASPBERRY PI (10.10.0.218)                             │
-│                   ROS2 Galactic / Ubuntu 20.04 / Python 3.8                │
-└─────────────────────────────────────────────────────────────────────────────┘
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐       │
+│  │ simple_gui  │  │slider_control│  │teleop_keyb. │  │ training/    │       │
+│  │  (Tkinter)  │  │(joint_states)│  │  (clavier)  │  │ dream/       │       │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬───────┘       │
+│         └────────────────┴────────────────┘                │              │
+│                          │                          TCP:5005 + 5006        │
+│                   /to_robot (JSON)                         │              │
+│                          ▼                                 ▼              │
+│                ┌─────────────────┐                                         │
+│                │   bridge_tour   │                                         │
+│                └────────┬────────┘                                         │
+├─────────────────────────┼───────────────────────────────────────────────────┤
+│                   RÉSEAU ETHERNET (10.10.0.x)                              │
+├─────────────────────────┼───────────────────────────────────────────────────┤
+│                         ▼                                                   │
+│           ┌─────────────────┐       ┌─────────────────┐                    │
+│           │bridge_pi_simple │       │pi_camera_server │                    │
+│           │  TCP:5005       │       │  TCP:5006       │                    │
+│           └────────┬────────┘       └────────┬────────┘                    │
+│                    ▼                         ▼                             │
+│           ┌─────────────────┐       ┌─────────────────┐                    │
+│           │    pymycobot    │       │ Arducam USB ×2  │                    │
+│           │  /dev/ttyAMA0   │       │  cam0 + cam3    │                    │
+│           └────────┬────────┘       └─────────────────┘                    │
+│                    ▼                                                       │
+│           ┌─────────────────┐                                              │
+│           │  MyCobot 320 Pi │                                              │
+│           └─────────────────┘                                              │
+│                     RASPBERRY PI (10.10.0.225)                             │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📦 Structure du Projet
+## Structure du projet
 
 ```
 mycobot_R6A/
-├── SESSION_RESUME.md              # 👈 CE FICHIER - Point de départ
+├── SESSION_RESUME.md              # Ce fichier
 ├── DEVELOPMENT_SUMMARY.md         # Résumé technique détaillé
-├── INDEX.md                       # Index de documentation
+├── CHANGELOG.md                   # Historique des versions
 ├── README.md                      # README principal
-├── bridge_pi_debug.py             # Script debug pour Pi
 │
-├── mycobot_gateway/               # 📦 Package ROS2 Principal
-│   ├── package.xml
-│   ├── setup.py
-│   │
-│   ├── mycobot_gateway/           # Modules Python
-│   │   ├── __init__.py
-│   │   ├── bridge_tour.py         # ⭐ Client TCP vers Pi
-│   │   ├── robot_commander.py     # Interface CLI
-│   │   ├── joint_sync.py          # Sync angles → RViz
+├── mycobot_gateway/               # Package ROS2 — contrôle + vision
+│   ├── mycobot_gateway/
+│   │   ├── bridge_tour.py         # Client TCP vers Pi
 │   │   ├── simple_gui.py          # GUI Tkinter
-│   │   ├── slider_control.py      # Contrôle sliders
-│   │   ├── teleop_keyboard.py     # Contrôle clavier
-│   │   └── marker_follower.py     # Suivi ArUco
-│   │
+│   │   ├── slider_control.py      # Contrôle sliders temps réel
+│   │   ├── dream_inference_node.py# Inférence DREAM + PnP ROS2
+│   │   ├── pick_and_place_node.py # State machine pick & place
+│   │   └── synthetic_data_collector_v2.py
 │   ├── scripts/
-│   │   ├── bridge_pi_simple.py    # ⭐ Script Pi (serveur TCP)
-│   │   └── bridge_pi_standalone.py
-│   │
+│   │   ├── bridge_pi_simple.py    # Script Pi (serveur TCP robot)
+│   │   └── pi_camera_server.py    # Script Pi (serveur TCP caméras)
 │   └── launch/
-│       ├── simple_gui.launch.py
-│       ├── slider_control.launch.py   # ⭐ Contrôle temps réel validé
-│       ├── teleop_keyboard.launch.py
-│       ├── rviz_sync.launch.py
-│       └── marker_follow_full.launch.py
+│       ├── pick_and_place.launch.py
+│       ├── synthetic_data_v2.launch.py
+│       └── synthetic_data_v3.launch.py
 │
-├── mycobot_description/           # 📦 Package URDF
-│   ├── urdf/320_pi/               # Modèle 3D robot
-│   ├── config/mycobot_320_pi.rviz # Config RViz
-│   └── launch/display.launch.py
+├── mycobot_description/           # Package ROS2 — URDF/Gazebo
+│   ├── urdf/320_pi/               # Modèle 3D + 4 caméras Gazebo
+│   │   └── link6_2022.dae         # Mesh link6 pour compat. gripper
+│   ├── urdf/pro_adaptive_gripper/ # Gripper adaptatif (meshes STL)
+│   └── worlds/
+│       ├── randomized.sdf         # Monde de base
+│       └── randomized_v2.sdf      # 6 lights + 12 clutter objects
 │
-├── docs/                          # Documentation détaillée
-└── scripts/                       # Scripts shell utilitaires
+├── training/                      # Pipeline ML/IA
+│   ├── train.py / model.py        # Legacy: régression directe (abandonné)
+│   ├── capture_real.py            # Capture réelle avec FK safety
+│   └── dream/                     # DREAM keypoint detection (actif)
+│       ├── mycobot_fk.py          # FK + projection (7 keypoints)
+│       ├── convert_to_ndds.py     # Conversion → format NDDS
+│       ├── merge_and_convert.py   # Fusion datasets + conversion
+│       ├── evaluate_dream.py      # Évaluation (filtre sentinel -999.99)
+│       ├── infer_dream.py         # Inférence + PnP solving
+│       ├── finetune_real.py       # Fine-tuning expérimental (⚠️ ne fonctionne pas)
+│       └── manip_configs/mycobot320.yaml
+│
+├── scripts/
+│   ├── train_pipeline.sh          # Pipeline merge→NDDS→training automatisé
+│   └── monitor_collection.sh      # Suivi collecte en temps réel
+│
+└── docs/                          # Documentation détaillée
 ```
 
 ---
 
-## 🚀 DÉMARRAGE RAPIDE
+## Points importants
 
-### ⚠️ PRÉREQUIS CRITIQUE - Éviter le conflit Conda
-
-```bash
-# TOUJOURS exécuter avant ROS2 (conflit Python 3.13 vs 3.12)
-conda deactivate
-
-# OU utiliser la commande "propre" :
-env -i HOME=$HOME PATH="/usr/bin:/bin:/opt/ros/jazzy/bin" DISPLAY=$DISPLAY bash
-```
-
-### Étape 1 : Démarrer le Bridge sur le Pi
-
-```bash
-# SSH vers le Pi
-ssh er@10.10.0.218
-
-# Lancer le bridge
-python3 bridge_pi_simple.py
-```
-
-### Étape 2 : Lancer le contrôle sur le PC Tour
-
-```bash
-# Option A : Slider Control (RECOMMANDÉ - testé et validé)
-env -i HOME=$HOME PATH="/usr/bin:/bin:/opt/ros/jazzy/bin" DISPLAY=$DISPLAY bash -c '
-source /opt/ros/jazzy/setup.bash && 
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash && 
-ros2 launch mycobot_gateway slider_control.launch.py'
-
-# Option B : GUI Simple
-ros2 launch mycobot_gateway simple_gui.launch.py
-
-# Option C : Contrôle clavier
-ros2 launch mycobot_gateway teleop_keyboard.launch.py
-```
+1. **Conda vs ROS2** : Toujours `conda deactivate` avant ROS2. Training ML → `/home/genji/miniconda/bin/python3` ou venv_dream.
+2. **Fine-tuning DREAM custom** : Deux tentatives ont échoué (σ mismatch + belief map collapse). Utiliser uniquement `train_network.py` natif.
+3. **Sentinel DREAM** : DREAM renvoie -999.99 quand peak < seuil — filtrer dans l'évaluation.
+4. **VGG sans BatchNorm** est stable. ResNet+BN explose avec batch_size < 64.
+5. **1 px = 1.44 mm** (caméras latérales à 0.8m, fx=554.38).
+6. **Gripper** : intégré dans la simulation mais joints fixés (pas de support `mimic` dans Gazebo Harmonic).
 
 ---
 
-## � Protocole de Communication
-
-### Format JSON (Recommandé)
-
-```json
-// Mouvements
-{"action": "send_angles", "angles": [0, 0, 0, 0, 0, 0], "speed": 30}
-{"action": "send_coords", "coords": [200, 0, 200, 180, 0, 0], "speed": 40, "mode": 1}
-{"action": "go_home"}
-{"action": "go_zero"}
-
-// Lecture état
-{"action": "get_angles"}    // → "ANGLES: [0.43, 0.0, 0.0, 0.35, 0.26, 0.35]"
-{"action": "get_coords"}    // → "COORDS: [...]"
-
-// Gripper
-{"action": "gripper_open"}
-{"action": "gripper_close"}
-
-// Contrôle moteurs
-{"action": "power_on"}
-{"action": "power_off"}
-{"action": "emergency_stop"}
-```
-
-### Commandes Texte (Alternative)
-
-| Commande | Description |
-|----------|-------------|
-| `ping` | Test connexion → `PONG` |
-| `status` | État robot |
-| `home` / `go_home` | Position home |
-| `zero` / `go_zero` | Position zéro |
-| `get_angles` / `angles` | Lire angles |
-| `get_coords` / `coords` | Lire coordonnées |
-| `power_on` | Allumer moteurs |
-| `power_off` | Relâcher servos |
-| `gripper_open` | Ouvrir pince |
-| `gripper_close` | Fermer pince |
-| `stop` | Arrêt d'urgence |
-
----
-
-## 🔌 Configuration Réseau
-
-| Machine | IP | Port | Rôle |
-|---------|-----|------|------|
-| PC Tour | 10.10.0.115 | - | Calcul, GUI, RViz |
-| Raspberry Pi | 10.10.0.218 | 5005 | Bridge robot |
-
----
-
-## ✅ Tests Validés (Session 26/03/2026)
-
-| Test | Résultat | Notes |
-|------|----------|-------|
-| `ping` | ✅ PONG | Connexion TCP OK |
-| `get_angles` | ✅ `[0.43, 0.0, 0.0, 0.35, 0.26, 0.35]` | Lecture réelle |
-| `go_home` | ✅ Robot moved | Position home |
-| JSON `send_angles` | ✅ Temps réel | Via slider_control |
-| RViz visualisation | ✅ Robot visible | Fixed Frame = base |
-| simple_gui | ✅ Fonctionnel | Interface Tkinter |
-| slider_control | ✅ Validé complet | Robot suit sliders |
-
----
-
-## 🔑 Points Importants à Retenir
-
-### 1. Conflit Python Conda
-```bash
-# TOUJOURS désactiver Conda avant ROS2
-conda deactivate
-# OU utiliser env -i pour environnement propre
-```
-
-### 2. Position HOME vs ZERO
-- **HOME** : `[0, 8, -127, 40, 0, 0]` (position sécurisée)
-- **ZERO** : `[0, 0, 0, 0, 0, 0]` (tous joints à zéro)
-
-### 3. Ordre de démarrage
-1. Pi : `python3 bridge_pi_simple.py`
-2. Tour : `ros2 launch mycobot_gateway <launch_file>`
-
-### 4. Compilation
-```bash
-cd ~/ros_jazzy/src/mycobot_R6A
-colcon build --packages-select mycobot_gateway --symlink-install
-source install/setup.bash
-```
-
----
-
-## 🚧 TODO - Prochaines Étapes
-
-### Priorité Haute
-- [ ] Tester `teleop_keyboard` (contrôle clavier)
-- [ ] Tester `marker_follower` (suivi ArUco)
-- [ ] Améliorer gestion erreurs bridge
-
-### Priorité Moyenne
-- [ ] Streaming caméra Pi → Tour
-- [ ] Interface web (option future)
-- [ ] Enregistrement/rejeu trajectoires
-
-### Priorité Basse
-- [ ] Intégration Gazebo simulation
-- [ ] Path planning MoveIt2
-- [ ] Multi-robot coordination
-
----
-
-## 📚 Documentation Complémentaire
+## Documentation
 
 | Fichier | Description |
 |---------|-------------|
-| `DEVELOPMENT_SUMMARY.md` | Résumé technique détaillé |
-| `INDEX.md` | Index de toute la documentation |
-| `docs/QUICKSTART.md` | Guide démarrage rapide |
-| `docs/ARCHITECTURE.md` | Architecture système |
-| `docs/DEPLOYMENT.md` | Guide de déploiement |
-| `mycobot_gateway/README.md` | Documentation du package |
+| [SESSION_RESUME.md](SESSION_RESUME.md) | Ce fichier — point de départ |
+| [DEVELOPMENT_SUMMARY.md](DEVELOPMENT_SUMMARY.md) | Résumé technique complet |
+| [CHANGELOG.md](CHANGELOG.md) | Historique des versions |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture détaillée |
+| [docs/SYNTHETIC_DATA.md](docs/SYNTHETIC_DATA.md) | Pipeline données synthétiques |
+| [training/README.md](training/README.md) | Pipeline ML / DREAM |
+| [training/dream/README.md](training/dream/README.md) | Module DREAM |
 
 ---
 
-## 🔗 Liens Utiles
-
-- **GitHub** : https://github.com/ABMI-software/mycobot_320pi_R6A
-- **ROS2 Jazzy** : https://docs.ros.org/en/jazzy/
-- **pymycobot** : https://github.com/elephantrobotics/pymycobot
-
----
-
-*Ce fichier est le point de départ pour les prochaines sessions de développement.*  
-*Dernière mise à jour : 26 mars 2026*
+*Dernière mise à jour : 21 avril 2026*

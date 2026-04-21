@@ -1,0 +1,622 @@
+<?xml version="1.0"?>
+<!--
+  MyCobot 320 Pi - Gazebo-compatible URDF
+  
+  This file extends the original URDF with:
+  - <inertial> tags on every link  (required by Gazebo physics)
+  - <gazebo> colour hints
+  
+  Joint names, limits and kinematics are identical to
+  mycobot_pro_320_pi.urdf.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mycobot_320_pi">
+
+  <!-- ==================== LINKS ==================== -->
+
+  <link name="base">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/base.dae"/>
+      </geometry>
+      <origin xyz="0.0 0 0" rpy="0 0 3.1415926"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/base.dae"/>
+      </geometry>
+      <origin xyz="0.0 0 0" rpy="0 0 3.1415926"/>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <link name="link1">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link1.dae"/>
+      </geometry>
+      <origin xyz="0.115 -0.172 -0.086" rpy="0 0 3.1415926"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link1.dae"/>
+      </geometry>
+      <origin xyz="0.115 -0.172 -0.09" rpy="0 0 3.1415926"/>
+    </collision>
+    <inertial>
+      <mass value="0.3"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005"/>
+    </inertial>
+  </link>
+
+  <link name="link2">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link2.dae"/>
+      </geometry>
+      <origin xyz="-0.075 -0.115 -0.022" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link2.dae"/>
+      </geometry>
+      <origin xyz="-0.075 -0.115 -0.022" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.25"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0004" ixy="0" ixz="0" iyy="0.0004" iyz="0" izz="0.0004"/>
+    </inertial>
+  </link>
+
+  <link name="link3">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link3.dae"/>
+      </geometry>
+      <origin xyz="-0.22 -0.115 0.142" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link3.dae"/>
+      </geometry>
+      <origin xyz="-0.22 -0.115 0.142" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.2"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0003" ixy="0" ixz="0" iyy="0.0003" iyz="0" izz="0.0003"/>
+    </inertial>
+  </link>
+
+  <link name="link4">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link4.dae"/>
+      </geometry>
+      <origin xyz="-0.115 0.338 -0.1435" rpy="1.5708 0 0"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link4.dae"/>
+      </geometry>
+      <origin xyz="-0.115 0.338 -0.1435" rpy="1.5708 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.15"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002"/>
+    </inertial>
+  </link>
+
+  <link name="link5">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link5.dae"/>
+      </geometry>
+      <origin xyz="-0.1149 -0.0322 -0.482" rpy="0 0 0"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link5.dae"/>
+      </geometry>
+      <origin xyz="-0.1149 -0.0322 -0.482" rpy="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.1"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <link name="link6">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link6_2022.dae"/>
+      </geometry>
+      <origin xyz="0.0 0.0 -0.0115" rpy="1.5708 1.5708 0"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/320_pi/link6_2022.dae"/>
+      </geometry>
+      <origin xyz="0.0 0.0 -0.0115" rpy="1.5708 1.5708 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.08"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00008" ixy="0" ixz="0" iyy="0.00008" iyz="0" izz="0.00008"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== ADAPTIVE GRIPPER LINKS ==================== -->
+
+  <link name="gripper_base">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_base.dae"/>
+      </geometry>
+      <origin xyz="-0.02 0.012 -0.018" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_base.dae"/>
+      </geometry>
+      <origin xyz="-0.02 0.012 -0.018" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.1"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <link name="gripper_left1">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left1.dae"/>
+      </geometry>
+      <origin xyz="0.048 -0.035 -0.003" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left1.dae"/>
+      </geometry>
+      <origin xyz="0.048 -0.035 -0.003" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.02"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <link name="gripper_left2">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left2.dae"/>
+      </geometry>
+      <origin xyz="0.026 0.022 -0.018" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left2.dae"/>
+      </geometry>
+      <origin xyz="0.026 0.022 -0.018" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.02"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <link name="gripper_left3">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left3.dae"/>
+      </geometry>
+      <origin xyz="0.0 0.0 -0.018" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left3.dae"/>
+      </geometry>
+      <origin xyz="0.0 0.0 -0.018" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.02"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <link name="gripper_right1">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right1.dae"/>
+      </geometry>
+      <origin xyz="-0.086 -0.036 -0.003" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right1.dae"/>
+      </geometry>
+      <origin xyz="-0.086 -0.036 -0.003" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.02"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <link name="gripper_right2">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right2.dae"/>
+      </geometry>
+      <origin xyz="-0.062 0.0224 -0.018" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right2.dae"/>
+      </geometry>
+      <origin xyz="-0.062 0.0224 -0.018" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.02"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <link name="gripper_right3">
+    <visual>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right3.dae"/>
+      </geometry>
+      <origin xyz="-0.034 0.0 -0.018" rpy="1.5708 0 1.5708"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right3.dae"/>
+      </geometry>
+      <origin xyz="-0.034 0.0 -0.018" rpy="1.5708 0 1.5708"/>
+    </collision>
+    <inertial>
+      <mass value="0.02"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== JOINTS ==================== -->
+
+  <joint name="joint2_to_joint1" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-2.93" upper="2.93" velocity="3.14"/>
+    <parent link="base"/>
+    <child link="link1"/>
+    <origin xyz="0 0 0.162" rpy="0 0 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <joint name="joint3_to_joint2" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-2.35" upper="2.35" velocity="3.14"/>
+    <parent link="link1"/>
+    <child link="link2"/>
+    <origin xyz="0 0 0" rpy="0 -1.5708 1.5708"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <joint name="joint4_to_joint3" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-2.53" upper="2.53" velocity="3.14"/>
+    <parent link="link2"/>
+    <child link="link3"/>
+    <origin xyz="0.13635 0 0" rpy="0 0 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <joint name="joint5_to_joint4" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-2.53" upper="2.53" velocity="3.14"/>
+    <parent link="link3"/>
+    <child link="link4"/>
+    <origin xyz="0.1205 0 0.082" rpy="0 0 1.57080"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <joint name="joint6_to_joint5" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-2.93" upper="2.93" velocity="3.14"/>
+    <parent link="link4"/>
+    <child link="link5"/>
+    <origin xyz="0 -0.084 0" rpy="1.5708 0 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <joint name="joint6output_to_joint6" type="revolute">
+    <axis xyz="0 0 1"/>
+    <limit effort="1000.0" lower="-3.14" upper="3.14" velocity="3.14"/>
+    <parent link="link5"/>
+    <child link="link6"/>
+    <origin xyz="0 0.06635 0" rpy="-1.5708 0 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+  </joint>
+
+  <!-- ==================== ADAPTIVE GRIPPER JOINTS ==================== -->
+  <!-- Gripper is fixed (cosmetic) – used for complete robot appearance in
+       synthetic images. All finger joints are fixed at a slightly open pose. -->
+
+  <joint name="joint6output_to_gripper_base" type="fixed">
+    <parent link="link6"/>
+    <child link="gripper_base"/>
+    <origin xyz="0.0 -0.007 0.056" rpy="1.5708 0 0"/>
+  </joint>
+
+  <joint name="gripper_controller" type="fixed">
+    <parent link="gripper_base"/>
+    <child link="gripper_left3"/>
+    <origin xyz="-0.018 0.015 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="gripper_base_to_gripper_left2" type="fixed">
+    <parent link="gripper_base"/>
+    <child link="gripper_left2"/>
+    <origin xyz="-0.047 -0.01 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="gripper_left3_to_gripper_left1" type="fixed">
+    <parent link="gripper_left3"/>
+    <child link="gripper_left1"/>
+    <origin xyz="-0.05 0.035 -0.015" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="gripper_base_to_gripper_right3" type="fixed">
+    <parent link="gripper_base"/>
+    <child link="gripper_right3"/>
+    <origin xyz="0.016 0.014 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="gripper_base_to_gripper_right2" type="fixed">
+    <parent link="gripper_base"/>
+    <child link="gripper_right2"/>
+    <origin xyz="0.044 -0.01 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="gripper_right3_to_gripper_right1" type="fixed">
+    <parent link="gripper_right3"/>
+    <child link="gripper_right1"/>
+    <origin xyz="0.052 0.035 -0.015" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ==================== GAZEBO EXTRAS ==================== -->
+
+  <!-- Fix base to world so robot doesn't fall -->
+  <link name="world"/>
+  <joint name="world_to_base" type="fixed">
+    <parent link="world"/>
+    <child link="base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ==================== CAMERA FOR SYNTHETIC DATA ==================== -->
+
+  <!-- Camera mount (fixed in the world, looking at the robot) -->
+  <link name="camera_link">
+    <visual>
+      <geometry>
+        <box size="0.03 0.03 0.03"/>
+      </geometry>
+      <material name="camera_blue">
+        <color rgba="0.2 0.2 0.8 1.0"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.01"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <!-- ===== CAMERA 1 (front) — original position ===== -->
+  <joint name="world_to_camera" type="fixed">
+    <parent link="world"/>
+    <child link="camera_link"/>
+    <!-- x=0.8 forward, z=0.4 height, pitched down toward robot -->
+    <origin xyz="0.8 0.0 0.4" rpy="0 0.3 3.1416"/>
+  </joint>
+
+  <gazebo reference="camera_link">
+    <sensor name="synth_camera" type="camera">
+      <always_on>true</always_on>
+      <update_rate>10</update_rate>
+      <visualize>true</visualize>
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>10.0</far>
+        </clip>
+      </camera>
+      <topic>synth_camera/image</topic>
+    </sensor>
+  </gazebo>
+
+  <!-- ===== CAMERA 2 (right side, 90° from front) ===== -->
+  <link name="camera_link_right">
+    <visual>
+      <geometry><box size="0.03 0.03 0.03"/></geometry>
+      <material name="camera_green"><color rgba="0.2 0.8 0.2 1.0"/></material>
+    </visual>
+    <inertial>
+      <mass value="0.01"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <joint name="world_to_camera_right" type="fixed">
+    <parent link="world"/>
+    <child link="camera_link_right"/>
+    <origin xyz="0.0 0.8 0.4" rpy="0 0.3 -1.5708"/>
+  </joint>
+
+  <gazebo reference="camera_link_right">
+    <sensor name="synth_camera_right" type="camera">
+      <always_on>true</always_on>
+      <update_rate>10</update_rate>
+      <visualize>false</visualize>
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+        <clip><near>0.05</near><far>10.0</far></clip>
+      </camera>
+      <topic>synth_camera_right/image</topic>
+    </sensor>
+  </gazebo>
+
+  <!-- ===== CAMERA 3 (left side, -90° from front) ===== -->
+  <link name="camera_link_left">
+    <visual>
+      <geometry><box size="0.03 0.03 0.03"/></geometry>
+      <material name="camera_red"><color rgba="0.8 0.2 0.2 1.0"/></material>
+    </visual>
+    <inertial>
+      <mass value="0.01"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <joint name="world_to_camera_left" type="fixed">
+    <parent link="world"/>
+    <child link="camera_link_left"/>
+    <origin xyz="0.0 -0.8 0.4" rpy="0 0.3 1.5708"/>
+  </joint>
+
+  <gazebo reference="camera_link_left">
+    <sensor name="synth_camera_left" type="camera">
+      <always_on>true</always_on>
+      <update_rate>10</update_rate>
+      <visualize>false</visualize>
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+        <clip><near>0.05</near><far>10.0</far></clip>
+      </camera>
+      <topic>synth_camera_left/image</topic>
+    </sensor>
+  </gazebo>
+
+  <!-- ===== CAMERA 4 (overhead, looking straight down) ===== -->
+  <link name="camera_link_top">
+    <visual>
+      <geometry><box size="0.03 0.03 0.03"/></geometry>
+      <material name="camera_yellow"><color rgba="0.8 0.8 0.2 1.0"/></material>
+    </visual>
+    <inertial>
+      <mass value="0.01"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <joint name="world_to_camera_top" type="fixed">
+    <parent link="world"/>
+    <child link="camera_link_top"/>
+    <origin xyz="0.0 0.0 1.2" rpy="0 1.5708 0"/>
+  </joint>
+
+  <gazebo reference="camera_link_top">
+    <sensor name="synth_camera_top" type="camera">
+      <always_on>true</always_on>
+      <update_rate>10</update_rate>
+      <visualize>false</visualize>
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+        <clip><near>0.05</near><far>10.0</far></clip>
+      </camera>
+      <topic>synth_camera_top/image</topic>
+    </sensor>
+  </gazebo>
+
+  <!-- Gazebo joint state publisher plugin -->
+  <gazebo>
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <joint_name>joint2_to_joint1</joint_name>
+      <joint_name>joint3_to_joint2</joint_name>
+      <joint_name>joint4_to_joint3</joint_name>
+      <joint_name>joint5_to_joint4</joint_name>
+      <joint_name>joint6_to_joint5</joint_name>
+      <joint_name>joint6output_to_joint6</joint_name>
+    </plugin>
+  </gazebo>
+
+  <!-- Gazebo joint position controller plugin (per-joint topics) -->
+  <gazebo>
+    <plugin filename="gz-sim-joint-position-controller-system"
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>joint2_to_joint1</joint_name>
+      <topic>/model/mycobot_320/joint/joint2_to_joint1/cmd_pos</topic>
+    </plugin>
+  </gazebo>
+  <gazebo>
+    <plugin filename="gz-sim-joint-position-controller-system"
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>joint3_to_joint2</joint_name>
+      <topic>/model/mycobot_320/joint/joint3_to_joint2/cmd_pos</topic>
+    </plugin>
+  </gazebo>
+  <gazebo>
+    <plugin filename="gz-sim-joint-position-controller-system"
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>joint4_to_joint3</joint_name>
+      <topic>/model/mycobot_320/joint/joint4_to_joint3/cmd_pos</topic>
+    </plugin>
+  </gazebo>
+  <gazebo>
+    <plugin filename="gz-sim-joint-position-controller-system"
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>joint5_to_joint4</joint_name>
+      <topic>/model/mycobot_320/joint/joint5_to_joint4/cmd_pos</topic>
+    </plugin>
+  </gazebo>
+  <gazebo>
+    <plugin filename="gz-sim-joint-position-controller-system"
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>joint6_to_joint5</joint_name>
+      <topic>/model/mycobot_320/joint/joint6_to_joint5/cmd_pos</topic>
+    </plugin>
+  </gazebo>
+  <gazebo>
+    <plugin filename="gz-sim-joint-position-controller-system"
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>joint6output_to_joint6</joint_name>
+      <topic>/model/mycobot_320/joint/joint6output_to_joint6/cmd_pos</topic>
+    </plugin>
+  </gazebo>
+
+  <!-- Gazebo sensors system (required for camera) -->
+  <gazebo>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+  </gazebo>
+
+</robot>

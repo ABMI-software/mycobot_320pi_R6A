@@ -1,0 +1,154 @@
+<?xml version="1.0" ?>
+<!--
+  Pick-and-Place Gazebo world for MyCobot 320 Pi.
+
+  Features:
+  - Standard lighting (stable for DREAM inference)
+  - Ground plane + table under robot
+  - Target cube (red, 4cm) at a known reachable position
+  - Secondary objects for visual context
+-->
+<sdf version="1.9">
+  <world name="pick_and_place">
+
+    <!-- Physics -->
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <!-- Sun -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.85 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.3 -0.9</direction>
+    </light>
+
+    <!-- Fill light -->
+    <light type="directional" name="fill_light">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 8 0 0 0</pose>
+      <diffuse>0.4 0.4 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.5 -0.3 -0.7</direction>
+    </light>
+
+    <!-- Point light near robot -->
+    <light type="point" name="warm_point">
+      <cast_shadows>false</cast_shadows>
+      <pose>1.0 0.5 1.5 0 0 0</pose>
+      <diffuse>0.6 0.5 0.3 1</diffuse>
+      <specular>0.1 0.1 0.05 1</specular>
+      <attenuation>
+        <range>5</range>
+        <constant>0.5</constant>
+        <linear>0.2</linear>
+        <quadratic>0.05</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- Ground plane -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>20 20</size></plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>20 20</size></plane>
+          </geometry>
+          <material>
+            <ambient>0.55 0.55 0.52 1</ambient>
+            <diffuse>0.6 0.6 0.57 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Table under robot -->
+    <model name="table">
+      <static>true</static>
+      <pose>0 0 -0.02 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.8 0.8 0.04</size></box></geometry>
+          <material>
+            <ambient>0.35 0.25 0.15 1</ambient>
+            <diffuse>0.45 0.32 0.2 1</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry><box><size>0.8 0.8 0.04</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ============================================================ -->
+    <!--  TARGET CUBE — red, 4cm, at a reachable position             -->
+    <!--  Position: x=0.25, y=0.10, z=0.02 (on the table surface)    -->
+    <!--  This is within the MyCobot 320 workspace (~0.32m reach)     -->
+    <!-- ============================================================ -->
+    <model name="target_cube">
+      <static>true</static>
+      <pose>0.25 0.10 0.02 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.04 0.04 0.04</size></box></geometry>
+          <material>
+            <ambient>0.8 0.1 0.1 1</ambient>
+            <diffuse>0.9 0.15 0.15 1</diffuse>
+            <specular>0.4 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry><box><size>0.04 0.04 0.04</size></box></geometry>
+        </collision>
+        <inertial>
+          <mass>0.05</mass>
+        </inertial>
+      </link>
+    </model>
+
+    <!-- Drop zone (green area) — where to place the cube -->
+    <model name="drop_zone">
+      <static>true</static>
+      <pose>-0.20 0.15 0.001 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.08 0.08 0.002</size></box></geometry>
+          <material>
+            <ambient>0.1 0.7 0.2 1</ambient>
+            <diffuse>0.15 0.8 0.25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Back wall for visual reference -->
+    <model name="back_wall">
+      <static>true</static>
+      <pose>-1.0 0 0.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.05 2.0 1.0</size></box></geometry>
+          <material>
+            <ambient>0.45 0.45 0.50 1</ambient>
+            <diffuse>0.5 0.5 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

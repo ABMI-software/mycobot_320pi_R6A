@@ -1,0 +1,4 @@
+#!/usr/bin/python3
+"""Pick-and-Place Node wrapper script."""
+from mycobot_gateway.pick_and_place_node import main
+main()

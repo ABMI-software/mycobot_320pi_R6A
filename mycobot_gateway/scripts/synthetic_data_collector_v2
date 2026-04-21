@@ -1,0 +1,4 @@
+#!/usr/bin/python3
+"""Wrapper for ros2 run to find synthetic_data_collector_v2."""
+from mycobot_gateway.synthetic_data_collector_v2 import main
+main()

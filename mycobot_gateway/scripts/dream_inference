@@ -1,0 +1,4 @@
+#!/home/genji/ros_jazzy/venv_dream/bin/python3
+"""DREAM Inference Node wrapper script."""
+from mycobot_gateway.dream_inference_node import main
+main()
