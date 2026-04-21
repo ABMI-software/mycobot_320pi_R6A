@@ -20,6 +20,7 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
+    SetEnvironmentVariable,
     TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -36,6 +37,15 @@ def generate_launch_description():
         desc_pkg, 'urdf', '320_pi', 'mycobot_pro_320_pi_gazebo.urdf',
     )
     world_path = os.path.join(desc_pkg, 'worlds', 'randomized.sdf')
+
+    # Gazebo needs to resolve package:// URIs for meshes
+    # The share parent dir contains 'mycobot_description/' subfolder
+    gz_resource_path = os.path.dirname(desc_pkg)  # …/install/mycobot_description/share
+    existing = os.environ.get('GZ_SIM_RESOURCE_PATH', '')
+    full_resource_path = f'{gz_resource_path}:{existing}' if existing else gz_resource_path
+    set_gz_resource = SetEnvironmentVariable(
+        'GZ_SIM_RESOURCE_PATH', full_resource_path,
+    )
 
     # ---------- launch arguments ----------
     num_samples_arg = DeclareLaunchArgument(
@@ -167,12 +177,16 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        # Environment
+        set_gz_resource,
+        # Arguments
         num_samples_arg,
         output_dir_arg,
         settle_arg,
         multi_view_arg,
         domain_rand_arg,
         noise_arg,
+        # Core
         rsp,
         gz_sim,
         spawn,

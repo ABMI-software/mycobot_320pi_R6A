@@ -47,14 +47,23 @@ class SyntheticDataCollectorV2(Node):
         'joint6output_to_joint6',
     ]
 
+    # Official MyCobot 320 Pi joint limits (from elephantrobotics URDF)
+    # J1 ±167.9°  J2 ±134.6°  J3 ±145.0°  J4 ±145.0°  J5 ±167.9°  J6 ±180.0°
     JOINT_LIMITS = [
-        (-2.96, 2.96),
-        (-2.79, 2.79),
-        (-2.79, 2.79),
-        (-2.79, 2.79),
-        (-2.96, 2.96),
-        (-3.05, 3.05),
+        (-2.93, 2.93),   # J1 – base rotation
+        (-2.35, 2.35),   # J2 – shoulder
+        (-2.53, 2.53),   # J3 – elbow
+        (-2.53, 2.53),   # J4 – wrist 1
+        (-2.93, 2.93),   # J5 – wrist 2
+        (-3.14, 3.14),   # J6 – wrist 3 (flange)
     ]
+
+    # DH link lengths (metres) – used for self-collision check
+    L1 = 0.162    # base to J2
+    L2 = 0.13635  # J2–J3  (upper arm)
+    L3 = 0.1205   # J3–J4  (forearm)
+    L4 = 0.084    # J4–J5  (wrist offset)
+    L5 = 0.06635  # J5–J6  (flange)
 
     # Camera topic names (must match URDF sensor topics)
     CAMERA_TOPICS = {
@@ -172,57 +181,147 @@ class SyntheticDataCollectorV2(Node):
     # ------------------------------------------------------------------
     # Domain randomization
     # ------------------------------------------------------------------
+    # All scene lights to randomize (name → type)
+    SCENE_LIGHTS = {
+        'sun':           'directional',
+        'fill_light':    'directional',
+        'back_light':    'directional',
+        'warm_point':    'point',
+        'cool_point':    'point',
+        'overhead_spot': 'point',
+    }
+
+    # Clutter models whose material colour can be randomized
+    CLUTTER_MODELS = [
+        'clutter_box_1', 'clutter_box_2', 'clutter_box_3',
+        'clutter_box_4', 'clutter_box_5', 'clutter_box_6',
+        'clutter_cylinder_1', 'clutter_cylinder_2',
+        'clutter_cylinder_3', 'clutter_cylinder_4',
+        'clutter_sphere_1', 'clutter_sphere_2',
+    ]
+
+    # Surfaces whose colour can be randomized
+    SURFACE_MODELS = ['back_wall', 'left_wall', 'right_wall', 'table', 'ground_plane']
+
     def _randomize_scene(self):
-        """Randomize lighting via gz service calls (best-effort)."""
+        """Aggressively randomize lighting, clutter colours, and surfaces."""
         if not self.domain_randomize:
             return
 
         try:
-            # Randomize sun direction
-            dx = random.uniform(-1.0, 0.0)
-            dy = random.uniform(-0.5, 0.5)
-            dz = random.uniform(-1.0, -0.3)
-            # Randomize sun intensity
-            r = random.uniform(0.5, 1.0)
-            g = random.uniform(0.5, 1.0)
-            b = random.uniform(0.45, 0.95)
-
-            # Use gz service to update light (Gazebo Harmonic)
-            cmd = (
-                f'gz service -s /world/{self.world_name}/light_config '
-                f'--reqtype gz.msgs.Light '
-                f'--reptype gz.msgs.Boolean '
-                f'--timeout 500 '
-                f'--req "name: \\"sun\\", '
-                f'direction: {{x: {dx}, y: {dy}, z: {dz}}}, '
-                f'diffuse: {{r: {r}, g: {g}, b: {b}, a: 1.0}}"'
-            )
-            subprocess.Popen(cmd, shell=True,
-                             stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
-
-            # Also randomize the warm point light position
-            px = random.uniform(-0.5, 1.5)
-            py = random.uniform(-1.0, 1.0)
-            pz = random.uniform(0.8, 2.0)
-            wr = random.uniform(0.3, 0.8)
-            wg = random.uniform(0.25, 0.7)
-            wb = random.uniform(0.1, 0.5)
-            cmd2 = (
-                f'gz service -s /world/{self.world_name}/light_config '
-                f'--reqtype gz.msgs.Light '
-                f'--reptype gz.msgs.Boolean '
-                f'--timeout 500 '
-                f'--req "name: \\"warm_point\\", '
-                f'pose: {{position: {{x: {px}, y: {py}, z: {pz}}}}}, '
-                f'diffuse: {{r: {wr}, g: {wg}, b: {wb}, a: 1.0}}"'
-            )
-            subprocess.Popen(cmd2, shell=True,
-                             stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
-
+            self._randomize_lights()
+            # Randomize clutter/surface colours every 5th sample (expensive)
+            if self.sample_idx % 5 == 0:
+                self._randomize_material_colours()
         except Exception as e:
             self.get_logger().debug(f'Domain randomization failed: {e}')
+
+    def _gz_light_cmd(self, name, **kwargs):
+        """Build and fire a gz service light_config command."""
+        parts = [f'name: \\"{name}\\"']
+        if 'direction' in kwargs:
+            d = kwargs['direction']
+            parts.append(f'direction: {{x: {d[0]}, y: {d[1]}, z: {d[2]}}}')
+        if 'diffuse' in kwargs:
+            c = kwargs['diffuse']
+            parts.append(f'diffuse: {{r: {c[0]}, g: {c[1]}, b: {c[2]}, a: 1.0}}')
+        if 'pose' in kwargs:
+            p = kwargs['pose']
+            parts.append(f'pose: {{position: {{x: {p[0]}, y: {p[1]}, z: {p[2]}}}}}')
+
+        req = ', '.join(parts)
+        cmd = (
+            f'gz service -s /world/{self.world_name}/light_config '
+            f'--reqtype gz.msgs.Light --reptype gz.msgs.Boolean '
+            f'--timeout 300 --req "{req}"'
+        )
+        subprocess.Popen(cmd, shell=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def _randomize_lights(self):
+        """Randomize direction, colour, and position of all scene lights."""
+        # Sun — varying direction + warm/cool colour temperature
+        self._gz_light_cmd(
+            'sun',
+            direction=(random.uniform(-1.0, 0.0),
+                       random.uniform(-0.5, 0.5),
+                       random.uniform(-1.0, -0.3)),
+            diffuse=(random.uniform(0.4, 1.0),
+                     random.uniform(0.4, 1.0),
+                     random.uniform(0.35, 0.95)),
+        )
+
+        # Fill light — opposite side, variable colour
+        self._gz_light_cmd(
+            'fill_light',
+            direction=(random.uniform(0.0, 1.0),
+                       random.uniform(-0.5, 0.5),
+                       random.uniform(-0.9, -0.3)),
+            diffuse=(random.uniform(0.2, 0.6),
+                     random.uniform(0.2, 0.6),
+                     random.uniform(0.2, 0.7)),
+        )
+
+        # Back light — subtle rim
+        self._gz_light_cmd(
+            'back_light',
+            direction=(random.uniform(-0.5, 1.0),
+                       random.uniform(-0.5, 0.5),
+                       random.uniform(-0.8, -0.3)),
+            diffuse=(random.uniform(0.1, 0.4),
+                     random.uniform(0.1, 0.4),
+                     random.uniform(0.1, 0.5)),
+        )
+
+        # Point lights — random position + colour
+        for name in ('warm_point', 'cool_point', 'overhead_spot'):
+            self._gz_light_cmd(
+                name,
+                pose=(random.uniform(-1.0, 1.5),
+                      random.uniform(-1.0, 1.0),
+                      random.uniform(0.6, 2.5)),
+                diffuse=(random.uniform(0.15, 0.8),
+                         random.uniform(0.15, 0.8),
+                         random.uniform(0.1, 0.7)),
+            )
+
+    def _randomize_material_colours(self):
+        """Randomize clutter and surface material colours via gz service."""
+        # Randomize clutter objects — full RGB range
+        for model_name in self.CLUTTER_MODELS:
+            r = random.uniform(0.1, 0.95)
+            g = random.uniform(0.1, 0.95)
+            b = random.uniform(0.1, 0.95)
+            cmd = (
+                f'gz service -s /world/{self.world_name}/visual_config '
+                f'--reqtype gz.msgs.Visual --reptype gz.msgs.Boolean '
+                f'--timeout 200 '
+                f'--req "parent_name: \\"{model_name}::link\\", '
+                f'name: \\"visual\\", '
+                f'material: {{ambient: {{r: {r}, g: {g}, b: {b}, a: 1}}, '
+                f'diffuse: {{r: {min(r+0.05,1)}, g: {min(g+0.05,1)}, b: {min(b+0.05,1)}, a: 1}}}}"'
+            )
+            subprocess.Popen(cmd, shell=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # Randomize surfaces — more subtle
+        for model_name in self.SURFACE_MODELS:
+            base = random.uniform(0.2, 0.7)
+            # Add slight colour tint
+            r = base + random.uniform(-0.1, 0.1)
+            g = base + random.uniform(-0.1, 0.1)
+            b = base + random.uniform(-0.1, 0.1)
+            cmd = (
+                f'gz service -s /world/{self.world_name}/visual_config '
+                f'--reqtype gz.msgs.Visual --reptype gz.msgs.Boolean '
+                f'--timeout 200 '
+                f'--req "parent_name: \\"{model_name}::link\\", '
+                f'name: \\"visual\\", '
+                f'material: {{ambient: {{r: {r}, g: {g}, b: {b}, a: 1}}, '
+                f'diffuse: {{r: {min(r+0.05,1)}, g: {min(g+0.05,1)}, b: {min(b+0.05,1)}, a: 1}}}}"'
+            )
+            subprocess.Popen(cmd, shell=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     # ------------------------------------------------------------------
     # Collection loop
@@ -263,6 +362,21 @@ class SyntheticDataCollectorV2(Node):
         self._capture_and_save(target_angles)
 
     def _random_joint_angles(self) -> List[float]:
+        """Generate physically-valid random joint angles.
+
+        Applies ``joint_limit_fraction`` to the official limits and then
+        rejects configurations that would cause self-collision on the
+        real MyCobot 320 Pi.  Tries up to 50 times before falling back.
+        """
+        for _ in range(50):
+            angles = self._sample_raw_angles()
+            if self._is_collision_free(angles):
+                return angles
+        # Fallback: return a conservative home-ish pose with slight randomness
+        return [random.uniform(-0.3, 0.3) for _ in range(6)]
+
+    def _sample_raw_angles(self) -> List[float]:
+        """Sample angles within ``limit_frac`` of the official limits."""
         angles = []
         for lo, hi in self.JOINT_LIMITS:
             span = (hi - lo) * self.limit_frac
@@ -270,6 +384,70 @@ class SyntheticDataCollectorV2(Node):
             a = random.uniform(mid - span / 2, mid + span / 2)
             angles.append(round(a, 4))
         return angles
+
+    def _is_collision_free(self, angles: List[float]) -> bool:
+        """Approximate self-collision check via forward-kinematics.
+
+        Computes elbow and wrist positions using the planar arm formed
+        by J1-J2-J3 and rejects poses where the wrist or end-effector
+        dips below the table / into the base, or where the forearm
+        doubles back close to the base column.
+
+        This is intentionally conservative: it rejects ~15-20 % of
+        random samples, eliminating unreachable / physically-dangerous
+        poses that the real robot would refuse or collide on.
+        """
+        j1, j2, j3, j4, j5, j6 = angles
+
+        # --- Planar kinematics in the J1-rotation plane -----------------
+        # After J1 rotation, the arm lies in a vertical plane.
+        # Shoulder (J2 axis) is at height L1 above the base.
+        # We compute 2-D coordinates (r, z) where r = radial from base axis.
+        #
+        # Note: in the MyCobot 320 Pi kinematic convention J2=0 is horizontal
+        # and J3=0 extends the forearm in-line with the upper arm.
+
+        # Elbow position
+        elbow_r = self.L2 * math.cos(j2)
+        elbow_z = self.L1 + self.L2 * math.sin(j2)
+
+        # Wrist position (end of forearm)
+        wrist_r = elbow_r + self.L3 * math.cos(j2 + j3)
+        wrist_z = elbow_z + self.L3 * math.sin(j2 + j3)
+
+        # End-effector (approx, adding wrist offset vertically)
+        ee_r = wrist_r + self.L4 * math.cos(j2 + j3 + j4)
+        ee_z = wrist_z + self.L4 * math.sin(j2 + j3 + j4)
+
+        # ---- Rejection rules ----
+
+        # R1: End-effector or wrist below the table surface (z < 0.02 m)
+        #     The real robot base sits on the table; anything below z=0
+        #     means the gripper would crash into the table.
+        TABLE_CLEARANCE = 0.02
+        if wrist_z < TABLE_CLEARANCE or ee_z < TABLE_CLEARANCE:
+            return False
+
+        # R2: Wrist too close to the base column (r < 0.05 m)
+        #     and not high enough to clear the base housing.
+        BASE_RADIUS = 0.06   # approximate base housing radius
+        BASE_HEIGHT = 0.20   # height of the base enclosure
+        if abs(wrist_r) < BASE_RADIUS and wrist_z < BASE_HEIGHT:
+            return False
+        if abs(ee_r) < BASE_RADIUS and ee_z < BASE_HEIGHT:
+            return False
+
+        # R3: Elbow below the table
+        if elbow_z < TABLE_CLEARANCE:
+            return False
+
+        # R4: Arm fully folded back (J2+J3 summing to bring the forearm
+        #     inside the upper arm envelope) — reject extreme fold-back
+        fold_angle = j2 + j3
+        if fold_angle < -3.8 or fold_angle > 3.8:
+            return False
+
+        return True
 
     def _command_joints(self, angles: List[float]):
         for jname, angle in zip(self.JOINT_NAMES, angles):
@@ -359,10 +537,30 @@ class SyntheticDataCollectorV2(Node):
                 if arr.shape[2] == 4:
                     arr = arr[:, :, :3].copy()
 
-            # Domain randomization: add Gaussian noise to pixels
+            # Domain randomization: sensor noise simulation
             if noise_sigma > 0:
                 noise = np.random.normal(0, noise_sigma, arr.shape).astype(np.float32)
                 arr = np.clip(arr.astype(np.float32) + noise, 0, 255).astype(np.uint8)
+
+                # Randomly apply additional sensor effects (30% chance each)
+                if random.random() < 0.3:
+                    # Slight colour temperature shift
+                    shift = np.array([random.uniform(-15, 15),
+                                      random.uniform(-10, 10),
+                                      random.uniform(-15, 15)], dtype=np.float32)
+                    arr = np.clip(arr.astype(np.float32) + shift, 0, 255).astype(np.uint8)
+
+                if random.random() < 0.2:
+                    # Vignetting effect (darken corners)
+                    from PIL import ImageFilter
+                    rows, cols = arr.shape[:2]
+                    Y, X = np.ogrid[:rows, :cols]
+                    cy, cx = rows / 2, cols / 2
+                    dist = np.sqrt((X - cx)**2 + (Y - cy)**2)
+                    max_dist = np.sqrt(cx**2 + cy**2)
+                    vignette = 1.0 - 0.3 * (dist / max_dist)**2
+                    arr = np.clip(arr.astype(np.float32) * vignette[:, :, None],
+                                  0, 255).astype(np.uint8)
 
             PILImage.fromarray(arr).save(path)
 

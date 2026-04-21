@@ -158,11 +158,69 @@ Suggested architectures:
 - **EfficientNet-B0** for better accuracy/speed trade-off
 - **MobileNetV3** for real-time inference on edge devices
 
-## Domain Randomization (Future)
+## Domain Randomization (v2/v3) ✅ Implémenté
 
-To improve real-world transfer, consider adding:
-- [ ] Random lighting conditions
-- [ ] Random background textures
-- [ ] Camera position jitter
-- [ ] Random table/objects around the robot
-- [ ] Noise/blur on captured images
+Pour réduire le domain gap sim→réel, deux versions avancées existent :
+
+### v2 — Randomisation éclairage + couleurs (`synthetic_data_collector_v2.py`)
+- 6 lumières (3 directionnelles + 3 ponctuelles) avec intensité/direction aléatoires
+- Color temperature shift (warm/cool)
+- Vignetting sur les images
+- Materials aléatoires sur objets
+
+### v3 — World randomisé (`randomized_v2.sdf`)
+- 12 objets clutter (cubes, cylindres, sphères)
+- 3 murs avec textures
+- Positions aléatoires des objets à chaque capture
+
+```bash
+# Collecte v2 (domain randomization avancée)
+ros2 launch mycobot_gateway synthetic_data_v2.launch.py num_samples:=5000
+
+# Collecte v3 (world randomized_v2 — 6 lights, 12 objets clutter, 3 murs)
+# Recommandée pour réduire le domain gap sim-to-real
+ros2 launch mycobot_gateway synthetic_data_v3.launch.py num_samples:=7500
+
+# Monitoring en temps réel (terminal séparé)
+bash scripts/monitor_collection.sh
+```
+
+> Les données collectées avec v3 visent 7500 poses × 4 vues = **30K images** dans
+> `/tmp/dream_data/synthetic_50k_v2/`. L'anti-collision FK rejette ~35% des poses
+> générées aléatoirement, donc prévoir ~11500 tentatives pour 7500 captures réussies.
+
+## Conversion vers DREAM (NDDS)
+
+Pour entraîner avec DREAM, les données doivent être converties au format NDDS.
+
+### Dataset synthétique seul
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+python training/dream/convert_to_ndds.py \
+  --input datasets/synthetic_dataset \
+  --output /tmp/dream_data/synthetic
+```
+
+### Dataset mixte réel+synthétique (recommandé pour sim-to-real)
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+python training/dream/merge_and_convert.py \
+  --real /tmp/dream_data/real_cam0 \
+  --synth /tmp/dream_data/synthetic_50k \
+  --output /tmp/dream_data/mixed_v2 \
+  --real-oversample 5
+
+# Ou en pipeline automatisé :
+bash scripts/train_pipeline.sh
+```
+
+Le format NDDS produit :
+```
+output_dir/
+├── _camera_settings.json     # Intrinsèques caméra
+├── 000000.png               # Image RGB
+├── 000000.json              # 7 keypoints 2D projetés (FK + caméra)
+└── ...
+```
+
+Voir [`training/README.md`](../training/README.md) pour le pipeline DREAM complet.

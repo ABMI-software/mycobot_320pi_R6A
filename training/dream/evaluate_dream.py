@@ -163,9 +163,15 @@ def evaluate(args):
                 frame_errors.append(float('nan'))
                 continue
 
+            # Filter DREAM sentinel values (-999.99 in net-output = not detected)
+            du_val, dv_val = float(det[0]), float(det[1])
+            if du_val < -900 or dv_val < -900:
+                frame_errors.append(float('nan'))
+                continue
+
             n_det += 1
-            du = float(det[0]) - float(gt[0])
-            dv = float(det[1]) - float(gt[1])
+            du = du_val - float(gt[0])
+            dv = dv_val - float(gt[1])
             err = math.sqrt(du * du + dv * dv)
             frame_errors.append(err)
 
