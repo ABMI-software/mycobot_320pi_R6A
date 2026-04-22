@@ -352,8 +352,10 @@
   </joint>
 
   <!-- ==================== ADAPTIVE GRIPPER JOINTS ==================== -->
-  <!-- Gripper is fixed (cosmetic) – used for complete robot appearance in
-       synthetic images. All finger joints are fixed at a slightly open pose. -->
+  <!-- gripper_controller drives the left-finger stack through a revolute
+       joint. The right-finger stack mirrors it via a URDF <mimic> tag with
+       multiplier=-1. All "tip" joints (left1, right1, left2, right2) stay
+       fixed — only the two servo joints move. -->
 
   <joint name="joint6output_to_gripper_base" type="fixed">
     <parent link="link6"/>
@@ -361,10 +363,13 @@
     <origin xyz="0.0 -0.007 0.056" rpy="1.5708 0 0"/>
   </joint>
 
-  <joint name="gripper_controller" type="fixed">
+  <joint name="gripper_controller" type="revolute">
     <parent link="gripper_base"/>
     <child link="gripper_left3"/>
     <origin xyz="-0.018 0.015 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10.0" lower="-0.7" upper="0.0" velocity="3.14"/>
+    <dynamics damping="0.3" friction="0.1"/>
   </joint>
 
   <joint name="gripper_base_to_gripper_left2" type="fixed">
@@ -379,10 +384,14 @@
     <origin xyz="-0.05 0.035 -0.015" rpy="0 0 0"/>
   </joint>
 
-  <joint name="gripper_base_to_gripper_right3" type="fixed">
+  <joint name="gripper_base_to_gripper_right3" type="revolute">
     <parent link="gripper_base"/>
     <child link="gripper_right3"/>
     <origin xyz="0.016 0.014 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10.0" lower="0.0" upper="0.7" velocity="3.14"/>
+    <dynamics damping="0.3" friction="0.1"/>
+    <mimic joint="gripper_controller" multiplier="-1.0" offset="0.0"/>
   </joint>
 
   <joint name="gripper_base_to_gripper_right2" type="fixed">
@@ -605,6 +614,24 @@
         <param name="min">-3.14</param>
         <param name="max">3.14</param>
       </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- Gripper (adaptive). Only gripper_controller is commanded; the right
+         finger joint mirrors it via <mimic> in the URDF above. -->
+    <joint name="gripper_controller">
+      <command_interface name="position">
+        <param name="min">-0.7</param>
+        <param name="max">0.0</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="gripper_base_to_gripper_right3">
+      <param name="mimic">gripper_controller</param>
+      <param name="multiplier">-1.0</param>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
     </joint>

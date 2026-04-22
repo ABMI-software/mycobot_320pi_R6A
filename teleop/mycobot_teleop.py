@@ -285,6 +285,15 @@ class RosBridgeArmPublisher:
         )
         self.hand_xyz_topic.advertise()
 
+        # Gripper position command (Gazebo). Pro adaptive gripper has one
+        # driving joint; we send [rad] where 0 = open, -0.7 = closed (matches
+        # the URDF limits). See set_gripper_normalized() below.
+        self.gripper_topic = roslibpy.Topic(
+            self.ros, "/gripper_position_controller/commands",
+            "std_msgs/Float64MultiArray",
+        )
+        self.gripper_topic.advertise()
+
         # Live gain tuning: subscribe to /teleop/gains
         self._gain_callback = None
         self._tfs_callback = None
@@ -322,6 +331,15 @@ class RosBridgeArmPublisher:
             "vector": {"x": float(xyz[0]), "y": float(xyz[1]), "z": float(xyz[2])},
         }
         self.hand_xyz_topic.publish(msg)
+
+    def send_gripper_normalized(self, openness: float) -> None:
+        """Publish gripper command. openness ∈ [0, 1]: 0 = closed, 1 = open.
+
+        Maps to the URDF limit range [-0.7, 0] rad where 0 rad = open, -0.7 rad = closed.
+        """
+        o = max(0.0, min(1.0, float(openness)))
+        position_rad = -0.7 * (1.0 - o)  # o=0 → -0.7 (closed), o=1 → 0 (open)
+        self.gripper_topic.publish(roslibpy.Message({"data": [position_rad]}))
 
     def set_tfs(self, time_from_start_s: float) -> None:
         sec = int(time_from_start_s)
@@ -364,6 +382,7 @@ class RosBridgeArmPublisher:
         try:
             self.topic.unadvertise()
             self.hand_xyz_topic.unadvertise()
+            self.gripper_topic.unadvertise()
             self.gain_topic.unsubscribe()
             self.recal_topic.unsubscribe()
             self.ros.terminate()
@@ -540,10 +559,18 @@ def main(
 
             if ros_pub is not None:
                 ros_pub.send_deg(q_deg)
-                # Mirror hand XYZ for the dashboard (rosbridge path only)
                 if use_rosbridge:
+                    # Mirror hand XYZ + gripper openness for the dashboard
                     try:
                         ros_pub.send_hand_xyz(xyz)
+                    except AttributeError:
+                        pass
+                    # Map Wilor open_degree (SAFE_RANGE["g"] = 2..90) → [0, 1]
+                    try:
+                        g_lo, g_hi = SAFE_RANGE["g"]
+                        opn = float(pose.open_degree) if hasattr(pose, "open_degree") else g_lo
+                        normalized = (opn - g_lo) / max(1e-6, g_hi - g_lo)
+                        ros_pub.send_gripper_normalized(normalized)
                     except AttributeError:
                         pass
 
