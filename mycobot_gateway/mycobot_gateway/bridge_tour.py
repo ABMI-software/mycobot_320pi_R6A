@@ -12,9 +12,11 @@ class BridgeTour(Node):
         self.publisher_ = self.create_publisher(String, '/from_robot', 10)
         self.subscription = self.create_subscription(String, '/to_robot', self.send_callback, 10)
         
-        # --- VERIFIEZ BIEN CETTE IP ---
-        self.pi_ip = '10.10.0.218' 
-        self.port = 5005
+        # Pi IP is configurable via ROS parameter
+        self.declare_parameter('pi_ip', '10.10.0.225')
+        self.declare_parameter('pi_port', 5005)
+        self.pi_ip = self.get_parameter('pi_ip').get_parameter_value().string_value
+        self.port = self.get_parameter('pi_port').get_parameter_value().integer_value
         self.socket = None
         self.connected = False
         self.lock = threading.Lock()

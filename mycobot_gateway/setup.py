@@ -51,6 +51,9 @@ setup(
             # DREAM inference + Pick-and-place (Gazebo)
             'dream_inference = mycobot_gateway.dream_inference_node:main',
             'pick_and_place = mycobot_gateway.pick_and_place_node:main',
+
+            # Hand teleoperation (trajectory → JSON bridge for real robot)
+            'trajectory_to_robot_bridge = mycobot_gateway.trajectory_to_robot_bridge:main',
         ],
     },
 )
