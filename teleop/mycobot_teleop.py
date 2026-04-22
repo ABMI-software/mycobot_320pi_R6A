@@ -288,10 +288,17 @@ class RosBridgeArmPublisher:
         # Live gain tuning: subscribe to /teleop/gains
         self._gain_callback = None
         self._tfs_callback = None
+        self._recalibrate_callback = None
         self.gain_topic = roslibpy.Topic(
             self.ros, "/teleop/gains", "std_msgs/Float64MultiArray"
         )
         self.gain_topic.subscribe(self._on_gain_message)
+
+        # Recalibration trigger (Dashboard → teleop)
+        self.recal_topic = roslibpy.Topic(
+            self.ros, "/teleop/recalibrate", "std_msgs/Empty"
+        )
+        self.recal_topic.subscribe(self._on_recalibrate_message)
         sec = int(time_from_start_s)
         nsec = int((time_from_start_s - sec) * 1e9)
         self.tfs = {"sec": sec, "nanosec": nsec}
@@ -325,6 +332,17 @@ class RosBridgeArmPublisher:
         """cb(x_gain: float, y_gain: float, z_gain: float, tfs: float) -> None"""
         self._gain_callback = cb
 
+    def set_recalibrate_callback(self, cb) -> None:
+        """cb() -> None, called when /teleop/recalibrate receives a message."""
+        self._recalibrate_callback = cb
+
+    def _on_recalibrate_message(self, _msg: dict) -> None:
+        if self._recalibrate_callback is not None:
+            try:
+                self._recalibrate_callback()
+            except Exception as e:
+                print(f"[WARN] recalibrate failed: {e}")
+
     def _on_gain_message(self, msg: dict) -> None:
         if self._gain_callback is None:
             return
@@ -347,6 +365,7 @@ class RosBridgeArmPublisher:
             self.topic.unadvertise()
             self.hand_xyz_topic.unadvertise()
             self.gain_topic.unsubscribe()
+            self.recal_topic.unsubscribe()
             self.ros.terminate()
         except Exception:
             pass
@@ -479,9 +498,21 @@ def main(
         if not quiet:
             print(f"[GAINS] x={gx:.2f} y={gy:.2f} z={gz:.2f} tfs={tfs}", flush=True)
 
+    def _recalibrate():
+        """Reset the tracker's initial pose, using the next detection as new zero."""
+        try:
+            tracker._pause()
+            time.sleep(0.05)
+            tracker._resume()  # this calls pose_computer.reset() internally
+            if not quiet:
+                print("[RECAL] Tracker initial_pose cleared — keep palm in view", flush=True)
+        except Exception as e:
+            print(f"[WARN] recalibrate failed: {e}")
+
     if ros_pub is not None and use_rosbridge:
         try:
             ros_pub.set_gain_callback(_on_gain_update)
+            ros_pub.set_recalibrate_callback(_recalibrate)
         except AttributeError:
             pass  # direct rclpy publisher doesn't support live tuning
 
