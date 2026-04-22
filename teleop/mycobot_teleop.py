@@ -114,8 +114,14 @@ def get_rot_from_pose(pose: GripperPose) -> np.ndarray:
     return np.asarray(getattr(pose, "rotation"), dtype=float)
 
 
+# How many degrees of joint motion we produce per metre of hand motion at
+# gain=1.0. Picked so that a natural 15 cm hand displacement drives roughly
+# 90° of joint travel — comfortable workspace for a seated operator.
+BASE_SCALE_DEG_PER_M = 600.0
+
+
 def xyz_to_joints_deg(
-    xyz: np.ndarray,
+    rel_xyz: np.ndarray,
     *,
     invert_x: bool = True,   # hand forward  → elbow extends (EE goes forward)
     invert_y: bool = False,  # hand right    → base rotates right
@@ -126,45 +132,43 @@ def xyz_to_joints_deg(
     joint_limits: Dict[str, Tuple[float, float]] = JOINT_LIMITS_DEG,
     joint_names: List[str] = DEFAULT_JOINT_NAMES,
 ) -> np.ndarray:
-    """Map hand XYZ to 6 MyCobot joint angles (deg). No IK — direct linear map.
+    """Map relative hand XYZ (m) to joint angles (deg) in delta form.
 
-    Intuitive mapping (operator's point of view):
-      Y (hand left/right) → J1 base yaw        lateral hand → base rotates
-      Z (hand up/down)    → J2 shoulder pitch  hand up → EE up
-      X (hand forward)    → J3 elbow           hand forward → arm extends
-      Z (hand up/down)    → J5 wrist pitch     keeps EE horizontal as arm tilts
-      J4, J6 stay neutral (rotations we don't extract from hand yet)
+    The mapping is intentionally *relative*: with rel_xyz = (0, 0, 0) all
+    joints are exactly 0°, so after Wilor captures its initial_pose on
+    first detection the robot stays at home. The joints only move as the
+    operator's hand drifts away from that reference.
 
-    Default inversions (invert_x=True, invert_z=True) chosen so the robot
-    mirrors the operator without kinematic surprises. Flip with
-    --no-invert-x / --no-invert-z if your robot config goes the other way.
+    Axis routing (operator's point of view):
+      Y delta (lateral)   → J1 base yaw         hand right → base right
+      Z delta (vertical)  → J2 shoulder pitch   hand up → EE up
+      X delta (depth)     → J3 elbow            hand forward → arm extends
+      Z delta (vertical)  → J5 wrist pitch      half-coupled to shoulder
+      J4, J6 stay at 0° (not driven yet)
+
+    Gains are in dimensionless multipliers on top of BASE_SCALE_DEG_PER_M
+    (≈600 deg/m). Defaults land J2/J3 around 45–90° for a 15 cm hand move,
+    which feels natural. Flip signs with --no-invert-{x,y,z} if your
+    robot orientation mirrors the operator.
     """
-    x, y, z = xyz.tolist()
+    dx, dy, dz = rel_xyz.tolist()
+    if invert_x:
+        dx = -dx
+    if invert_y:
+        dy = -dy
+    if invert_z:
+        dz = -dz
 
-    def _scaled(rng: Tuple[float, float], gain: float) -> Tuple[float, float]:
-        lo, hi = rng
-        mid = 0.5 * (lo + hi)
-        half = 0.5 * (hi - lo) / max(1e-6, gain)
-        return (mid - half, mid + half)
-
-    src_x = _scaled(SAFE_RANGE["x"], x_gain)
-    src_y = _scaled(SAFE_RANGE["y"], y_gain)
-    src_z = _scaled(SAFE_RANGE["z"], z_gain)
-
-    lims = {k: joint_limits[k] for k in joint_names}
-    dst_j1 = maybe_reverse(lims[joint_names[0]], invert_y)   # Y → J1
-    dst_j2 = maybe_reverse(lims[joint_names[1]], invert_z)   # Z → J2
-    dst_j3 = maybe_reverse(lims[joint_names[2]], invert_x)   # X → J3
-    dst_j5 = maybe_reverse(lims[joint_names[4]], invert_z)   # Z → J5
-
-    j1 = map_range(y, src_y, dst_j1)
-    j2 = map_range(z, src_z, dst_j2)
-    j3 = map_range(x, src_x, dst_j3)
+    scale = BASE_SCALE_DEG_PER_M
+    j1 = dy * scale * y_gain           # base yaw   ← lateral
+    j2 = dz * scale * z_gain           # shoulder   ← vertical
+    j3 = dx * scale * x_gain           # elbow      ← depth
     j4 = 0.0
-    j5 = map_range(z, src_z, dst_j5)
+    j5 = dz * scale * z_gain * 0.5     # wrist      ← vertical (half amplitude)
     j6 = 0.0
 
     joints = np.array([j1, j2, j3, j4, j5, j6], dtype=float)
+    lims = {k: joint_limits[k] for k in joint_names}
     for i, name in enumerate(joint_names):
         lo, hi = lims[name]
         joints[i] = clamp(joints[i], lo, hi)
@@ -452,9 +456,9 @@ def main(
         print(f"[INFO] Input: {src_desc} (backend={be})")
 
     # -------- build hand tracker (no pinocchio) --------
-    follower_pos = np.array([0.18, 0.0, 0.1])
-    follower_rot = R.from_euler("ZYX", [0, 45, -90], degrees=True).as_matrix()
-    follower_pose = GripperPose(follower_pos, follower_rot, open_degree=5)
+    # Zero base_pose so the tracker returns pure relative displacement —
+    # that way rel=0 (hand at calibration reference) maps to all joints 0°.
+    follower_pose = GripperPose.zero()
 
     tracker = HandTracker(
         cam_idx=0,
