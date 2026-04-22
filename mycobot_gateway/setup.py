@@ -54,6 +54,7 @@ setup(
 
             # Hand teleoperation (trajectory → JSON bridge for real robot)
             'trajectory_to_robot_bridge = mycobot_gateway.trajectory_to_robot_bridge:main',
+            'gripper_to_robot_bridge = mycobot_gateway.gripper_to_robot_bridge:main',
         ],
     },
 )
