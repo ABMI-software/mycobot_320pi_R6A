@@ -6,10 +6,12 @@ Ce projet intègre :
 - Un **bridge ROS2 TCP** pour contrôler un MyCobot 320 Pi depuis un PC distant
 - Une **simulation Gazebo Harmonic** avec gripper adaptatif, 4 caméras et domain randomization
 - Un **pipeline ML DREAM** : keypoint detection (VGG-19) → belief maps → PnP → pose 3D
+- Une **téléopération par la main** (Wilor + Orbbec Astra) avec dashboard de tuning et rapport Excel — adapté du pipeline R5A / LeRobot
 - Des **datasets** synthétiques (Gazebo, 50K frames) et réels (caméras Pi, 4K images) via Git LFS
 
 > Pour reprendre le développement, voir [`SESSION_RESUME.md`](SESSION_RESUME.md)
 > Documentation technique détaillée dans [`DEVELOPMENT_SUMMARY.md`](DEVELOPMENT_SUMMARY.md)
+> Pour la téléopération (pipeline, filtres, dashboard, rapport de perf) : [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md)
 
 ---
 
@@ -222,6 +224,47 @@ Plus de détails : [`datasets/README.md`](datasets/README.md)
 | **Teleop Keyboard** | `teleop_keyboard.launch.py` | Contrôle clavier (WASD + ZX) |
 | **Commander CLI** | `commander.launch.py` | Commandes textuelles interactives |
 | **RViz Sync** | `rviz_sync.launch.py` | Synchronisation robot réel → RViz |
+| **Hand Teleop** | `mycobot_teleop.launch.py` | **Téléop par caméra/main** (Wilor + Astra) — voir ci-dessous |
+
+---
+
+## 🖐️ Téléopération par la main
+
+Pipeline complet de pilotage du robot par la main de l'opérateur, adapté du R5A / LeRobot. **Orbbec Astra S** (RGB via OpenNI2 shared-memory) → **Wilor** (hand pose 6-DoF) → mapping relatif → filtres R5A → **rosbridge** → JTC Gazebo + `bridge_tour` vers le Pi réel.
+
+**Outils livrés** ([teleop/](teleop/)) :
+
+| Outil | Rôle |
+|-------|------|
+| `mycobot_teleop.py` | Script principal — caméra → joints |
+| `teleop_dashboard.py` | GUI ttkbootstrap : 4 sliders live (x/y/z gain, tfs), bouton Recalibrate, 3 plots temps réel, tableau stats par joint avec flags OK/JITTERY/UNSTABLE |
+| `performance_analyzer.py` | Générateur de rapport Excel — protocole guidé 7 phases → verdict READY / CAUTIOUS / NOT READY + onglets par-joint, par-scénario, raw data |
+| `orbbec_capture.py` | Wrapper shared-memory Astra avec auto-spawn `oni_grabber` + watchdog |
+
+**Workflow 5 terminaux** :
+
+```bash
+# T1 — rosbridge
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+
+# T2 — Gazebo + controllers
+ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim
+
+# T3 — teleop (env conda hand-teleop)
+conda activate hand-teleop && cd teleop
+python3 mycobot_teleop.py --camera astra --ros --use-rosbridge
+
+# T4 — dashboard live tuning
+python3 teleop_dashboard.py
+
+# T5 — rapport de performance avant robot réel
+python3 performance_analyzer.py --guided
+```
+
+**Documentation détaillée** :
+- [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) — pipeline complet, filtres, historique
+- [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) — manuel utilisateur du dashboard
+- [`docs/TELEOP_TUNING.md`](docs/TELEOP_TUNING.md) — référence des paramètres + dépannage
 
 ---
 
@@ -266,6 +309,12 @@ mycobot_R6A/
 ├── datasets/                       # 📦 Données (Git LFS)
 │   ├── real_dataset/               # 2000 poses × 2 caméras
 │   └── synthetic_dataset/          # 5000 poses × 4 caméras
+│
+├── teleop/                         # 🖐️ Téléopération par la main (env conda)
+│   ├── mycobot_teleop.py           # Script principal : caméra → joints
+│   ├── teleop_dashboard.py         # GUI ttkbootstrap live tuning + plots
+│   ├── performance_analyzer.py     # Rapport Excel avant robot réel
+│   └── orbbec_capture.py           # Wrapper Astra via oni_grabber + shm
 │
 ├── scripts/
 │   ├── train_pipeline.sh           # Pipeline merge→NDDS→training automatisé
@@ -322,6 +371,9 @@ git lfs pull
 | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | Guide démarrage rapide |
 | [`docs/SYNTHETIC_DATA.md`](docs/SYNTHETIC_DATA.md) | Pipeline données synthétiques |
 | [`docs/ROBOT_QUICKSTART.md`](docs/ROBOT_QUICKSTART.md) | Procédure robot réel |
+| [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) | Téléopération par la main (pipeline + filtres) |
+| [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) | Manuel utilisateur du dashboard de téléop |
+| [`docs/TELEOP_TUNING.md`](docs/TELEOP_TUNING.md) | Référence paramètres + dépannage téléop |
 | [`training/README.md`](training/README.md) | Documentation pipeline ML |
 
 ---

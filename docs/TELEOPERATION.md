@@ -2,41 +2,131 @@
 
 Pilotage du MyCobot 320 Pi par la main de l'opérateur, en simulation Gazebo et sur le robot réel. Adaptation du pipeline développé par l'équipe pour les robots ArmR5A et LeRobot (voir [ABMI-software/hand_controlLerobot](https://github.com/ABMI-software/hand_controlLerobot)).
 
+> **Documents liés**
+> - [TELEOP_TUNING.md](TELEOP_TUNING.md) — référence des paramètres + dépannage
+> - [ARCHITECTURE.md](ARCHITECTURE.md) — architecture système globale
+
+---
+
+## Table des matières
+
+1. [Principe](#principe)
+2. [Pipeline complet](#pipeline-complet)
+3. [Prérequis](#prérequis)
+4. [Workflow 5 terminaux](#workflow-5-terminaux)
+5. [Outils livrés](#outils-livrés)
+6. [Chaîne de filtres](#chaîne-de-filtres)
+7. [Mapping main → joints](#mapping-main--joints)
+8. [Performance + critères d'acceptation](#performance--critères-dacceptation)
+9. [Limitations connues](#limitations-connues)
+10. [Historique des itérations](#historique-des-itérations)
+
 ---
 
 ## Principe
 
-Une caméra filme la main de l'opérateur → [Wilor](https://github.com/warmshao/WiLor-mini-pipeline) estime la pose de la main → un mapping linéaire XYZ → 6 angles articulaires est publié sur le topic ROS2 `/mycobot_controller/joint_trajectory`. De là, deux consommateurs en parallèle :
+Une caméra filme la main de l'opérateur → [Wilor](https://github.com/warmshao/WiLor-mini-pipeline) estime la pose 6-DoF de la main → un mapping linéaire + des filtres traduisent ça en **angles de joints** pour le MyCobot, plus un **état d'ouverture** pour la pince. Deux cibles en parallèle :
 
-- **Simulation** : `joint_trajectory_controller` (ros2_control) → `gz_ros2_control` → Gazebo
-- **Robot réel** : `trajectory_to_robot_bridge` → JSON `send_angles` → `bridge_tour` → TCP:5005 → `bridge_pi_simple.py` → pymycobot → servos
+- **Simulation Gazebo** : pour valider la téléop sans hardware
+- **Robot réel** (MyCobot 320 Pi via Raspberry Pi TCP) : une fois le sim validé
+
+**Approche** : pilotage *relatif* (delta-based). À la première détection, la main est prise comme référence (origine). Le robot reste à sa pose zéro ; les joints ne bougent qu'en fonction du **déplacement** par rapport à cette référence. Cliquer sur "Recalibrate" dans le dashboard recapture la référence à n'importe quel moment.
+
+---
+
+## Pipeline complet
 
 ```
-┌───────────────────────────┐
-│  mycobot_teleop.py        │  (conda env: hand-teleop)
-│  Wilor hand pose → XYZ    │
-│  xyz_to_joints_deg() → 6 angles deg
-│  publish via rosbridge    │
-└──────────────┬────────────┘
-               ▼
-     rosbridge_server (ws://localhost:9090)
-               ▼
-  /mycobot_controller/joint_trajectory   (trajectory_msgs/JointTrajectory)
-          │                      │
-          │ (sim)                │ (real)
-          ▼                      ▼
-  joint_trajectory_controller    trajectory_to_robot_bridge
-  (ros2_control)                 (rclpy node, rad→deg, rate-limit, deadband)
-          │                      │
-          ▼                      ▼ /to_robot (JSON)
-  gz_ros2_control                bridge_tour (TCP client)
-          │                      │ TCP:5005
-          ▼                      ▼
-   Gazebo Harmonic        Raspberry Pi (10.10.0.225)
-                          bridge_pi_simple.py → pymycobot
-                                 │
-                                 ▼
-                          MyCobot 320 Pi (/dev/ttyAMA0)
+┌───────────────────────────────────────────────────────────────┐
+│ 1. ACQUISITION — Astra S → Wilor                              │
+│                                                                │
+│   oni_grabber (C++ OpenNI2, spawné auto par le teleop)        │
+│     └→ /dev/shm/oni_color.rgb    (RGB 640×480 @ 30 Hz)        │
+│                                                                │
+│   OrbbecCapture (wrapper compatible cv2.VideoCapture)         │
+│     ├→ watchdog : respawn auto si frames stall > 2 s          │
+│     └→ survit aux Ctrl+C (start_new_session=True)             │
+│                                                                │
+│   hand_teleop.HandTracker (thread daemon)                     │
+│     ├→ Wilor inference → keypoints + pose 6-DoF               │
+│     ├→ Jump clamp 2 m/s (rejette les sauts Wilor)             │
+│     ├→ Kalman XYZ (dt=1/30, q=r=5e-3)                         │
+│     ├→ Exception wrapper — survit aux crashs Wilor            │
+│     └→ initial_pose capturée au premier detect                │
+│                                                                │
+│   Sortie : GripperPose(rel_pos=[dx,dy,dz], rot=3×3, open_deg) │
+└───────────────────────────────────────────────────────────────┘
+                            ▼
+┌───────────────────────────────────────────────────────────────┐
+│ 2. MAPPING — xyz_to_joints_deg() + extraction RPY             │
+│                                                                │
+│   rpy = as_euler("ZYX") → (roll, pitch, yaw)                  │
+│                                                                │
+│   scale = 150 °/m (BASE_SCALE_DEG_PER_M)                      │
+│                                                                │
+│   j1 = dy * scale * y_gain     (base yaw ← main latérale)     │
+│   j2 = dz * scale * z_gain     (shoulder ← main verticale)    │
+│   j3 = dx * scale * x_gain     (elbow   ← main profondeur)    │
+│   j4 = pitch * pitch_gain / 2  (wrist1  ← inclinaison paume)  │
+│   j5 = pitch * pitch_gain / 2  (wrist2  — même que j4)        │
+│   j6 = yaw   * roll_gain       (EE roll ← doorknob)           │
+│                                                                │
+│   Clampage aux limites URDF (±134° J2, ±145° J3, ...)         │
+└───────────────────────────────────────────────────────────────┘
+                            ▼
+┌───────────────────────────────────────────────────────────────┐
+│ 3. FILTRAGE — pipeline R5A / LeRobot porté                    │
+│                                                                │
+│   Joints (6 valeurs) :                                        │
+│     ├→ EMA alpha=0.20    q = 0.8 * q_prev + 0.2 * q_raw       │
+│     └→ Slew 1°/frame     Δq ∈ [−1°, +1°] → 30 °/s @ 30 Hz    │
+│                                                                │
+│   Gripper (scalaire) :                                        │
+│     ├→ Deadband 3°       ignore bruit au repos                │
+│     ├→ EMA alpha=0.25                                         │
+│     └→ Slew 4°/frame                                          │
+└───────────────────────────────────────────────────────────────┘
+                            ▼
+┌───────────────────────────────────────────────────────────────┐
+│ 4. PUBLICATION via rosbridge (ws://localhost:9090)            │
+│                                                                │
+│   /mycobot_controller/joint_trajectory                        │
+│       trajectory_msgs/JointTrajectory                          │
+│       [{positions: [q1..q6] rad, time_from_start: 0.25 s}]    │
+│       → 30 Hz                                                 │
+│                                                                │
+│   /gripper_position_controller/commands                       │
+│       std_msgs/Float64MultiArray                              │
+│       data = [servo_left, servo_right, tip_left, tip_right]   │
+│                                                                │
+│   /teleop/hand_xyz                 (monitoring dashboard)     │
+│   /teleop/gains    (subscribe)     (slider dashboard)         │
+│   /teleop/recalibrate (subscribe)  (bouton dashboard)         │
+└───────────────────────────────────────────────────────────────┘
+                            ▼
+┌───────────────────────────────────────────────────────────────┐
+│ 5. EXÉCUTION                                                  │
+│                                                                │
+│   ┌─ SIM ──────────────────────────────────────┐              │
+│   │ joint_trajectory_controller (JTC)          │              │
+│   │   • PID p=100, i=0.01, d=1.0 par joint     │              │
+│   │   • interpolation splines entre waypoints  │              │
+│   │ gz_ros2_control → DART physics → Gazebo    │              │
+│   │ joint_state_broadcaster → /joint_states    │              │
+│   └────────────────────────────────────────────┘              │
+│                                                                │
+│   ┌─ RÉEL ──────────────────────────────────────┐             │
+│   │ trajectory_to_robot_bridge (ROS2 node)      │             │
+│   │   /mycobot_controller/joint_trajectory (rad)│             │
+│   │     ├→ conversion rad → deg                 │             │
+│   │     ├→ rate limit 15 Hz (baud série limite) │             │
+│   │     ├→ deadband 1° (skip micro-changes)     │             │
+│   │     └→ publish /to_robot JSON               │             │
+│   │ bridge_tour (TCP:5005 → Raspberry Pi)       │             │
+│   │ bridge_pi_simple.py → pymycobot             │             │
+│   │   → servos MyCobot 320                      │             │
+│   └─────────────────────────────────────────────┘             │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -46,7 +136,7 @@ Une caméra filme la main de l'opérateur → [Wilor](https://github.com/warmsha
 ### Sur le PC Tour
 
 ```bash
-# ROS2 stack (déjà installé sur le poste)
+# Packages ROS2 (installés sur ce poste)
 sudo apt install \
   ros-jazzy-ros2-control \
   ros-jazzy-ros2-controllers \
@@ -59,35 +149,29 @@ sudo apt install \
 
 ### Environnement `hand-teleop` (conda)
 
-Déjà présent sur ce poste à `/home/genji/miniconda/envs/hand-teleop`. Dépendances :
-- `roslibpy` (pour le mode `--use-rosbridge`)
-- `primesense` (pour l'accès Astra — `pip install primesense` dans l'env)
-- `wilor`, `mediapipe`, `opencv-python`, `scipy`
-- modules du repo `hand-teleop` (`hand_teleop.gripper_pose`, `hand_teleop.hand_pose`, `hand_teleop.tracking`)
+À `/home/genji/miniconda/envs/hand-teleop`. Dépendances :
 
-> **Pourquoi `--use-rosbridge` est obligatoire :** l'env conda est en Python 3.10,
-> alors que ROS2 Jazzy est compilé pour Python 3.12. `import rclpy` échoue donc
-> dans l'env conda (`No module named 'rclpy._rclpy_pybind11'`). Le script détecte
-> l'erreur et bascule silencieusement en "pas de ROS" — d'où l'impression que
-> "le bras ne bouge pas". Passer par rosbridge (WebSocket, Python-agnostic)
-> contourne le problème. C'est la même raison pour laquelle le R5A utilise
-> `--use-rosbridge` dans ses 4 terminaux.
+```
+roslibpy            # pour --use-rosbridge (OBLIGATOIRE en mode conda)
+primesense          # bindings Python OpenNI2 (test wrapper initial)
+wilor               # hand pose model
+mediapipe, opencv-python, scipy, numpy
+pandas, openpyxl, xlsxwriter     # pour performance_analyzer
+ttkbootstrap        # theme dark du dashboard
+matplotlib          # plots du dashboard
+primesense          # ancien wrapper Astra (rejoué au cas où)
+hand_teleop         # modules locaux (gripper_pose, hand_pose, tracking)
+```
 
-### Caméra Orbbec Astra S (profondeur)
+> **Pourquoi `--use-rosbridge` est obligatoire depuis cet env** : conda est en **Python 3.10**, ROS2 Jazzy est compilé pour **Python 3.12**. `import rclpy` échoue dans le conda env (`No module named 'rclpy._rclpy_pybind11'`). Rosbridge (WebSocket) est Python-agnostic, c'est la raison d'être de `--use-rosbridge`.
 
-Le teleop sait utiliser la caméra Astra au lieu d'une webcam UVC via `--camera astra`.
-Le flag spawne automatiquement le binaire `oni_grabber` (OpenNI2) qui lit le flux
-RGB et le publie dans `/dev/shm/oni_color.rgb`. Le wrapper
-[`orbbec_capture.py`](../teleop/orbbec_capture.py) expose ces frames via une
-interface compatible `cv2.VideoCapture`.
+### Caméra Orbbec Astra S
 
-Prérequis :
-- Binaire `oni_grabber` localisé dans `~/Downloads/Orbbec_OpenNI_v2.3.0.86-beta6_linux_release/.../samples/bin/`
-- Aucun autre processus OpenNI2 ne doit tourner (sinon `pkill -f oni_grabber` avant)
+- Binaire `oni_grabber` dans `~/Downloads/Orbbec_OpenNI_v2.3.0.86-beta6_linux_release/.../samples/bin/`
+- Spawné automatiquement par `open_orbbec()` au démarrage du teleop (`--camera astra`)
+- Frames RGB 640×480 publiées dans `/dev/shm/oni_color.rgb` via shared memory
 
-### Sur la Raspberry Pi
-
-Le même `bridge_pi_simple.py` que pour le contrôle GUI / sliders.
+### Sur la Raspberry Pi (seulement pour le robot réel)
 
 ```bash
 ssh er@10.10.0.225
@@ -96,215 +180,278 @@ python3 bridge_pi_simple.py
 
 ---
 
-## Lancement (4 terminaux, pattern identique au R5A)
-
-### Terminal 1 — rosbridge_server
+## Workflow 5 terminaux
 
 ```bash
+# ================================================================
+# T1 — rosbridge WebSocket (démarre en premier)
+# ================================================================
 conda deactivate
 source /opt/ros/jazzy/setup.bash
+source ~/ros_jazzy/install/setup.bash
 ros2 launch rosbridge_server rosbridge_websocket_launch.xml
-# → Web socket ws://localhost:9090
-```
+#    → Rosbridge WebSocket server started on port 9090
 
-### Terminal 2 — Gazebo + controllers + bridge_tour
-
-```bash
+# ================================================================
+# T2 — Gazebo + controllers (attends ~30s que controllers active)
+# ================================================================
 conda deactivate
-cd ~/ros_jazzy
-colcon build --packages-select mycobot_description mycobot_gateway --symlink-install
-source install/setup.bash
+source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+export GZ_SIM_RESOURCE_PATH=~/ros_jazzy/install/mycobot_description/share
 
-# Mode par défaut : simulation + robot réel en parallèle
+# Mode par défaut : sim + robot réel parallèle
 ros2 launch mycobot_gateway mycobot_teleop.launch.py
 
-# Simulation uniquement (utile pour tester sans le Pi)
-ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim
+# Variantes
+ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim     # Gazebo only
+ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=real    # Pi only
+ros2 launch mycobot_gateway mycobot_teleop.launch.py pi_ip:=10.10.0.225 rosbridge:=false
 
-# Robot réel uniquement (sans Gazebo)
-ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=real
-
-# IP Pi alternative
-ros2 launch mycobot_gateway mycobot_teleop.launch.py pi_ip:=192.168.1.50
-```
-
-### Terminal 3 — script de téléopération
-
-```bash
-conda deactivate
+# ================================================================
+# T3 — script de téléopération (webcam → joints via rosbridge)
+# ================================================================
 conda activate hand-teleop
 cd ~/ros_jazzy/src/mycobot_R6A/teleop
+python3 mycobot_teleop.py --camera astra --ros --use-rosbridge
 
-# Webcam UVC classique (Logitech, built-in laptop cam…)
-python3 mycobot_teleop.py \
-  --ros --use-rosbridge \
-  --ros-topic /mycobot_controller/joint_trajectory \
-  --time-from-start 0.8 \
-  --x-gain 1.2 --y-gain 1.2 --z-gain 1.6
+# Pour une webcam USB classique au lieu de l'Astra :
+python3 mycobot_teleop.py --camera auto --cam-idx 0 --ros --use-rosbridge
 
-# Orbbec Astra S (spawne oni_grabber automatiquement)
-python3 mycobot_teleop.py --camera astra \
-  --ros --use-rosbridge \
-  --ros-topic /mycobot_controller/joint_trajectory \
-  --time-from-start 0.8 \
-  --x-gain 1.2 --y-gain 1.2 --z-gain 1.6
-```
-
-> Note : `--use-rosbridge` est **obligatoire** depuis l'env conda (voir section
-> "Environnement hand-teleop" ci-dessus). Au démarrage le tracker est en pause
-> par défaut ; le script appelle `tracker._resume()` automatiquement pour ne
-> pas nécessiter d'appui sur ESPACE.
-
-### Terminal 4 — Dashboard de tuning et monitoring (recommandé en phase sim)
-
-```bash
+# ================================================================
+# T4 — dashboard (tuning + monitoring en direct)
+# ================================================================
 conda activate hand-teleop
 cd ~/ros_jazzy/src/mycobot_R6A/teleop
 python3 teleop_dashboard.py
+
+# ================================================================
+# T5 — performance analyzer (rapport Excel avant robot réel)
+# ================================================================
+conda activate hand-teleop
+cd ~/ros_jazzy/src/mycobot_R6A/teleop
+python3 performance_analyzer.py --guided      # protocole scripté 64 s
+python3 performance_analyzer.py --duration 120 # libre 2 min
 ```
 
-Le dashboard se connecte au même rosbridge (ws://localhost:9090) et fournit :
+**Ordre important** : T1 → T2 (attendre que `mycobot_controller active`) → T3 → T4 → T5.
 
-- **4 sliders** appliqués en direct pendant que le teleop tourne :
-  - `X gain` / `Y gain` / `Z gain` — multiplicateurs qui rétrécissent la bande
-    XYZ "active" autour du centre : plus le gain est élevé, plus un petit
-    mouvement de main produit un grand mouvement articulaire. Défaut 1.2 / 1.2 / 1.6.
-  - `time_from_start` — durée de chaque trajectoire JTC (s). Plus bas = plus
-    réactif, plus haut = plus lissé. Défaut 0.8 s.
-- **3 plots temps-réel** (fenêtre glissante 10 s) :
-  - Wilor XYZ main (signal d'entrée)
-  - Angles joints commandés vs réels (solid = commandé, dashed = actual)
-  - Erreur de tracking par joint (|commandé − actual|, en degrés)
-- **Stats de stabilité** rafraîchies chaque 250 ms :
-  - RMS error et max error par joint sur la fenêtre 10 s
-  - Indicateur "OK / JITTERY / UNSTABLE" basé sur σ(Δq) entre deux commandes
-    consécutives (détecte les oscillations Wilor ou sur-amplification)
-
-Le dashboard publie sur `/teleop/gains` (`std_msgs/Float64MultiArray` :
-`[x_gain, y_gain, z_gain, time_from_start_s]`) et le teleop applique les
-nouvelles valeurs instantanément via sa callback rosbridge.
-
-### Terminal 4 bis — (non utilisé) forwarder MQTT
-
-Non utilisé pour le MyCobot : la liaison avec le robot réel passe par `bridge_tour` (TCP/JSON), pas par MQTT. Le script `mqtt_joint_forwarder.py` du projet R5A reste disponible si un jour on branche un broker MQTT, mais n'est pas nécessaire ici.
+**Après démarrage T3** : dans le dashboard T4, clique **⟲ Recalibrate hand origin** **avec la paume face caméra**. Ça capture l'origine du mapping relatif.
 
 ---
 
-## Paramètres clés
+## Outils livrés
 
-### Gains et inversions (`mycobot_teleop.py`)
+### `teleop/mycobot_teleop.py` — script principal (750+ lignes)
+
+Orchestre tout le pipeline. Arguments principaux :
 
 | Flag | Défaut | Rôle |
 |------|--------|------|
-| `--x-gain` | 1.2 | Gain X (main avant/arrière → épaule J2) |
-| `--y-gain` | 1.2 | Gain Y (main gauche/droite → base J1) |
-| `--z-gain` | 1.6 | Gain Z (main haute/basse → coude J3 + poignet J5) |
-| `--invert-z` | True | Main haute ⇒ bras haut |
-| `--time-from-start` | 0.8 | Durée de la trajectoire (s) — plus faible = plus réactif mais moins lissé |
-| `--fps` | 60 | Fréquence de lecture de la main |
+| `--camera {auto,astra}` | `auto` | `astra` = Orbbec via shared mem ; `auto` = webcam UVC |
+| `--cam-idx N` | 0 | Index /dev/videoN en mode `auto` |
+| `--ros` / `--no-ros` | on | Active la publication ROS2 |
+| `--use-rosbridge` | off | OBLIGATOIRE en env conda ; utilise WebSocket |
+| `--ros-topic T` | `/mycobot_controller/joint_trajectory` | Topic de sortie |
+| `--time-from-start S` | 0.25 | Durée de chaque trajectoire JTC (s) |
+| `--x-gain / --y-gain / --z-gain` | 1.2 / 1.2 / 1.6 | Multiplicateurs position |
+| `--invert-x / --invert-y / --invert-z` | T / F / F | Inversion par axe |
+| `--fps N` | 30 | Taux de publication (Hz) |
+| `--run-seconds N` | ∞ | Auto-shutdown après N secondes |
 
-### Limites articulaires (URDF + `JOINT_LIMITS_DEG`)
+### `teleop/orbbec_capture.py` — wrapper Astra
 
-| Joint | URDF | Limite (deg) |
-|-------|------|--------------|
-| `joint2_to_joint1` (J1) | ±2.93 rad | ±168° |
-| `joint3_to_joint2` (J2) | ±2.35 rad | ±134.6° |
-| `joint4_to_joint3` (J3) | ±2.53 rad | ±145° |
-| `joint5_to_joint4` (J4) | ±2.53 rad | ±145° |
-| `joint6_to_joint5` (J5) | ±2.93 rad | ±168° |
-| `joint6output_to_joint6` (J6) | ±3.14 rad | ±180° |
+- Spawne `oni_grabber` automatiquement (sans sudo)
+- Watchdog respawn si les frames stallent
+- Détection proprement des états morts (fichiers existants mais tick figé)
+- Survit aux Ctrl+C du parent via `start_new_session=True`
 
-### Envelope XYZ (SAFE_RANGE)
+### `teleop/teleop_dashboard.py` — GUI de tuning
 
-Tightened par rapport au R5A pour respecter la portée ~280 mm du MyCobot :
-- X : 0.10 → 0.28 m
-- Y : -0.20 → +0.20 m
-- Z : 0.01 → 0.26 m
+Design ttkbootstrap "darkly" — connecté à rosbridge. Affiche :
 
-### Rate limiting vers le robot réel (`trajectory_to_robot_bridge`)
+- **4 sliders** live : `x/y/z gain`, `time_from_start` (appliqués via `/teleop/gains`)
+- **Bouton ⟲ Recalibrate** (publie sur `/teleop/recalibrate`)
+- **Indicateur connexion** + compteurs de messages par topic
+- **Tableau stats** par joint : RMS, max, jitter, flag `✓ OK / △ JITTERY / ⚠ UNSTABLE`
+- **3 plots matplotlib** (fenêtre 10 s glissante) : Wilor XYZ / commandé vs actual / erreur de tracking par joint + ligne 5° cible
 
-| Paramètre | Défaut | Rôle |
-|-----------|--------|------|
-| `rate_hz` | 15.0 | Fréquence max d'envoi JSON vers `/to_robot` |
-| `deadband_deg` | 1.0 | Ignore les commandes qui changent de < 1° |
-| `speed` | 40 | Vitesse pymycobot (0–100) |
-| `enable` | true | Toggle pour couper le réel sans tuer la sim |
+### `teleop/performance_analyzer.py` — rapport Excel
 
-> Le rate-limit à 15 Hz est volontairement conservateur : `pymycobot` sature vers 20–25 Hz sur liaison série 115200 baud. En cas de latence excessive, baisser `rate_hz` à 10.
+Génère un `.xlsx` multi-onglets avec verdict `READY / CAUTIOUS / NOT READY`. Deux modes :
+
+- `--guided` : protocole scripté 7 phases (idle, up/down, left/right, forward/back, combined, gripper, rest) sur 64 s
+- `--duration N` : enregistrement libre pendant N secondes
+
+Onglets générés :
+
+- **Summary** : verdict coloré + santé globale + workspace utilisé
+- **Per-joint tracking** : RMS, max, p50/p90/p99 avec graphique bar chart
+- **Scenarios** : breakdown par phase (mode guided uniquement)
+- **Signal health** : taux de publication, dropouts, longest gap
+- **raw_hand / raw_cmd / raw_actual** : données brutes horodatées
+
+### `mycobot_gateway/mycobot_gateway/trajectory_to_robot_bridge.py`
+
+Nœud ROS2 qui souscrit à `/mycobot_controller/joint_trajectory` et publie des commandes JSON sur `/to_robot` pour `bridge_tour` :
+
+```json
+{"action": "send_angles", "angles": [deg1, ..., deg6], "speed": 40}
+```
+
+Paramètres ROS : `trajectory_topic`, `out_topic`, `speed`, `rate_hz` (15 par défaut), `deadband_deg` (1), `enable`.
+
+### `mycobot_gateway/launch/mycobot_teleop.launch.py`
+
+Launch orchestré. Args : `target:={sim,real,both}`, `pi_ip`, `pi_port`, `rosbridge`, `real_speed`, `real_rate_hz`.
 
 ---
 
-## Dépannage
+## Chaîne de filtres
 
-### Le robot ne bouge pas en Gazebo
+Trois étages ADD sur la sortie Wilor, tous empruntés au R5A / LeRobot (validés en prod) :
 
-1. Vérifier que le `mycobot_controller` est bien actif :
-   ```bash
-   ros2 control list_controllers
-   # → mycobot_controller [joint_trajectory_controller/JointTrajectoryController] active
-   ```
+### Stage 1 — Tracker interne (dans hand_teleop.HandTracker)
 
-2. Vérifier que `/mycobot_controller/joint_trajectory` reçoit bien des messages :
-   ```bash
-   ros2 topic hz /mycobot_controller/joint_trajectory
-   ```
+| Filtre | Paramètres | Effet |
+|--------|-----------|-------|
+| **Jump clamp** | 2 m/s | Rejette les sauts Wilor > 2 m/s (typiquement reacquisition) |
+| **Kalman XYZ** | dt=1/30, q=5e-3, r=5e-3 | Lisse la position 3D, prédit entre détections |
 
-3. Si le spawner échoue avec *"Could not contact controller manager"*, augmenter le `period` dans le `TimerAction` du launch file (Gazebo met parfois >3 s à spawner le robot).
+### Stage 2 — Joint command (dans xyz_to_joints_deg puis main loop)
 
-### Le robot réel ne bouge pas
+| Filtre | Paramètres | Effet |
+|--------|-----------|-------|
+| **EMA** | α=0.20 | `q = 0.8 * q_prev + 0.2 * q_raw` — atténue le jitter |
+| **Slew limiter** | 1 °/frame | `Δq ∈ [−1°, +1°]` → 30 °/s max @ 30 Hz (URDF limite 180 °/s) |
 
-1. Vérifier que `bridge_tour` est connecté :
-   ```bash
-   ros2 topic echo /from_robot
-   # Devrait afficher les réponses du Pi à chaque JSON envoyé
-   ```
+### Stage 3 — Gripper (pipeline séparé, spécifique à open_degree)
 
-2. Tester manuellement :
-   ```bash
-   ros2 topic pub --once /to_robot std_msgs/msg/String \
-     '{data: "{\"action\":\"send_angles\",\"angles\":[0,0,0,0,0,0],\"speed\":40}"}'
-   ```
+| Filtre | Paramètres | Effet |
+|--------|-----------|-------|
+| **Deadband** | 3° | Si `|g − center| < 3°` → garde la valeur EMA → pas de "breathing" |
+| **EMA** | α=0.25 | Lisse le bruit de `open_degree` Wilor |
+| **Slew** | 4°/frame | Bloque les jumps de reacquisition |
 
-3. Vérifier les limites — le Pi rejette les commandes hors-limite silencieusement.
+> **Historique de tuning** : scale commencé à 300 °/m avec slew 8 °/frame → RMS 40-70°. Itérations successives (200 → 150 °/m, slew 8 → 5 → 3 → **1 °/frame** comme R5A) ont réduit RMS à 13-17° puis < 10°.
 
-### rosbridge refuse la connexion
+---
 
-```bash
-# Vérifier que le port 9090 est libre
-nc -zv localhost 9090
-# Puis relancer le Terminal 1
+## Mapping main → joints
+
+```
+╔═════════════════════════════════════════════════════════════╗
+║  Position (relative à initial_pose de Wilor)                ║
+╠═════════════════════════════════════════════════════════════╣
+║  Y (main latérale)  →  J1 base yaw                          ║
+║  Z (main verticale) →  J2 shoulder                          ║
+║  X (main profondeur)→  J3 elbow                             ║
+╠═════════════════════════════════════════════════════════════╣
+║  Orientation (Euler ZYX intrinsèque de la pose relative)    ║
+╠═════════════════════════════════════════════════════════════╣
+║  pitch  →  J4 wrist1 (*gain*0.5)                            ║
+║  pitch  →  J5 wrist2 (*gain*0.5)   ← J4+J5 combinés         ║
+║  yaw    →  J6 EE roll              ← doorknob, paume face   ║
+║                                     caméra qui tourne       ║
+║  roll   →  (inutilisé — axe ambigu dans le repère Wilor)    ║
+╚═════════════════════════════════════════════════════════════╝
 ```
 
-### Main non détectée
+**Signes par défaut** (CLI `--invert-{x,y,z}`) :
 
-Le modèle Wilor est sensible au cadrage et à l'éclairage. Tester avec la main bien visible, paume face caméra, fond uni. `--model mediapipe` est une alternative plus rapide mais moins précise.
+| Axe | Défaut | Comportement |
+|-----|--------|--------------|
+| X | `invert_x=True` | Main avance → coude s'étend → EE avance |
+| Y | `invert_y=False` | Main droite → base tourne droite |
+| Z | `invert_z=False` | Main monte → épaule pivote → EE monte |
+
+**Scale et gains** (tous tunables via dashboard) :
+
+- **BASE_SCALE** = 150 °/m → 1.0 de gain = 15 cm déplace un joint de 22.5°
+- **x/y/z_gain** = 1.2 / 1.2 / 1.6 → 15 cm de main = 27° / 27° / 36° au joint
+- **pitch_gain** = 0.4 → 45° de main = 9° par joint (J4 + J5)
+- **roll_gain** = 0.4 → 45° de yaw main = 18° sur J6
+
+---
+
+## Performance + critères d'acceptation
+
+`performance_analyzer.py` évalue la téléop contre ces **seuils** (dans [performance_analyzer.py:41-44](../teleop/performance_analyzer.py)) :
+
+- **RMS error** ≤ 10° par joint → pas JITTERY
+- **Max error** ≤ 30° par joint → pas UNSTABLE
+- **Cmd jitter** ≤ 3° → pas JITTERY ; ≤ 6° → pas UNSTABLE
+- **Publish rate** ≥ 70% cible (30 Hz) pour un verdict non-failing
+- **Detection dropouts** ≤ 2 pour un verdict non-failing
+
+Verdict final :
+- **READY FOR REAL ROBOT** — tous les joints pilotés OK, cadence nominale
+- **CAUTIOUS — REAL OK WITH REDUCED SPEED** — joints JITTERY seulement (halver les gains avant réel)
+- **NOT READY FOR REAL** — au moins 1 joint UNSTABLE ou cadence / dropouts problématiques
+
+### Résultats des runs successifs
+
+| Run | Config | RMS J1-J3 | Max J1-J3 | Verdict |
+|-----|--------|-----------|-----------|---------|
+| 1 | 60 Hz, tfs 0.15, scale 300, slew 8°/f | 47-70° | 185-281° | NOT READY (4 UNSTABLE) |
+| 2 | 30 Hz, tfs 0.25, scale 200, slew 5°/f, rot gains ÷2 | 13-17° | 46-52° | NOT READY (4 UNSTABLE) |
+| 3 | scale 150, slew 3°/f + seuils réalistes | 13-17° | 45-52° | NOT READY (J6 noisy) |
+| 4 | slew 1°/f + gripper deadband chain | **visé < 10°** | **visé < 30°** | — |
 
 ---
 
 ## Limitations connues
 
-1. **Pas d'IK réelle** — le mapping XYZ → angles est linéaire, pas géométrique. L'effecteur ne suit pas la main au mm près ; c'est un contrôle "gestuel" pas "précis". Pour du pick-and-place précis, utiliser `pick_and_place.launch.py` avec la détection DREAM.
+### Pince en simulation
 
-2. **J4 et J6 sont fixes à 0°** — le mapping actuel n'utilise pas la rotation de la main pour piloter les poignets. Une extension future pourrait lire les angles d'Euler de la main (`rot` de `GripperPose`) et les mapper sur J4/J6.
+Le `pro_adaptive_gripper` utilise un **mécanisme 4-barres à boucle fermée** qu'URDF ne peut pas représenter (arbres uniquement). DART physics ignore les `<mimic>` constraints. Solution retenue : **piloter les 4 joints explicitement** via le controller → les doigts bougent symétriquement mais la cinématique n'est pas anatomiquement précise (extrémités qui tournent avec leur parent au lieu de rester parallèles).
 
-3. **Pas de contrôle gripper** — le `pro_adaptive_gripper` est fixé en Gazebo (joints `fixed`). Pour le robot réel, ajouter une détection de pinch dans le script et publier un `{"action": "gripper_open"}` / `{"action": "gripper_close"}`.
+**Impact pratique** : la pince *visuelle* dans Gazebo n'est pas fidèle mais la fonctionnalité (open/close commandable) fonctionne. Sur le **robot réel** cette limitation disparaît : `pymycobot` commande directement le servo physique qui gère la cinématique 4-barres mécaniquement.
 
-4. **Dépendance sim-réel synchrone** — quand `target:=both`, la sim et le réel reçoivent les mêmes commandes. Si le réel est plus lent que la sim (limite servo), une désynchronisation visible apparaîtra. C'est accepté pour la démo ; pour un travail sérieux, utiliser `target:=real` ou `target:=sim`.
+### Inversion rclpy ↔ conda
+
+Impossible d'utiliser `rclpy` dans l'env conda `hand-teleop` (Python 3.10 vs ROS2 Jazzy 3.12). Contournement : **`--use-rosbridge` obligatoire**. Inconvénient : une connexion WebSocket de plus. Avantage : découple totalement la téléop de ROS2 niveau versioning.
+
+### Axe du doorknob (J6)
+
+Le remapping `j6 = yaw * roll_gain` a été ajouté le 22/04. Le test visuel par l'opérateur est encore à faire — si le yaw Wilor ne correspond pas au doorknob physique, il faudra diagnostiquer via le log RPY (ajouté dans le même commit) et éventuellement tester `j6 = roll` ou `j6 = pitch`.
+
+### Filtres par défaut parfois trop mous
+
+Slew 1°/frame = 30°/s max. Feels *sluggish* sur des gestes rapides. Pour un utilisateur qui veut plus de réactivité : monter à 2 ou 3 via la constante `DEFAULT_MAX_DELTA_DEG_PER_FRAME` (pas de CLI flag pour l'instant).
 
 ---
 
-## Architecture des fichiers
+## Historique des itérations
 
-```
-mycobot_R6A/
-├── teleop/
-│   └── mycobot_teleop.py                # Script Wilor → JointTrajectory (conda env)
-├── mycobot_description/
-│   ├── config/controller.yaml           # Config JointTrajectoryController
-│   └── urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf  # URDF + ros2_control block
-├── mycobot_gateway/
-│   ├── mycobot_gateway/
-│   │   └── trajectory_to_robot_bridge.py  # ROS2 node: trajectoire → JSON Pi
-│   └── launch/mycobot_teleop.launch.py    # Orchestration complète
-└── docs/TELEOPERATION.md                # Ce fichier
-```
+Chronologiquement, les commits qui structurent le travail (plus récent en haut) :
+
+| Commit | Résumé |
+|--------|--------|
+| `2ee80d35` | fix J6 : yaw (doorknob) au lieu de roll + log RPY debug |
+| `0866dc2c` | port filtres R5A/LeRobot : slew 1°/f + gripper deadband chain |
+| `e9cc87c7` | retune + seuils analyzer réalistes (30° max, 10° RMS) |
+| `6f87cac1` | stabilisation : fps 60→30, tfs 0.15→0.25, scale 300→200, EE orientation pitch→J4+J5 |
+| `6605e9a5` | pince : 4 joints explicites, plus de mimic |
+| `cdb106a4` | pince : retrait des mimic joints du bloc ros2_control |
+| `2437c2f3` | pince : tentative command_interface sur mimic (CRASH expected) |
+| `81e21c8f` | pince : 4-bar linkage URDF mimic (tentative, échec gravité) |
+| `6cb1e381` | wrist J4/J6 depuis hand rotation + performance_analyzer.py |
+| `432ec650` | flip invert_z default + slew rate limiter |
+| `a536e39b` | 3 fixes stabilité : /clock bridge + rate limit + auto-resume |
+| `ada34845` | mapping delta-based → robot à pose zéro au démarrage |
+| `0289fd59` | robustesse : Wilor exception wrapper + Astra watchdog |
+| `d5ae06f6` | mapping intuitif Z→J2 shoulder (était X→J2) |
+| `872ce54f` | gripper fonctionnel en Gazebo (1re version) |
+| `0cd922f6` | detect stale oni_grabber + respawn, survivre aux Ctrl+C |
+| `7859f621` | bouton Recalibrate dans dashboard |
+| `1b1a0010` | redesign dashboard moderne (ttkbootstrap darkly) |
+| `19db10c4` | dashboard live-tuning initial |
+| `f9569656` | support Orbbec Astra S via oni_grabber + auto-resume tracker |
+| `583f783e` | fix /clock bridge de Gazebo (nécessaire pour ros2_control) |
+| `1f3fae7e` | mise en place initiale du pipeline teleop complet |
+
+Pour un récapitulatif technique plus fin de chaque fix, voir `git show <commit>` — chaque message explique le root cause et la solution.
+
+---
+
+*Dernière mise à jour : 22 avril 2026*
