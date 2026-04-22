@@ -367,11 +367,18 @@ class RosBridgeArmPublisher:
     def send_gripper_normalized(self, openness: float) -> None:
         """Publish gripper command. openness ∈ [0, 1]: 0 = closed, 1 = open.
 
-        Maps to the URDF limit range [-0.7, 0] rad where 0 rad = open, -0.7 rad = closed.
+        The controller drives four joints explicitly (see controller.yaml):
+            [servo_left, servo_right, tip_left, tip_right]
+        so we build a symmetric 4-element target that keeps the fingers
+        mirrored AND the fingertips parallel to the base across the sweep:
+
+            open  (o=1):  all four at  0 rad
+            close (o=0):  [-0.7, +0.7, +0.7, -0.7]
         """
         o = max(0.0, min(1.0, float(openness)))
-        position_rad = -0.7 * (1.0 - o)  # o=0 → -0.7 (closed), o=1 → 0 (open)
-        self.gripper_topic.publish({"data": [position_rad]})
+        servo = -0.7 * (1.0 - o)          # gripper_controller (left servo)
+        data = [servo, -servo, -servo, servo]
+        self.gripper_topic.publish({"data": data})
 
     def set_tfs(self, time_from_start_s: float) -> None:
         sec = int(time_from_start_s)

@@ -385,9 +385,6 @@
     <axis xyz="0 0 1"/>
     <limit effort="2.0" lower="-0.7" upper="0.7" velocity="3.14"/>
     <dynamics damping="0.2" friction="0.05"/>
-    <!-- Counter-rotate so the finger-tip stays parallel to gripper_base
-         (4-bar linkage approximation, since URDF can't express closed loops). -->
-    <mimic joint="gripper_controller" multiplier="-1.0" offset="0.0"/>
   </joint>
 
   <joint name="gripper_base_to_gripper_right3" type="revolute">
@@ -397,7 +394,6 @@
     <axis xyz="0 0 1"/>
     <limit effort="10.0" lower="0.0" upper="0.7" velocity="3.14"/>
     <dynamics damping="0.3" friction="0.1"/>
-    <mimic joint="gripper_controller" multiplier="-1.0" offset="0.0"/>
   </joint>
 
   <joint name="gripper_base_to_gripper_right2" type="fixed">
@@ -413,10 +409,6 @@
     <axis xyz="0 0 1"/>
     <limit effort="2.0" lower="-0.7" upper="0.7" velocity="3.14"/>
     <dynamics damping="0.2" friction="0.05"/>
-    <!-- Mirror of left1: counter-rotate right3's rotation so the fingertip
-         stays parallel to gripper_base. right3 itself mimics gripper_controller
-         with multiplier=-1, so right1 needs multiplier=+1 here to cancel. -->
-    <mimic joint="gripper_controller" multiplier="1.0" offset="0.0"/>
   </joint>
 
   <!-- ==================== GAZEBO EXTRAS ==================== -->
@@ -631,8 +623,11 @@
       <state_interface name="velocity"/>
     </joint>
 
-    <!-- Gripper (adaptive). Only gripper_controller is commanded; the right
-         finger joint mirrors it via <mimic> in the URDF above. -->
+    <!-- Adaptive gripper — four joints commanded explicitly. DART doesn't
+         support URDF <mimic> constraints so we drive every mobile gripper
+         joint from the same position controller, with opposite signs to
+         keep the two fingers mirrored and the tips parallel to the base.
+         -->
     <joint name="gripper_controller">
       <command_interface name="position">
         <param name="min">-0.7</param>
@@ -642,14 +637,32 @@
       <state_interface name="velocity"/>
     </joint>
 
-    <!-- Mimic joints are intentionally NOT declared in <ros2_control>.
-         ros2_control forbids command_interface on mimic joints ("Activated
-         mimic joints cannot have command interfaces"), but a mimic joint
-         without a command_interface isn't driven under DART (no physics-
-         level mimic support). gz_ros2_control reads the URDF <mimic> tag
-         on the joints directly and mirrors them at the hardware-interface
-         level regardless of whether they appear in this ros2_control
-         block, so we just omit them here. -->
+    <joint name="gripper_base_to_gripper_right3">
+      <command_interface name="position">
+        <param name="min">0.0</param>
+        <param name="max">0.7</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="gripper_left3_to_gripper_left1">
+      <command_interface name="position">
+        <param name="min">-0.7</param>
+        <param name="max">0.7</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="gripper_right3_to_gripper_right1">
+      <command_interface name="position">
+        <param name="min">-0.7</param>
+        <param name="max">0.7</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
   </ros2_control>
 
   <!-- Gazebo ↔ ros2_control bridge plugin -->

@@ -51,8 +51,15 @@ mycobot_controller:
 
 gripper_position_controller:
   ros__parameters:
+    # Four joints driven explicitly. The caller must publish a 4-element
+    # Float64MultiArray in exactly this order:
+    #   [servo_left, servo_right, tip_left, tip_right]
+    # Close:  [-0.7, +0.7, +0.7, -0.7]   |   Open: [0, 0, 0, 0]
     joints:
       - gripper_controller
+      - gripper_base_to_gripper_right3
+      - gripper_left3_to_gripper_left1
+      - gripper_right3_to_gripper_right1
     command_interfaces:
       - position
     state_interfaces:
@@ -60,4 +67,7 @@ gripper_position_controller:
       - velocity
     state_publish_rate: 50.0
     gains:
-      gripper_controller: {p: 60.0, i: 0.005, d: 1.5, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_controller:                 {p: 60.0, i: 0.005, d: 1.5, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_base_to_gripper_right3:     {p: 60.0, i: 0.005, d: 1.5, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_left3_to_gripper_left1:     {p: 30.0, i: 0.005, d: 1.0, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_right3_to_gripper_right1:   {p: 30.0, i: 0.005, d: 1.0, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
