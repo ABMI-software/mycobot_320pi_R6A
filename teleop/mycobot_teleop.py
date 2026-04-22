@@ -126,13 +126,18 @@ BASE_SCALE_DEG_PER_M = 300.0
 # track. alpha ∈ (0, 1]: 1.0 = no smoothing, 0.2 = heavy smoothing.
 DEFAULT_COMMAND_EMA_ALPHA = 0.25
 
+# Slew rate limit — maximum joint-angle change per frame, in degrees.
+# Runs on top of EMA to catch single-frame spikes that slipped through
+# (Wilor reacquisition jumps are typically 30–150° on J1 etc.).
+DEFAULT_MAX_DELTA_DEG_PER_FRAME = 8.0
+
 
 def xyz_to_joints_deg(
     rel_xyz: np.ndarray,
     *,
     invert_x: bool = True,   # hand forward  → elbow extends (EE goes forward)
     invert_y: bool = False,  # hand right    → base rotates right
-    invert_z: bool = True,   # hand up       → shoulder tilts back (EE goes up)
+    invert_z: bool = False,  # hand up       → shoulder tilts back (EE goes up)
     x_gain: float = 1.0,
     y_gain: float = 1.0,
     z_gain: float = 1.0,
@@ -424,7 +429,7 @@ def main(
     z_gain: float = 1.6,
     invert_x: bool = False,
     invert_y: bool = False,
-    invert_z: bool = True,
+    invert_z: bool = False,
     video: Optional[str] = None,
 ) -> None:
 
@@ -613,11 +618,17 @@ def main(
                 joint_names=joint_names,
             )
 
-            # EMA smoothing: tame Wilor jitter + sudden reacquisition jumps
-            # before handing the command to the JTC. Alpha=0.25 is aggressive
-            # enough to kill single-frame spikes but still tracks a genuine
-            # hand move in ~4 frames (~65 ms at 60 Hz).
-            q_smoothed[:] = (1.0 - ema_alpha) * q_smoothed + ema_alpha * q_raw
+            # EMA smoothing + slew rate limiter. EMA settles genuine moves
+            # in ~4 frames (~65 ms at 60 Hz); the slew limiter caps each
+            # frame's delta at DEFAULT_MAX_DELTA_DEG_PER_FRAME so a single
+            # Wilor reacquisition spike can't push more than 8°/frame
+            # downstream. Together they keep the JTC inside its smooth
+            # tracking regime.
+            ema_target = (1.0 - ema_alpha) * q_smoothed + ema_alpha * q_raw
+            delta = ema_target - q_smoothed
+            max_d = DEFAULT_MAX_DELTA_DEG_PER_FRAME
+            delta = np.clip(delta, -max_d, max_d)
+            q_smoothed[:] = q_smoothed + delta
             q_deg = q_smoothed.copy()
 
             if ros_pub is not None:
@@ -703,7 +714,7 @@ if __name__ == "__main__":
     p.set_defaults(invert_y=False)
     p.add_argument("--invert-z", dest="invert_z", action="store_true")
     p.add_argument("--no-invert-z", dest="invert_z", action="store_false")
-    p.set_defaults(invert_z=True)
+    p.set_defaults(invert_z=False)
 
     args = p.parse_args()
     joint_names = [s.strip() for s in args.joints.split(",") if s.strip()]
