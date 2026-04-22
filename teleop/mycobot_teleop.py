@@ -135,12 +135,17 @@ DEFAULT_MAX_DELTA_DEG_PER_FRAME = 8.0
 def xyz_to_joints_deg(
     rel_xyz: np.ndarray,
     *,
+    rpy_deg: Tuple[float, float, float] | None = None,
     invert_x: bool = True,   # hand forward  → elbow extends (EE goes forward)
     invert_y: bool = False,  # hand right    → base rotates right
     invert_z: bool = False,  # hand up       → shoulder tilts back (EE goes up)
+    invert_roll: bool = False,
+    invert_pitch: bool = False,
     x_gain: float = 1.0,
     y_gain: float = 1.0,
     z_gain: float = 1.0,
+    roll_gain: float = 0.8,   # hand twist → J6 end-effector roll
+    pitch_gain: float = 0.6,  # hand pitch → J4 wrist tilt
     joint_limits: Dict[str, Tuple[float, float]] = JOINT_LIMITS_DEG,
     joint_names: List[str] = DEFAULT_JOINT_NAMES,
 ) -> np.ndarray:
@@ -175,9 +180,22 @@ def xyz_to_joints_deg(
     j1 = dy * scale * y_gain           # base yaw   ← lateral
     j2 = dz * scale * z_gain           # shoulder   ← vertical
     j3 = dx * scale * x_gain           # elbow      ← depth
-    j4 = 0.0
     j5 = dz * scale * z_gain * 0.5     # wrist      ← vertical (half amplitude)
-    j6 = 0.0
+
+    # Hand orientation → wrist joints. rpy_deg is a relative Euler tuple
+    # (roll, pitch, yaw) in degrees; Wilor produces ±60° at most for a
+    # natural palm rotation so we pass it through with modest gains.
+    if rpy_deg is not None:
+        roll, pitch, _ = rpy_deg
+        if invert_roll:
+            roll = -roll
+        if invert_pitch:
+            pitch = -pitch
+        j4 = pitch * pitch_gain
+        j6 = roll * roll_gain
+    else:
+        j4 = 0.0
+        j6 = 0.0
 
     joints = np.array([j1, j2, j3, j4, j5, j6], dtype=float)
     lims = {k: joint_limits[k] for k in joint_names}
@@ -610,8 +628,20 @@ def main(
                 break
 
             xyz = get_xyz_from_pose(pose)
+            # Extract hand roll/pitch/yaw from the relative rotation matrix
+            # for wrist control (J4 pitch, J6 roll).
+            try:
+                rot = get_rot_from_pose(pose)
+                yaw_deg, pitch_deg, roll_deg = R.from_matrix(rot).as_euler(
+                    "ZYX", degrees=True
+                )
+                rpy = (float(roll_deg), float(pitch_deg), float(yaw_deg))
+            except Exception:
+                rpy = None
+
             q_raw = xyz_to_joints_deg(
                 xyz,
+                rpy_deg=rpy,
                 invert_x=invert_x, invert_y=invert_y, invert_z=invert_z,
                 x_gain=gains["x"], y_gain=gains["y"], z_gain=gains["z"],
                 joint_limits=JOINT_LIMITS_DEG,
