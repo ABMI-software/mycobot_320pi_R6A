@@ -6,7 +6,7 @@ Ce projet intègre :
 - Un **bridge ROS2 TCP** pour contrôler un MyCobot 320 Pi depuis un PC distant
 - Une **simulation Gazebo Harmonic** avec gripper adaptatif, 4 caméras et domain randomization
 - Un **pipeline ML DREAM** : keypoint detection (VGG-19) → belief maps → PnP → pose 3D
-- Une **téléopération par la main** (Wilor + Orbbec Astra) avec dashboard de tuning et rapport Excel — adapté du pipeline R5A / LeRobot
+- Une **téléopération par la main** (Wilor + Orbbec Astra) avec dashboard de tuning et rapport Excel — adapté du pipeline R5A / LeRobot. **Pipeline validé sur robot physique le 22/04/2026**
 - Des **datasets** synthétiques (Gazebo, 50K frames) et réels (caméras Pi, 4K images) via Git LFS
 
 > Pour reprendre le développement, voir [`SESSION_RESUME.md`](SESSION_RESUME.md)
@@ -263,8 +263,10 @@ python3 performance_analyzer.py --guided
 
 **Documentation détaillée** :
 - [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) — pipeline complet, filtres, historique
+- [`docs/TELEOP_ARCHITECTURE_VIZ.md`](docs/TELEOP_ARCHITECTURE_VIZ.md) — **visuel détaillé** : de la détection main au mouvement du bras (types, unités, latences)
 - [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) — manuel utilisateur du dashboard
 - [`docs/TELEOP_TUNING.md`](docs/TELEOP_TUNING.md) — référence des paramètres + dépannage
+- [`docs/REAL_ROBOT_TEST_PROCEDURE.md`](docs/REAL_ROBOT_TEST_PROCEDURE.md) — procédure de test sur robot physique
 
 ---
 
@@ -372,8 +374,10 @@ git lfs pull
 | [`docs/SYNTHETIC_DATA.md`](docs/SYNTHETIC_DATA.md) | Pipeline données synthétiques |
 | [`docs/ROBOT_QUICKSTART.md`](docs/ROBOT_QUICKSTART.md) | Procédure robot réel |
 | [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) | Téléopération par la main (pipeline + filtres) |
+| [`docs/TELEOP_ARCHITECTURE_VIZ.md`](docs/TELEOP_ARCHITECTURE_VIZ.md) | Visuel détaillé — détection main → mouvement bras |
 | [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) | Manuel utilisateur du dashboard de téléop |
 | [`docs/TELEOP_TUNING.md`](docs/TELEOP_TUNING.md) | Référence paramètres + dépannage téléop |
+| [`docs/REAL_ROBOT_TEST_PROCEDURE.md`](docs/REAL_ROBOT_TEST_PROCEDURE.md) | Procédure + protocole de calibration sécurisé sur robot physique |
 | [`training/README.md`](training/README.md) | Documentation pipeline ML |
 
 ---
