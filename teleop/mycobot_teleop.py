@@ -117,9 +117,9 @@ def get_rot_from_pose(pose: GripperPose) -> np.ndarray:
 def xyz_to_joints_deg(
     xyz: np.ndarray,
     *,
-    invert_x: bool = False,
-    invert_y: bool = False,
-    invert_z: bool = True,
+    invert_x: bool = True,   # hand forward  → elbow extends (EE goes forward)
+    invert_y: bool = False,  # hand right    → base rotates right
+    invert_z: bool = True,   # hand up       → shoulder tilts back (EE goes up)
     x_gain: float = 1.0,
     y_gain: float = 1.0,
     z_gain: float = 1.0,
@@ -128,21 +128,19 @@ def xyz_to_joints_deg(
 ) -> np.ndarray:
     """Map hand XYZ to 6 MyCobot joint angles (deg). No IK — direct linear map.
 
-    Axis mapping (same logic as R5A, extended to 6 joints):
-      Y (hand lateral) → J1 base yaw
-      X (hand forward) → J2 shoulder
-      Z (hand height)  → J3 elbow
-      J4 stays neutral (could be mapped to wrist-pitch later)
-      Z (hand height)  → J5 wrist yaw (complementary to elbow)
-      J6 stays neutral (end-effector roll, controlled later from hand roll)
+    Intuitive mapping (operator's point of view):
+      Y (hand left/right) → J1 base yaw        lateral hand → base rotates
+      Z (hand up/down)    → J2 shoulder pitch  hand up → EE up
+      X (hand forward)    → J3 elbow           hand forward → arm extends
+      Z (hand up/down)    → J5 wrist pitch     keeps EE horizontal as arm tilts
+      J4, J6 stay neutral (rotations we don't extract from hand yet)
 
-    Per-axis gains (x_gain/y_gain/z_gain) scale the effective workspace so
-    that smaller hand motion produces larger joint motion, matching the
-    R5A flags --x-gain/--y-gain/--z-gain.
+    Default inversions (invert_x=True, invert_z=True) chosen so the robot
+    mirrors the operator without kinematic surprises. Flip with
+    --no-invert-x / --no-invert-z if your robot config goes the other way.
     """
     x, y, z = xyz.tolist()
 
-    # Apply gains by shrinking the "active" input band around the midpoint.
     def _scaled(rng: Tuple[float, float], gain: float) -> Tuple[float, float]:
         lo, hi = rng
         mid = 0.5 * (lo + hi)
@@ -154,14 +152,14 @@ def xyz_to_joints_deg(
     src_z = _scaled(SAFE_RANGE["z"], z_gain)
 
     lims = {k: joint_limits[k] for k in joint_names}
-    dst_j1 = maybe_reverse(lims[joint_names[0]], invert_y)
-    dst_j2 = maybe_reverse(lims[joint_names[1]], invert_x)
-    dst_j3 = maybe_reverse(lims[joint_names[2]], invert_z)
-    dst_j5 = maybe_reverse(lims[joint_names[4]], invert_z)
+    dst_j1 = maybe_reverse(lims[joint_names[0]], invert_y)   # Y → J1
+    dst_j2 = maybe_reverse(lims[joint_names[1]], invert_z)   # Z → J2
+    dst_j3 = maybe_reverse(lims[joint_names[2]], invert_x)   # X → J3
+    dst_j5 = maybe_reverse(lims[joint_names[4]], invert_z)   # Z → J5
 
     j1 = map_range(y, src_y, dst_j1)
-    j2 = map_range(x, src_x, dst_j2)
-    j3 = map_range(z, src_z, dst_j3)
+    j2 = map_range(z, src_z, dst_j2)
+    j3 = map_range(x, src_x, dst_j3)
     j4 = 0.0
     j5 = map_range(z, src_z, dst_j5)
     j6 = 0.0
