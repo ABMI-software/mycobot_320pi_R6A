@@ -155,7 +155,36 @@ python3 mycobot_teleop.py --camera astra \
 > par défaut ; le script appelle `tracker._resume()` automatiquement pour ne
 > pas nécessiter d'appui sur ESPACE.
 
-### Terminal 4 — (optionnel) forwarder MQTT
+### Terminal 4 — Dashboard de tuning et monitoring (recommandé en phase sim)
+
+```bash
+conda activate hand-teleop
+cd ~/ros_jazzy/src/mycobot_R6A/teleop
+python3 teleop_dashboard.py
+```
+
+Le dashboard se connecte au même rosbridge (ws://localhost:9090) et fournit :
+
+- **4 sliders** appliqués en direct pendant que le teleop tourne :
+  - `X gain` / `Y gain` / `Z gain` — multiplicateurs qui rétrécissent la bande
+    XYZ "active" autour du centre : plus le gain est élevé, plus un petit
+    mouvement de main produit un grand mouvement articulaire. Défaut 1.2 / 1.2 / 1.6.
+  - `time_from_start` — durée de chaque trajectoire JTC (s). Plus bas = plus
+    réactif, plus haut = plus lissé. Défaut 0.8 s.
+- **3 plots temps-réel** (fenêtre glissante 10 s) :
+  - Wilor XYZ main (signal d'entrée)
+  - Angles joints commandés vs réels (solid = commandé, dashed = actual)
+  - Erreur de tracking par joint (|commandé − actual|, en degrés)
+- **Stats de stabilité** rafraîchies chaque 250 ms :
+  - RMS error et max error par joint sur la fenêtre 10 s
+  - Indicateur "OK / JITTERY / UNSTABLE" basé sur σ(Δq) entre deux commandes
+    consécutives (détecte les oscillations Wilor ou sur-amplification)
+
+Le dashboard publie sur `/teleop/gains` (`std_msgs/Float64MultiArray` :
+`[x_gain, y_gain, z_gain, time_from_start_s]`) et le teleop applique les
+nouvelles valeurs instantanément via sa callback rosbridge.
+
+### Terminal 4 bis — (non utilisé) forwarder MQTT
 
 Non utilisé pour le MyCobot : la liaison avec le robot réel passe par `bridge_tour` (TCP/JSON), pas par MQTT. Le script `mqtt_joint_forwarder.py` du projet R5A reste disponible si un jour on branche un broker MQTT, mais n'est pas nécessaire ici.
 
