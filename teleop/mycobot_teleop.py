@@ -115,9 +115,15 @@ def get_rot_from_pose(pose: GripperPose) -> np.ndarray:
 
 
 # How many degrees of joint motion we produce per metre of hand motion at
-# gain=1.0. Picked so that a natural 15 cm hand displacement drives roughly
-# 90° of joint travel — comfortable workspace for a seated operator.
-BASE_SCALE_DEG_PER_M = 600.0
+# gain=1.0. Tuned for stability: at gain 1.2 a 15 cm hand move → ~54° of
+# joint travel, which keeps the JTC in its smooth tracking regime instead
+# of fighting saturation. Operators who want more range bump the gains.
+BASE_SCALE_DEG_PER_M = 300.0
+
+# Exponential-moving-average smoothing on commanded joints. Dampens the
+# natural jitter coming out of Wilor/Kalman and lets the JTC actually
+# track. alpha ∈ (0, 1]: 1.0 = no smoothing, 0.2 = heavy smoothing.
+DEFAULT_COMMAND_EMA_ALPHA = 0.25
 
 
 def xyz_to_joints_deg(
@@ -411,7 +417,7 @@ def main(
     rosbridge_port: int = 9090,
     ros2_topic: str = DEFAULT_TOPIC,
     joint_names: List[str] = DEFAULT_JOINT_NAMES,
-    time_from_start: float = 0.8,
+    time_from_start: float = 0.15,
     x_gain: float = 1.2,
     y_gain: float = 1.2,
     z_gain: float = 1.6,
@@ -534,6 +540,12 @@ def main(
     # Mutable gain container — can be updated from the dashboard via rosbridge.
     gains = {"x": x_gain, "y": y_gain, "z": z_gain}
 
+    # EMA state for the published joint command. Zero-init so the first
+    # publish matches whatever the first raw mapping produces (Wilor rel=0
+    # → joints=0 → EMA stays at 0).
+    q_smoothed = np.zeros(6)
+    ema_alpha = DEFAULT_COMMAND_EMA_ALPHA
+
     def _on_gain_update(gx, gy, gz, tfs):
         gains["x"], gains["y"], gains["z"] = gx, gy, gz
         if not quiet:
@@ -592,13 +604,20 @@ def main(
                 break
 
             xyz = get_xyz_from_pose(pose)
-            q_deg = xyz_to_joints_deg(
+            q_raw = xyz_to_joints_deg(
                 xyz,
                 invert_x=invert_x, invert_y=invert_y, invert_z=invert_z,
                 x_gain=gains["x"], y_gain=gains["y"], z_gain=gains["z"],
                 joint_limits=JOINT_LIMITS_DEG,
                 joint_names=joint_names,
             )
+
+            # EMA smoothing: tame Wilor jitter + sudden reacquisition jumps
+            # before handing the command to the JTC. Alpha=0.25 is aggressive
+            # enough to kill single-frame spikes but still tracks a genuine
+            # hand move in ~4 frames (~65 ms at 60 Hz).
+            q_smoothed[:] = (1.0 - ema_alpha) * q_smoothed + ema_alpha * q_raw
+            q_deg = q_smoothed.copy()
 
             if ros_pub is not None:
                 ros_pub.send_deg(q_deg)
@@ -669,7 +688,7 @@ if __name__ == "__main__":
     p.add_argument("--ros-topic", default=DEFAULT_TOPIC)
     p.add_argument("--joints", default=",".join(DEFAULT_JOINT_NAMES),
                    help="Comma-separated joint names in controller order")
-    p.add_argument("--time-from-start", type=float, default=0.8)
+    p.add_argument("--time-from-start", type=float, default=0.15)
 
     # Axis gains & inversions
     p.add_argument("--x-gain", type=float, default=1.2)
