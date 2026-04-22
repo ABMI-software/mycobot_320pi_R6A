@@ -337,7 +337,7 @@ class RosBridgeArmPublisher:
         """
         o = max(0.0, min(1.0, float(openness)))
         position_rad = -0.7 * (1.0 - o)  # o=0 → -0.7 (closed), o=1 → 0 (open)
-        self.gripper_topic.publish(roslibpy.Message({"data": [position_rad]}))
+        self.gripper_topic.publish({"data": [position_rad]})
 
     def set_tfs(self, time_from_start_s: float) -> None:
         sec = int(time_from_start_s)
@@ -632,7 +632,7 @@ if __name__ == "__main__":
     p.add_argument("--z-gain", type=float, default=1.6)
     p.add_argument("--invert-x", dest="invert_x", action="store_true")
     p.add_argument("--no-invert-x", dest="invert_x", action="store_false")
-    p.set_defaults(invert_x=False)
+    p.set_defaults(invert_x=True)
     p.add_argument("--invert-y", dest="invert_y", action="store_true")
     p.add_argument("--no-invert-y", dest="invert_y", action="store_false")
     p.set_defaults(invert_y=False)
