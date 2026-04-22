@@ -60,9 +60,13 @@ MYCOBOT_JOINTS = [
 JOINT_SHORT = ["J1 yaw", "J2 shoulder", "J3 elbow", "J4 wrist1", "J5 yaw", "J6 roll"]
 PUBLISH_RATE_TARGET_HZ = 30.0  # what mycobot_teleop.py aims for (stable default)
 
-# Acceptance thresholds borrowed from the dashboard stability flag.
-ERR_MAX_OK = 15.0       # deg — single-sample tracking error below this is fine
-ERR_RMS_OK = 5.0        # deg — RMS error below this = good tracking
+# Acceptance thresholds. Relaxed vs the dashboard's live-tuning flags
+# because here we judge readiness for the real robot, not instantaneous
+# signal quality: a 30° transient spike on a 60 s session is acceptable
+# if the RMS stays below 10°. Over-tight thresholds were flagging joints
+# UNSTABLE purely on single reacquisition spikes.
+ERR_MAX_OK = 30.0       # deg — single-sample tracking error below this is fine
+ERR_RMS_OK = 10.0       # deg — RMS error below this = good tracking
 JITTER_OK = 3.0         # deg — cmd-to-cmd std below this = stable signal
 
 

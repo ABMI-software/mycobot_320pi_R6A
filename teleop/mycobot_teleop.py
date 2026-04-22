@@ -116,19 +116,19 @@ def get_rot_from_pose(pose: GripperPose) -> np.ndarray:
 
 
 # How many degrees of joint motion we produce per metre of hand motion at
-# gain=1.0. Tuned down from 300 after the first acceptance run showed RMS
-# tracking errors of 40–70° on J1/J2/J3: commanded swings were bigger than
-# the JTC could execute before the next command arrived. 200 keeps a 15 cm
-# hand move at ~36° at gain 1.2, well within the JTC's achievable reach.
-BASE_SCALE_DEG_PER_M = 200.0
+# gain=1.0. Tuned down twice (300 → 200 → 150) to keep the commanded
+# trajectory inside the JTC's achievable envelope — at gain 1.2, 15 cm of
+# hand motion now produces 27° of commanded travel, which the controller
+# tracks cleanly even during aggressive reach moves.
+BASE_SCALE_DEG_PER_M = 150.0
 
 # EMA smoothing — dampens Wilor/Kalman jitter.
 DEFAULT_COMMAND_EMA_ALPHA = 0.20
 
-# Max joint-angle change per frame, in degrees. At 30 Hz that's 150 °/s,
-# under the URDF joint velocity limit (180 °/s = π rad/s) and inside the
-# JTC's smooth-tracking envelope.
-DEFAULT_MAX_DELTA_DEG_PER_FRAME = 5.0
+# Max joint-angle change per frame, in degrees. At 30 Hz that's 90 °/s —
+# about half of the URDF velocity limit (180 °/s) so the JTC always has
+# headroom to catch up instead of saturating on transients.
+DEFAULT_MAX_DELTA_DEG_PER_FRAME = 3.0
 
 
 def xyz_to_joints_deg(
@@ -143,8 +143,8 @@ def xyz_to_joints_deg(
     x_gain: float = 1.0,
     y_gain: float = 1.0,
     z_gain: float = 1.0,
-    roll_gain: float = 0.8,   # hand twist → J6 end-effector roll
-    pitch_gain: float = 0.6,  # hand pitch → J4 wrist tilt
+    roll_gain: float = 0.4,   # hand twist → J6 end-effector roll (Wilor roll is noisy — keep gain low)
+    pitch_gain: float = 0.4,  # hand pitch → split across J4 + J5 for gripper orientation
     joint_limits: Dict[str, Tuple[float, float]] = JOINT_LIMITS_DEG,
     joint_names: List[str] = DEFAULT_JOINT_NAMES,
 ) -> np.ndarray:
