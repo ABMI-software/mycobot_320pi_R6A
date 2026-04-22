@@ -471,8 +471,28 @@ def main(
         pass
     tracker.cap = cap
 
-    # HandTracker defaults to tracking_paused=True, waiting for a SPACE/p
-    # keypress. We're running automated, so resume immediately.
+    # -- Protect the capture loop against Wilor exceptions --
+    # The upstream HandTracker._capture_loop has no try/except around
+    # pose_computer.compute_relative_pose(), so a single malformed output
+    # (NaN keypoints, shape mismatch, etc.) would silently kill the daemon
+    # thread and freeze detection for the rest of the session. We wrap
+    # compute_relative_pose so exceptions just produce a None detection
+    # (same as "no hand visible" — the KF simply doesn't update that frame).
+    _orig_crp = tracker.pose_computer.compute_relative_pose
+    _crp_fail_count = [0]
+
+    def _safe_compute_relative_pose(frame, focal_length, cam_t):
+        try:
+            return _orig_crp(frame, focal_length, cam_t)
+        except Exception as e:
+            _crp_fail_count[0] += 1
+            if _crp_fail_count[0] <= 3 or _crp_fail_count[0] % 50 == 0:
+                print(f"[WARN] Wilor compute_relative_pose failed "
+                      f"(#{_crp_fail_count[0]}): {type(e).__name__}: {e}",
+                      flush=True)
+            return None
+    tracker.pose_computer.compute_relative_pose = _safe_compute_relative_pose
+
     try:
         tracker._resume()
         if not quiet:
@@ -532,6 +552,27 @@ def main(
             ros_pub.set_recalibrate_callback(_recalibrate)
         except AttributeError:
             pass  # direct rclpy publisher doesn't support live tuning
+
+    # Background watchdog: if the Astra frames stop flowing (oni_grabber dies
+    # or its tick file goes stale), restart the grabber so the operator
+    # doesn't have to rerun the whole teleop.
+    if camera == "astra":
+        from orbbec_capture import _oni_grabber_alive, _tick_is_fresh, _spawn_oni_grabber
+        _stop_watchdog = threading.Event()
+
+        def _astra_watchdog():
+            while not _stop_watchdog.is_set():
+                time.sleep(1.0)
+                if not _oni_grabber_alive() or not _tick_is_fresh(max_age_s=2.0):
+                    print("[WATCHDOG] Astra frames stalled — respawning oni_grabber",
+                          flush=True)
+                    try:
+                        _spawn_oni_grabber()
+                    except Exception as e:
+                        print(f"[WATCHDOG] respawn failed: {e}", flush=True)
+        threading.Thread(target=_astra_watchdog, daemon=True).start()
+    else:
+        _stop_watchdog = None
 
     try:
         while tracker.cap.isOpened():
