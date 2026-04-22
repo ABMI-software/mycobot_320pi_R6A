@@ -471,6 +471,7 @@ def main(
     invert_x: bool = False,
     invert_y: bool = False,
     invert_z: bool = False,
+    publish_gripper: bool = True,
     video: Optional[str] = None,
 ) -> None:
 
@@ -699,34 +700,37 @@ def main(
                         pass
                     # Gripper: apply the same 3-stage filter chain as R5A /
                     # LeRobot (deadband → EMA → slew) on Wilor's open_degree
-                    # before normalizing to [0,1] for the controller.
-                    try:
-                        g_lo, g_hi = SAFE_RANGE["g"]
-                        g_raw = float(pose.open_degree) if hasattr(pose, "open_degree") else g_lo
-                        # Stage 1: deadband — ignore tiny fluctuations around center
-                        g_center = 0.5 * (g_lo + g_hi)
-                        if abs(g_raw - g_center) < GRIPPER_DEADBAND_DEG:
-                            g_input = grip_state["ema"] if grip_state["ema"] is not None else g_center
-                        else:
-                            g_input = g_raw
-                        # Stage 2: EMA smoothing
-                        if grip_state["ema"] is None:
-                            grip_state["ema"] = g_input
-                        else:
-                            grip_state["ema"] = ((1.0 - GRIPPER_EMA_ALPHA) * grip_state["ema"]
-                                                 + GRIPPER_EMA_ALPHA * g_input)
-                        # Stage 3: slew limit vs last published value
-                        if grip_state["last_sent"] is None:
-                            g_out = grip_state["ema"]
-                        else:
-                            step = grip_state["ema"] - grip_state["last_sent"]
-                            step = max(-GRIPPER_MAX_STEP_DEG, min(GRIPPER_MAX_STEP_DEG, step))
-                            g_out = grip_state["last_sent"] + step
-                        grip_state["last_sent"] = g_out
-                        normalized = (g_out - g_lo) / max(1e-6, g_hi - g_lo)
-                        ros_pub.send_gripper_normalized(normalized)
-                    except AttributeError:
-                        pass
+                    # before normalizing to [0,1] for the controller. Skipped
+                    # entirely when the hardware doesn't have a gripper
+                    # (--no-gripper), to keep the topic clean.
+                    if publish_gripper:
+                        try:
+                            g_lo, g_hi = SAFE_RANGE["g"]
+                            g_raw = float(pose.open_degree) if hasattr(pose, "open_degree") else g_lo
+                            # Stage 1: deadband — ignore tiny fluctuations around center
+                            g_center = 0.5 * (g_lo + g_hi)
+                            if abs(g_raw - g_center) < GRIPPER_DEADBAND_DEG:
+                                g_input = grip_state["ema"] if grip_state["ema"] is not None else g_center
+                            else:
+                                g_input = g_raw
+                            # Stage 2: EMA smoothing
+                            if grip_state["ema"] is None:
+                                grip_state["ema"] = g_input
+                            else:
+                                grip_state["ema"] = ((1.0 - GRIPPER_EMA_ALPHA) * grip_state["ema"]
+                                                     + GRIPPER_EMA_ALPHA * g_input)
+                            # Stage 3: slew limit vs last published value
+                            if grip_state["last_sent"] is None:
+                                g_out = grip_state["ema"]
+                            else:
+                                step = grip_state["ema"] - grip_state["last_sent"]
+                                step = max(-GRIPPER_MAX_STEP_DEG, min(GRIPPER_MAX_STEP_DEG, step))
+                                g_out = grip_state["last_sent"] + step
+                            grip_state["last_sent"] = g_out
+                            normalized = (g_out - g_lo) / max(1e-6, g_hi - g_lo)
+                            ros_pub.send_gripper_normalized(normalized)
+                        except AttributeError:
+                            pass
 
             dt = time.perf_counter() - t0
             inst = 1.0 / dt if dt > 0 else fps
@@ -798,6 +802,12 @@ if __name__ == "__main__":
     p.add_argument("--no-invert-z", dest="invert_z", action="store_false")
     p.set_defaults(invert_z=False)
 
+    # Skip gripper publishing — set when the physical robot has no gripper
+    p.add_argument("--no-gripper", dest="publish_gripper", action="store_false",
+                   help="Disable publication on /gripper_position_controller/commands "
+                        "(use when the real MyCobot doesn't have a physical gripper).")
+    p.set_defaults(publish_gripper=True)
+
     args = p.parse_args()
     joint_names = [s.strip() for s in args.joints.split(",") if s.strip()]
     if len(joint_names) != 6:
@@ -819,5 +829,6 @@ if __name__ == "__main__":
         time_from_start=args.time_from_start,
         x_gain=args.x_gain, y_gain=args.y_gain, z_gain=args.z_gain,
         invert_x=args.invert_x, invert_y=args.invert_y, invert_z=args.invert_z,
+        publish_gripper=args.publish_gripper,
         video=(args.video or None),
     )
