@@ -55,11 +55,14 @@ from hand_teleop.tracking.tracker import HandTracker
 
 # --------------------------- MyCobot configuration --------------------------- #
 
-# Reach envelope (metres) – tightened vs R5A because MyCobot 320 has ~280 mm reach
+# Wilor XYZ envelope (metres) — aligned with the R5A defaults since those are
+# battle-tested for typical webcam framing. Tightening this for the MyCobot's
+# physical reach (~280 mm) causes clipping as soon as the user's hand drifts
+# off-centre; use --x-gain / --y-gain / --z-gain if you want less dynamic range.
 SAFE_RANGE = {
-    "x": (0.10, 0.28),
-    "y": (-0.20, 0.20),
-    "z": (0.01, 0.26),
+    "x": (0.13, 0.36),
+    "y": (-0.23, 0.23),
+    "z": (0.008, 0.25),
     "g": (2, 90),
 }
 
@@ -301,6 +304,7 @@ def main(
     quiet: bool = False,
     fps: int = 60,
     model: ModelName = "wilor",
+    camera: str = "auto",
     cam_idx: int = 0,
     width: int = 640,
     height: int = 440,
@@ -333,6 +337,15 @@ def main(
             print(f"[ERROR] Failed to open video: {video}")
             return
         src_desc = Path(video).name
+    elif camera == "astra":
+        from orbbec_capture import open_orbbec
+        try:
+            cap = open_orbbec(auto_spawn=True)
+            be = "oni_grabber+shm"
+        except Exception as e:
+            print(f"[ERROR] Failed to open Astra: {e}")
+            return
+        src_desc = "Orbbec Astra S (shared-memory)"
     else:
         try:
             chosen_idx = pick_camera(cam_idx, width, height)
@@ -366,6 +379,15 @@ def main(
     except Exception:
         pass
     tracker.cap = cap
+
+    # HandTracker defaults to tracking_paused=True, waiting for a SPACE/p
+    # keypress. We're running automated, so resume immediately.
+    try:
+        tracker._resume()
+        if not quiet:
+            print("[INFO] Tracker auto-resumed (press SPACE to pause, 'p' to toggle)")
+    except Exception as e:
+        print(f"[WARN] Could not auto-resume tracker: {e}")
 
     if not quiet:
         print(f"[INFO] Publishing joints: {joint_names}")
@@ -451,6 +473,8 @@ if __name__ == "__main__":
     p.add_argument("--quiet", action="store_true")
     p.add_argument("--fps", type=int, default=60)
     p.add_argument("--model", type=str, default="wilor")
+    p.add_argument("--camera", type=str, default="auto", choices=["auto", "astra"],
+                   help="'auto' = UVC webcam via cv2; 'astra' = Orbbec Astra via OpenNI2.")
     p.add_argument("--cam-idx", type=int, default=0)
     p.add_argument("--width", type=int, default=640)
     p.add_argument("--height", type=int, default=440)
@@ -494,6 +518,7 @@ if __name__ == "__main__":
 
     main(
         quiet=args.quiet, fps=args.fps, model=args.model,
+        camera=args.camera,
         cam_idx=args.cam_idx, width=args.width, height=args.height,
         hand=args.hand, run_seconds=args.run_seconds,
         ros2_enable=args.ros2_enable,

@@ -61,8 +61,29 @@ sudo apt install \
 
 Déjà présent sur ce poste à `/home/genji/miniconda/envs/hand-teleop`. Dépendances :
 - `roslibpy` (pour le mode `--use-rosbridge`)
+- `primesense` (pour l'accès Astra — `pip install primesense` dans l'env)
 - `wilor`, `mediapipe`, `opencv-python`, `scipy`
 - modules du repo `hand-teleop` (`hand_teleop.gripper_pose`, `hand_teleop.hand_pose`, `hand_teleop.tracking`)
+
+> **Pourquoi `--use-rosbridge` est obligatoire :** l'env conda est en Python 3.10,
+> alors que ROS2 Jazzy est compilé pour Python 3.12. `import rclpy` échoue donc
+> dans l'env conda (`No module named 'rclpy._rclpy_pybind11'`). Le script détecte
+> l'erreur et bascule silencieusement en "pas de ROS" — d'où l'impression que
+> "le bras ne bouge pas". Passer par rosbridge (WebSocket, Python-agnostic)
+> contourne le problème. C'est la même raison pour laquelle le R5A utilise
+> `--use-rosbridge` dans ses 4 terminaux.
+
+### Caméra Orbbec Astra S (profondeur)
+
+Le teleop sait utiliser la caméra Astra au lieu d'une webcam UVC via `--camera astra`.
+Le flag spawne automatiquement le binaire `oni_grabber` (OpenNI2) qui lit le flux
+RGB et le publie dans `/dev/shm/oni_color.rgb`. Le wrapper
+[`orbbec_capture.py`](../teleop/orbbec_capture.py) expose ces frames via une
+interface compatible `cv2.VideoCapture`.
+
+Prérequis :
+- Binaire `oni_grabber` localisé dans `~/Downloads/Orbbec_OpenNI_v2.3.0.86-beta6_linux_release/.../samples/bin/`
+- Aucun autre processus OpenNI2 ne doit tourner (sinon `pkill -f oni_grabber` avant)
 
 ### Sur la Raspberry Pi
 
@@ -114,12 +135,25 @@ conda deactivate
 conda activate hand-teleop
 cd ~/ros_jazzy/src/mycobot_R6A/teleop
 
+# Webcam UVC classique (Logitech, built-in laptop cam…)
 python3 mycobot_teleop.py \
   --ros --use-rosbridge \
   --ros-topic /mycobot_controller/joint_trajectory \
   --time-from-start 0.8 \
   --x-gain 1.2 --y-gain 1.2 --z-gain 1.6
+
+# Orbbec Astra S (spawne oni_grabber automatiquement)
+python3 mycobot_teleop.py --camera astra \
+  --ros --use-rosbridge \
+  --ros-topic /mycobot_controller/joint_trajectory \
+  --time-from-start 0.8 \
+  --x-gain 1.2 --y-gain 1.2 --z-gain 1.6
 ```
+
+> Note : `--use-rosbridge` est **obligatoire** depuis l'env conda (voir section
+> "Environnement hand-teleop" ci-dessus). Au démarrage le tracker est en pause
+> par défaut ; le script appelle `tracker._resume()` automatiquement pour ne
+> pas nécessiter d'appui sur ESPACE.
 
 ### Terminal 4 — (optionnel) forwarder MQTT
 
