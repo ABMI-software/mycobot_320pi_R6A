@@ -67,16 +67,22 @@ class OrbbecCapture:
     def read(self) -> tuple[bool, np.ndarray | None]:
         if not self._opened:
             return False, None
-        # Wait for a new tick (new frame)
-        for _ in range(2000):
+        # Wait for a new tick (new frame). If the tick doesn't advance within
+        # ~1 s the grabber is likely dead — return failure rather than a stale
+        # frame, so Wilor doesn't keep re-running on the same pixels.
+        got_new = False
+        for _ in range(500):  # 500 * 2ms = 1s max
             try:
                 t = ONI_TICK.read_text().strip()
             except Exception:
                 t = self._last_tick
             if t and t != self._last_tick:
                 self._last_tick = t
+                got_new = True
                 break
             time.sleep(0.002)
+        if not got_new:
+            return False, None
         try:
             buf = ONI_COLOR.read_bytes()
         except Exception:
@@ -134,17 +140,55 @@ def _spawn_oni_grabber(no_ir: bool = True) -> subprocess.Popen | None:
         cwd=str(Path(exe).parent),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        # Detach from the parent's process group so Ctrl+C in the teleop
+        # terminal doesn't also SIGINT oni_grabber. Also makes the grabber
+        # survive if the teleop crashes or is killed uncleanly.
+        start_new_session=True,
     )
 
 
-def open_orbbec(auto_spawn: bool = True, open_timeout: float = 8.0) -> OrbbecCapture:
-    """Open the Astra via shared-memory, spawning oni_grabber if needed.
+def _oni_grabber_alive() -> bool:
+    """True if an oni_grabber process is currently running."""
+    try:
+        import subprocess
+        result = subprocess.run(["pgrep", "-f", "oni_grabber"],
+                                capture_output=True, text=True)
+        return result.returncode == 0 and result.stdout.strip() != ""
+    except Exception:
+        return False
 
-    Returns an OrbbecCapture. The spawned subprocess is not returned; it will
-    keep running until the Python process exits (its parent). That's intentional
-    — we don't want the capture to die mid-trajectory if we garbage-collect.
+
+def _tick_is_fresh(max_age_s: float = 1.0) -> bool:
+    """True if /dev/shm/oni_tick.txt was modified within max_age_s."""
+    try:
+        return (time.time() - ONI_TICK.stat().st_mtime) < max_age_s
+    except FileNotFoundError:
+        return False
+
+
+def open_orbbec(auto_spawn: bool = True, open_timeout: float = 8.0) -> OrbbecCapture:
+    """Open the Astra via shared-memory, (re)spawning oni_grabber if needed.
+
+    Detects and recovers from the common "stale /dev/shm from a previous run"
+    case: if the shared files exist but oni_grabber is dead (or its tick is
+    older than 1 s), we clean up and re-spawn before reading.
     """
-    if not ONI_INFO.exists() and auto_spawn:
+    alive = _oni_grabber_alive()
+    fresh = _tick_is_fresh() if ONI_INFO.exists() else False
+
+    if alive and not fresh:
+        # Stale grabber (writing to a tick that's not advancing); kill it so
+        # the respawn doesn't result in two grabbers fighting over the device.
+        import subprocess
+        subprocess.run(["pkill", "-9", "-f", "oni_grabber"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(0.3)
+        alive = False
+
+    needs_spawn = not alive or not ONI_INFO.exists()
+
+    if needs_spawn and auto_spawn:
+        print("[orbbec] Spawning oni_grabber")
         proc = _spawn_oni_grabber()
         if proc is None:
             raise RuntimeError(
@@ -152,4 +196,5 @@ def open_orbbec(auto_spawn: bool = True, open_timeout: float = 8.0) -> OrbbecCap
                 f"{DEFAULT_SAMPLES_BIN}. Install the Orbbec OpenNI samples or "
                 f"start oni_grabber manually."
             )
+
     return OrbbecCapture(open_timeout=open_timeout)
