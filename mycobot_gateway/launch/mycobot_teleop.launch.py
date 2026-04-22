@@ -99,12 +99,13 @@ def generate_launch_description():
         condition=IfCondition(sim_enabled),
     )
 
-    # Gazebo → ROS2 bridge for joint states (keeps external tools working; the
-    # joint_state_broadcaster also publishes /joint_states, so we remap this one
-    # onto a Gazebo-specific topic to avoid duplicates).
+    # Gazebo → ROS2 bridges: /clock (CRITICAL for ros2_control use_sim_time)
+    # and /joint_states (mapped to /gz/joint_states to avoid collision with
+    # the joint_state_broadcaster's /joint_states).
     gz_bridge = Node(
         package="ros_gz_bridge", executable="parameter_bridge", output="screen",
         arguments=[
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
             "/world/empty/model/mycobot_320/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model",
         ],
         remappings=[
