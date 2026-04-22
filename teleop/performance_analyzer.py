@@ -58,7 +58,7 @@ MYCOBOT_JOINTS = [
     "joint6output_to_joint6",
 ]
 JOINT_SHORT = ["J1 yaw", "J2 shoulder", "J3 elbow", "J4 wrist1", "J5 yaw", "J6 roll"]
-PUBLISH_RATE_TARGET_HZ = 60.0  # what mycobot_teleop.py aims for
+PUBLISH_RATE_TARGET_HZ = 30.0  # what mycobot_teleop.py aims for (stable default)
 
 # Acceptance thresholds borrowed from the dashboard stability flag.
 ERR_MAX_OK = 15.0       # deg — single-sample tracking error below this is fine

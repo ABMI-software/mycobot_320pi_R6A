@@ -116,20 +116,19 @@ def get_rot_from_pose(pose: GripperPose) -> np.ndarray:
 
 
 # How many degrees of joint motion we produce per metre of hand motion at
-# gain=1.0. Tuned for stability: at gain 1.2 a 15 cm hand move → ~54° of
-# joint travel, which keeps the JTC in its smooth tracking regime instead
-# of fighting saturation. Operators who want more range bump the gains.
-BASE_SCALE_DEG_PER_M = 300.0
+# gain=1.0. Tuned down from 300 after the first acceptance run showed RMS
+# tracking errors of 40–70° on J1/J2/J3: commanded swings were bigger than
+# the JTC could execute before the next command arrived. 200 keeps a 15 cm
+# hand move at ~36° at gain 1.2, well within the JTC's achievable reach.
+BASE_SCALE_DEG_PER_M = 200.0
 
-# Exponential-moving-average smoothing on commanded joints. Dampens the
-# natural jitter coming out of Wilor/Kalman and lets the JTC actually
-# track. alpha ∈ (0, 1]: 1.0 = no smoothing, 0.2 = heavy smoothing.
-DEFAULT_COMMAND_EMA_ALPHA = 0.25
+# EMA smoothing — dampens Wilor/Kalman jitter.
+DEFAULT_COMMAND_EMA_ALPHA = 0.20
 
-# Slew rate limit — maximum joint-angle change per frame, in degrees.
-# Runs on top of EMA to catch single-frame spikes that slipped through
-# (Wilor reacquisition jumps are typically 30–150° on J1 etc.).
-DEFAULT_MAX_DELTA_DEG_PER_FRAME = 8.0
+# Max joint-angle change per frame, in degrees. At 30 Hz that's 150 °/s,
+# under the URDF joint velocity limit (180 °/s = π rad/s) and inside the
+# JTC's smooth-tracking envelope.
+DEFAULT_MAX_DELTA_DEG_PER_FRAME = 5.0
 
 
 def xyz_to_joints_deg(
@@ -180,21 +179,24 @@ def xyz_to_joints_deg(
     j1 = dy * scale * y_gain           # base yaw   ← lateral
     j2 = dz * scale * z_gain           # shoulder   ← vertical
     j3 = dx * scale * x_gain           # elbow      ← depth
-    j5 = dz * scale * z_gain * 0.5     # wrist      ← vertical (half amplitude)
 
-    # Hand orientation → wrist joints. rpy_deg is a relative Euler tuple
-    # (roll, pitch, yaw) in degrees; Wilor produces ±60° at most for a
-    # natural palm rotation so we pass it through with modest gains.
+    # Hand orientation → wrist joints (J4 + J5 split the pitch so their
+    # combined rotation points the EE in the direction the palm points,
+    # J6 carries the roll / twist).
+    # rpy_deg is a relative (roll, pitch, yaw) tuple in degrees; Wilor
+    # produces ±60° at most for a natural palm rotation.
     if rpy_deg is not None:
         roll, pitch, _ = rpy_deg
         if invert_roll:
             roll = -roll
         if invert_pitch:
             pitch = -pitch
-        j4 = pitch * pitch_gain
+        j4 = pitch * pitch_gain * 0.5  # half of pitch on wrist1
+        j5 = pitch * pitch_gain * 0.5  # other half on wrist2 — EE tracks palm
         j6 = roll * roll_gain
     else:
         j4 = 0.0
+        j5 = 0.0
         j6 = 0.0
 
     joints = np.array([j1, j2, j3, j4, j5, j6], dtype=float)
@@ -434,7 +436,7 @@ class RosBridgeArmPublisher:
 def main(
     *,
     quiet: bool = False,
-    fps: int = 60,
+    fps: int = 30,
     model: ModelName = "wilor",
     camera: str = "auto",
     cam_idx: int = 0,
@@ -448,7 +450,7 @@ def main(
     rosbridge_port: int = 9090,
     ros2_topic: str = DEFAULT_TOPIC,
     joint_names: List[str] = DEFAULT_JOINT_NAMES,
-    time_from_start: float = 0.15,
+    time_from_start: float = 0.25,
     x_gain: float = 1.2,
     y_gain: float = 1.2,
     z_gain: float = 1.6,
@@ -715,7 +717,7 @@ def main(
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="MyCobot 320 Pi hand teleoperation")
     p.add_argument("--quiet", action="store_true")
-    p.add_argument("--fps", type=int, default=60)
+    p.add_argument("--fps", type=int, default=30)
     p.add_argument("--model", type=str, default="wilor")
     p.add_argument("--camera", type=str, default="auto", choices=["auto", "astra"],
                    help="'auto' = UVC webcam via cv2; 'astra' = Orbbec Astra via OpenNI2.")
@@ -737,7 +739,7 @@ if __name__ == "__main__":
     p.add_argument("--ros-topic", default=DEFAULT_TOPIC)
     p.add_argument("--joints", default=",".join(DEFAULT_JOINT_NAMES),
                    help="Comma-separated joint names in controller order")
-    p.add_argument("--time-from-start", type=float, default=0.15)
+    p.add_argument("--time-from-start", type=float, default=0.25)
 
     # Axis gains & inversions
     p.add_argument("--x-gain", type=float, default=1.2)
