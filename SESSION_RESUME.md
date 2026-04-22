@@ -1,7 +1,7 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 21 avril 2026
-> **Version :** 1.9.0
+> **Date de dernière mise à jour :** 22 avril 2026
+> **Version :** 2.0.0
 > **Branche active :** `feature/pose-training`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 
@@ -19,9 +19,32 @@ source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
 
 ---
 
-## État actuel (21 avril 2026)
+## État actuel (22 avril 2026)
 
-### Problème principal : Domain gap sim-to-real
+### Nouveauté majeure : pipeline de téléopération complet
+
+Le pipeline de téléopération par la main (Wilor + Orbbec Astra → MyCobot) a été implémenté et validé en simulation Gazebo. Adapté du R5A / LeRobot.
+
+**Outils livrés** dans [`teleop/`](teleop/) :
+- [`mycobot_teleop.py`](teleop/mycobot_teleop.py) — script principal (caméra → joints via rosbridge)
+- [`teleop_dashboard.py`](teleop/teleop_dashboard.py) — GUI ttkbootstrap : sliders live + plots + stats
+- [`performance_analyzer.py`](teleop/performance_analyzer.py) — rapport Excel avec verdict READY/CAUTIOUS/NOT READY
+- [`orbbec_capture.py`](teleop/orbbec_capture.py) — wrapper Astra shared-memory via `oni_grabber`
+
+**Documentation** :
+- [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) — pipeline complet, filtres, mapping, historique
+- [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) — manuel utilisateur du dashboard
+- [`docs/TELEOP_TUNING.md`](docs/TELEOP_TUNING.md) — référence paramètres + dépannage
+
+**Status** :
+- ✅ Pipeline complet en simulation (Astra → Wilor → filtres → Gazebo JTC)
+- ✅ Dashboard de tuning live + rapport Excel
+- ✅ Filtres R5A/LeRobot portés (EMA + slew 1°/f + gripper deadband chain)
+- ⚠️ Axe J6 (doorknob) à valider visuellement (mapping yaw ou roll ?)
+- ⚠️ Pince Gazebo : limitation cosmétique (4-bar linkage pas reproductible sous DART)
+- 🔜 **Prochain** : test sur robot Pi réel une fois verdict `READY` atteint
+
+### Problème DREAM toujours ouvert : Domain gap sim-to-real
 
 Le modèle DREAM VGG atteint **97% de détection à 3.1px médiane** sur les données synthétiques, mais seulement **~26% de détection sur les images réelles**. Les pics des belief maps sont 10× plus faibles sur les images réelles que sur les synthétiques.
 
