@@ -257,7 +257,12 @@ class RosArmPublisher:
 # ---------------------- ROS 2 publisher (via rosbridge) ---------------------- #
 
 class RosBridgeArmPublisher:
-    """Publishes JointTrajectory through rosbridge (WebSocket) — matches the R5A flow."""
+    """Publishes JointTrajectory through rosbridge (WebSocket) — matches the R5A flow.
+
+    Also publishes /teleop/hand_xyz (Vector3Stamped) for the monitoring dashboard
+    and subscribes to /teleop/gains (Float64MultiArray [x_gain, y_gain, z_gain,
+    time_from_start_s]) so gains can be tuned live without restarting the script.
+    """
 
     def __init__(self, host: str, port: int, topic: str, time_from_start_s: float,
                  joint_names: List[str]) -> None:
@@ -265,6 +270,7 @@ class RosBridgeArmPublisher:
             import roslibpy
         except ImportError as e:
             raise SystemExit("Missing dependency: roslibpy (pip install roslibpy)") from e
+        self._roslibpy = roslibpy
         self.ros = roslibpy.Ros(host=host, port=port)
         self.ros.run()
         if not self.ros.is_connected:
@@ -272,6 +278,20 @@ class RosBridgeArmPublisher:
         self.topic = roslibpy.Topic(self.ros, topic, "trajectory_msgs/JointTrajectory")
         self.topic.advertise()
         self.joint_names = joint_names
+
+        # Monitoring: publish hand XYZ for the dashboard
+        self.hand_xyz_topic = roslibpy.Topic(
+            self.ros, "/teleop/hand_xyz", "geometry_msgs/Vector3Stamped"
+        )
+        self.hand_xyz_topic.advertise()
+
+        # Live gain tuning: subscribe to /teleop/gains
+        self._gain_callback = None
+        self._tfs_callback = None
+        self.gain_topic = roslibpy.Topic(
+            self.ros, "/teleop/gains", "std_msgs/Float64MultiArray"
+        )
+        self.gain_topic.subscribe(self._on_gain_message)
         sec = int(time_from_start_s)
         nsec = int((time_from_start_s - sec) * 1e9)
         self.tfs = {"sec": sec, "nanosec": nsec}
@@ -289,9 +309,44 @@ class RosBridgeArmPublisher:
         }
         self.topic.publish(msg)
 
+    def send_hand_xyz(self, xyz: np.ndarray) -> None:
+        msg = {
+            "header": {"frame_id": "camera", "stamp": {"sec": 0, "nanosec": 0}},
+            "vector": {"x": float(xyz[0]), "y": float(xyz[1]), "z": float(xyz[2])},
+        }
+        self.hand_xyz_topic.publish(msg)
+
+    def set_tfs(self, time_from_start_s: float) -> None:
+        sec = int(time_from_start_s)
+        nsec = int((time_from_start_s - sec) * 1e9)
+        self.tfs = {"sec": sec, "nanosec": nsec}
+
+    def set_gain_callback(self, cb) -> None:
+        """cb(x_gain: float, y_gain: float, z_gain: float, tfs: float) -> None"""
+        self._gain_callback = cb
+
+    def _on_gain_message(self, msg: dict) -> None:
+        if self._gain_callback is None:
+            return
+        data = msg.get("data", [])
+        if len(data) < 3:
+            return
+        x_gain = float(data[0])
+        y_gain = float(data[1])
+        z_gain = float(data[2])
+        tfs = float(data[3]) if len(data) >= 4 else None
+        try:
+            self._gain_callback(x_gain, y_gain, z_gain, tfs)
+            if tfs is not None:
+                self.set_tfs(tfs)
+        except Exception as e:
+            print(f"[WARN] gain update failed: {e}")
+
     def shutdown(self) -> None:
         try:
             self.topic.unadvertise()
+            self.hand_xyz_topic.unadvertise()
+            self.gain_topic.unsubscribe()
             self.ros.terminate()
         except Exception:
             pass
@@ -416,6 +471,20 @@ def main(
     ema_fps = None
     t_start = time.perf_counter()
 
+    # Mutable gain container — can be updated from the dashboard via rosbridge.
+    gains = {"x": x_gain, "y": y_gain, "z": z_gain}
+
+    def _on_gain_update(gx, gy, gz, tfs):
+        gains["x"], gains["y"], gains["z"] = gx, gy, gz
+        if not quiet:
+            print(f"[GAINS] x={gx:.2f} y={gy:.2f} z={gz:.2f} tfs={tfs}", flush=True)
+
+    if ros_pub is not None and use_rosbridge:
+        try:
+            ros_pub.set_gain_callback(_on_gain_update)
+        except AttributeError:
+            pass  # direct rclpy publisher doesn't support live tuning
+
     try:
         while tracker.cap.isOpened():
             if run_seconds is not None and (time.perf_counter() - t_start) >= run_seconds:
@@ -433,13 +502,19 @@ def main(
             q_deg = xyz_to_joints_deg(
                 xyz,
                 invert_x=invert_x, invert_y=invert_y, invert_z=invert_z,
-                x_gain=x_gain, y_gain=y_gain, z_gain=z_gain,
+                x_gain=gains["x"], y_gain=gains["y"], z_gain=gains["z"],
                 joint_limits=JOINT_LIMITS_DEG,
                 joint_names=joint_names,
             )
 
             if ros_pub is not None:
                 ros_pub.send_deg(q_deg)
+                # Mirror hand XYZ for the dashboard (rosbridge path only)
+                if use_rosbridge:
+                    try:
+                        ros_pub.send_hand_xyz(xyz)
+                    except AttributeError:
+                        pass
 
             dt = time.perf_counter() - t0
             inst = 1.0 / dt if dt > 0 else fps
