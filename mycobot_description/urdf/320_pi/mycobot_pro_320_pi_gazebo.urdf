@@ -378,10 +378,16 @@
     <origin xyz="-0.047 -0.01 0" rpy="0 0 0"/>
   </joint>
 
-  <joint name="gripper_left3_to_gripper_left1" type="fixed">
+  <joint name="gripper_left3_to_gripper_left1" type="revolute">
     <parent link="gripper_left3"/>
     <child link="gripper_left1"/>
     <origin xyz="-0.05 0.035 -0.015" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="2.0" lower="-0.7" upper="0.7" velocity="3.14"/>
+    <dynamics damping="0.2" friction="0.05"/>
+    <!-- Counter-rotate so the finger-tip stays parallel to gripper_base
+         (4-bar linkage approximation, since URDF can't express closed loops). -->
+    <mimic joint="gripper_controller" multiplier="-1.0" offset="0.0"/>
   </joint>
 
   <joint name="gripper_base_to_gripper_right3" type="revolute">
@@ -400,10 +406,17 @@
     <origin xyz="0.044 -0.01 0" rpy="0 0 0"/>
   </joint>
 
-  <joint name="gripper_right3_to_gripper_right1" type="fixed">
+  <joint name="gripper_right3_to_gripper_right1" type="revolute">
     <parent link="gripper_right3"/>
     <child link="gripper_right1"/>
     <origin xyz="0.052 0.035 -0.015" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="2.0" lower="-0.7" upper="0.7" velocity="3.14"/>
+    <dynamics damping="0.2" friction="0.05"/>
+    <!-- Mirror of left1: counter-rotate right3's rotation so the fingertip
+         stays parallel to gripper_base. right3 itself mimics gripper_controller
+         with multiplier=-1, so right1 needs multiplier=+1 here to cancel. -->
+    <mimic joint="gripper_controller" multiplier="1.0" offset="0.0"/>
   </joint>
 
   <!-- ==================== GAZEBO EXTRAS ==================== -->
@@ -632,6 +645,22 @@
     <joint name="gripper_base_to_gripper_right3">
       <param name="mimic">gripper_controller</param>
       <param name="multiplier">-1.0</param>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- 4-bar linkage approximation: counter-rotate the fingertips so they
+         stay parallel to the base as the servo joints sweep. -->
+    <joint name="gripper_left3_to_gripper_left1">
+      <param name="mimic">gripper_controller</param>
+      <param name="multiplier">-1.0</param>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="gripper_right3_to_gripper_right1">
+      <param name="mimic">gripper_controller</param>
+      <param name="multiplier">1.0</param>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
     </joint>
