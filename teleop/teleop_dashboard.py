@@ -198,7 +198,7 @@ class Dashboard:
             "x": tk.DoubleVar(value=1.2),
             "y": tk.DoubleVar(value=1.2),
             "z": tk.DoubleVar(value=1.6),
-            "tfs": tk.DoubleVar(value=0.8),
+            "tfs": tk.DoubleVar(value=0.15),
         }
         rows = [
             ("X gain — hand forward → J2 shoulder", "x", 0.3, 3.0, INFO),
