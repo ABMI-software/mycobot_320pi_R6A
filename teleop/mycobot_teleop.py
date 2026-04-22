@@ -125,10 +125,21 @@ BASE_SCALE_DEG_PER_M = 150.0
 # EMA smoothing — dampens Wilor/Kalman jitter.
 DEFAULT_COMMAND_EMA_ALPHA = 0.20
 
-# Max joint-angle change per frame, in degrees. At 30 Hz that's 90 °/s —
-# about half of the URDF velocity limit (180 °/s) so the JTC always has
-# headroom to catch up instead of saturating on transients.
-DEFAULT_MAX_DELTA_DEG_PER_FRAME = 3.0
+# Max joint-angle change per frame, in degrees. Matches the value used
+# by the R5A / LeRobot hand_control pipeline (ARM_MAX_STEP_DEG = 1.0),
+# which is the filter chain that's been production-validated on two
+# other robots. At 30 Hz → 30 °/s — feels a bit slow on gestures but
+# keeps the JTC glued to the command. Crank up to 2–3 if you want snappier
+# motion at the cost of more tracking error spikes.
+DEFAULT_MAX_DELTA_DEG_PER_FRAME = 1.0
+
+# Gripper conditioning — deadband + EMA + slew, same three-stage pipeline
+# used by hand_control. Deadband kills the "breathing" at rest; EMA dampens
+# frame-to-frame noise on Wilor's open_degree; slew limit prevents jumps
+# on reacquisition. All in degrees of open_degree (Wilor native scale).
+GRIPPER_DEADBAND_DEG = 3.0
+GRIPPER_EMA_ALPHA = 0.25
+GRIPPER_MAX_STEP_DEG = 4.0
 
 
 def xyz_to_joints_deg(
@@ -579,6 +590,9 @@ def main(
     q_smoothed = np.zeros(6)
     ema_alpha = DEFAULT_COMMAND_EMA_ALPHA
 
+    # Gripper filter state: EMA on open_degree + slew on the output.
+    grip_state = {"ema": None, "last_sent": None}
+
     def _on_gain_update(gx, gy, gz, tfs):
         gains["x"], gains["y"], gains["z"] = gx, gy, gz
         if not quiet:
@@ -678,11 +692,33 @@ def main(
                         ros_pub.send_hand_xyz(xyz)
                     except AttributeError:
                         pass
-                    # Map Wilor open_degree (SAFE_RANGE["g"] = 2..90) → [0, 1]
+                    # Gripper: apply the same 3-stage filter chain as R5A /
+                    # LeRobot (deadband → EMA → slew) on Wilor's open_degree
+                    # before normalizing to [0,1] for the controller.
                     try:
                         g_lo, g_hi = SAFE_RANGE["g"]
-                        opn = float(pose.open_degree) if hasattr(pose, "open_degree") else g_lo
-                        normalized = (opn - g_lo) / max(1e-6, g_hi - g_lo)
+                        g_raw = float(pose.open_degree) if hasattr(pose, "open_degree") else g_lo
+                        # Stage 1: deadband — ignore tiny fluctuations around center
+                        g_center = 0.5 * (g_lo + g_hi)
+                        if abs(g_raw - g_center) < GRIPPER_DEADBAND_DEG:
+                            g_input = grip_state["ema"] if grip_state["ema"] is not None else g_center
+                        else:
+                            g_input = g_raw
+                        # Stage 2: EMA smoothing
+                        if grip_state["ema"] is None:
+                            grip_state["ema"] = g_input
+                        else:
+                            grip_state["ema"] = ((1.0 - GRIPPER_EMA_ALPHA) * grip_state["ema"]
+                                                 + GRIPPER_EMA_ALPHA * g_input)
+                        # Stage 3: slew limit vs last published value
+                        if grip_state["last_sent"] is None:
+                            g_out = grip_state["ema"]
+                        else:
+                            step = grip_state["ema"] - grip_state["last_sent"]
+                            step = max(-GRIPPER_MAX_STEP_DEG, min(GRIPPER_MAX_STEP_DEG, step))
+                            g_out = grip_state["last_sent"] + step
+                        grip_state["last_sent"] = g_out
+                        normalized = (g_out - g_lo) / max(1e-6, g_hi - g_lo)
                         ros_pub.send_gripper_normalized(normalized)
                     except AttributeError:
                         pass
