@@ -191,20 +191,23 @@ def xyz_to_joints_deg(
     j2 = dz * scale * z_gain           # shoulder   ← vertical
     j3 = dx * scale * x_gain           # elbow      ← depth
 
-    # Hand orientation → wrist joints (J4 + J5 split the pitch so their
-    # combined rotation points the EE in the direction the palm points,
-    # J6 carries the roll / twist).
-    # rpy_deg is a relative (roll, pitch, yaw) tuple in degrees; Wilor
-    # produces ±60° at most for a natural palm rotation.
+    # Hand orientation → wrist joints. rpy_deg is (roll, pitch, yaw) in
+    # degrees extracted from the ZYX intrinsic Euler decomposition.
+    # Mapping:
+    #   hand pitch → J4 + J5 combined → EE points where the palm points
+    #   hand yaw   → J6               → "doorknob" rotation around the
+    #                                    optical axis spins the EE
+    # Roll is currently unused (too noisy in Wilor, hard to disambiguate
+    # from yaw in practice).
     if rpy_deg is not None:
-        roll, pitch, _ = rpy_deg
+        roll, pitch, yaw = rpy_deg
         if invert_roll:
             roll = -roll
         if invert_pitch:
             pitch = -pitch
-        j4 = pitch * pitch_gain * 0.5  # half of pitch on wrist1
-        j5 = pitch * pitch_gain * 0.5  # other half on wrist2 — EE tracks palm
-        j6 = roll * roll_gain
+        j4 = pitch * pitch_gain * 0.5
+        j5 = pitch * pitch_gain * 0.5
+        j6 = yaw * roll_gain           # renamed variable, same semantic knob
     else:
         j4 = 0.0
         j5 = 0.0
@@ -651,8 +654,10 @@ def main(
                 break
 
             xyz = get_xyz_from_pose(pose)
-            # Extract hand roll/pitch/yaw from the relative rotation matrix
-            # for wrist control (J4 pitch, J6 roll).
+            # Extract hand roll/pitch/yaw from the relative rotation matrix.
+            # ZYX intrinsic: yaw is rotation around the first axis (Z),
+            # then pitch around the new Y, then roll around the new X.
+            # Tuple order in our code: (roll, pitch, yaw).
             try:
                 rot = get_rot_from_pose(pose)
                 yaw_deg, pitch_deg, roll_deg = R.from_matrix(rot).as_euler(
@@ -728,7 +733,9 @@ def main(
             ema_fps = inst if ema_fps is None else 0.9 * ema_fps + 0.1 * inst
             if not quiet:
                 pairs = ", ".join(f"{n.split('_')[0]}:{v:+.1f}" for n, v in zip(joint_names, q_deg))
-                print(f"XYZ {np.round(xyz, 3)} | {pairs} | FPS {ema_fps:.1f}")
+                rpy_str = (f" | RPY {rpy[0]:+6.1f},{rpy[1]:+6.1f},{rpy[2]:+6.1f}"
+                           if rpy is not None else "")
+                print(f"XYZ {np.round(xyz, 3)}{rpy_str} | {pairs} | FPS {ema_fps:.1f}")
 
             remain = target_dt - (time.perf_counter() - t0)
             if remain > 0:
