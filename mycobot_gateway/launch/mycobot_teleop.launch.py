@@ -128,6 +128,13 @@ def generate_launch_description():
         output="screen",
         condition=IfCondition(sim_enabled),
     )
+    gripper_controller_spawner = Node(
+        package="controller_manager", executable="spawner",
+        arguments=["gripper_position_controller", "--controller-manager", "/controller_manager",
+                   "--param-file", controller_cfg],
+        output="screen",
+        condition=IfCondition(sim_enabled),
+    )
 
     # --------------------------- rosbridge_server ---------------------------- #
     rosbridge_launch = IncludeLaunchDescription(
@@ -175,6 +182,7 @@ def generate_launch_description():
         # Controllers come up after Gazebo has spawned the robot
         TimerAction(period=3.0, actions=[joint_state_broadcaster]),
         TimerAction(period=3.5, actions=[mycobot_controller_spawner]),
+        TimerAction(period=4.0, actions=[gripper_controller_spawner]),
         rosbridge_launch,
         bridge_tour,
         # Start the trajectory bridge last so bridge_tour has time to connect
