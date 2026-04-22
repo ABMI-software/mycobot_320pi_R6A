@@ -554,7 +554,74 @@
     </sensor>
   </gazebo>
 
-  <!-- Gazebo joint state publisher plugin -->
+  <!-- ros2_control hardware interface (Gazebo sim) -->
+  <ros2_control name="MyCobotSystem" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+      <param name="use_sim_time">true</param>
+    </hardware>
+    <joint name="joint2_to_joint1">
+      <command_interface name="position">
+        <param name="min">-2.93</param>
+        <param name="max">2.93</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint3_to_joint2">
+      <command_interface name="position">
+        <param name="min">-2.35</param>
+        <param name="max">2.35</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint4_to_joint3">
+      <command_interface name="position">
+        <param name="min">-2.53</param>
+        <param name="max">2.53</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint5_to_joint4">
+      <command_interface name="position">
+        <param name="min">-2.53</param>
+        <param name="max">2.53</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint6_to_joint5">
+      <command_interface name="position">
+        <param name="min">-2.93</param>
+        <param name="max">2.93</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint6output_to_joint6">
+      <command_interface name="position">
+        <param name="min">-3.14</param>
+        <param name="max">3.14</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <!-- Gazebo ↔ ros2_control bridge plugin -->
+  <gazebo>
+    <plugin filename="libgz_ros2_control-system.so"
+            name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(find mycobot_description)/config/controller.yaml</parameters>
+      <controller_manager_name>controller_manager</controller_manager_name>
+      <robot_param>robot_description</robot_param>
+      <robot_param_node>robot_state_publisher</robot_param_node>
+    </plugin>
+  </gazebo>
+
+  <!-- Gazebo joint state publisher (kept for Gazebo-side introspection) -->
   <gazebo>
     <plugin filename="gz-sim-joint-state-publisher-system"
             name="gz::sim::systems::JointStatePublisher">
@@ -564,50 +631,6 @@
       <joint_name>joint5_to_joint4</joint_name>
       <joint_name>joint6_to_joint5</joint_name>
       <joint_name>joint6output_to_joint6</joint_name>
-    </plugin>
-  </gazebo>
-
-  <!-- Gazebo joint position controller plugin (per-joint topics) -->
-  <gazebo>
-    <plugin filename="gz-sim-joint-position-controller-system"
-            name="gz::sim::systems::JointPositionController">
-      <joint_name>joint2_to_joint1</joint_name>
-      <topic>/model/mycobot_320/joint/joint2_to_joint1/cmd_pos</topic>
-    </plugin>
-  </gazebo>
-  <gazebo>
-    <plugin filename="gz-sim-joint-position-controller-system"
-            name="gz::sim::systems::JointPositionController">
-      <joint_name>joint3_to_joint2</joint_name>
-      <topic>/model/mycobot_320/joint/joint3_to_joint2/cmd_pos</topic>
-    </plugin>
-  </gazebo>
-  <gazebo>
-    <plugin filename="gz-sim-joint-position-controller-system"
-            name="gz::sim::systems::JointPositionController">
-      <joint_name>joint4_to_joint3</joint_name>
-      <topic>/model/mycobot_320/joint/joint4_to_joint3/cmd_pos</topic>
-    </plugin>
-  </gazebo>
-  <gazebo>
-    <plugin filename="gz-sim-joint-position-controller-system"
-            name="gz::sim::systems::JointPositionController">
-      <joint_name>joint5_to_joint4</joint_name>
-      <topic>/model/mycobot_320/joint/joint5_to_joint4/cmd_pos</topic>
-    </plugin>
-  </gazebo>
-  <gazebo>
-    <plugin filename="gz-sim-joint-position-controller-system"
-            name="gz::sim::systems::JointPositionController">
-      <joint_name>joint6_to_joint5</joint_name>
-      <topic>/model/mycobot_320/joint/joint6_to_joint5/cmd_pos</topic>
-    </plugin>
-  </gazebo>
-  <gazebo>
-    <plugin filename="gz-sim-joint-position-controller-system"
-            name="gz::sim::systems::JointPositionController">
-      <joint_name>joint6output_to_joint6</joint_name>
-      <topic>/model/mycobot_320/joint/joint6output_to_joint6/cmd_pos</topic>
     </plugin>
   </gazebo>
 
