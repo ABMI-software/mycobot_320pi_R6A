@@ -1,8 +1,13 @@
 # Procédure de test — Téléopération sur le MyCobot 320 Pi physique
 
-Checklist à suivre avant et pendant le premier test de la téléopération sur le robot réel. **À lire intégralement la première fois** — les sections sont organisées par ordre chronologique de la session.
+Checklist à suivre avant et pendant le test de la téléopération sur le robot réel. **À lire intégralement la première fois** — les sections sont organisées par ordre chronologique de la session.
+
+> ✅ **Premier test validé le 22/04/2026 sur le MyCobot 320 Pi (IP 10.10.0.223).**
+> Le pipeline complet `Astra → Wilor → rosbridge → trajectory_to_robot_bridge → bridge_tour → bridge_pi_simple → pymycobot → servos` est fonctionnel. Gains initiaux 0.6/0.6/0.6, tfs 0.3 s, speed 25 — mouvements lents et précis du bras.
 
 > ⚠️ **Le robot réel MyCobot 320 Pi actuel n'a pas de gripper physique.** Ce document assume donc un test **bras seul**. Le pipeline gripper est codé mais non câblé par défaut (voir [`TELEOPERATION.md § Limitations`](TELEOPERATION.md#limitations-connues)).
+
+> 📝 **L'IP par défaut de la Pi est `10.10.0.223`** (pas `10.10.0.225` comme indiqué dans les anciens docs).
 
 ---
 
@@ -35,7 +40,7 @@ Checklist à suivre avant et pendant le premier test de la téléopération sur 
 ## Étape 1 — Démarrage côté Pi
 
 ```bash
-ssh er@10.10.0.225
+ssh er@10.10.0.223
 ```
 
 ```bash
@@ -113,14 +118,14 @@ ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=real rosbridge:=fal
 **C. IP Pi custom** :
 ```bash
 ros2 launch mycobot_gateway mycobot_teleop.launch.py \
-    target:=real rosbridge:=false pi_ip:=10.10.0.225 real_speed:=20
+    target:=real rosbridge:=false pi_ip:=10.10.0.223 real_speed:=20
 ```
 
 > **⚠️ Paramètre `real_speed`** : c'est la vitesse pymycobot (0–100) pour chaque `send_angles`. **Pour le premier test commence bas** (20–30). Tu pourras monter ensuite si le comportement est sain.
 
 **Attendu dans le log T2** :
 ```
-[bridge_tour]: ✅ Connecté à la Pi (10.10.0.225:5005)
+[bridge_tour]: ✅ Connecté à la Pi (10.10.0.223:5005)
 [trajectory_to_robot_bridge]: Bridging /mycobot_controller/joint_trajectory → /to_robot
 ```
 
@@ -300,5 +305,74 @@ Range-les dans `docs/real_robot_tests/YYYY-MM-DD/` pour traçabilité.
 
 ---
 
-*Dernière mise à jour : 22 avril 2026*
+## Protocole de calibration sécurisé (validé 22/04/2026)
+
+Séquence exacte utilisée lors du premier test réussi sur le MyCobot physique — à reproduire à l'identique pour les prochaines sessions.
+
+### Avant de lancer la téléop
+
+1. **Dans le dashboard, descends les sliders AVANT de bouger ta main** :
+   - `X gain` : **0.6**
+   - `Y gain` : **0.6**
+   - `Z gain` : **0.6**
+   - `time_from_start` : **0.3 s**
+
+### Calibration Wilor
+
+2. **Paume ouverte face à l'Astra, centrée, ~50 cm de distance, main immobile**
+3. Clique **⟲ Recalibrate hand origin** dans le dashboard
+4. **Attends 2 secondes** sans bouger la main — ça laisse Wilor stabiliser
+5. Tu peux maintenant commencer à bouger
+
+### Montée incrémentale
+
+6. **Commence UNIQUEMENT avec des mouvements lents gauche/droite** (axe Y, J1 base). Le robot physique doit pivoter doucement à sa base.
+7. Si ça va bien, **ajoute haut/bas** (axe Z, J2 shoulder). Puis avant/arrière (axe X, J3 elbow).
+8. Une fois les 3 axes position validés sans saturation ni oscillation, **monte les gains vers 1.0 / 1.0 / 1.2** puis vers les nominaux `1.2 / 1.2 / 1.6` si le comportement reste sain.
+
+### Conditions de Ctrl+C immédiat sur T3
+
+Arrête la téléop (`Ctrl+C` sur T3) **immédiatement** si tu observes :
+
+- Le robot **accélère** tout seul ou prend de la vitesse sans raison
+- **Oscillations** visibles sur un ou plusieurs joints
+- Robot qui part dans une **position suspecte** (près d'une limite ou vers un obstacle)
+- **Perte de synchronisation** entre ta main et le robot (robot qui continue alors que ta main est immobile)
+
+### Ce que l'opérateur surveille en parallèle
+
+- **Dashboard → flags par joint** : passe à `✓ OK` en régime établi ; `△ JITTERY` ponctuel toléré, `⚠ UNSTABLE` = reprise
+- **Dashboard → plot error** : doit rester sous la ligne 5° cible la plupart du temps
+- **Terminal T2 (bridge_tour)** : JSON envoyés ~15 Hz max (rate_hz garde-fou)
+- **Terminal Pi (bridge_pi_simple.py)** : logs `📥 Reçu` et `📤 Envoyé` alignés, pas de `ERROR` dans la stack pymycobot
+
+---
+
+## Résultats du premier test (22/04/2026)
+
+| Métrique | Observation |
+|----------|-------------|
+| Pi IP | `10.10.0.223` |
+| Vitesse pymycobot | 25 (real_speed=25 dans le launch) |
+| Gains teleop | 0.6 / 0.6 / 0.6 puis montée progressive |
+| Latence visuelle | imperceptible (<200 ms entre geste et mouvement robot) |
+| Stabilité | **Pas d'oscillation, pas de saturation observée** |
+| Pipeline validé | Astra → Wilor → rosbridge → JTC topic → trajectory_to_robot_bridge → bridge_tour → Pi → pymycobot → servos |
+| Commande statique send_angles [45,0,0,0,0,0] | ✅ Base pivote 45° en ~3 s |
+| Commande texte `home` | ✅ Robot rejoint `[0, 8, -127, 40, 0, 0]` |
+| Téléop main complète | ✅ Mouvements coordonnés, pas d'accélération anormale |
+
+### Points à creuser lors des prochaines sessions
+
+1. **bridge_tour receive_loop** : les réponses de la Pi arrivent à la Tour mais ne sont pas logguées (observation terrain). La Pi log montre bien `📤 Envoyé` mais bridge_tour côté Tower n'affiche pas `📥 Reçu`. Non-bloquant (la téléop n'a pas besoin du retour) mais à debug pour le monitoring.
+
+2. **Unités** : `bridge_pi_simple.py` appelle `mc.send_angles(angles_deg, speed)` — pymycobot attend des **degrés**. Notre `trajectory_to_robot_bridge` convertit bien rad → deg avant publication. ✓
+
+3. **Défaut d'IP dans les docs anciens** : `10.10.0.225` → à remplacer par `10.10.0.223` partout.
+
+4. **Priorité prochaine session** : test performance_analyzer sur le réel (attention : `/joint_states` Gazebo pas disponible côté réel, donc les RMS/max seront faussés — juger visuellement).
+
+---
+
+*Dernière mise à jour : 22 avril 2026 — après le premier test physique validé.*
 *Voir aussi : [TELEOPERATION.md](TELEOPERATION.md), [TELEOP_DASHBOARD.md](TELEOP_DASHBOARD.md), [TELEOP_TUNING.md](TELEOP_TUNING.md).*

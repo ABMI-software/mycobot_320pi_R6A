@@ -7,6 +7,48 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.1.0] - 2026-04-22 (soir)
+
+### ✅ Premier test sur robot physique validé
+
+Session de validation end-to-end sur le **MyCobot 320 Pi physique** (IP `10.10.0.223`). Le pipeline complet Astra → Wilor → rosbridge → JTC topic → trajectory_to_robot_bridge → bridge_tour → Pi → pymycobot est fonctionnel avec une latence main→bras de ~150–250 ms, imperceptible visuellement. Mouvements coordonnés, pas d'oscillation ni saturation sur les gains initiaux 0.6/0.6/0.6.
+
+### Ajouté — Documentation
+
+- `docs/TELEOP_ARCHITECTURE_VIZ.md` — visuel détaillé du pipeline complet (9 étapes, types, conversions d'unités, latences mesurées, exemples chiffrés). Répond au besoin de comprendre exactement comment la détection se traduit en mouvement.
+- `docs/REAL_ROBOT_TEST_PROCEDURE.md` étendu :
+  - Protocole de calibration sécurisé validé (gains 0.6/0.6/0.6, tfs 0.3, speed 25, montée progressive)
+  - Conditions de Ctrl+C immédiat
+  - Tableau de résultats du premier test
+  - Points à creuser pour les prochaines sessions
+
+### Ajouté — Infrastructure test réel
+
+- `scripts/real_robot_preflight.sh` — check pré-vol 5 étapes avec exit codes distincts.
+- `mycobot_gateway/gripper_to_robot_bridge.py` — bridge prêt pour gripper physique (non câblé : robot actuel sans pince).
+- Flag `--no-gripper` dans `mycobot_teleop.py`.
+
+### Corrigé
+
+- IP par défaut Pi dans les docs : `10.10.0.225` → `10.10.0.223`.
+- `bridge_tour` accepte `pi_ip` et `pi_port` comme paramètres ROS2.
+
+### Validé — Session 22/04/2026 (soir)
+
+| Check | Résultat |
+|-------|----------|
+| ping Pi + TCP 5005 | ✅ |
+| bridge_tour TCP connect + ping/pong | ✅ |
+| `get_angles`, `home`, `send_angles [45,0,…]` | ✅ |
+| Téléop main complète (Wilor → bras physique) | ✅ |
+
+### Points non bloquants
+
+- `bridge_tour` receive_loop : ne log pas `📥 Reçu de Pi` (non bloquant pour téléop)
+- Axe J6 (doorknob) : mapping `j6 = yaw * roll_gain` à valider visuellement sur réel
+
+---
+
 ## [2.0.0] - 2026-04-22
 
 Version majeure : **téléopération par la main** opérationnelle en simulation Gazebo, avec dashboard live de tuning + rapport de performance Excel.

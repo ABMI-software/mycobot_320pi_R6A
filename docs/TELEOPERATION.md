@@ -1,10 +1,15 @@
 # Hand Teleoperation — MyCobot 320 Pi
 
-Pilotage du MyCobot 320 Pi par la main de l'opérateur, en simulation Gazebo et sur le robot réel. Adaptation du pipeline développé par l'équipe pour les robots ArmR5A et LeRobot (voir [ABMI-software/hand_controlLerobot](https://github.com/ABMI-software/hand_controlLerobot)).
+Pilotage du MyCobot 320 Pi par la main de l'opérateur, en simulation Gazebo et **sur le robot réel** (premier test validé 22/04/2026, Pi à 10.10.0.223). Adaptation du pipeline développé par l'équipe pour les robots ArmR5A et LeRobot (voir [ABMI-software/hand_controlLerobot](https://github.com/ABMI-software/hand_controlLerobot)).
 
 > **Documents liés**
+> - [TELEOP_ARCHITECTURE_VIZ.md](TELEOP_ARCHITECTURE_VIZ.md) — **visuel détaillé : détection → mouvement**
+> - [REAL_ROBOT_TEST_PROCEDURE.md](REAL_ROBOT_TEST_PROCEDURE.md) — procédure test physique + calibration sécurisée
+> - [TELEOP_DASHBOARD.md](TELEOP_DASHBOARD.md) — manuel utilisateur du dashboard
 > - [TELEOP_TUNING.md](TELEOP_TUNING.md) — référence des paramètres + dépannage
 > - [ARCHITECTURE.md](ARCHITECTURE.md) — architecture système globale
+
+> ✅ **Status** : validé en simulation + **validé sur robot physique** (MyCobot 320 Pi, 22/04/2026). Pipeline complet Astra → Wilor → rosbridge → JTC topic → trajectory_to_robot_bridge → bridge_tour → Pi → pymycobot.
 
 ---
 
