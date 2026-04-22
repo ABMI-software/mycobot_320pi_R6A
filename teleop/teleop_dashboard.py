@@ -93,6 +93,10 @@ class RosClient:
                                        "std_msgs/Float64MultiArray")
         self._p_gains.advertise()
 
+        self._p_recal = roslibpy.Topic(self.ros, "/teleop/recalibrate",
+                                       "std_msgs/Empty")
+        self._p_recal.advertise()
+
     def _now(self) -> float:
         return time.perf_counter() - self._t0
 
@@ -127,6 +131,9 @@ class RosClient:
     def publish_gains(self, gx: float, gy: float, gz: float, tfs: float) -> None:
         self._p_gains.publish(roslibpy.Message({"data": [gx, gy, gz, tfs]}))
 
+    def request_recalibrate(self) -> None:
+        self._p_recal.publish(roslibpy.Message({}))
+
     def snapshot(self):
         with self._lock:
             return (list(self.hand_xyz), list(self.cmd_joints), list(self.actual_joints))
@@ -137,10 +144,11 @@ class RosClient:
                 t.unsubscribe()
             except Exception:
                 pass
-        try:
-            self._p_gains.unadvertise()
-        except Exception:
-            pass
+        for t in (self._p_gains, self._p_recal):
+            try:
+                t.unadvertise()
+            except Exception:
+                pass
         self.ros.terminate()
 
 
@@ -207,13 +215,30 @@ class Dashboard:
         ttkb.Separator(frame, bootstyle=SECONDARY).grid(
             row=len(rows), column=0, columnspan=3, sticky="ew", pady=(6, 2)
         )
+
+        bottom = ttkb.Frame(frame)
+        bottom.grid(row=len(rows) + 1, column=0, columnspan=3, sticky="ew", pady=(2, 0))
+
         hint = ttkb.Label(
-            frame,
+            bottom,
             text="Changes apply live via rosbridge. "
                  "Higher gain = more joint motion for less hand motion.",
             font=("Segoe UI", 9), bootstyle=SECONDARY,
         )
-        hint.grid(row=len(rows) + 1, column=0, columnspan=3, sticky="w", pady=(2, 0))
+        hint.pack(side=LEFT)
+
+        recal_btn = ttkb.Button(
+            bottom, text="⟲  Recalibrate hand origin",
+            bootstyle=(SUCCESS, OUTLINE),
+            command=self._on_recalibrate,
+        )
+        recal_btn.pack(side=RIGHT, padx=(10, 4))
+        recal_hint = ttkb.Label(
+            bottom,
+            text="Click with your palm in view to re-zero the hand→robot mapping.",
+            font=("Segoe UI", 9), bootstyle=SECONDARY,
+        )
+        recal_hint.pack(side=RIGHT, padx=(0, 8))
 
     def _make_slider(self, parent, row, label, key, lo, hi, style) -> None:
         ttkb.Label(parent, text=label, font=("Segoe UI", 10)).grid(
@@ -306,6 +331,9 @@ class Dashboard:
             self.gain_vars["z"].get(),
             self.gain_vars["tfs"].get(),
         )
+
+    def _on_recalibrate(self) -> None:
+        self.client.request_recalibrate()
 
     def _refresh(self) -> None:
         hand, cmd, actual = self.client.snapshot()
