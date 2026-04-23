@@ -105,8 +105,9 @@ Une caméra filme la main de l'opérateur → [Wilor](https://github.com/warmsha
 │       data = [servo_left, servo_right, tip_left, tip_right]   │
 │                                                                │
 │   /teleop/hand_xyz                 (monitoring dashboard)     │
-│   /teleop/gains    (subscribe)     (slider dashboard)         │
-│   /teleop/recalibrate (subscribe)  (bouton dashboard)         │
+│   /teleop/camera/image             (preview JPEG ~10 Hz)      │
+│   /teleop/gains    (subscribe)     (sliders / presets)        │
+│   /teleop/recalibrate (subscribe)  (bouton Recalibrate)       │
 └───────────────────────────────────────────────────────────────┘
                             ▼
 ┌───────────────────────────────────────────────────────────────┐
@@ -270,15 +271,15 @@ Orchestre tout le pipeline. Arguments principaux :
 - Détection proprement des états morts (fichiers existants mais tick figé)
 - Survit aux Ctrl+C du parent via `start_new_session=True`
 
-### `teleop/teleop_dashboard.py` — GUI de tuning
+### `teleop/teleop_dashboard.py` — GUI de tuning (ABMI v2.2)
 
-Design ttkbootstrap "darkly" — connecté à rosbridge. Affiche :
+Design ttkbootstrap "darkly" + charte **ABMI navy+pink** — connecté à rosbridge. Trois onglets :
 
-- **4 sliders** live : `x/y/z gain`, `time_from_start` (appliqués via `/teleop/gains`)
-- **Bouton ⟲ Recalibrate** (publie sur `/teleop/recalibrate`)
-- **Indicateur connexion** + compteurs de messages par topic
-- **Tableau stats** par joint : RMS, max, jitter, flag `✓ OK / △ JITTERY / ⚠ UNSTABLE`
-- **3 plots matplotlib** (fenêtre 10 s glissante) : Wilor XYZ / commandé vs actual / erreur de tracking par joint + ligne 5° cible
+- **🏠 Home** : 5 KPI cards (mode, cmd rate, SIM avg RMS, REAL avg RMS, signal health), panneau caméra opérateur (feed JPEG via `/teleop/camera/image`), bar chart comparatif SIM↔REAL, plot hand position en **cm**, 5 boutons d'action dynamiques (Home robot / Stop / Recalibrate / Run analyzer / Export CSV) avec tooltip hover + feedback `⟳→✓/✗` + toast horodaté.
+- **📊 Analytics** : plots détaillés — hand XYZ, joint angles sim / joint angles real côte à côte, tracking error sim / tracking error real côte à côte. Stats strip mono-space en bas.
+- **🎛️ Tuning** : 4 sliders live (`x/y/z gain`, `time_from_start`) publiés sur `/teleop/gains`, presets **🐢 Safe / ⚙️ Nominal / ⚡ Reactive** (le preset actif reste highlighted), bouton Recalibrate dédié.
+
+Badge de mode automatique en haut à droite : **SIM / REAL / BOTH / OFFLINE** (détection par fraîcheur de `/joint_states` vs `/from_robot`). Voir [TELEOP_DASHBOARD.md](TELEOP_DASHBOARD.md) pour le manuel complet.
 
 ### `teleop/performance_analyzer.py` — rapport Excel
 
