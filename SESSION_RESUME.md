@@ -1,9 +1,10 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 23 avril 2026
-> **Version :** 1.10.0
-> **Branche active :** `feature/pick-and-place-sorting` (off `main`)
+> **Date de dernière mise à jour :** 23 avril 2026 (merge teleop + sorting → main)
+> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting)
+> **Branche active :** `main` (téléop + sorting fusionnés)
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
+> **Pi réelle :** `10.10.0.223` (pas `.225` comme certains anciens docs)
 
 ---
 
@@ -19,9 +20,64 @@ source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
 
 ---
 
-## État actuel (21 avril 2026)
+## État actuel (22 avril 2026 — soir)
 
-### Problème principal : Domain gap sim-to-real
+### ✅ MILESTONE : premier test physique réussi
+
+Le pipeline complet de téléopération main a été **validé sur le MyCobot 320 Pi physique** (IP 10.10.0.223) dans la session du 22/04/2026 soir. Chaîne testée :
+
+```
+👋 Main opérateur → Astra S → Wilor → mapping → filtres
+    → rosbridge → /mycobot_controller/joint_trajectory
+    → trajectory_to_robot_bridge → JSON /to_robot
+    → bridge_tour (TCP) → Pi 10.10.0.223:5005
+    → bridge_pi_simple.py → pymycobot → servos → 🦾
+```
+
+**Résultats mesurés** :
+- Latence main→bras ~150–250 ms, imperceptible visuellement
+- Mouvements coordonnés, pas d'oscillation, pas de saturation
+- Gains initiaux 0.6/0.6/0.6 + tfs 0.3 + speed 25 (voir [`docs/REAL_ROBOT_TEST_PROCEDURE.md`](docs/REAL_ROBOT_TEST_PROCEDURE.md) § protocole sécurisé)
+
+### Outils livrés pour la téléop
+
+Dans [`teleop/`](teleop/) (env conda `hand-teleop`, Python 3.10) :
+- [`mycobot_teleop.py`](teleop/mycobot_teleop.py) — script principal caméra → joints via rosbridge · publie aussi `/teleop/camera/image` pour le dashboard
+- [`teleop_dashboard.py`](teleop/teleop_dashboard.py) — **GUI ABMI v2.2** (navy+pink) · 3 onglets (🏠 Home · 📊 Analytics · 🎛️ Tuning) · KPI cards · caméra intégrée · ActionButton dynamiques · presets de gains
+- [`performance_analyzer.py`](teleop/performance_analyzer.py) — rapport Excel avec verdict READY/CAUTIOUS/NOT READY
+- [`orbbec_capture.py`](teleop/orbbec_capture.py) — wrapper Astra shared-memory via `oni_grabber`
+- [`assets/abmi_logo.png`](teleop/assets/) — logo chargé par le dashboard
+
+Dans [`mycobot_gateway/`](mycobot_gateway/) (env ROS2 Jazzy, Python 3.12) :
+- `trajectory_to_robot_bridge` — JointTrajectory (rad) → JSON send_angles (deg) pour le Pi
+- `gripper_to_robot_bridge` — *(prêt, non câblé : robot actuel sans gripper physique)*
+- `bridge_tour` — TCP client vers Pi (IP paramétrable)
+- `mycobot_teleop.launch.py` — launch `target:={sim,real,both}`
+
+Dans [`scripts/`](scripts/) :
+- `real_robot_preflight.sh` — check pré-vol 5 étapes (ping, TCP, ROS2, bridge_tour round-trip, get_angles)
+
+### Documentation
+
+- [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) — pipeline complet, filtres, mapping, historique
+- [`docs/TELEOP_ARCHITECTURE_VIZ.md`](docs/TELEOP_ARCHITECTURE_VIZ.md) — **visuel détaillé** : détection → mouvement (types, unités, latences)
+- [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) — manuel utilisateur du dashboard
+- [`docs/TELEOP_TUNING.md`](docs/TELEOP_TUNING.md) — référence paramètres + dépannage
+- [`docs/REAL_ROBOT_TEST_PROCEDURE.md`](docs/REAL_ROBOT_TEST_PROCEDURE.md) — procédure + protocole calibration sécurisé
+
+**Status checklist** :
+- ✅ Pipeline complet en simulation (Astra → Wilor → filtres → Gazebo JTC)
+- ✅ Dashboard ABMI v2.2 (3 onglets · KPI cards · caméra intégrée · ActionButton dynamiques) + rapport Excel
+- ✅ Filtres R5A/LeRobot portés (EMA + slew 1°/f + gripper deadband chain)
+- ✅ **Pipeline réel validé** (22/04/2026, IP 10.10.0.223)
+- ✅ Preflight + procédure documentés
+- ⚠️ Axe J6 (doorknob) : mapping `yaw` implémenté, validation visuelle toujours à faire
+- ⚠️ bridge_tour receive_loop : n'affiche pas les `📥 Reçu de Pi` (Pi envoie bien mais logging Tower absent) — non bloquant
+- ⚠️ Pince Gazebo : limitation cosmétique (4-bar linkage pas reproductible sous DART)
+- ℹ️ Robot physique actuel **sans gripper** — flag `--no-gripper` obligatoire
+- 🔜 **Prochain** : tuning fin des gains sur robot réel, test performance_analyzer en conditions réelles
+
+### Problème DREAM toujours ouvert : Domain gap sim-to-real
 
 Le modèle DREAM VGG atteint **97% de détection à 3.1px médiane** sur les données synthétiques, mais seulement **~26% de détection sur les images réelles**. Les pics des belief maps sont 10× plus faibles sur les images réelles que sur les synthétiques.
 
