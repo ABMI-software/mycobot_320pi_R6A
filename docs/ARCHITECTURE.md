@@ -71,7 +71,9 @@ intelligente combinant :
 | `joint_sync` | `joint_sync.py` | Synchro états articulaires |
 | `marker_follower` | `marker_follower.py` | Suivi ArUco (legacy) |
 | `dream_inference` | `dream_inference_node.py` | Inférence DREAM + PnP pose |
-| `pick_and_place` | `pick_and_place_node.py` | Orchestre pick-and-place via IK |
+| `pick_and_place` | `pick_and_place_node.py` | Orchestre pick-and-place mono-objet via IK |
+| `color_object_detector` | `color_object_detector.py` | Segmentation HSV + back-projection (top camera) |
+| `sorting_orchestrator` | `sorting_orchestrator.py` | Pick-and-place multi-objets par couleur (boucle sur détections) |
 | `synth_data_collector` | `synthetic_data_collector_v2.py` | Collecte Gazebo + randomization |
 
 **Launch files :**
@@ -85,7 +87,8 @@ intelligente combinant :
 | `commander.launch.py` | CLI + bridge |
 | `rviz_sync.launch.py` | Sync robot réel → RViz |
 | `marker_follow.launch.py` | Suivi marqueur ArUco |
-| `pick_and_place.launch.py` | Cycle complet pick & place |
+| `pick_and_place.launch.py` | Cycle pick & place mono-objet (cube rouge → zone verte) |
+| `pick_and_place_sorting.launch.py` | Pick & place multi-objets par couleur (4 objets → 4 bacs) |
 | `synthetic_data.launch.py` | Collecte données sim (monde de base) |
 | `synthetic_data_v2.launch.py` | Collecte v2 (monde randomisé) |
 | `synthetic_data_v3.launch.py` | Collecte v3 (monde randomized_v2 — 6 lights, 12 objets) |
@@ -98,7 +101,10 @@ intelligente combinant :
 | Gripper | `urdf/pro_adaptive_gripper/` | Gripper adaptatif (meshes STL) |
 | Monde de base | `worlds/randomized.sdf` | Table + fond simple |
 | Monde v2 | `worlds/randomized_v2.sdf` | 6 lumières, 12 objets clutter, 3 murs |
+| Monde pick-and-place | `worlds/pick_and_place.sdf` | Table + cube cible rouge + zone verte |
+| Monde sorting | `worlds/pick_and_place_sorting.sdf` | Table 1.0×0.6 m + 4 objets colorés (cube R/B, cylindre G, boîte Y) + 4 bacs colorés |
 | Config RViz | `config/mycobot_320_pi.rviz` | Préréglage visualisation |
+| Visuels caméra | `urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf` | 4 caméras stylisées (corps + objectif + LED) — visuellement distinctes des objets à trier |
 
 ---
 

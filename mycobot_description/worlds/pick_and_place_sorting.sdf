@@ -1,0 +1,358 @@
+<?xml version="1.0" ?>
+<!--
+  Multi-object color-sorting world for MyCobot 320 Pi.
+
+  Layout (top-down, robot at origin, +X = front of robot):
+    - Pick zone (front, +X side):
+        red_cube      at ( 0.22, -0.12)
+        blue_cube     at ( 0.22,  0.12)
+        green_cyl     at ( 0.27, -0.05)
+        yellow_box    at ( 0.27,  0.05)
+    - Drop bins (back, -X side):
+        red_bin       at (-0.22, -0.18)
+        blue_bin      at (-0.22, -0.06)
+        green_bin     at (-0.22,  0.06)
+        yellow_bin    at (-0.22,  0.18)
+
+  All pick/place targets are within the ~0.32 m MyCobot 320 reach envelope.
+  Objects are dynamic (mass + inertia) so they sit naturally on the table
+  and the orchestrator can teleport them via gz set_pose during carry.
+-->
+<sdf version="1.9">
+  <world name="pick_and_place_sorting">
+
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.85 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.3 -0.9</direction>
+    </light>
+
+    <light type="directional" name="fill_light">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 8 0 0 0</pose>
+      <diffuse>0.4 0.4 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.5 -0.3 -0.7</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+          <material>
+            <ambient>0.55 0.55 0.52 1</ambient>
+            <diffuse>0.6 0.6 0.57 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Worktop: 1.0 x 0.6 m, top surface at z = 0 -->
+    <model name="table">
+      <static>true</static>
+      <pose>0 0 -0.02 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>1.0 0.6 0.04</size></box></geometry>
+          <material>
+            <ambient>0.30 0.22 0.14 1</ambient>
+            <diffuse>0.42 0.30 0.18 1</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry><box><size>1.0 0.6 0.04</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ============================================================ -->
+    <!--  OBJECTS TO SORT (dynamic, ~50 g each)                       -->
+    <!-- ============================================================ -->
+
+    <model name="red_cube">
+      <pose>0.22 -0.12 0.025 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.04 0.04 0.04</size></box></geometry>
+          <material>
+            <ambient>0.7 0.05 0.05 1</ambient>
+            <diffuse>0.95 0.10 0.10 1</diffuse>
+            <specular>0.4 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry><box><size>0.04 0.04 0.04</size></box></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <inertial>
+          <mass>0.05</mass>
+          <inertia>
+            <ixx>1.33e-5</ixx><iyy>1.33e-5</iyy><izz>1.33e-5</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+
+    <model name="blue_cube">
+      <pose>0.22 0.12 0.025 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <material>
+            <ambient>0.05 0.10 0.7 1</ambient>
+            <diffuse>0.10 0.20 0.95 1</diffuse>
+            <specular>0.1 0.1 0.4 1</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <inertial>
+          <mass>0.06</mass>
+          <inertia>
+            <ixx>2.5e-5</ixx><iyy>2.5e-5</iyy><izz>2.5e-5</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+
+    <model name="green_cylinder">
+      <pose>0.27 -0.05 0.025 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><cylinder><radius>0.022</radius><length>0.05</length></cylinder></geometry>
+          <material>
+            <ambient>0.05 0.55 0.10 1</ambient>
+            <diffuse>0.10 0.80 0.15 1</diffuse>
+            <specular>0.1 0.4 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry><cylinder><radius>0.022</radius><length>0.05</length></cylinder></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <inertial>
+          <mass>0.05</mass>
+          <inertia>
+            <ixx>1.25e-5</ixx><iyy>1.25e-5</iyy><izz>1.21e-5</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+
+    <model name="yellow_box">
+      <pose>0.27 0.05 0.020 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.05 0.03 0.04</size></box></geometry>
+          <material>
+            <ambient>0.7 0.6 0.05 1</ambient>
+            <diffuse>0.95 0.85 0.10 1</diffuse>
+            <specular>0.4 0.4 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry><box><size>0.05 0.03 0.04</size></box></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <inertial>
+          <mass>0.05</mass>
+          <inertia>
+            <ixx>1.08e-5</ixx><iyy>1.71e-5</iyy><izz>2.04e-5</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+
+    <!-- ============================================================ -->
+    <!--  DROP BINS (static, with low walls so objects stay inside)   -->
+    <!--  Each bin: 0.10 x 0.10 footprint, 0.03 m wall height         -->
+    <!-- ============================================================ -->
+
+    <model name="red_bin">
+      <static>true</static>
+      <pose>-0.22 -0.18 0.0 0 0 0</pose>
+      <link name="link">
+        <visual name="floor"><pose>0 0 0.001 0 0 0</pose>
+          <geometry><box><size>0.10 0.10 0.002</size></box></geometry>
+          <material><ambient>0.55 0.05 0.05 1</ambient><diffuse>0.85 0.10 0.10 1</diffuse></material>
+        </visual>
+        <visual name="wn"><pose>0 0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry>
+          <material><ambient>0.55 0.05 0.05 1</ambient><diffuse>0.85 0.10 0.10 1</diffuse></material>
+        </visual>
+        <visual name="ws"><pose>0 -0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry>
+          <material><ambient>0.55 0.05 0.05 1</ambient><diffuse>0.85 0.10 0.10 1</diffuse></material>
+        </visual>
+        <visual name="we"><pose>0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry>
+          <material><ambient>0.55 0.05 0.05 1</ambient><diffuse>0.85 0.10 0.10 1</diffuse></material>
+        </visual>
+        <visual name="ww"><pose>-0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry>
+          <material><ambient>0.55 0.05 0.05 1</ambient><diffuse>0.85 0.10 0.10 1</diffuse></material>
+        </visual>
+        <collision name="floor_c"><pose>0 0 0.001 0 0 0</pose>
+          <geometry><box><size>0.10 0.10 0.002</size></box></geometry></collision>
+        <collision name="wn_c"><pose>0 0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry></collision>
+        <collision name="ws_c"><pose>0 -0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry></collision>
+        <collision name="we_c"><pose>0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry></collision>
+        <collision name="ww_c"><pose>-0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry></collision>
+      </link>
+    </model>
+
+    <model name="blue_bin">
+      <static>true</static>
+      <pose>-0.22 -0.06 0.0 0 0 0</pose>
+      <link name="link">
+        <visual name="floor"><pose>0 0 0.001 0 0 0</pose>
+          <geometry><box><size>0.10 0.10 0.002</size></box></geometry>
+          <material><ambient>0.05 0.10 0.55 1</ambient><diffuse>0.10 0.20 0.85 1</diffuse></material>
+        </visual>
+        <visual name="wn"><pose>0 0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry>
+          <material><ambient>0.05 0.10 0.55 1</ambient><diffuse>0.10 0.20 0.85 1</diffuse></material>
+        </visual>
+        <visual name="ws"><pose>0 -0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry>
+          <material><ambient>0.05 0.10 0.55 1</ambient><diffuse>0.10 0.20 0.85 1</diffuse></material>
+        </visual>
+        <visual name="we"><pose>0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry>
+          <material><ambient>0.05 0.10 0.55 1</ambient><diffuse>0.10 0.20 0.85 1</diffuse></material>
+        </visual>
+        <visual name="ww"><pose>-0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry>
+          <material><ambient>0.05 0.10 0.55 1</ambient><diffuse>0.10 0.20 0.85 1</diffuse></material>
+        </visual>
+        <collision name="floor_c"><pose>0 0 0.001 0 0 0</pose>
+          <geometry><box><size>0.10 0.10 0.002</size></box></geometry></collision>
+        <collision name="wn_c"><pose>0 0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry></collision>
+        <collision name="ws_c"><pose>0 -0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry></collision>
+        <collision name="we_c"><pose>0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry></collision>
+        <collision name="ww_c"><pose>-0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry></collision>
+      </link>
+    </model>
+
+    <model name="green_bin">
+      <static>true</static>
+      <pose>-0.22 0.06 0.0 0 0 0</pose>
+      <link name="link">
+        <visual name="floor"><pose>0 0 0.001 0 0 0</pose>
+          <geometry><box><size>0.10 0.10 0.002</size></box></geometry>
+          <material><ambient>0.05 0.55 0.10 1</ambient><diffuse>0.10 0.85 0.15 1</diffuse></material>
+        </visual>
+        <visual name="wn"><pose>0 0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry>
+          <material><ambient>0.05 0.55 0.10 1</ambient><diffuse>0.10 0.85 0.15 1</diffuse></material>
+        </visual>
+        <visual name="ws"><pose>0 -0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry>
+          <material><ambient>0.05 0.55 0.10 1</ambient><diffuse>0.10 0.85 0.15 1</diffuse></material>
+        </visual>
+        <visual name="we"><pose>0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry>
+          <material><ambient>0.05 0.55 0.10 1</ambient><diffuse>0.10 0.85 0.15 1</diffuse></material>
+        </visual>
+        <visual name="ww"><pose>-0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry>
+          <material><ambient>0.05 0.55 0.10 1</ambient><diffuse>0.10 0.85 0.15 1</diffuse></material>
+        </visual>
+        <collision name="floor_c"><pose>0 0 0.001 0 0 0</pose>
+          <geometry><box><size>0.10 0.10 0.002</size></box></geometry></collision>
+        <collision name="wn_c"><pose>0 0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry></collision>
+        <collision name="ws_c"><pose>0 -0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry></collision>
+        <collision name="we_c"><pose>0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry></collision>
+        <collision name="ww_c"><pose>-0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry></collision>
+      </link>
+    </model>
+
+    <model name="yellow_bin">
+      <static>true</static>
+      <pose>-0.22 0.18 0.0 0 0 0</pose>
+      <link name="link">
+        <visual name="floor"><pose>0 0 0.001 0 0 0</pose>
+          <geometry><box><size>0.10 0.10 0.002</size></box></geometry>
+          <material><ambient>0.55 0.50 0.05 1</ambient><diffuse>0.90 0.85 0.10 1</diffuse></material>
+        </visual>
+        <visual name="wn"><pose>0 0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry>
+          <material><ambient>0.55 0.50 0.05 1</ambient><diffuse>0.90 0.85 0.10 1</diffuse></material>
+        </visual>
+        <visual name="ws"><pose>0 -0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry>
+          <material><ambient>0.55 0.50 0.05 1</ambient><diffuse>0.90 0.85 0.10 1</diffuse></material>
+        </visual>
+        <visual name="we"><pose>0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry>
+          <material><ambient>0.55 0.50 0.05 1</ambient><diffuse>0.90 0.85 0.10 1</diffuse></material>
+        </visual>
+        <visual name="ww"><pose>-0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry>
+          <material><ambient>0.55 0.50 0.05 1</ambient><diffuse>0.90 0.85 0.10 1</diffuse></material>
+        </visual>
+        <collision name="floor_c"><pose>0 0 0.001 0 0 0</pose>
+          <geometry><box><size>0.10 0.10 0.002</size></box></geometry></collision>
+        <collision name="wn_c"><pose>0 0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry></collision>
+        <collision name="ws_c"><pose>0 -0.05 0.015 0 0 0</pose>
+          <geometry><box><size>0.10 0.005 0.03</size></box></geometry></collision>
+        <collision name="we_c"><pose>0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry></collision>
+        <collision name="ww_c"><pose>-0.05 0 0.015 0 0 0</pose>
+          <geometry><box><size>0.005 0.10 0.03</size></box></geometry></collision>
+      </link>
+    </model>
+
+    <model name="back_wall">
+      <static>true</static>
+      <pose>-1.0 0 0.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.05 2.0 1.0</size></box></geometry>
+          <material>
+            <ambient>0.45 0.45 0.50 1</ambient>
+            <diffuse>0.5 0.5 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
