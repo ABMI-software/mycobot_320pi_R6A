@@ -237,7 +237,7 @@ Pipeline complet de pilotage du robot par la main de l'opérateur, adapté du R5
 | Outil | Rôle |
 |-------|------|
 | `mycobot_teleop.py` | Script principal — caméra → joints |
-| `teleop_dashboard.py` | GUI ttkbootstrap : 4 sliders live (x/y/z gain, tfs), bouton Recalibrate, 3 plots temps réel, tableau stats par joint avec flags OK/JITTERY/UNSTABLE |
+| `teleop_dashboard.py` | GUI ABMI navy+pink, 3 onglets (🏠 Home · 📊 Analytics · 🎛️ Tuning) · KPI cards SIM/REAL · caméra opérateur intégrée · ActionButton dynamiques (tooltip + feedback + toast) · presets de gains (🐢 Safe / ⚙️ Nominal / ⚡ Reactive) · badge de mode auto |
 | `performance_analyzer.py` | Générateur de rapport Excel — protocole guidé 7 phases → verdict READY / CAUTIOUS / NOT READY + onglets par-joint, par-scénario, raw data |
 | `orbbec_capture.py` | Wrapper shared-memory Astra avec auto-spawn `oni_grabber` + watchdog |
 
@@ -254,7 +254,7 @@ ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim
 conda activate hand-teleop && cd teleop
 python3 mycobot_teleop.py --camera astra --ros --use-rosbridge
 
-# T4 — dashboard live tuning
+# T4 — dashboard ABMI (Home / Analytics / Tuning)
 python3 teleop_dashboard.py
 
 # T5 — rapport de performance avant robot réel

@@ -1,7 +1,7 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 22 avril 2026 (soir — après 1er test robot physique)
-> **Version :** 2.1.0
+> **Date de dernière mise à jour :** 23 avril 2026 (dashboard ABMI + boutons dynamiques)
+> **Version :** 2.2.0
 > **Branche active :** `feature/teleoperation` (téléop), `feature/pose-training` (DREAM)
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.223` (pas `.225` comme certains anciens docs)
@@ -42,10 +42,11 @@ Le pipeline complet de téléopération main a été **validé sur le MyCobot 32
 ### Outils livrés pour la téléop
 
 Dans [`teleop/`](teleop/) (env conda `hand-teleop`, Python 3.10) :
-- [`mycobot_teleop.py`](teleop/mycobot_teleop.py) — script principal caméra → joints via rosbridge
-- [`teleop_dashboard.py`](teleop/teleop_dashboard.py) — GUI ttkbootstrap : sliders live + plots + stats
+- [`mycobot_teleop.py`](teleop/mycobot_teleop.py) — script principal caméra → joints via rosbridge · publie aussi `/teleop/camera/image` pour le dashboard
+- [`teleop_dashboard.py`](teleop/teleop_dashboard.py) — **GUI ABMI v2.2** (navy+pink) · 3 onglets (🏠 Home · 📊 Analytics · 🎛️ Tuning) · KPI cards · caméra intégrée · ActionButton dynamiques · presets de gains
 - [`performance_analyzer.py`](teleop/performance_analyzer.py) — rapport Excel avec verdict READY/CAUTIOUS/NOT READY
 - [`orbbec_capture.py`](teleop/orbbec_capture.py) — wrapper Astra shared-memory via `oni_grabber`
+- [`assets/abmi_logo.png`](teleop/assets/) — logo chargé par le dashboard
 
 Dans [`mycobot_gateway/`](mycobot_gateway/) (env ROS2 Jazzy, Python 3.12) :
 - `trajectory_to_robot_bridge` — JointTrajectory (rad) → JSON send_angles (deg) pour le Pi
@@ -66,7 +67,7 @@ Dans [`scripts/`](scripts/) :
 
 **Status checklist** :
 - ✅ Pipeline complet en simulation (Astra → Wilor → filtres → Gazebo JTC)
-- ✅ Dashboard de tuning live + rapport Excel
+- ✅ Dashboard ABMI v2.2 (3 onglets · KPI cards · caméra intégrée · ActionButton dynamiques) + rapport Excel
 - ✅ Filtres R5A/LeRobot portés (EMA + slew 1°/f + gripper deadband chain)
 - ✅ **Pipeline réel validé** (22/04/2026, IP 10.10.0.223)
 - ✅ Preflight + procédure documentés

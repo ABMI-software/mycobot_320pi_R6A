@@ -1,12 +1,12 @@
-# Manuel utilisateur — Dashboard de téléopération
+# Manuel utilisateur — Dashboard de téléopération (ABMI v2.2)
 
-Guide d'utilisation du `teleop_dashboard.py` pour tuner les gains en live et suivre les performances du système de téléopération en simulation.
+Guide d'utilisation du [`teleop_dashboard.py`](../teleop/teleop_dashboard.py) : tuning en direct, suivi sim ↔ réel côte à côte, caméra opérateur intégrée et boutons d'action dynamiques.
 
-> Prérequis : rosbridge en cours sur `ws://localhost:9090` (T1), Gazebo + controllers actifs (T2), teleop script en cours avec `--use-rosbridge` (T3). Voir [TELEOPERATION.md](TELEOPERATION.md) pour le workflow complet.
+> Prérequis : rosbridge sur `ws://localhost:9090` (T1), Gazebo + controllers actifs ou `bridge_tour` vers le Pi en cours (T2), teleop en cours avec `--use-rosbridge` (T3). Voir [TELEOPERATION.md](TELEOPERATION.md) pour le workflow complet.
 
 ---
 
-## Lancement
+## 1. Lancement
 
 ```bash
 conda activate hand-teleop
@@ -14,284 +14,223 @@ cd ~/ros_jazzy/src/mycobot_R6A/teleop
 python3 teleop_dashboard.py
 ```
 
-Une fenêtre 1400 × 900 s'ouvre, thème sombre "darkly".
+La fenêtre s'ouvre en **1500 × 950** sur la charte **ABMI** (navy `#1B1A3E` + pink `#E6417A`, thème ttkbootstrap *darkly*). Le logo se charge automatiquement depuis [`teleop/assets/abmi_logo.png`](../teleop/assets/).
 
 ---
 
-## Anatomie de l'interface
+## 2. Bandeau du haut
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  🦾 MyCobot 320 Pi — Teleop Dashboard                               │
-│     Live tuning · Hand → Joint tracking · Signal stability          │
-├─────────────────────────────────────────────────────────────────────┤
-│ ┌─ Live gain tuning ──────────────────────────────────────────────┐ │
-│ │  X gain — hand forward → J2 shoulder      ━━━━━━━●━━━   1.20    │ │
-│ │  Y gain — hand lateral → J1 yaw           ━━━━━━━●━━━   1.20    │ │
-│ │  Z gain — hand vertical → J3 + J5         ━━━━━━━━━●━   1.60    │ │
-│ │  time_from_start — trajectory duration(s) ━━━●━━━━━━━   0.25    │ │
-│ │                                                                  │ │
-│ │  Changes apply live via rosbridge. Higher gain = more joint ... │ │
-│ │                               [⟲  Recalibrate hand origin]       │ │
-│ └──────────────────────────────────────────────────────────────────┘ │
-│                                                                       │
-│  ● rosbridge connected    hand_xyz:  800   commanded:  800  joint_states:  800
-│                                                                       │
-│ ┌─ Tracking stability (last 10s) ─────────────────────────────────┐  │
-│ │ Joint         RMS err    Max err   Cmd jitter σΔ    Signal      │  │
-│ │ ─────────────────────────────────────────────────────────────── │  │
-│ │ J1 yaw         2.30 °    8.40 °       0.45         ✓ OK         │  │
-│ │ J2 shoulder    3.10 °   12.00 °       0.62         ✓ OK         │  │
-│ │ J3 elbow       5.80 °   18.20 °       0.91         △ JITTERY    │  │
-│ │ J4 wrist1      0.50 °    1.20 °       0.10         ✓ OK         │  │
-│ │ J5 yaw         0.50 °    1.20 °       0.10         ✓ OK         │  │
-│ │ J6 roll        1.20 °    3.50 °       0.28         ✓ OK         │  │
-│ └──────────────────────────────────────────────────────────────────┘ │
-│                                                                       │
-│ ┌─ Live signals ───────────────────────────────────────────────────┐ │
-│ │                                                                   │ │
-│ │  [Plot 1] Wilor hand position (m)                                │ │
-│ │   0.2 ▂▃▆▆▅▄▂▁▁▂▄▆▇▅    x (forward) — red                       │ │
-│ │   0.0 ▁▁▂▅▇▆▄▂▁▂▅▇▆▃    y (lateral) — green                     │ │
-│ │  -0.2                   z (vertical)— blue                       │ │
-│ │       └─────── 10 s glissantes ───────┘                          │ │
-│ │                                                                   │ │
-│ │  [Plot 2] Joint angles — solid=commanded, dashed=actual          │ │
-│ │   100° ╱╲╱╲      ╱╲╱╲        solid = ce qu'on envoie             │ │
-│ │     0° ╱  ╲    ╱    ╲        dashed = ce que Gazebo rapporte     │ │
-│ │  -100° ╲  ╱    ╲    ╱        6 couleurs pour 6 joints            │ │
-│ │                                                                   │ │
-│ │  [Plot 3] Tracking error per joint — |commanded − actual|        │ │
-│ │    20° ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─          │ │
-│ │     5° ━━━━━━━━━━━━ 5° target (ligne pointillée) ━━━━━━━━━       │ │
-│ │     0° ╱╲    ╱╲    ╱╲    ╱╲    ╱╲                               │ │
-│ └───────────────────────────────────────────────────────────────────┘ │
+│  [ABMI logo]  MyCobot 320 Pi — Teleop Performance     🟦 SIM (Gazebo)│
+│               Live tuning · Sim ↔ Real comparison                    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
----
+### Badge de mode (en haut à droite)
 
-## Bandeau du haut — Live gain tuning
+Détecté automatiquement selon la fraîcheur des topics `/joint_states` (sim) et `/from_robot` (réel) — fenêtre de 2 s.
 
-### Les 4 sliders
-
-Tous les changements sont **appliqués en direct via rosbridge** — pas besoin de redémarrer `mycobot_teleop.py`. Chaque glisse publie sur `/teleop/gains` (un `Float64MultiArray` `[x, y, z, tfs]`) et le script teleop applique les nouvelles valeurs à la prochaine frame (latence ~33 ms à 30 Hz).
-
-| Slider | Plage | Défaut | Effet |
-|--------|-------|--------|-------|
-| **X gain — hand forward → J2 shoulder** | 0.3 → 3.0 | 1.20 | ⚠ Note : le label dit "J2 shoulder" pour compat avec R5A ; dans notre mapping actuel X → **J3 elbow**. Plus c'est haut, plus un petit mouvement avant/arrière de la main produit un grand mouvement de coude. |
-| **Y gain — hand lateral → J1 yaw** | 0.3 → 3.0 | 1.20 | Main à gauche/droite → base qui pivote. Amplifier pour couvrir plus d'angle avec moins de mouvement de main. |
-| **Z gain — hand vertical → J3 + J5** | 0.3 → 3.0 | 1.60 | ⚠ Note : le label dit "J3 + J5" mais dans le mapping actuel Z → **J2 shoulder**. Plus haut = main monte/descend produit plus d'élévation de l'EE. |
-| **time_from_start — trajectory duration (s)** | 0.1 → 2.5 | 0.25 | Durée de chaque trajectoire envoyée au JTC. Plus bas = plus réactif mais risque de sursaturation ; plus haut = plus lissé mais lent à répondre. |
-
-> Les labels des sliders X et Z mentionnent les anciens routages (R5A). La routage **actuel** est documenté dans [TELEOPERATION.md § Mapping](TELEOPERATION.md#mapping-main--joints).
-
-### Le bouton ⟲ Recalibrate hand origin
-
-**À utiliser en début de session** (et à chaque fois que tu te déplaces ou changes de position devant la caméra).
-
-Cliquer publie un message vide sur `/teleop/recalibrate` ; le teleop reçoit, appelle `tracker._pause()` + `tracker._resume()` qui résèt l'`initial_pose` de Wilor. La **prochaine détection** avec ta main dans le cadre devient la nouvelle origine du mapping.
-
-**Protocole recommandé** :
-1. Place ta paume ouverte, bien centrée, à ~50 cm face à la caméra
-2. Clique **Recalibrate**
-3. Dans T3 tu verras `[RECAL] Tracker initial_pose cleared — keep palm in view`
-4. Ne bouge pas la main pendant ~1 s le temps que Wilor stabilise sa nouvelle référence
-5. Commence à bouger — le robot reste à la pose zéro tant que ta main reste à cette position de référence
-
-**Quand re-recalibrer** :
-- Le robot dérive alors que ta main est immobile → la référence a "vieilli"
-- Tu as bougé de position (siège / chaise) devant la caméra
-- Le robot est bloqué dans une position saturée (joints à ±168°) et tu veux repartir propre
+| État | Badge | Couleur | Signification |
+|------|-------|---------|---------------|
+| `SIM` | 🟦 SIM (Gazebo) | bleu | Seuls les `/joint_states` Gazebo arrivent |
+| `REAL` | 🟥 REAL (MyCobot) | rose ABMI | Seuls les `ANGLES:` du Pi arrivent |
+| `BOTH` | ⚡ SIM + REAL | jaune sur navy | Les deux streams sont live — mode comparaison |
+| `OFFLINE` | ⚪ OFFLINE | gris | Rien reçu depuis > 2 s |
 
 ---
 
-## Ligne de statut (entre gains et stats)
+## 3. L'onglet 🏠 Home
+
+Au-dessus de tout : **5 KPI cards** avec barre d'accent à gauche (couleur contextuelle).
+
+| Carte | Mesure | Couleur adaptative |
+|-------|--------|--------------------|
+| **Execution mode** | Reflète le badge mode | Héritée du badge |
+| **Command rate** | Hz mesuré sur `/mycobot_controller/joint_trajectory` | Vert ≥ 20 Hz · Jaune sinon · Gris si vide |
+| **SIM tracking — avg RMS** | Moyenne des 6 joints sur la fenêtre 10 s (Gazebo) | Vert < 5° · Jaune < 15° · Rose au-delà |
+| **REAL tracking — avg RMS** | Idem côté robot physique | Mêmes seuils |
+| **Signal health** | Pire flag parmi tous les joints (OK / JITTERY / UNSTABLE) | Vert / Jaune / Rose |
+
+### Caméra opérateur (panneau gauche)
+
+Feed JPEG annoté (Wilor skeleton + pose) publié par `mycobot_teleop.py` sur `/teleop/camera/image` à ~10 Hz (downscale 320 px de large, qualité 60). La dernière frame s'affiche en inline avec un footer horodaté — plus besoin de la fenêtre OpenCV séparée.
+
+**Si le panneau affiche "waiting for /teleop/camera/image…"** :
+- Le teleop tourne-t-il bien en `--use-rosbridge` ?
+- Pillow/ImageTk disponible ? (`pip install pillow` dans l'env `hand-teleop`)
+
+### Comparatif SIM ↔ REAL (panneau droit)
+
+Deux mini-plots empilés :
+
+1. **Per-joint RMS tracking error** — bar chart 2 barres par joint (bleu = SIM, rose = REAL). Lignes pointillées à 5° (cible) et 15° (alerte). Regarde à vue d'œil si un joint tracke moins bien côté robot réel vs. sim.
+2. **Hand position (cm)** — XYZ relatifs de la main après filtres Wilor. **L'échelle est en cm** (pas en m comme dans l'ancienne version) pour comparaison plus directe avec les mm du workspace.
+
+### Quick actions (bas de l'onglet)
+
+Les 5 boutons sont des **ActionButton** : tooltip au survol, feedback visuel au clic (label `⟳` → `✓`/`✗`), désactivation pendant l'action, et une **ligne de statut toast** en dessous qui horodate le résultat (vert = succès, rose = erreur, fondu vers gris après ~4,5 s).
+
+| Bouton | Publie | Effet |
+|--------|--------|-------|
+| 🏠 **Send robot home** | `/to_robot` : `"home"` | bridge_tour → Pi → `send_angles([0, 8, -127, 40, 0, 0])` (pose home officielle) |
+| ⊘ **Stop (release servos)** | `/to_robot` : `"stop"` | Relâche les servos. **Maintenir le bras avant de cliquer** — il va tomber ! |
+| ⟲ **Recalibrate hand origin** | `/teleop/recalibrate` (Empty) | Reset de l'initial_pose Wilor → la prochaine frame devient l'origine du mapping |
+| 📊 **Run performance analyzer** | Lance `performance_analyzer.py --guided` | Protocole scripté 64 s → rapport `.xlsx` à côté |
+| 💾 **Export CSV snapshot** | Fichier local `snapshot_YYYYMMDD_HHMMSS.csv` | Dump de cmd / sim / real de la fenêtre courante |
+
+**Exemple de toast** : `✓  🏠  Send robot home · 14:23:05`
+
+---
+
+## 4. L'onglet 📊 Analytics
+
+Cinq plots matplotlib sur fond navy, fenêtre glissante 10 s, rafraîchis toutes les 250 ms :
 
 ```
-● rosbridge connected    hand_xyz:  800   commanded:  800   joint_states:  800
+┌─────────────────────────────────────────────────────────┐
+│  [Wilor hand position (cm)]   — grand plot full-width    │
+├──────────────────────────────┬──────────────────────────┤
+│ [Joint angles — SIM]         │ [Joint angles — REAL]     │
+│  solide = commandé           │  solide = commandé        │
+│  pointillé = /joint_states   │  pointillé = /from_robot  │
+├──────────────────────────────┼──────────────────────────┤
+│ [Tracking error — SIM]       │ [Tracking error — REAL]   │
+│  |cmd − sim| par joint       │  |cmd − real| par joint   │
+│  ligne cible 5°              │  ligne cible 5°           │
+└──────────────────────────────┴──────────────────────────┘
 ```
 
-- **● rosbridge connected** (vert) — le dashboard est bien abonné au WebSocket. Si ça devient rouge → relancer T1 (`rosbridge_websocket_launch.xml`).
-- **hand_xyz: N** — nombre de messages de position de main reçus depuis le démarrage du dashboard. Monte à ~30/s quand le teleop tourne correctement.
-- **commanded: N** — messages `/mycobot_controller/joint_trajectory` reçus. Devrait monter au même rythme que `hand_xyz`.
-- **joint_states: N** — messages `/joint_states` de Gazebo reçus. Attendu à ~150 Hz depuis le joint_state_broadcaster.
+Les plots marqués *"not active in current mode"* sont en attente du stream correspondant (ex: REAL hors ligne → les deux colonnes droites affichent le placeholder).
 
-**Diagnostic** :
+En bas : ligne mono-space **stats strip** :
 
-| Symptôme | Cause probable |
-|----------|----------------|
-| hand_xyz: 0 (ne monte pas) | Teleop pas lancé, ou Wilor ne détecte pas la main → regarder la fenêtre `hand-teleop` |
-| hand_xyz monte, commanded: 0 | Teleop sans `--use-rosbridge`, ou erreur d'advertize du topic |
-| commanded monte, joint_states: 0 | Gazebo pas lancé ou controllers pas actifs → regarder les logs T2 |
-| Les 3 montent, robot ne bouge pas | Conflit de contrôleurs ou gains PID à zéro |
+```
+SIM avg RMS 2.14° · flags: O/O/J/O/O/O    REAL avg RMS 5.32° · flags: O/O/U/O/O/J
+```
+
+(`O` = OK, `J` = JITTERY, `U` = UNSTABLE)
 
 ---
 
-## Panneau central — Tracking stability (last 10s)
+## 5. L'onglet 🎛️ Tuning
 
-Tableau de 6 lignes, une par joint. Les stats sont recalculées toutes les 250 ms sur la **fenêtre glissante des 10 dernières secondes**.
+### Les 4 sliders live
 
-### Colonnes
+Tous les changements publient sur `/teleop/gains` (`Float64MultiArray [x, y, z, tfs]`) — le teleop applique à la prochaine frame (~33 ms à 30 Hz).
 
-- **RMS err** (°) : racine de la moyenne des carrés de l'erreur `|commandé − actual|` sur la fenêtre. Indicateur principal de qualité de tracking.
-- **Max err** (°) : pic d'erreur sur la fenêtre. Révèle les transients ponctuels (reacquisition Wilor, saut brusque).
-- **Cmd jitter σΔ** (°) : écart-type des différences entre deux commandes consécutives. Mesure la propreté du signal d'entrée indépendamment du tracking.
-- **Signal** : drapeau synthétique basé sur les 3 précédents.
+| Slider | Plage | Défaut | Hint affiché |
+|--------|-------|--------|--------------|
+| **X gain — hand forward → J3 elbow** | 0.3 → 3.0 | 1.20 | *Plus = petit mouvement avant produit un grand mouvement de coude* |
+| **Y gain — hand lateral → J1 base yaw** | 0.3 → 3.0 | 1.20 | *Plus = petit mouvement latéral produit une grande rotation base* |
+| **Z gain — hand vertical → J2 + J5** | 0.3 → 3.0 | 1.60 | *Plus = petit mouvement vertical produit un grand tilt épaule+poignet* |
+| **time_from_start (s)** | 0.1 → 2.5 | 0.25 | *Plus bas = plus réactif (risqué) · plus haut = plus lissé (mais lent)* |
 
-### Les flags
+La valeur courante s'affiche en gros à droite de chaque slider (JetBrains Mono) et suit en direct le drag.
 
-| Flag | Critère | Interprétation |
-|------|---------|----------------|
-| ✓ **OK** (vert) | max ≤ 15° AND jitter ≤ 3° AND RMS ≤ 5° | Le robot suit proprement. Tu peux y aller sur le réel si tous les joints pilotés sont OK. |
-| △ **JITTERY** (orange) | max ≤ 15° AND jitter entre 3 et 6° OR RMS entre 5 et 8° | Signal un peu bruyant mais robot tracke. Halver les gains avant réel. |
-| ⚠ **UNSTABLE** (rouge) | max > 15° OR jitter > 6° | Commandes trop amples ou trop rapides. Baisser gains + time_from_start. Ne pas passer au réel. |
+### Bouton Recalibrate (dans l'onglet Tuning aussi)
 
-> Les seuils du dashboard (15°/3°) sont **plus stricts** que ceux du `performance_analyzer.py` (30°/3°) — le dashboard est un outil de réglage fin, l'analyzer juge l'acceptation finale avant robot réel.
+Même effet que celui du Home — `ActionButton` avec tooltip et feedback. Pratique quand tu es en train de tuner et que tu veux re-zéro sans changer d'onglet.
 
-### Lecture rapide
+### Presets
 
-- **J4 wrist1 et J5 yaw à 0.50° RMS identiques** → normal, le mapping split `pitch / 2` envoie la même valeur aux deux.
-- **J6 roll qui grimpe brutalement** quand tu bouges → Wilor est sensible aux rotations de main, penser à réduire `roll_gain` dans le code si c'est systématique.
-- **J3 elbow jittery** alors que J1/J2 OK → le x_gain est probablement trop haut pour ton amplitude de gestes.
+Trois boutons sous les sliders — **le preset actif reste mis en évidence** (bootstyle solide) tant qu'aucun slider n'est modifié ni qu'un autre preset n'est cliqué.
 
----
-
-## Plots — Live signals
-
-Trois graphes empilés, fenêtre glissante de 10 s, rafraîchis toutes les 250 ms.
-
-### Plot 1 — Wilor hand position
-
-La position XYZ de la main en mètres, telle qu'estimée par Wilor après les filtres du tracker (Kalman + jump clamp) mais AVANT mapping vers les joints.
-
-| Courbe | Axe main | Ordre de grandeur |
-|--------|----------|-------------------|
-| 🔴 rouge — x (forward) | Distance main → caméra | ±0.1 m au repos, ±0.25 m amplitude |
-| 🟢 vert — y (lateral) | Main gauche/droite | ±0.15 m amplitude |
-| 🔵 bleu — z (vertical) | Main haute/basse | ±0.15 m amplitude |
-
-**Ce qu'il faut surveiller** :
-- **Trois courbes constantes à 0** : main immobile, mapping relatif à l'origine (normal après Recalibrate)
-- **Saut brutal simultané sur x+y+z** : reacquisition Wilor (main a quitté le cadre puis revenue)
-- **Bruit haute fréquence ~0.01 m** : normal (bruit capteur)
-- **Dérive lente** : la référence initial_pose a vieilli → Recalibrate
-
-### Plot 2 — Joint angles
-
-Les 6 joints en degrés, **commandé en solide** (ce qu'on envoie à Gazebo) vs **actual en pointillé** (ce que Gazebo rapporte via /joint_states).
-
-| Couleur | Joint |
-|---------|-------|
-| 🔴 | J1 yaw |
-| 🟠 | J2 shoulder |
-| 🟢 | J3 elbow |
-| 🔵 | J4 wrist1 |
-| 🟣 | J5 yaw |
-| 🟤 | J6 roll |
-
-**Lecture** :
-- **Solide et pointillée superposés** : tracking parfait (le robot suit la commande sans retard)
-- **Pointillée en retard avec un décalage constant** : latence de tracking (normal, 50-100 ms)
-- **Pointillée plate alors que solide bouge** : le robot ne reçoit pas les commandes (crash du JTC, sat. joint, ou contrôleur pas actif)
-- **Solide qui sature à ±168°** : le mapping + gain commande au-delà des limites → baisser les gains
-
-### Plot 3 — Tracking error per joint
-
-Erreur absolue `|commandé − actual|` en degrés, **une courbe par joint** (6 couleurs).
-
-- **Ligne pointillée horizontale à 5°** : cible de bonne téléopération. En dessous = excellent tracking.
-- **Pics ponctuels < 30°** : acceptables (transients de Wilor, reacquisition)
-- **Erreur qui reste > 30° en steady-state** : vrai problème — baisser les gains, augmenter `time_from_start`
+| Preset | Valeurs (x, y, z, tfs) | Quand l'utiliser |
+|--------|------------------------|------------------|
+| 🐢 **Safe start** | 0.6 · 0.6 · 0.6 · 0.30 | Première session sur robot physique. Débit lent, amplitude réduite. Validé sur le MyCobot 320 Pi le 22/04/2026. |
+| ⚙️ **Nominal** | 1.2 · 1.2 · 1.6 · 0.25 | Point de fonctionnement post-calibration, validé sur physique. **Default au démarrage.** |
+| ⚡ **Reactive** | 1.6 · 1.6 · 2.0 · 0.15 | Débit rapide — uniquement quand l'opérateur est calé et l'espace dégagé. |
 
 ---
 
-## Workflow de tuning complet
+## 6. Workflow tuning complet
 
 ### 1. Démarrage
 
 ```
-T1 rosbridge    →  T2 Gazebo     →  T3 teleop     →  T4 dashboard
+T1 rosbridge  →  T2 Gazebo (ou bridge_tour)  →  T3 teleop --use-rosbridge  →  T4 dashboard
 ```
-
-**Attendre** que T2 affiche `mycobot_controller active` + `gripper_position_controller Configured and activated`.
 
 ### 2. Calibration
 
-Paume face caméra, 50 cm, centrée. **Clique Recalibrate**. Ne bouge pas pendant 1 s.
+Dans l'onglet **Home** : paume ouverte à 50 cm face caméra, clique **⟲ Recalibrate hand origin**. Attends 1 s que le toast `✓ Recalibrate…` apparaisse.
 
-### 3. Vérification signal brut
+### 3. Mode comparaison SIM ↔ REAL
 
-Regarde le plot Wilor XYZ : tes courbes bougent-elles quand tu bouges la main ? Si `hand_xyz: 0` dans le bandeau, Wilor ne détecte rien — voir troubleshooting.
+Laisse tourner `target:=both` dans ton launch → badge **⚡ SIM + REAL**. Les deux colonnes des KPI cards et le bar chart Home te permettent de voir immédiatement où la sim diverge du réel (souvent en tracking error sur J3 elbow parce que le gear ratio du MyCobot n'est pas modélisé dans le DART).
 
-### 4. Vérification tracking
+### 4. Tuning
 
-Bouge **lentement** ta main en Y (gauche/droite). Le plot joint angles doit montrer :
-- Solide rouge (J1) qui suit ta main
-- Pointillé rouge qui suit la solide (avec peut-être 100 ms de retard)
+Onglet **Tuning** :
+- Démarre avec le preset **🐢 Safe start**
+- Ajuste X/Y/Z progressivement — regarde la KPI **REAL tracking** sur Home
+- `time_from_start` : descends vers 0.15 seulement si tout reste vert
+- En cas d'instabilité : preset **🐢 Safe start** pour tout remettre en place, puis recommence
 
-Si le pointillé reste à plat → le robot ne reçoit pas tes commandes.
+### 5. Validation avant robot réel
 
-### 5. Tuning amplitude
-
-Si tu dois bouger ta main de 50 cm pour obtenir un mouvement significatif → **augmente les gains** (Y gain 1.2 → 2.0 par ex.).
-
-Si ton robot oscille ou sature avec des mouvements de 5 cm → **baisse les gains** (1.2 → 0.8).
-
-### 6. Tuning lissage
-
-Si le tracking error dépasse la ligne 5° pendant des mouvements normaux → **augmente `time_from_start`** (0.25 → 0.4). Effet : commandes plus lissées mais plus lentes.
-
-Si le robot "traîne" visiblement derrière ta main → **diminue `time_from_start`** (0.25 → 0.15). Attention, peut réintroduire de l'instabilité.
-
-### 7. Validation finale
-
-Tous les joints pilotés (J1, J2, J3, J4, J5, J6) affichent **✓ OK** en stats panel pendant au moins 30 s de mouvement continu → lance `performance_analyzer.py --guided` pour un rapport formel.
+Retour Home :
+- **SIM tracking avg RMS** < 5° pendant 30 s continues
+- **REAL tracking avg RMS** idem si `target:=both`
+- **Signal health** au vert
+- Clique **📊 Run performance analyzer** — le `.xlsx` te donnera un verdict formel
+- Si `READY FOR REAL ROBOT` → go
 
 ---
 
-## Troubleshooting spécifique dashboard
+## 7. Topics utilisés
+
+### Souscriptions (lectures)
+
+| Topic | Type | Usage |
+|-------|------|-------|
+| `/teleop/hand_xyz` | `geometry_msgs/Vector3Stamped` | Plot hand position + carte rate |
+| `/teleop/camera/image` | `sensor_msgs/CompressedImage` | Panneau caméra Home |
+| `/mycobot_controller/joint_trajectory` | `trajectory_msgs/JointTrajectory` | Courbe solide des plots joints · base pour toutes les erreurs |
+| `/joint_states` | `sensor_msgs/JointState` | Pointillé SIM · KPI SIM tracking |
+| `/from_robot` | `std_msgs/String` | Parse `ANGLES: [...]` → pointillé REAL · KPI REAL tracking |
+
+### Publications (écritures)
+
+| Topic | Type | Déclencheur |
+|-------|------|-------------|
+| `/teleop/gains` | `std_msgs/Float64MultiArray` | Sliders + presets tuning |
+| `/teleop/recalibrate` | `std_msgs/Empty` | Bouton Recalibrate (Home et Tuning) |
+| `/to_robot` | `std_msgs/String` | Boutons Home / Stop + polling passif `get_angles` (0.3 s) pour remonter les angles réels |
+
+---
+
+## 8. Troubleshooting
 
 | Problème | Vérifier | Solution |
-|----------|---------|----------|
-| Fenêtre ne s'ouvre pas | `echo $DISPLAY` non vide | Relancer avec DISPLAY défini : `DISPLAY=:0 python3 teleop_dashboard.py` |
-| `cannot reach rosbridge` au démarrage | T1 lancé ? port 9090 libre ? | `nc -zv localhost 9090` ; si KO, relance T1 |
-| Sliders ne bougent rien dans T3 | Teleop lancé sans `--use-rosbridge` ? | Ajouter le flag et relancer T3 |
-| Compteurs hand_xyz / commanded / joint_states à 0 | Topics bien advertized ? | `ros2 topic list \| grep teleop` ; `ros2 topic hz /mycobot_controller/joint_trajectory` |
-| Plot gelé à t+X secondes | Matplotlib backend ? | Le dashboard utilise TkAgg ; si Qt interfère, désactive `QT_QPA_PLATFORM` |
-| Flag reste ⚠ UNSTABLE quoi qu'il arrive | Maximum error vient d'un transient unique | Relis l'onglet "scenarios" de `performance_analyzer.py` — le pic est souvent sur UN geste précis |
-| Tous les joints à 0° commandé mais flag UNSTABLE | Max error mesuré sur les samples initiaux avant Recalibrate | Clique Recalibrate + attends 30 s que la fenêtre glissante se recompose |
+|----------|----------|----------|
+| Fenêtre ne s'ouvre pas | `echo $DISPLAY` | `DISPLAY=:0 python3 teleop_dashboard.py` |
+| `cannot reach rosbridge` | T1 lancé, port 9090 libre | `nc -zv localhost 9090` ; sinon relance T1 |
+| Badge reste **⚪ OFFLINE** | Teleop lancé avec `--use-rosbridge` ? Topics advertized ? | `ros2 topic hz /mycobot_controller/joint_trajectory` |
+| Caméra Home vide en permanence | PIL/Pillow absent · teleop sans `--use-rosbridge` | `pip install pillow` dans `hand-teleop` |
+| KPI **Command rate** à 0 Hz | Teleop publie-t-il bien ? | Regarder T3 : voir si `tracking_paused` est True |
+| **REAL tracking — avg RMS** reste "—" | bridge_tour / Pi OK ? | `ros2 topic echo /from_robot` — devrait afficher `ANGLES: [..]` |
+| Toast bloqué sur `✗ … failed` | Action a levé une exception | Regarder la console du dashboard — le traceback imprime la raison |
+| Preset ne reste pas highlighted | Tu as ensuite bougé un slider | Comportement normal : dès qu'un slider bouge, l'état preset est "cassé" |
+| Signal health reste UNSTABLE | Window 10 s bloquée sur le pic | Clique Recalibrate + attends 30 s |
 
 ---
 
-## Utiliser le dashboard + performance_analyzer ensemble
+## 9. Changements depuis la v2.1 (22/04/2026)
 
-Le dashboard te montre la **situation instantanée** (fenêtre 10 s glissante). L'analyzer te produit un **rapport formel** pour la prise de décision "on passe au réel ou pas".
-
-Protocole recommandé avant robot réel :
-
-```
-1. Dashboard ouvert en permanence
-2. Tu tunes les gains jusqu'à voir tous les joints ✓ OK pendant 30 s
-3. Tu lances :
-   python3 performance_analyzer.py --guided
-4. Pendant les 64 s du protocole, tu suis les instructions affichées
-   (idle → up/down → left/right → forward/back → combined → gripper → rest)
-5. À la fin, l'analyzer produit un .xlsx + un verdict console
-6. Si verdict = READY FOR REAL ROBOT → passer au robot physique
-   Si verdict = CAUTIOUS → halver les gains (dashboard) et refaire
-   Si verdict = NOT READY → diagnostiquer via les onglets "Scenarios" et
-     "raw_*" de l'Excel, identifier quel joint / phase pose problème
-```
-
-Exemples de lectures utiles dans le `.xlsx` :
-
-- **Onglet Scenarios** : si une phase spécifique (par ex. `forward_back`) génère tous les errors UNSTABLE, c'est que le x_gain est mal tuné, pas le système global.
-- **Onglet Summary** → Workspace used : si `x_range_mm` est < 100 mm, tu n'as pas bougé assez pour vraiment tester.
-- **Onglet raw_cmd + raw_actual** : tu peux charger dans Excel / un script Python pour tracer toi-même des graphs au-delà de la fenêtre 10 s du dashboard.
+- **Refonte 3 onglets** (Home / Analytics / Tuning) · charte **ABMI** navy+pink + logo
+- **5 KPI cards** avec couleurs contextuelles (vert/jaune/rose selon les seuils)
+- **Caméra opérateur intégrée** (topic `/teleop/camera/image`) — plus de fenêtre OpenCV
+- **Badge de mode** automatique SIM / REAL / BOTH / OFFLINE
+- **Comparaison SIM ↔ REAL** côte à côte (bar chart + plots miroir dans Analytics)
+- **Hand position en cm** au lieu de m
+- **ActionButton dynamiques** : tooltip au survol, feedback `⟳ → ✓/✗`, toast horodaté
+- **Presets de gains** (Safe / Nominal / Reactive) avec highlight du preset actif
+- Polling passif de `get_angles` pour pouvoir tracer les angles réels quand `/joint_states` n'est pas là
 
 ---
 
-*Voir aussi : [TELEOPERATION.md](TELEOPERATION.md) pour le pipeline technique, [TELEOP_TUNING.md](TELEOP_TUNING.md) pour la référence des paramètres internes.*
+*Voir aussi : [TELEOPERATION.md](TELEOPERATION.md) pour le pipeline technique, [TELEOP_TUNING.md](TELEOP_TUNING.md) pour la référence des paramètres internes, [TELEOP_ARCHITECTURE_VIZ.md](TELEOP_ARCHITECTURE_VIZ.md) pour le visuel complet.*
 
-*Dernière mise à jour : 22 avril 2026*
+*Dernière mise à jour : 23 avril 2026.*
