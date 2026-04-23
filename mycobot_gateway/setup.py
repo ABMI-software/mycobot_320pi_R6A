@@ -51,6 +51,10 @@ setup(
             # DREAM inference + Pick-and-place (Gazebo)
             'dream_inference = mycobot_gateway.dream_inference_node:main',
             'pick_and_place = mycobot_gateway.pick_and_place_node:main',
+
+            # Multi-object color sorting (Gazebo)
+            'color_object_detector = mycobot_gateway.color_object_detector:main',
+            'sorting_orchestrator = mycobot_gateway.sorting_orchestrator:main',
         ],
     },
 )

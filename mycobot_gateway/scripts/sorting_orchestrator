@@ -1,0 +1,4 @@
+#!/usr/bin/python3
+"""Multi-object color-sorting orchestrator wrapper script."""
+from mycobot_gateway.sorting_orchestrator import main
+main()

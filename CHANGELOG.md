@@ -7,6 +7,38 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.10.0] - 2026-04-23
+
+### Ajouté
+- **Pick-and-place multi-objets par couleur** (branche `feature/pick-and-place-sorting`)
+  - Monde Gazebo `worlds/pick_and_place_sorting.sdf` :
+    table 1.0×0.6 m, 4 objets à trier (cube rouge, cube bleu, cylindre vert, boîte
+    jaune) côté +X, 4 bacs de réception colorés à parois côté −X, tous dans
+    l'enveloppe d'atteinte ~0.32 m du MyCobot 320.
+  - `color_object_detector` : segmentation HSV sur la caméra top-down, rétro-projection
+    pinhole vers le repère robot, publie `/sorting/detections` (`color,x,y;…`),
+    `/sorting/detector_status`, `/sorting/debug_image`.
+  - `sorting_orchestrator` : machine à états qui boucle sur les détections,
+    plan IK par objet, séquence approche/grasp/lift/place/retreat. Le « grasp »
+    est émulé via le service Gazebo `/world/<world>/set_pose` (téléport du modèle
+    sur l'EE pendant le portage, dépose dans le bac à la couleur correspondante).
+  - Launch `pick_and_place_sorting.launch.py` : Gazebo + spawn + bridges (joints
+    + 4 caméras) + détecteur (T+6 s) + orchestrateur (T+10 s).
+- **Visuels caméra réalistes** dans le URDF Gazebo : les 4 caméras embarquent
+  désormais un corps gris foncé + objectif noir cylindrique + LED rouge,
+  au lieu de cubes 3 cm colorés qui ressemblaient aux objets à trier.
+
+### Corrigé
+- **`color_object_detector` : paramètre boolisé par YAML 1.1** —
+  les valeurs `'y'` / `'x'` étaient coercées en `True` par rclpy (YAML 1.1
+  truthy). Renommé en `image_u_to_world_axis_name` / `image_v_to_world_axis_name`
+  avec valeurs `'world_y'` / `'world_x'`.
+- **Axe Y de la caméra top-down inversé** : ajout de `flip_u: True` dans le
+  launch ; les positions détectées correspondent maintenant aux positions SDF
+  (vérifié rouge à −0.12, bleu à +0.12).
+
+---
+
 ## [1.9.0] - 2026-04-21
 
 ### Documentation

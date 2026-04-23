@@ -409,14 +409,36 @@
 
   <!-- ==================== CAMERA FOR SYNTHETIC DATA ==================== -->
 
-  <!-- Camera mount (fixed in the world, looking at the robot) -->
+  <!-- Camera mount (fixed in the world, looking at the robot).
+       Visual is shaped like a real CCTV/IP camera so it doesn't look
+       like one of the colored sort cubes: a dark-gray body box plus a
+       black lens cylinder protruding along the optical axis (+X). -->
   <link name="camera_link">
-    <visual>
+    <visual name="body">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.03 0.03 0.03"/>
+        <box size="0.06 0.04 0.04"/>
       </geometry>
-      <material name="camera_blue">
-        <color rgba="0.2 0.2 0.8 1.0"/>
+      <material name="camera_body_dark">
+        <color rgba="0.15 0.15 0.18 1.0"/>
+      </material>
+    </visual>
+    <visual name="lens">
+      <origin xyz="0.035 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.013" length="0.025"/>
+      </geometry>
+      <material name="camera_lens_black">
+        <color rgba="0.05 0.05 0.05 1.0"/>
+      </material>
+    </visual>
+    <visual name="led">
+      <origin xyz="0.030 0.013 0.013" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.0025"/>
+      </geometry>
+      <material name="camera_led_red">
+        <color rgba="0.9 0.05 0.05 1.0"/>
       </material>
     </visual>
     <inertial>
@@ -457,9 +479,20 @@
 
   <!-- ===== CAMERA 2 (right side, 90° from front) ===== -->
   <link name="camera_link_right">
-    <visual>
-      <geometry><box size="0.03 0.03 0.03"/></geometry>
-      <material name="camera_green"><color rgba="0.2 0.8 0.2 1.0"/></material>
+    <visual name="body">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.06 0.04 0.04"/></geometry>
+      <material name="camera_body_dark2"><color rgba="0.15 0.15 0.18 1.0"/></material>
+    </visual>
+    <visual name="lens">
+      <origin xyz="0.035 0 0" rpy="0 1.5708 0"/>
+      <geometry><cylinder radius="0.013" length="0.025"/></geometry>
+      <material name="camera_lens_black2"><color rgba="0.05 0.05 0.05 1.0"/></material>
+    </visual>
+    <visual name="led">
+      <origin xyz="0.030 0.013 0.013" rpy="0 0 0"/>
+      <geometry><sphere radius="0.0025"/></geometry>
+      <material name="camera_led_red2"><color rgba="0.9 0.05 0.05 1.0"/></material>
     </visual>
     <inertial>
       <mass value="0.01"/>
@@ -490,9 +523,20 @@
 
   <!-- ===== CAMERA 3 (left side, -90° from front) ===== -->
   <link name="camera_link_left">
-    <visual>
-      <geometry><box size="0.03 0.03 0.03"/></geometry>
-      <material name="camera_red"><color rgba="0.8 0.2 0.2 1.0"/></material>
+    <visual name="body">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.06 0.04 0.04"/></geometry>
+      <material name="camera_body_dark3"><color rgba="0.15 0.15 0.18 1.0"/></material>
+    </visual>
+    <visual name="lens">
+      <origin xyz="0.035 0 0" rpy="0 1.5708 0"/>
+      <geometry><cylinder radius="0.013" length="0.025"/></geometry>
+      <material name="camera_lens_black3"><color rgba="0.05 0.05 0.05 1.0"/></material>
+    </visual>
+    <visual name="led">
+      <origin xyz="0.030 0.013 0.013" rpy="0 0 0"/>
+      <geometry><sphere radius="0.0025"/></geometry>
+      <material name="camera_led_red3"><color rgba="0.9 0.05 0.05 1.0"/></material>
     </visual>
     <inertial>
       <mass value="0.01"/>
@@ -523,9 +567,20 @@
 
   <!-- ===== CAMERA 4 (overhead, looking straight down) ===== -->
   <link name="camera_link_top">
-    <visual>
-      <geometry><box size="0.03 0.03 0.03"/></geometry>
-      <material name="camera_yellow"><color rgba="0.8 0.8 0.2 1.0"/></material>
+    <visual name="body">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.06 0.04 0.04"/></geometry>
+      <material name="camera_body_dark4"><color rgba="0.15 0.15 0.18 1.0"/></material>
+    </visual>
+    <visual name="lens">
+      <origin xyz="0.035 0 0" rpy="0 1.5708 0"/>
+      <geometry><cylinder radius="0.013" length="0.025"/></geometry>
+      <material name="camera_lens_black4"><color rgba="0.05 0.05 0.05 1.0"/></material>
+    </visual>
+    <visual name="led">
+      <origin xyz="0.030 0.013 0.013" rpy="0 0 0"/>
+      <geometry><sphere radius="0.0025"/></geometry>
+      <material name="camera_led_red4"><color rgba="0.9 0.05 0.05 1.0"/></material>
     </visual>
     <inertial>
       <mass value="0.01"/>

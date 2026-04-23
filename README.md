@@ -123,6 +123,34 @@ ros2 launch mycobot_gateway slider_control.launch.py    # Sliders RViz
 ros2 launch mycobot_gateway teleop_keyboard.launch.py   # Clavier
 ros2 launch mycobot_gateway commander.launch.py         # CLI interactif
 ros2 launch mycobot_gateway rviz_sync.launch.py         # Sync robot→RViz
+
+# Pick-and-place en simulation (Gazebo)
+ros2 launch mycobot_gateway pick_and_place.launch.py             # mono-objet (cube rouge → zone verte)
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py     # multi-objet par couleur (4 objets → 4 bacs)
+```
+
+### Multi-object color sorting (`feature/pick-and-place-sorting`)
+
+Branche dédiée au tri par couleur en Gazebo Harmonic. Le monde
+[`mycobot_description/worlds/pick_and_place_sorting.sdf`](mycobot_description/worlds/pick_and_place_sorting.sdf)
+contient 4 objets de couleurs et formes différentes (cube rouge, cube bleu,
+cylindre vert, boîte jaune) côté +X, et 4 bacs colorés à parois côté −X.
+
+| Composant | Rôle |
+|-----------|------|
+| `color_object_detector` | Segmentation HSV sur la caméra top-down + rétro-projection vers le repère robot (`/sorting/detections`) |
+| `sorting_orchestrator` | Boucle sur les couleurs détectées, plan IK par objet, dépose dans le bac correspondant |
+| `gz service set_pose` | Émulation du grasp : téléport du modèle sur l'EE pendant le portage |
+
+```bash
+# Lancement complet (détecteur HSV actif)
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py
+
+# Smoke-test sans perception (positions SDF connues)
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py use_detector:=false
+
+# Trier seulement un sous-ensemble
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py process_order:=blue,green
 ```
 
 ---

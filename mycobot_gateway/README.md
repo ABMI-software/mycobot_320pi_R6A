@@ -40,7 +40,9 @@ Package ROS2 central du projet MyCobot 320 Pi R6A. Fournit le bridge TCP vers la
 | `robot_commander` | `robot_commander.py` | CLI interactif |
 | `joint_sync` | `joint_sync.py` | Sync état robot réel → RViz |
 | `dream_inference` | `dream_inference_node.py` | Inférence DREAM + PnP pose estimation |
-| `pick_and_place` | `pick_and_place_node.py` | State machine pick & place |
+| `pick_and_place` | `pick_and_place_node.py` | State machine pick & place mono-objet |
+| `color_object_detector` | `color_object_detector.py` | Segmentation HSV (top camera) + back-projection vers le repère robot |
+| `sorting_orchestrator` | `sorting_orchestrator.py` | Pick-and-place multi-objets par couleur (boucle sur `/sorting/detections`) |
 | `synth_data_collector` | `synthetic_data_collector_v2.py` | Collecte Gazebo + anti-collision FK |
 
 ## Launch files
@@ -53,7 +55,8 @@ Package ROS2 central du projet MyCobot 320 Pi R6A. Fournit le bridge TCP vers la
 | `teleop_keyboard.launch.py` | Clavier + bridge |
 | `commander.launch.py` | CLI + bridge |
 | `rviz_sync.launch.py` | Sync robot réel → RViz |
-| `pick_and_place.launch.py` | Cycle complet pick & place (Gazebo) |
+| `pick_and_place.launch.py` | Cycle pick & place mono-objet (cube rouge → zone verte) |
+| `pick_and_place_sorting.launch.py` | Pick & place multi-objets par couleur (4 objets → 4 bacs) |
 | `synthetic_data.launch.py` | Collecte données sim (monde de base) |
 | `synthetic_data_v2.launch.py` | Collecte v2 (domain randomization) |
 | `synthetic_data_v3.launch.py` | Collecte v3 (monde randomized_v2 — 6 lights, 12 objets) |
@@ -115,7 +118,15 @@ ros2 launch mycobot_gateway synthetic_data_v3.launch.py num_samples:=7500
 ### Pick-and-place en simulation
 
 ```bash
+# Mono-objet (cube rouge → zone verte)
 ros2 launch mycobot_gateway pick_and_place.launch.py
+
+# Multi-objet par couleur (4 objets → 4 bacs)
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py
+
+# Variantes :
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py use_detector:=false
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py process_order:=blue,green
 ```
 
 ---
@@ -127,7 +138,12 @@ ros2 launch mycobot_gateway pick_and_place.launch.py
 | `/to_robot` | `std_msgs/String` | Tour → Pi | Commandes JSON vers le robot |
 | `/from_robot` | `std_msgs/String` | Pi → Tour | Réponses du robot |
 | `/joint_states` | `sensor_msgs/JointState` | Gz → ROS2 | États articulaires Gazebo |
-| `/synth_camera/image` | `sensor_msgs/Image` | Gz → ROS2 | Image caméra Gazebo |
+| `/synth_camera/image` | `sensor_msgs/Image` | Gz → ROS2 | Image caméra Gazebo (front) |
+| `/synth_camera_top/image` | `sensor_msgs/Image` | Gz → ROS2 | Image caméra top-down |
+| `/sorting/detections` | `std_msgs/String` | detector → orchestrator | `color,x,y;…` (positions m, repère robot) |
+| `/sorting/detector_status` | `std_msgs/String` | detector → * | `WAITING_IMAGE` / `OK\|n=N` / `NO_DETECTIONS` |
+| `/sorting/debug_image` | `sensor_msgs/Image` | detector → * | Overlay des centroïdes détectés |
+| `/pickplace/status` | `std_msgs/String` | orchestrator → * | `STATE\|detail` (état machine) |
 
 ## Protocole JSON (tour → Pi)
 
