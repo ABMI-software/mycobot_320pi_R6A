@@ -44,6 +44,7 @@ Package ROS2 central du projet MyCobot 320 Pi R6A. Fournit le bridge TCP vers la
 | `color_object_detector` | `color_object_detector.py` | Segmentation HSV (top camera) + back-projection vers le repère robot |
 | `sorting_orchestrator` | `sorting_orchestrator.py` | Pick-and-place multi-objets par couleur (boucle sur `/sorting/detections`) |
 | `synth_data_collector` | `synthetic_data_collector_v2.py` | Collecte Gazebo + anti-collision FK |
+| `trajectory_to_robot_bridge` | `trajectory_to_robot_bridge.py` | Pont `JointTrajectory` (rad) → JSON `send_angles` (deg) pour `bridge_tour` — cœur de la téléop côté robot réel |
 
 ## Launch files
 
@@ -60,6 +61,9 @@ Package ROS2 central du projet MyCobot 320 Pi R6A. Fournit le bridge TCP vers la
 | `synthetic_data.launch.py` | Collecte données sim (monde de base) |
 | `synthetic_data_v2.launch.py` | Collecte v2 (domain randomization) |
 | `synthetic_data_v3.launch.py` | Collecte v3 (monde randomized_v2 — 6 lights, 12 objets) |
+| `mycobot_teleop.launch.py` | **Téléop par la main** — orchestre Gazebo + controllers + rosbridge + bridge_tour + trajectory_to_robot_bridge (target sim/real/both) |
+
+> Pour la téléopération complète, voir [`../docs/TELEOPERATION.md`](../docs/TELEOPERATION.md) et [`../docs/TELEOP_DASHBOARD.md`](../docs/TELEOP_DASHBOARD.md).
 
 ---
 

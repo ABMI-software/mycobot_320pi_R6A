@@ -55,6 +55,10 @@ setup(
             # Multi-object color sorting (Gazebo)
             'color_object_detector = mycobot_gateway.color_object_detector:main',
             'sorting_orchestrator = mycobot_gateway.sorting_orchestrator:main',
+
+            # Hand teleoperation (trajectory → JSON bridge for real robot)
+            'trajectory_to_robot_bridge = mycobot_gateway.trajectory_to_robot_bridge:main',
+            'gripper_to_robot_bridge = mycobot_gateway.gripper_to_robot_bridge:main',
         ],
     },
 )
