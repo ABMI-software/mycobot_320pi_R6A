@@ -58,7 +58,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │           │  MyCobot 320 Pi │                                              │
 │           └─────────────────┘                                              │
 │                                                                            │
-│                     RASPBERRY PI (10.10.0.225)                             │
+│                     RASPBERRY PI (10.10.0.223)                             │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,7 +87,9 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │   │   └── pro_adaptive_gripper/                   # Gripper adaptatif (7 meshes DAE)
 │   ├── worlds/
 │   │   ├── randomized.sdf                          # Monde de base
-│   │   └── randomized_v2.sdf                       # 6 lights + 12 clutter objects
+│   │   ├── randomized_v2.sdf                       # 6 lights + 12 clutter objects (synth v2)
+│   │   ├── pick_and_place.sdf                      # Cube rouge + zone verte (mono-objet)
+│   │   └── pick_and_place_sorting.sdf              # 4 objets colorés + 4 bacs colorés à parois
 │   ├── config/mycobot_320_pi.rviz
 │   └── launch/
 │       ├── display.launch.py
@@ -102,7 +104,11 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │   │   ├── robot_commander.py                  # CLI interactif
 │   │   ├── joint_sync.py                       # Synchro robot → RViz
 │   │   ├── dream_inference_node.py             # Inférence DREAM + PnP ROS2
-│   │   ├── pick_and_place_node.py              # State machine pick & place
+│   │   ├── pick_and_place_node.py              # State machine pick & place mono-objet
+│   │   ├── color_object_detector.py            # HSV + back-projection (top camera) — sorting
+│   │   ├── sorting_orchestrator.py             # Pick-and-place multi-couleur (boucle 4 objets)
+│   │   ├── trajectory_to_robot_bridge.py       # JointTrajectory rad → JSON deg (téléop réel)
+│   │   ├── gripper_to_robot_bridge.py          # Bridge gripper (no-op tant que pas de pince)
 │   │   └── synthetic_data_collector_v2.py      # Collecte Gazebo + anti-collision FK
 │   ├── scripts/
 │   │   ├── bridge_pi_simple.py     # Script Pi (serveur TCP robot)
@@ -114,7 +120,9 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │       ├── teleop_keyboard.launch.py
 │       ├── commander.launch.py
 │       ├── rviz_sync.launch.py
-│       ├── pick_and_place.launch.py
+│       ├── pick_and_place.launch.py            # Mono-objet (cube rouge → zone verte)
+│       ├── pick_and_place_sorting.launch.py    # Sorting 4 couleurs → 4 bacs
+│       ├── mycobot_teleop.launch.py            # Téléop main (target=sim/real/both)
 │       ├── synthetic_data.launch.py
 │       ├── synthetic_data_v2.launch.py
 │       └── synthetic_data_v3.launch.py
@@ -163,8 +171,10 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 | `urdf/320_pi/*.urdf` | URDF RViz (sans inertials) |
 | `urdf/320_pi/*_gazebo.urdf` | URDF Gazebo (inertials, plugins, 4 caméras) |
 | `urdf/pro_adaptive_gripper/` | Gripper adaptatif (7 meshes DAE) |
-| `worlds/randomized.sdf` | Monde Gazebo de base |
-| `worlds/randomized_v2.sdf` | Monde v2 (6 lights, 12 clutter objects, 3 murs) |
+| `worlds/randomized.sdf` | Monde Gazebo de base (synthetic data v1) |
+| `worlds/randomized_v2.sdf` | Monde v2 (6 lights, 12 clutter objects, 3 murs) — synthetic data v2 |
+| `worlds/pick_and_place.sdf` | Cube cible rouge + zone de dépose verte (pick-and-place mono-objet) |
+| `worlds/pick_and_place_sorting.sdf` | 4 objets colorés (cube R, cube B, cylindre G, boîte Y) + 4 bacs assortis (sorting) |
 | `config/mycobot_320_pi.rviz` | Config RViz prête à l'emploi |
 
 ### 2. `mycobot_gateway`
@@ -180,7 +190,11 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 | `robot_commander` | CLI interactif |
 | `joint_sync` | Synchronisation robot réel → RViz |
 | `dream_inference` | Inférence DREAM + PnP en temps réel |
-| `pick_and_place` | State machine pick & place (Gazebo) |
+| `pick_and_place` | State machine pick & place mono-objet (Gazebo) |
+| `color_object_detector` | Segmentation HSV + back-projection (top camera) — sorting |
+| `sorting_orchestrator` | Pick-and-place multi-couleur (4 objets → 4 bacs assortis) |
+| `trajectory_to_robot_bridge` | JointTrajectory rad → JSON deg (téléop main → robot réel) |
+| `gripper_to_robot_bridge` | Bridge gripper (no-op tant que le robot physique n'a pas de pince) |
 | `synth_data_collector` | Collecte données synthétiques (anti-collision FK) |
 
 ---
@@ -188,7 +202,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 ## 🌐 Communication TCP - Protocole
 
 ### Configuration réseau
-- **IP Raspberry Pi:** `10.10.0.225`
+- **IP Raspberry Pi:** `10.10.0.223`
 - **Port TCP robot:** `5005`
 - **Port TCP caméras:** `5006`
 - **Format commandes:** JSON avec terminaison `\n`
@@ -224,9 +238,9 @@ ros2 launch mycobot_description display.launch.py
 
 ### 2. Communication avec le robot réel
 
-**Sur la Raspberry Pi (10.10.0.225) :**
+**Sur la Raspberry Pi (10.10.0.223) :**
 ```bash
-ssh er@10.10.0.225
+ssh er@10.10.0.223
 # Terminal 1 : bridge robot
 python3 bridge_pi_simple.py
 # Terminal 2 : serveur caméras
@@ -247,9 +261,34 @@ ros2 launch mycobot_gateway rviz_sync.launch.py         # Sync robot → RViz
 ```
 
 ### 3. Pick-and-place en simulation Gazebo
+
+**Mono-objet** (cube rouge → zone verte) :
 ```bash
 ros2 launch mycobot_gateway pick_and_place.launch.py
+ros2 launch mycobot_gateway pick_and_place.launch.py use_vision:=false   # open-loop IK
 ```
+
+**Multi-couleur sorting** (4 objets → 4 bacs assortis) — validé end-to-end le 23/04/2026 :
+```bash
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py use_detector:=false
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py process_order:=blue,green
+```
+
+Stack : Gazebo + spawn robot + 4 caméras + `color_object_detector` (T+6 s, HSV) + `sorting_orchestrator` (T+10 s, IK + état machine). Émulation du grasp via `gz service /world/<world>/set_pose` (téléport du modèle sur l'EE pendant le portage).
+
+Voir [`docs/TELEOP_SIM_TESTING.md`](docs/TELEOP_SIM_TESTING.md) pour les critères d'acceptation et les use cases sim-only.
+
+### 4. Téléopération par la main (Wilor + Astra)
+
+```bash
+# 4 terminaux : rosbridge + Gazebo + teleop conda + dashboard
+# Voir docs/TELEOPERATION.md pour le workflow complet
+ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim    # sim seul
+ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=both   # sim + bras réel
+```
+
+Pipeline validé sur le robot physique le 22/04/2026 — voir [`docs/REAL_ROBOT_TEST_PROCEDURE.md`](docs/REAL_ROBOT_TEST_PROCEDURE.md).
 
 ---
 
@@ -277,7 +316,7 @@ ros2 launch mycobot_gateway pick_and_place.launch.py
 
 ---
 
-## 📝 Fichiers sur la Raspberry Pi (10.10.0.225)
+## 📝 Fichiers sur la Raspberry Pi (10.10.0.223)
 
 Les scripts standalone à copier sur la Pi :
 
@@ -302,8 +341,12 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 ### Prioritaire (domain gap sim-to-real)
 - [x] Domain Randomization v2 (6 lights, 12 clutter, 3 murs)
 - [x] Fine-tuning custom — tentatives v1/v2 échouées (belief map collapse, sigma mismatch)
-- [x] Entraînement mixte réel+synth via DREAM natif (18K frames, terminé)
-- [ ] **Évaluer le modèle mixte** sur données réelles (objectif : >50% détection)
+- [x] Entraînement mixte réel+synth via DREAM natif (18K frames, 50 epochs, terminé 16/04/2026)
+- [x] **Pick-and-place mono-objet** end-to-end (cube rouge → zone verte) — `pick_and_place.launch.py`
+- [x] **Pick-and-place sorting 4 couleurs** end-to-end (HSV + IK + bins) — `pick_and_place_sorting.launch.py`, validé 23/04/2026
+- [x] **Téléopération main → bras réel** validée sur le MyCobot 320 Pi physique (22/04/2026, gains 1.2/1.2/1.6/0.25, latence ~150–250 ms)
+- [x] Procédure de validation **sim-only** documentée — [`docs/TELEOP_SIM_TESTING.md`](docs/TELEOP_SIM_TESTING.md)
+- [ ] **Évaluer le modèle mixte** sur données réelles (objectif : >50% détection) — étape bloquante restante
 - [ ] **Self-supervised labeling** : FK + caméra calibrée → annotations GT automatiques sur réel
 - [ ] Fine-tune sur données réelles auto-annotées
 
@@ -649,7 +692,12 @@ cd /tmp/DREAM && pip install -e . -r requirements.txt
 | DREAM — Fine-tune v1 (σ=4, 0% det) | 15/04/2026 | ❌ Modèle mort |
 | DREAM — Fine-tune v2 (σ=2, 0% det) | 16/04/2026 | ❌ Belief maps effondrées |
 | DREAM — Dataset mixte 18K créé | 16/04/2026 | ✅ OK |
-| DREAM — Training mixte natif (25 époques) | 16/04/2026 | ✅ Terminé |
+| DREAM — Training mixte natif (50 époques) | 16/04/2026 | ✅ Terminé (à évaluer sur réel) |
+| Téléopération main → bras réel (premier test physique) | 22/04/2026 | ✅ Validé (gains 1.2/1.2/1.6/0.25) |
+| Pick-and-place mono-objet end-to-end (Gazebo) | 22/04/2026 | ✅ Cycle complet ~33 s |
+| Pick-and-place sorting 4 couleurs (HSV + IK) | 23/04/2026 | ✅ 4/4 couleurs sortées ~95 s |
+| URDF caméras reshapées (corps + objectif + LED) | 23/04/2026 | ✅ Plus de confusion HSV |
+| Doc validation sim-only `TELEOP_SIM_TESTING.md` | 23/04/2026 | ✅ Crée + référencée |
 | Domain randomization v2/v3 (worlds) | 15/04/2026 | ✅ OK |
 | Documentation ARCHITECTURE.md rewrite | 16/04/2026 | ✅ OK |
 | Gripper adaptatif intégré (pro_adaptive_gripper) | 15/04/2026 | ✅ OK |
