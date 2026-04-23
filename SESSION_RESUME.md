@@ -1,8 +1,8 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 21 avril 2026
-> **Version :** 1.9.0
-> **Branche active :** `feature/pose-training`
+> **Date de dernière mise à jour :** 23 avril 2026
+> **Version :** 1.10.0
+> **Branche active :** `feature/pick-and-place-sorting` (off `main`)
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 
 ---
@@ -57,6 +57,10 @@ Le modèle DREAM VGG atteint **97% de détection à 3.1px médiane** sur les don
 | 16/04/2026 | Monde Gazebo v2 (randomized_v2.sdf — 6 lights, 12 objets) | ✅ |
 | 16/04/2026 | Collecte 7500 poses × 4 vues (30K images) synth v2 | 🔄 À vérifier |
 | 16/04/2026 | Training mixte natif (18K frames) — epoch 1: val=0.000474 | ✅ Terminé |
+| 23/04/2026 | **Pick-and-place multi-objets par couleur** (4 objets → 4 bacs) | ✅ End-to-end vérifié |
+| 23/04/2026 | `color_object_detector` (HSV + back-projection top camera) | ✅ 4/4 couleurs détectées |
+| 23/04/2026 | `sorting_orchestrator` (boucle sur détections, gz `set_pose` carry) | ✅ Cycle complet ~95 s |
+| 23/04/2026 | URDF caméras reshapées (corps + objectif + LED, plus de cubes 3 cm colorés) | ✅ |
 
 ### Ce qui reste à faire
 
@@ -74,7 +78,8 @@ Le modèle DREAM VGG atteint **97% de détection à 3.1px médiane** sur les don
 
 3. **[JAUNE] Vérifier collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/`
 
-4. **[JAUNE] Pick-and-place Gazebo** : tester le pipeline complet (`pick_and_place.launch.py`)
+4. **[VERT] Pick-and-place Gazebo (mono-objet)** : pipeline `pick_and_place.launch.py` validé
+   et étendu en multi-objet par couleur (`pick_and_place_sorting.launch.py`)
 
 5. **[VERT] Bench test robot réel** une fois detection > 50%
 
@@ -202,7 +207,14 @@ conda deactivate
 source /opt/ros/jazzy/setup.bash
 source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
 
+# Mono-objet (cube rouge → bac vert)
 ros2 launch mycobot_gateway pick_and_place.launch.py
+
+# Multi-objet par couleur (4 objets → 4 bacs)
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py
+# Variantes :
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py use_detector:=false
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py process_order:=blue,green
 ```
 
 ---
