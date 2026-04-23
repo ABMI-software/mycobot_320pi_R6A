@@ -333,6 +333,15 @@ class RosBridgeArmPublisher:
         )
         self.hand_xyz_topic.advertise()
 
+        # Webcam feed (annotated with hand keypoints) for the dashboard.
+        # Published as base64-encoded JPEG on /teleop/camera/image, at a
+        # throttled rate (~10 Hz) to stay inside rosbridge's bandwidth.
+        self.camera_topic = roslibpy.Topic(
+            self.ros, "/teleop/camera/image", "sensor_msgs/CompressedImage"
+        )
+        self.camera_topic.advertise()
+        self._last_camera_pub_t = 0.0
+
         # Gripper position command (Gazebo). Pro adaptive gripper has one
         # driving joint; we send [rad] where 0 = open, -0.7 = closed (matches
         # the URDF limits). See set_gripper_normalized() below.
@@ -379,6 +388,34 @@ class RosBridgeArmPublisher:
             "vector": {"x": float(xyz[0]), "y": float(xyz[1]), "z": float(xyz[2])},
         }
         self.hand_xyz_topic.publish(msg)
+
+    def send_camera_frame(self, bgr_frame) -> None:
+        """Throttled publish of the annotated camera frame (JPEG over rosbridge)."""
+        now = time.perf_counter()
+        if now - self._last_camera_pub_t < 0.1:  # ~10 Hz cap
+            return
+        try:
+            import cv2
+            import base64
+            # Downscale to 320x240 to keep the WebSocket payload small
+            h, w = bgr_frame.shape[:2]
+            if w > 320:
+                scale = 320 / w
+                bgr_small = cv2.resize(bgr_frame, (int(w * scale), int(h * scale)))
+            else:
+                bgr_small = bgr_frame
+            ok, buf = cv2.imencode(".jpg", bgr_small, [cv2.IMWRITE_JPEG_QUALITY, 60])
+            if not ok:
+                return
+            data_b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+            self.camera_topic.publish({
+                "header": {"frame_id": "camera", "stamp": {"sec": 0, "nanosec": 0}},
+                "format": "jpeg",
+                "data": data_b64,
+            })
+            self._last_camera_pub_t = now
+        except Exception:
+            pass
 
     def send_gripper_normalized(self, openness: float) -> None:
         """Publish gripper command. openness ∈ [0, 1]: 0 = closed, 1 = open.
@@ -528,6 +565,18 @@ def main(
     except Exception:
         pass
     tracker.cap = cap
+
+    # Wrap cap.read() so the main loop can access the most recent frame
+    # for publishing to the dashboard's camera panel (no separate capture
+    # to avoid contention with Wilor on the Astra shared-memory feed).
+    _orig_read = cap.read
+    def _read_and_cache():
+        ok, frame = _orig_read()
+        if ok and frame is not None:
+            cap._last_frame = frame
+        return ok, frame
+    cap.read = _read_and_cache
+    cap._last_frame = None
 
     # -- Protect the capture loop against Wilor exceptions --
     # The upstream HandTracker._capture_loop has no try/except around
@@ -697,6 +746,15 @@ def main(
                     try:
                         ros_pub.send_hand_xyz(xyz)
                     except AttributeError:
+                        pass
+                    # Forward the latest camera frame captured by the tracker
+                    # (plain BGR — no hand keypoint overlay yet; enough to show
+                    # the operator in the dashboard's camera panel).
+                    try:
+                        last_frame = getattr(cap, "_last_frame", None)
+                        if last_frame is not None:
+                            ros_pub.send_camera_frame(last_frame)
+                    except Exception:
                         pass
                     # Gripper: apply the same 3-stage filter chain as R5A /
                     # LeRobot (deadband → EMA → slew) on Wilor's open_degree
