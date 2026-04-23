@@ -18,44 +18,72 @@ Ce projet intègre :
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              PC TOUR (10.10.0.115)                          │
-│                ROS2 Jazzy / Ubuntu 24.04 / Python 3.12                      │
-│                Conda: Python 3.13 / PyTorch 2.6 + CUDA 12.4                │
-│                GPU: NVIDIA RTX 4000 Ada (20 GB VRAM)                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐       │
-│  │ simple_gui  │  │slider_control│  │teleop_keyb. │  │ training/    │       │
-│  │  (Tkinter)  │  │(joint_states)│  │  (clavier)  │  │ train.py     │       │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  │ predict.py   │       │
-│         │                │                │          │ capture_real  │       │
-│         └────────────────┴────────────────┘          └──────┬───────┘       │
-│                          │                                  │               │
-│                   /to_robot (JSON)                   TCP:5005 + 5006        │
-│                          ▼                                  ▼               │
-│                ┌─────────────────┐                                          │
-│                │   bridge_tour   │                                          │
-│                └────────┬────────┘                                          │
-├─────────────────────────┼───────────────────────────────────────────────────┤
-│                   RÉSEAU ETHERNET (10.10.0.x)                              │
-├─────────────────────────┼───────────────────────────────────────────────────┤
-│                         ▼                                                   │
-│           ┌─────────────────┐       ┌─────────────────┐                    │
-│           │bridge_pi_simple │       │pi_camera_server │                    │
-│           │  TCP:5005       │       │  TCP:5006       │                    │
-│           └────────┬────────┘       └────────┬────────┘                    │
-│                    ▼                         ▼                             │
-│           ┌─────────────────┐       ┌─────────────────┐                    │
-│           │    pymycobot    │       │ Arducam USB ×2  │                    │
-│           │  /dev/ttyAMA0   │       │  cam0 + cam3    │                    │
-│           └────────┬────────┘       └─────────────────┘                    │
-│                    ▼                                                       │
-│           ┌─────────────────┐                                              │
-│           │  MyCobot 320 Pi │                                              │
-│           └─────────────────┘                                              │
-│                     RASPBERRY PI (10.10.0.225)                             │
-└────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                              PC TOUR (10.10.0.115)                                   │
+│           ROS2 Jazzy / Ubuntu 24.04 / Python 3.12 (system)                           │
+│           Conda env hand-teleop : Python 3.10 (Wilor + Astra)                        │
+│           Conda env venv_dream  : Python 3.12 / PyTorch 2.6 + CUDA 12.4              │
+│           GPU : NVIDIA RTX 4000 Ada (20 GB VRAM)                                     │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────── CONTRÔLES INTERACTIFS ────────────────────┐                     │
+│ │ simple_gui · slider_control · teleop_keyboard · commander    │                     │
+│ │ (Tkinter / RViz / clavier / CLI)                             │                     │
+│ └──────────────────────────────┬───────────────────────────────┘                     │
+│                                │                                                     │
+│ ┌──────────── TÉLÉOPÉRATION PAR LA MAIN (conda hand-teleop) ───────────────┐        │
+│ │  Astra S RGB ──► Wilor (hand 6-DoF) ──► mapping rel + filtres R5A        │        │
+│ │  (oni_grabber, shm)    (PyTorch)        (Kalman + EMA + slew 1°/frame)   │        │
+│ │                                  │                                       │        │
+│ │                                  ▼  rosbridge :9090                      │        │
+│ │  /mycobot_controller/joint_trajectory  +  /teleop/* (gains, recal, KPI)  │        │
+│ └─────────────────┬────────────────────────────────────────┬───────────────┘        │
+│                   │                                        │                         │
+│           target=sim │                              target=real │                    │
+│                   ▼                                        ▼                         │
+│        ┌──────────────────┐                   ┌──────────────────────────┐          │
+│        │ Gazebo Harmonic  │                   │ trajectory_to_robot_     │          │
+│        │ + JTC + 4 caméras│                   │  bridge (rad → deg JSON, │          │
+│        │ + gripper 4 DOF  │                   │  15 Hz, deadband 1°)     │          │
+│        │ /joint_states    │                   └──────────────┬───────────┘          │
+│        └──────────────────┘                                  │                       │
+│                                                              ▼                       │
+│ ┌──────── PIPELINE VISION DREAM ────────┐         ┌──────────────────┐              │
+│ │ training/dream/  ·  venv_dream         │         │   bridge_tour    │              │
+│ │ VGG-19 → belief maps → 7 keypoints     │         │  (JSON /to_robot)│              │
+│ │ → PnP → pose 6-DoF                     │         └────────┬─────────┘              │
+│ │ checkpoints_dream/vgg_*                │                  │                        │
+│ └────────────────────────────────────────┘                  │                        │
+│                                                             │                        │
+│ ┌─────── PICK-AND-PLACE GAZEBO ─────────┐                   │                        │
+│ │ pick_and_place_node  (mono)            │                  │                        │
+│ │ sorting_orchestrator (4 couleurs)      │                  │                        │
+│ │   ←  color_object_detector (HSV)       │                  │                        │
+│ └────────────────────────────────────────┘                  │                        │
+├─────────────────────────────────────────────────────────────┼────────────────────────┤
+│                          RÉSEAU ETHERNET (10.10.0.x)        │                        │
+├─────────────────────────────────────────────────────────────┼────────────────────────┤
+│                                                             ▼                        │
+│              ┌──────────────────┐              ┌─────────────────────┐              │
+│              │ pi_camera_server │              │  bridge_pi_simple   │              │
+│              │   TCP:5006       │              │   TCP:5005          │              │
+│              └────────┬─────────┘              └──────────┬──────────┘              │
+│                       │                                   ▼                          │
+│              ┌────────▼────────┐                ┌─────────────────┐                  │
+│              │ Arducam USB ×2  │                │    pymycobot    │                  │
+│              │  cam0 + cam3    │                │  /dev/ttyAMA0   │                  │
+│              └─────────────────┘                └────────┬────────┘                  │
+│                                                          ▼                           │
+│                                                ┌─────────────────┐                   │
+│                                                │  MyCobot 320 Pi │                   │
+│                                                └─────────────────┘                   │
+│                          RASPBERRY PI (10.10.0.223)                                  │
+└──────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+> **Trois chemins de commande convergent vers le robot** :
+> (1) GUI/CLI/clavier classique → `bridge_tour` → Pi ;
+> (2) téléop main (Astra→Wilor) → rosbridge → JTC (sim) **ou** trajectory_to_robot_bridge → bridge_tour → Pi (réel) ;
+> (3) pipeline vision DREAM (synthétique + mixte) pour l'estimation de pose qui alimentera le futur asservissement par caméra.
 
 ---
 
@@ -63,12 +91,13 @@ Ce projet intègre :
 
 | Composant | Description |
 |-----------|-------------|
-| `mycobot_gateway/` | Bridge TCP, GUI, contrôles robotiques (ROS2 package) |
-| `mycobot_description/` | URDF, meshes 3D, configs RViz, Gazebo simulation |
-| `training/` | Pipeline ML : DREAM keypoint detection (VGG-19), legacy ResNet regression |
-| `datasets/` | Données synthétiques (Gazebo) et réelles (Pi) — via **Git LFS** |
-| `scripts/` | Scripts utilitaires de diagnostic et test |
-| `docs/` | Documentation technique complète |
+| `mycobot_gateway/` | Bridge TCP, GUI, contrôles, vision DREAM, pick-and-place mono + sorting (ROS2 package) |
+| `mycobot_description/` | URDF avec gripper adaptatif et 4 caméras stylisées + worlds Gazebo (randomized, pick-and-place mono, pick-and-place sorting) |
+| `training/` | Pipeline ML : DREAM keypoint detection (VGG-19, mixed real+synth), legacy ResNet regression |
+| `teleop/` | Téléopération par la main : Wilor + Astra + dashboard ABMI + performance analyzer (env conda `hand-teleop`) |
+| `datasets/` | Données synthétiques (Gazebo, 50K) et réelles (Pi, 4K) — via **Git LFS** |
+| `scripts/` | Scripts utilitaires : preflight robot réel, train pipeline, monitoring, diagnostics |
+| `docs/` | Documentation technique complète (architecture, téléop, real-robot, dashboard, tuning, sim testing) |
 
 ---
 
@@ -104,7 +133,7 @@ source install/setup.bash
 
 ```bash
 # Sur le Pi — Terminal 1 : bridge robot
-ssh er@10.10.0.225
+ssh er@10.10.0.223
 python3 bridge_pi_simple.py
 
 # Sur le Pi — Terminal 2 : serveur caméras
@@ -175,9 +204,11 @@ Le projet utilise **deux approches** de pose estimation, la seconde (DREAM) éta
 ═══════════════════════════════════════════════════════════════
   Image → VGG-19 → 7 belief maps → keypoints 2D → PnP → pose
 
-  Données synthétiques (50K) : 98.3% détection, 3.15px médiane ✅
-  Transfert sim-to-real       : 13.2% détection ❌ (domain gap)
-  🔄 Entraînement mixte (10K réel + 8K synth) en cours
+  VGG synth-only 20K : 97% det synth, 3.1px médiane ✅
+  VGG synth-only 50K : 98.3% det synth, 3.15px ✅ / 13.2% det réel ❌
+  VGG mixte 18K (10K réel ×5 + 8K synth, 50 epochs) : entraîné ✅
+        → évaluation real-world en cours
+  Fine-tune custom (σ=4 / σ=2)  : ❌ deux échecs documentés
 ```
 
 ### Approche DREAM (active)
@@ -194,11 +225,60 @@ Image 640×480 → VGG-19 → 6 stages cascadés → 7 belief maps 100×100
 
 ### Résultats
 
-| Modèle | Dataset entraîn. | Eval synth | Eval réel |
-|--------|-----------------|------------|-----------|
-| VGG synth-only (20K) | 20K synth | 97% det, 3.1px | ~26% det |
-| VGG synth-only (50K) | 50K synth | 98.3% det, 3.15px | 13.2% det, 172px |
-| **VGG mixte** | 10K réel + 8K synth | — | **À évaluer** |
+| Modèle | Dataset entraînement | Eval synth | Eval réel | Notes |
+|--------|----------------------|------------|-----------|-------|
+| VGG base (synth-only) | 20K synth (5K poses × 4 vues) | 97% det · 3.1 px | ~26% det | val=0.000438, baseline DREAM |
+| VGG augmenté (synth-only) | 20K synth + augmentation aggressive | 97% det · 3.1 px | 22.9 → 25.7% det | val=0.000667, gain marginal |
+| VGG weighted (50K synth) | 50K synth + loss pondérée par keypoint | **98.3% det · 3.15 px** | **13.2% det · 172 px** | meilleure perf synth, gap sim-to-real majeur |
+| VGG fine-tune v1 (σ=4) | 2K réel, single-stage | — | **0% det** | ❌ pics belief écrasés, modèle mort |
+| VGG fine-tune v2 (σ=2) | 2K réel, MSE direct | — | **0% det** | ❌ belief maps effondrées (max ≈ 0) |
+| **VGG mixte (DREAM natif)** | **18K = 2K réel ×5 + 8K synth, 50 epochs** | _en cours_ | **🔄 à évaluer** | val=0.000474 dès epoch 1 — checkpoint dispo |
+
+**Métriques par keypoint sur le meilleur synth-only (VGG-aug, eval synthétique)** :
+
+| Keypoint | Détection | Médiane px | Médiane mm | Erreur ang. |
+|----------|-----------|------------|------------|-------------|
+| base · link1 · link2 | 100% | 2.6–2.8 | 3.7–4.0 | ~0.7° |
+| link3 | 99% | 5.6 | 8.1 | ~2.1° |
+| link4 | 96% | 6.4 | 9.2 | ~3.4° |
+| link5 | 95% | 8.8 | 12.7 | ~8.7° |
+| link6 (EE) | 86% | 10.1 | 14.6 | ~18.3° |
+| **TOTAL** | **97%** | **3.1 px** | **4.5 mm** | **~0.8° médiane** |
+
+> Adéquation pick-and-place (cible ±5 mm) : ✅ joints proximaux · ⚠️ joints intermédiaires · ❌ end-effector (besoin ~3× mieux). Le gain pose-réelle viendra du modèle mixte ou d'un re-training Isaac Sim.
+
+### Tests réalisés (DREAM)
+
+| Test | Date | Résultat |
+|------|------|----------|
+| Conversion 20K frames → NDDS (0 skip) | 03/04/2026 | ✅ |
+| FK + projection caméra (4 vues) | 03/04/2026 | ✅ |
+| Training ResNet-H (25 epochs) | 03/04/2026 | ❌ BN instable, tué E10 |
+| Training VGG-base (25 epochs) | 03/04/2026 | ✅ val=0.000438 |
+| Training VGG-aug (25 epochs) | 03/04/2026 | ✅ val=0.000667 |
+| Eval synthétique (20K) | 03/04/2026 | ✅ 97% det, 3.1 px |
+| Eval sim-to-real (20K) | 03/04/2026 | ⚠️ ~26% det |
+| Training VGG weighted 50K (50 epochs) | 15/04/2026 | ✅ 98.3% det synth |
+| Eval VGG 50K sur réel | 15/04/2026 | ⚠️ 13.2% det, 172 px |
+| Fine-tune custom v1 (σ=4) | 15/04/2026 | ❌ 0% det |
+| Fine-tune custom v2 (σ=2) | 16/04/2026 | ❌ belief effondrées |
+| Dataset mixte 18K créé (2K×5 + 8K) | 16/04/2026 | ✅ |
+| Training mixte natif 50 epochs | 16/04/2026 | ✅ checkpoint sauvegardé |
+| **Évaluation modèle mixte sur réel** | _à venir_ | 🔄 ROUGE — étape bloquante |
+
+### Pistes pour la suite
+
+1. **🔴 Évaluer le checkpoint mixte** sur `real_cam0` — premier indicateur si l'oversampling 5× a comblé le domain gap (cible : ≥ 50% détection sur réel) :
+   ```bash
+   source ~/ros_jazzy/venv_dream/bin/activate
+   python training/dream/evaluate_dream.py \
+     --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
+     --data /tmp/dream_data/real_cam0 --split all
+   ```
+2. **🔴 Si détection < 50% sur réel** → self-supervised labeling : utiliser les angles lus du robot + FK + intrinsèques caméra pour générer automatiquement des keypoints GT sur des images réelles, puis fine-tune sur ces annotations auto.
+3. **🟡 Vérifier la collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/` (worlds randomized_v2 — 6 lights, 12 clutter objects) et lancer un training combiné v2 + réel.
+4. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — substitution de Gazebo par Isaac Sim + Isaac Lab pour rendu photoréaliste, devrait fermer le gap sim-to-real à la racine plutôt que par oversampling.
+5. **🟢 Bench pose-driven pick-and-place sur robot réel** une fois la détection stabilisée — réutiliser le pipeline `pick_and_place_node.py` (déjà validé en sim) avec la pose DREAM en boucle de feedback.
 
 ### Entraînement DREAM (natif)
 
@@ -208,7 +288,7 @@ python /tmp/DREAM/scripts/train_network.py \
   -i /tmp/dream_data/mixed_real_synth \
   -m /tmp/DREAM/manip_configs/mycobot320.yaml \
   -ar /tmp/DREAM/arch_configs/dream_vgg_q.yaml \
-  -e 25 -b 32 -lr 0.0001 \
+  -e 50 -b 32 -lr 0.0001 \
   -o training/checkpoints_dream/vgg_mixed_real_synth -f
 ```
 
@@ -218,7 +298,7 @@ python /tmp/DREAM/scripts/train_network.py \
 /home/genji/miniconda/bin/python3 training/capture_real.py \
   --output datasets/real_dataset \
   --num-samples 2000 \
-  --pi-host 10.10.0.225 \
+  --pi-host 10.10.0.223 \
   --settle-time 3.0 --speed 25 --limit-fraction 0.5
 ```
 
@@ -252,7 +332,9 @@ Plus de détails : [`datasets/README.md`](datasets/README.md)
 | **Teleop Keyboard** | `teleop_keyboard.launch.py` | Contrôle clavier (WASD + ZX) |
 | **Commander CLI** | `commander.launch.py` | Commandes textuelles interactives |
 | **RViz Sync** | `rviz_sync.launch.py` | Synchronisation robot réel → RViz |
-| **Hand Teleop** | `mycobot_teleop.launch.py` | **Téléop par caméra/main** (Wilor + Astra) — voir ci-dessous |
+| **Hand Teleop** | `mycobot_teleop.launch.py` | **Téléop par caméra/main** (Wilor + Astra), `target={sim,real,both}` |
+| **Pick-and-place mono** | `pick_and_place.launch.py` | Cube rouge → zone verte (Gazebo, vision DREAM optionnelle) |
+| **Pick-and-place sorting** | `pick_and_place_sorting.launch.py` | 4 objets colorés → 4 bacs assortis (Gazebo, HSV + IK) |
 
 ---
 
@@ -294,7 +376,55 @@ python3 performance_analyzer.py --guided
 - [`docs/TELEOP_ARCHITECTURE_VIZ.md`](docs/TELEOP_ARCHITECTURE_VIZ.md) — **visuel détaillé** : de la détection main au mouvement du bras (types, unités, latences)
 - [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) — manuel utilisateur du dashboard
 - [`docs/TELEOP_TUNING.md`](docs/TELEOP_TUNING.md) — référence des paramètres + dépannage
+- [`docs/TELEOP_SIM_TESTING.md`](docs/TELEOP_SIM_TESTING.md) — **valider la téléop en simulation seule** avant le robot réel : KPIs, scénarios guidés, seuils, use cases sim-only
 - [`docs/REAL_ROBOT_TEST_PROCEDURE.md`](docs/REAL_ROBOT_TEST_PROCEDURE.md) — procédure de test sur robot physique
+
+---
+
+## 🎯 Pick-and-place (Gazebo)
+
+Deux pipelines complets de pick-and-place en simulation, utilisés pour démontrer la chaîne perception → IK → contrôle moteur :
+
+| Pipeline | Monde | Objets | Perception | Doc |
+|----------|-------|--------|------------|-----|
+| **Mono-objet** | `worlds/pick_and_place.sdf` | 1 cube rouge → zone verte | DREAM keypoints + PnP (optionnelle, fallback open-loop IK) | [pick_and_place_node.py](mycobot_gateway/mycobot_gateway/pick_and_place_node.py) |
+| **Multi-couleur sorting** | `worlds/pick_and_place_sorting.sdf` | 4 objets dynamiques (cube R, cube B, cylindre G, boîte Y) → 4 bacs colorés à parois | HSV top-down + back-projection pinhole + IK numérique | [sorting_orchestrator.py](mycobot_gateway/mycobot_gateway/sorting_orchestrator.py) |
+
+**Composants partagés** :
+- IK numérique : `training/dream/mycobot_ik.py` (scipy L-BFGS-B + FK chain, multi-restart, warm-start, < 0.01 mm précision)
+- Émulation grasp : appel au service Gazebo `/world/<world>/set_pose` pour téléporter l'objet sur l'EE pendant le portage et le déposer dans le bac à la couleur correspondante (le bras MyCobot 320 Pi physique n'a pas de gripper actuellement)
+
+**Pipeline sorting (testé end-to-end le 23/04/2026)** :
+```
+   Top camera (1.2 m)              ┌──────────────────────────┐
+        │                          │   sorting_orchestrator   │
+        ▼                          │   ────────────────────   │
+ ┌──────────────┐  /sorting/      │  for color in detections │
+ │  HSV detector │ detections ──▶ │    1. plan IK            │
+ │  + back-proj  │                 │    2. approach + descend │
+ └──────────────┘                  │    3. GRASP (gz set_pose)│
+                                    │    4. lift + carry       │
+                                    │    5. place in bin       │
+                                    │    6. RELEASE + retreat  │
+                                    └──────────┬───────────────┘
+                                               │
+                                               ▼  /model/.../cmd_pos
+                                       Gazebo joints (DART)
+```
+
+**Lancement** :
+```bash
+ros2 launch mycobot_gateway pick_and_place.launch.py             # mono-objet
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py     # 4 couleurs
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py use_detector:=false   # smoke-test
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py process_order:=blue,green
+```
+
+**Résultats validation 23/04/2026** :
+- ✅ 4/4 couleurs détectées par HSV (positions à ~1 mm près des positions SDF)
+- ✅ IK résolue pour tous les waypoints (erreur < 0.01 mm sur l'EE)
+- ✅ Cycle complet 4 objets en ~95 s (red → blue → green → yellow → home)
+- ✅ Aucune chute, aucun objet manqué (téléport gz fiable)
 
 ---
 
@@ -306,23 +436,32 @@ mycobot_R6A/
 ├── SESSION_RESUME.md               # Point de départ sessions dev
 ├── DEVELOPMENT_SUMMARY.md          # Résumé technique complet
 │
-├── mycobot_gateway/                # 📦 Package ROS2 — contrôle
+├── mycobot_gateway/                # 📦 Package ROS2 — contrôle + vision + sorting
 │   ├── mycobot_gateway/
-│   │   ├── bridge_tour.py          # Client TCP vers Pi
-│   │   ├── simple_gui.py           # GUI Tkinter
-│   │   ├── slider_control.py       # Contrôle sliders
-│   │   └── synthetic_data_collector_v2.py
+│   │   ├── bridge_tour.py                    # Client TCP vers Pi
+│   │   ├── trajectory_to_robot_bridge.py     # JointTrajectory rad → JSON deg (téléop réel)
+│   │   ├── gripper_to_robot_bridge.py        # Gripper bridge (no-op tant que pas de pince)
+│   │   ├── simple_gui.py                     # GUI Tkinter
+│   │   ├── slider_control.py                 # Contrôle sliders
+│   │   ├── dream_inference_node.py           # Inférence DREAM + PnP pose
+│   │   ├── pick_and_place_node.py            # State machine pick & place mono
+│   │   ├── color_object_detector.py          # HSV + back-projection (top camera)
+│   │   ├── sorting_orchestrator.py           # Pick & place multi-objets par couleur
+│   │   └── synthetic_data_collector_v2.py    # Collecte Gazebo + anti-collision FK
 │   ├── scripts/
 │   │   ├── bridge_pi_simple.py     # Script Pi (serveur robot)
 │   │   └── pi_camera_server.py     # Script Pi (serveur caméras)
 │   └── launch/                     # Fichiers launch ROS2
 │
 ├── mycobot_description/            # 📦 Package ROS2 — URDF/Gazebo
-│   ├── urdf/320_pi/                # Modèle 3D + 4 caméras Gazebo
-│   ├── urdf/pro_adaptive_gripper/   # Gripper adaptatif (meshes)
+│   ├── urdf/320_pi/                # Modèle 3D + 4 caméras stylisées (corps + objectif + LED)
+│   ├── urdf/pro_adaptive_gripper/  # Gripper adaptatif (meshes)
+│   ├── config/controller.yaml      # JTC + gripper_position_controller (gz_ros2_control)
 │   └── worlds/
-│       ├── randomized.sdf           # Monde de base
-│       └── randomized_v2.sdf        # 6 lights + 12 clutter objects
+│       ├── randomized.sdf                # Monde de base (synthetic data v1)
+│       ├── randomized_v2.sdf             # 6 lights + 12 clutter objects (v2)
+│       ├── pick_and_place.sdf            # Cube rouge + zone verte (mono-objet)
+│       └── pick_and_place_sorting.sdf    # 4 objets colorés + 4 bacs colorés
 │
 ├── training/                       # 📦 Pipeline ML/IA
 │   ├── train.py                    # Legacy: régression directe ResNet
@@ -359,7 +498,7 @@ mycobot_R6A/
 | Machine | IP | Ports |
 |---------|-----|-------|
 | PC Tour | 10.10.0.115 | — |
-| Raspberry Pi | 10.10.0.225 | 5005 (robot) + 5006 (caméras) |
+| Raspberry Pi | 10.10.0.223 | 5005 (robot) + 5006 (caméras) |
 
 ```bash
 ros2 launch mycobot_gateway simple_gui.launch.py pi_ip:=<VOTRE_IP_PI>
@@ -377,9 +516,9 @@ conda deactivate
 
 ### Connexion TCP échoue
 ```bash
-ping 10.10.0.225
-nc -zv 10.10.0.225 5005   # robot bridge
-nc -zv 10.10.0.225 5006   # camera server
+ping 10.10.0.223
+nc -zv 10.10.0.223 5005   # robot bridge
+nc -zv 10.10.0.223 5006   # camera server
 ```
 
 ### Git LFS — images manquantes après clone
@@ -394,19 +533,29 @@ git lfs pull
 
 | Fichier | Description |
 |---------|-------------|
-| [`SESSION_RESUME.md`](SESSION_RESUME.md) | Point de départ pour le développement |
+| [`SESSION_RESUME.md`](SESSION_RESUME.md) | Point de départ pour le développement (état courant) |
 | [`DEVELOPMENT_SUMMARY.md`](DEVELOPMENT_SUMMARY.md) | Résumé technique complet |
+| [`INDEX.md`](INDEX.md) | Index général de la documentation |
+| [`CHANGELOG.md`](CHANGELOG.md) | Historique versionné (Keep a Changelog) |
+| [`CLAUDE.md`](CLAUDE.md) | Onboarding + POC direction (Isaac Sim, VLA, etc.) |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Architecture détaillée du système |
-| [`datasets/README.md`](datasets/README.md) | Documentation des datasets |
 | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | Guide démarrage rapide |
 | [`docs/SYNTHETIC_DATA.md`](docs/SYNTHETIC_DATA.md) | Pipeline données synthétiques |
 | [`docs/ROBOT_QUICKSTART.md`](docs/ROBOT_QUICKSTART.md) | Procédure robot réel |
-| [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) | Téléopération par la main (pipeline + filtres) |
+| **Téléopération** | |
+| [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) | Pipeline téléop main (filtres, mapping, historique) |
 | [`docs/TELEOP_ARCHITECTURE_VIZ.md`](docs/TELEOP_ARCHITECTURE_VIZ.md) | Visuel détaillé — détection main → mouvement bras |
-| [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) | Manuel utilisateur du dashboard de téléop |
+| [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) | Manuel utilisateur du dashboard ABMI 3-onglets |
 | [`docs/TELEOP_TUNING.md`](docs/TELEOP_TUNING.md) | Référence paramètres + dépannage téléop |
-| [`docs/REAL_ROBOT_TEST_PROCEDURE.md`](docs/REAL_ROBOT_TEST_PROCEDURE.md) | Procédure + protocole de calibration sécurisé sur robot physique |
+| [`docs/TELEOP_SIM_TESTING.md`](docs/TELEOP_SIM_TESTING.md) | **Procédure de validation en simulation seule** (avant le robot réel) |
+| [`docs/REAL_ROBOT_TEST_PROCEDURE.md`](docs/REAL_ROBOT_TEST_PROCEDURE.md) | Protocole de calibration sécurisé sur robot physique |
+| **Pick-and-place / sorting** | |
+| [`mycobot_description/README_GAZEBO.md`](mycobot_description/README_GAZEBO.md) | Worlds Gazebo (mono, sorting) + visuels caméra |
+| [`mycobot_gateway/README.md`](mycobot_gateway/README.md) | Nœuds, launches, topics — incluant `color_object_detector` et `sorting_orchestrator` |
+| **Données / ML** | |
+| [`datasets/README.md`](datasets/README.md) | Documentation des datasets |
 | [`training/README.md`](training/README.md) | Documentation pipeline ML |
+| [`training/dream/README.md`](training/dream/README.md) | Module DREAM (keypoints + PnP, training mixte) |
 
 ---
 
