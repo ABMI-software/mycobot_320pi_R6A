@@ -1,8 +1,8 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 23 avril 2026 (merge teleop + sorting → main)
-> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting)
-> **Branche active :** `main` (téléop + sorting fusionnés)
+> **Date de dernière mise à jour :** 23 avril 2026 (soir — diagnostic DREAM pose estimation + scaffold Claude Code)
+> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.11.0 (pose-est diagnostic + tooling)
+> **Branche active :** `main`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.223` (pas `.225` comme certains anciens docs)
 
@@ -20,7 +20,115 @@ source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
 
 ---
 
-## État actuel (22 avril 2026 — soir)
+## État actuel (23 avril 2026 — soir)
+
+### 🧭 Reprise pour demain — lire en premier
+
+La pose estimation (DREAM) est **l'urgence actuelle**. Les tests sur la tour et la simulation téléop + sorting sont validés.
+
+**Question en attente pour demain** : on passe à l'option 2 (collecte de plus de données réelles, biaisée vers des poses bras étendu). Deux chemins possibles :
+
+- **(a) recommandé** : garder `/tmp/dream_data/real_cam0/` intact (baseline mesurable) et capturer un nouveau dataset 5-10 K poses sous `real_cam0_v2` → merger avec le synthétique pour un `mixed_v2` → retrain.
+- **(b)** : étendre `real_cam0` in-place.
+
+Avant de capturer, ouvrir `training/capture_real.py` et identifier le sampler de poses — il faut biaiser vers des poses où J3/J4/J5 sont loin du repos pour que les distal keypoints couvrent plus de la grille de pixels.
+
+Commande rapide pour confirmer l'état DREAM (doit reporter 47.3% de détection globale, link6 à 3.0% @ 62px) :
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+python training/dream/evaluate_dream.py \
+  --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
+  --data /tmp/dream_data/real_cam0 --split all
+```
+
+### Ce qui a été accompli aujourd'hui (23/04/2026)
+
+#### 1. Diagnostic complet de la pose estimation DREAM
+
+3 évaluations + visualisation sur 500 frames réelles issues de `/tmp/dream_data/real_cam0/` :
+
+| Checkpoint / config | Détection globale | Médiane px | Diagnostic |
+|---------------------|-------------------|------------|------------|
+| `vgg_weighted_50k_e50` (synth-only) | 12.8 % | 128 | Mauvais — confirme que la data réelle est *load-bearing* |
+| `vgg_mixed_real_synth` epoch 25 (baseline) | **47.3 %** | 2.95 | État d'avant-session |
+| `vgg_mixed_real_synth` epoch 25 + threshold relaxé (0.001 au lieu de 0.01) | 49.8 % | 2.95 | Débloque link5 en détection (48%) mais la précision s'effondre (176px) — hypothèse "filtre de confiance trop strict" réfutée |
+| `vgg_mixed_real_synth` epoch 50 (après option 1) | **47.3 %** | 2.78 | Détection inchangée, raffinement proximal seulement |
+
+**Analyse par keypoint (mixed e50)** :
+
+| Keypoint | Détection | Médiane px | Verdict |
+|----------|-----------|------------|---------|
+| base | 0 % | — | À investiguer (FK ? toujours occlu par le mount ?) |
+| link1 | 100 % | 2.78 | ✅ Résolu |
+| link2 | 100 % | 2.78 | ✅ Résolu |
+| link3 | 89 % | 2.20 | 🟡 OK, quelques outliers |
+| link4 | 36 % | 81 | ❌ Réseau perd la localisation |
+| link5 | 3.8 % | 7.3 | ❌ Presque jamais détecté |
+| link6 | 3.0 % | 62 | ❌ End-effector inutilisable pour pick-and-place |
+
+**Visualisations sauvegardées** : `/tmp/dream_eval_viz_mixed/` (30 frames + montage).
+
+**Hypothèse C confirmée** (réseau n'a pas appris les distal keypoints sur les images réelles) :
+- Le bras est bien visible dans les frames échantillonnées (pas d'occlusion systématique)
+- Les GT hollow circles sont à la bonne place sur le bras (FK / calibration OK)
+- Les prédictions distal sont placées à des positions aléatoires hors bras, ou absentes
+
+**Raison racine** : 2000 poses réelles uniques × 5 oversample, c'est suffisant pour les keypoints proximaux (stables dans l'image) mais pas pour link4/5/6 qui doivent être localisés sur toute la grille de pixels 640×480.
+
+#### 2. Option 1 (entraînement prolongé sur la même data) — épuisée
+
+Resume training `e25 → e50` sur les 18K mixed frames existantes (2.6 h, 25 époques × ~6 min) :
+
+| Métrique | e25 | e50 | Delta |
+|----------|-----|-----|-------|
+| Détection globale | 47.3 % | 47.3 % | 0 |
+| Val loss | 0.000334 | 0.000322 | −3.6 % (plateau après ~5 époques) |
+| Train loss | 0.000225 | 0.000166 | −26 % (overfitting qui s'installe) |
+| Per-frame mean error | 21.2 px | 14.2 px | ✓ |
+| link6 | 1.2 % @ 263 px | 3.0 % @ 62 px | amélioration marginale |
+
+La val loss a plafonné dès les premières époques du resume → l'information pour apprendre les distal keypoints n'est pas dans le dataset actuel. **Plus d'époques ne résout rien, seul plus de diversité le pourra.**
+
+Backup du meilleur checkpoint d'avant-resume : `training/checkpoints_dream/vgg_mixed_real_synth/best_network.e25.pth`. Fichier de remplacement (post-resume) : `best_network.pth` pointe maintenant sur e50.
+
+#### 3. Scaffold Claude Code (CLAUDE.md + `.claude/`)
+
+Structure complète pour que les futures sessions Claude aient le contexte du projet dès le démarrage (pas de re-découverte à chaque session) :
+
+- `CLAUDE.md` à la racine — project overview, 3 env Python, branch map, POC scope (digital twin · AI physics · VLA · pose estimation)
+- `.claude/settings.json` — permissions partagées (per-user resté dans `settings.local.json`)
+- `.claude/rules/` (5) — python-environments · ros2-conventions · real-robot-safety · git-branching · documentation
+- `.claude/commands/` (5) — launch-sim · launch-teleop · real-robot-preflight · train-dream · collect-synthetic
+- `.claude/skills/` (6) — teleop-troubleshoot · dream-workflow · gazebo-setup · real-robot-session · isaac-sim-integration · lerobot-dataset
+- `.claude/agents/` (6) — ros2-debugger · dream-trainer · teleop-tuner · urdf-surgeon · digital-twin-engineer · vla-integrator
+- `.claude/hooks/validate-ros2-build.sh` — inactif par défaut (à câbler via settings si désiré)
+
+Le fichier `isaac-sim-integration/SKILL.md` contient la roadmap 5-phases pour Isaac Sim (USD conversion → ROS2 bridge → synthetic data for DREAM → parallel envs for VLA → real-robot validation). **Aucune migration réelle démarrée** — uniquement la planification. Gazebo reste sur `main`.
+
+#### 4. Artefacts code nouveaux
+
+- `training/dream/evaluate_dream_relaxed.py` — wrapper de `evaluate_dream.py` qui monkey-patch les seuils de peak detection (sans toucher `/tmp/DREAM/`). CLI : `--peak-thresh 0.001 --next-best-score 0.05`.
+
+### Prochaines actions (par ordre)
+
+1. **[ROUGE] Choisir (a) ou (b)** pour le dataset v2 (voir section "Reprise pour demain" ci-dessus)
+2. **[ROUGE] Lire et adapter `training/capture_real.py`** pour biaiser le sampler vers les poses bras-étendu (J3 > 45°, J4 > 30°, J5 ≠ 0)
+3. **[ROUGE] Capturer le nouveau dataset** (5-10K poses sur cam0 + cam3 avec FK safety obligatoire) — compter ~2-3 h caméra + preflight
+4. **[JAUNE] Training mixte v2** — merger le nouveau `real_cam0_v2` avec le `synthetic_50k_v2` (world randomized_v2) → viser 30-40K mixed, 50 époques
+5. **[JAUNE] Eval v2** — cible minimale pour débloquer pick-and-place : détection ≥ 70 % sur tous les keypoints, link6 médiane ≤ 10 px
+6. **[VERT] Ensuite seulement** : envisager Isaac Sim ou self-supervised labeling selon le résultat
+
+### État par checkpoint DREAM
+
+| Checkpoint | Best val | Real det (overall) | link6 (det / med px) |
+|------------|----------|---------------------|-----------------------|
+| `vgg_weighted_50k_e50` | ~0.00019 | 12.8 % | 5.6 % / 395 |
+| `vgg_mixed_real_synth` e25 (backup) | 0.000334 | 47.3 % | 1.2 % / 263 |
+| **`vgg_mixed_real_synth` e50 (best)** | **0.000322** | **47.3 %** | **3.0 % / 62** |
+
+---
+
+## État précédent (22 avril 2026 — soir)
 
 ### ✅ MILESTONE : premier test physique réussi
 

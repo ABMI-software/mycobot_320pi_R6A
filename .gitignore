@@ -44,3 +44,4 @@ training/dream/checkpoints_dream/
 *.pth
 *.pkl
 *.onnx
+.claude/scheduled_tasks.lock

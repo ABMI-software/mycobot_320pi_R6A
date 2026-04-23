@@ -7,6 +7,54 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.11.0] - 2026-04-23 (soir)
+
+### 🎯 Pose estimation — diagnostic complet + option 1 épuisée
+
+Session dédiée à débloquer la **pose estimation DREAM** (bloqué ~26 % détection réel depuis mi-avril). Verdict : le modèle `vgg_mixed_real_synth` résout proximal (link1/2/3 à 100 %) mais **n'a pas appris les distal keypoints** (link4/5/6 <= 36 % détection) sur les images réelles. Plus d'entraînement sur la même data (option 1) raffine le proximal mais **ne déplace pas la détection globale** (47.3 % → 47.3 %). Reste à faire : collecter plus de données réelles diverses (option 2).
+
+### Ajouté — Tooling DREAM
+
+- [`training/dream/evaluate_dream_relaxed.py`](../training/dream/evaluate_dream_relaxed.py) — wrapper de `evaluate_dream.py` qui monkey-patch les seuils de peak detection sans toucher la lib vendored `/tmp/DREAM/`. CLI : `--peak-thresh` (défaut 0.001 vs lib 0.01) et `--next-best-score` (défaut 0.05 vs lib 0.25).
+- Backup du checkpoint pré-resume : `training/checkpoints_dream/vgg_mixed_real_synth/best_network.e25.{pth,yaml}`.
+
+### Ajouté — Claude Code project structure
+
+Structure complète pour que les sessions Claude aient le contexte projet dès le démarrage :
+
+- [`CLAUDE.md`](../CLAUDE.md) à la racine — project overview, 3 envs Python, branch map, POC scope (digital twin · AI physics · VLA · pose estimation)
+- [`.claude/settings.json`](../.claude/settings.json) — permissions partagées projet-wide
+- [`.claude/rules/`](../.claude/rules/) (5) — `python-environments` · `ros2-conventions` · `real-robot-safety` · `git-branching` · `documentation`
+- [`.claude/commands/`](../.claude/commands/) (5) — `launch-sim` · `launch-teleop` · `real-robot-preflight` · `train-dream` · `collect-synthetic`
+- [`.claude/skills/`](../.claude/skills/) (6) — `teleop-troubleshoot` · `dream-workflow` · `gazebo-setup` · `real-robot-session` · `isaac-sim-integration` · `lerobot-dataset`
+- [`.claude/agents/`](../.claude/agents/) (6) — `ros2-debugger` · `dream-trainer` · `teleop-tuner` · `urdf-surgeon` · `digital-twin-engineer` · `vla-integrator`
+- [`.claude/hooks/validate-ros2-build.sh`](../.claude/hooks/validate-ros2-build.sh) — inactif par défaut (à câbler dans settings si désiré)
+
+La skill `isaac-sim-integration` contient la roadmap 5-phases pour Isaac Sim (USD conversion → ROS2 bridge → synth data DREAM → Isaac Lab parallel envs → real-robot validation). **Aucune migration démarrée** — uniquement la planification. Gazebo reste sur `main`.
+
+### Mesuré
+
+| Checkpoint | Real det | link6 (det / med px) |
+|------------|----------|-----------------------|
+| `vgg_weighted_50k_e50` (synth-only) | 12.8 % | 5.6 % / 395 |
+| `vgg_mixed_real_synth` e25 | 47.3 % | 1.2 % / 263 |
+| **`vgg_mixed_real_synth` e50 (best)** | **47.3 %** | **3.0 % / 62** |
+
+### Validé
+
+- Hypothèse "confidence threshold trop strict" réfutée : relaxer `peak_thresh` de 0.01 à 0.001 débloque 48 % de détection sur link5 mais la médiane d'erreur explose de 2.97 px à 176 px → les peaks low-conf sont du bruit, pas des bonnes prédictions masquées.
+- Hypothèse "unlearned" confirmée par visualisation (`/tmp/dream_eval_viz_mixed/montage_eval.png`) : bras entièrement visible + GT bien placée + prédictions distal hors bras.
+
+### Prochaine session (24/04/2026)
+
+1. Choisir (a) nouveau dataset `real_cam0_v2` ou (b) append in-place
+2. Adapter `training/capture_real.py` pour biaiser vers poses bras-étendu
+3. Capturer 5-10 K nouvelles poses (FK safety obligatoire)
+4. Retrain mixte v2 (~30 K frames, 50 épochs)
+5. Cible : détection ≥ 70 % tous keypoints, link6 médiane ≤ 10 px avant pick-and-place
+
+---
+
 ## [2.2.0] - 2026-04-23
 
 ### 🎨 Dashboard ABMI + boutons dynamiques
