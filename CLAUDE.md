@@ -12,6 +12,24 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full diagram, [`SESSI
 
 ---
 
+## Session workflow — docs and commits are automatic
+
+**Important.** The user does not want to ask Claude to update docs or commit at the end of every session. Claude must do both **proactively** when:
+
+- the user signals end-of-session ("je m'arrête", "I'm stopping", "c'est bon pour aujourd'hui", "to be continued", "document what we did"), OR
+- a coherent milestone just completed (test run conclusive, feature demonstrated, scaffold finished, doc sweep done).
+
+The full policy — when to trigger, which files to update, branch discipline, commit-message conventions, and what **not** to auto-commit — lives in [`.claude/rules/auto-commit.md`](.claude/rules/auto-commit.md). Read it at session start; follow it without prompting.
+
+**Hard boundaries:**
+- Branch must match the work's domain (see [`.claude/rules/git-branching.md`](.claude/rules/git-branching.md)). Mismatch → stop and ask.
+- Pushing is **never** automatic — only on explicit user instruction.
+- Skip backup files (`*.bak*`), local reports (`*.xlsx` in `teleop/`), build outputs, training checkpoints, runtime locks.
+
+For explicit mid-session invocation, use [`/finish-session`](.claude/commands/finish-session.md).
+
+---
+
 ## POC direction (2026+)
 
 This repo is not just a control-software project — it's the starting substrate for an emerging-technology POC. The near-term ambition is:
