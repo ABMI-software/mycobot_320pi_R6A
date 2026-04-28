@@ -1,17 +1,37 @@
 # MyCobot 320 Pi — ROS2 Control & Vision-Based Pose Estimation
 
-**Plateforme complète pour contrôle robotique et estimation de pose par vision CNN**
+**Plateforme de recherche pour le MyCobot 320 Pi 6-DoF — substrat d'un POC ABMI digital-twin / VLA / AI-physics**
 
-Ce projet intègre :
-- Un **bridge ROS2 TCP** pour contrôler un MyCobot 320 Pi depuis un PC distant
-- Une **simulation Gazebo Harmonic** avec gripper adaptatif, 4 caméras et domain randomization
-- Un **pipeline ML DREAM** : keypoint detection (VGG-19) → belief maps → PnP → pose 3D
-- Une **téléopération par la main** (Wilor + Orbbec Astra) avec dashboard de tuning et rapport Excel — adapté du pipeline R5A / LeRobot. **Pipeline validé sur robot physique le 22/04/2026**
-- Des **datasets** synthétiques (Gazebo, 50K frames) et réels (caméras Pi, 4K images) via Git LFS
+Ce dépôt intègre :
+- Un **bridge ROS2 TCP** Tour ↔ Raspberry Pi pour contrôler le robot physique (`10.10.0.223`)
+- Un **digital twin Gazebo Harmonic** : URDF + gripper adaptatif + 4 caméras + worlds randomisés
+- Un **pipeline DREAM** (NVlabs) de pose-estimation par keypoints : VGG-19 → belief maps → PnP → pose 6-DoF
+- Une **téléopération par la main** (Astra → Wilor → rosbridge → JTC) avec dashboard ABMI 3-onglets et performance analyzer Excel — *validée sur robot physique le 22/04/2026*
+- Un **pipeline pick-and-place + sorting 4 couleurs** en simulation (`pick_and_place.launch.py`, `sorting_orchestrator`)
+- Une **calibration intrinsèque ChArUco** des caméras (cam_0, cam_3, Astra) avec auto-save et rejet d'outliers — *cam_0 + cam_3 mesurées le 28/04/2026*
+- Des **datasets** Git LFS : 50 K synth (Gazebo, randomized v1/v2) + 4 K réels (Arducam Pi cam_0/cam_3)
 
-> Pour reprendre le développement, voir [`SESSION_RESUME.md`](SESSION_RESUME.md)
-> Documentation technique détaillée dans [`DEVELOPMENT_SUMMARY.md`](DEVELOPMENT_SUMMARY.md)
-> Pour la téléopération (pipeline, filtres, dashboard, rapport de perf) : [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md)
+> Pour reprendre le développement → [`SESSION_RESUME.md`](SESSION_RESUME.md)
+> Roadmap POC (Isaac Sim, VLA, AI physics) → [`CLAUDE.md § POC direction`](CLAUDE.md)
+> Manuel téléop → [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) · Manuel calibration → [`docs/CAMERA_CALIBRATION.md`](docs/CAMERA_CALIBRATION.md)
+
+---
+
+## 📑 Table des matières
+
+- [Architecture](#-architecture) — diagramme des 3 chemins de commande (GUI/CLI · téléop main · vision DREAM)
+- [Packages & Composants](#-packages--composants) — `mycobot_gateway`, `mycobot_description`, `training/`, `teleop/`, `datasets/`, `scripts/`, `docs/`
+- [Quick Start](#-quick-start) — prérequis, installation, démarrage robot + contrôles + sorting
+- [Pipeline Vision / Pose Estimation](#-pipeline-vision--pose-estimation) — DREAM, résultats par checkpoint, tests réalisés, pistes pour la suite
+- [Datasets](#-datasets) — synthétique 50 K + réel 4 K via Git LFS
+- [Modes de Contrôle](#-modes-de-contrôle) — GUI · sliders · clavier · CLI · sync RViz
+- [Téléopération par la main](#%EF%B8%8F-téléopération-par-la-main) — pipeline Astra→Wilor→robot avec validation physique
+- [Pick-and-place (Gazebo)](#-pick-and-place-gazebo) — pipeline mono + sorting 4 couleurs
+- [Structure du Projet](#-structure-du-projet) — arborescence complète
+- [Configuration Réseau](#-configuration-réseau) — IP Tour ↔ Pi, ports TCP
+- [Troubleshooting](#%EF%B8%8F-troubleshooting) — conda/ROS2, TCP, Git LFS
+- [Documentation](#-documentation) — index des fichiers `docs/`
+- [License](#-license) · [Contributeurs](#-contributeurs)
 
 ---
 
@@ -301,13 +321,17 @@ Image 640×480 → VGG-19 → 6 stages cascadés → 7 belief maps 100×100
 | Build `mixed_v2_cam03` (cam0 + cam3 + synth) | 28/04/2026 PM | ✅ 18K symlinks |
 | Retrain v2 25 epochs sur mixed_v2_cam03 | 28/04/2026 PM | ✅ 2h35, val=0.000356 |
 | Eval v2 cam0 / cam3 / synth | 28/04/2026 PM | 🟰 cam0 -7.1 pts, cam3 +10 pts, synth +1.2 pts |
+| **Calibration intrinsèque cam_0 + cam_3** (ChArUco) | 28/04/2026 soir | ✅ cam_0 RMS 0.67 px / cam_3 RMS 0.68 px — voir [docs/CAMERA_CALIBRATION.md](docs/CAMERA_CALIBRATION.md) |
+| **Finding K dataset DREAM** | 28/04/2026 soir | ❌ `fx=fy=610` du `_camera_settings.json` faux de ~14 % vs caméras physiques (cam_0: fx=525.67) — cause probable du gap distal |
 
 ### Pistes pour la suite
 
 > Mise à jour 28/04/2026 (PM) : test cheap cam0+cam3 fait. Verdict = **calibrer cam3 avant tout retrain v3**. Sans calibration on échange perf cam0 contre perf cam3 sans gain global.
+>
+> Mise à jour 28/04/2026 (soir) : **points 1 + 2 faits** sur la branche `feature/calibration-cam`. cam_0 mesurée à fx=525.67 fy=529.70 cx=317.73 cy=226.00 (RMS 0.67 px) ; cam_3 mesurée à fx=496.31 fy=494.14 cx=313.37 cy=248.01 (RMS 0.68 px). Le `fx=fy=610` du `_camera_settings.json` du dataset DREAM est **faux de ~14 %** par rapport aux deux Arducams physiques — c'est probablement la cause majeure du gap distal observé en 1.11.0/1.12.0. Voir [`docs/CAMERA_CALIBRATION.md`](docs/CAMERA_CALIBRATION.md). Astra **différée** (logistique : board jamais dans le frame, FOV trop large, capteur RGB trop "soft" pour les patterns 4×4 — à refaire avec setup mural fixe).
 
-1. **🔴 Calibrer cam3** (chessboard OpenCV pour intrinsèques + extrinsèques mesurées physiquement ou par PnP sur le checkpoint v1).
-2. **🔴 Calibrer cam0** par la même occasion (vérifier fx=610).
+1. ~~**🔴 Calibrer cam3**~~ ✅ fait — `training/calibration/cam_3.{npz, meta.json}` (RMS 0.68 px, 21 vues).
+2. ~~**🔴 Calibrer cam0**~~ ✅ fait — `training/calibration/cam_0.{npz, meta.json}` (RMS 0.67 px, 18 vues). **Confirmé** : `fx=610` du dataset est faux.
 3. **🔴 Refactor `training/dream/convert_to_ndds.py`** : `REAL_CAMERA_INTRINSICS` devient un dict par-cam, `REAL_CAMERA_TRANSFORMS["cam3"]` mis à jour avec les valeurs calibrées.
 4. **🔴 Régénérer `real_cam0_v3` + `real_cam3_v3`** + build `mixed_v3` (18K même structure que v2).
 5. **🔴 Retrain v3 50 epochs** (vs 25 en v2 — la val loss n'avait pas plateauté). **Cible** : ≥ 50 % cam0 + ≥ 50 % cam3 simultanément.
@@ -341,7 +365,7 @@ python /tmp/DREAM/scripts/train_network.py \
 
 ---
 
-## � Datasets
+## 💾 Datasets
 
 > ⚠️ Les images sont stockées via **Git LFS**. Après `git clone`, exécutez `git lfs pull`.
 

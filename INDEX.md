@@ -56,6 +56,17 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | [docs/SYNTHETIC_DATA.md](docs/SYNTHETIC_DATA.md) | Pipeline données synthétiques Gazebo + domain randomization v2 |
 | [datasets/README.md](datasets/README.md) | Documentation des datasets (synthétique 50K + réel 4K via Git LFS) |
 
+### 📷 Calibration intrinsèque caméras (`feature/calibration-cam`)
+| Document | Description |
+|----------|-------------|
+| [docs/CAMERA_CALIBRATION.md](docs/CAMERA_CALIBRATION.md) | **Manuel d'utilisation** — pourquoi calibrer, board à imprimer, workflow Arducam + Astra, troubleshooting, intégration DREAM |
+| [training/calibration/calibrate_camera.py](training/calibration/calibrate_camera.py) | Calibrateur ChArUco unifié — UVC (`--source v4l2`) ou Astra OpenNI (`--source astra`), auto-save, rejet outliers, presets caméra |
+| [training/calibration/generate_board.py](training/calibration/generate_board.py) | Génère un PNG ChArUco prêt à imprimer (DPI configurable) |
+| [training/calibration/probe_charuco.py](training/calibration/probe_charuco.py) | Probe diagnostique single-frame |
+| [training/calibration/probe_astra.py](training/calibration/probe_astra.py) | Probe Astra 15s (4 modes : raw / CLAHE / swap-RB / swap-RB+CLAHE) |
+| [training/calibration/cam_0.npz](training/calibration/cam_0.npz) · [.meta.json](training/calibration/cam_0.meta.json) | **K mesuré cam_0** : fx=525.67 fy=529.70 cx=317.73 cy=226.00 (RMS 0.67 px, 18 vues) |
+| [training/calibration/cam_3.npz](training/calibration/cam_3.npz) · [.meta.json](training/calibration/cam_3.meta.json) | **K mesuré cam_3** : fx=496.31 fy=494.14 cx=313.37 cy=248.01 (RMS 0.68 px, 21 vues) |
+
 ### 🏗️ Architecture
 | Document | Description |
 |----------|-------------|
@@ -88,5 +99,5 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 
 ---
 
-**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3)
-**Mise à jour :** 28 avril 2026 (PM) — test cheap d'inclusion cam3 dans le mix : signal clair, calibration cam3 nécessaire pour v3
+**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3) · 1.14.0-pre (calibration cam0/cam3 mesurée — `feature/calibration-cam`)
+**Mise à jour :** 28 avril 2026 (soir) — calibration intrinsèque cam_0 + cam_3, finding fx=610 du dataset DREAM faux de ~14 % vs caméras physiques
