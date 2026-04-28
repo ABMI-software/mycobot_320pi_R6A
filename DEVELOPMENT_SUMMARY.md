@@ -347,7 +347,8 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 - [x] **Téléopération main → bras réel** validée sur le MyCobot 320 Pi physique (22/04/2026, gains 1.2/1.2/1.6/0.25, latence ~150–250 ms)
 - [x] Procédure de validation **sim-only** documentée — [`docs/TELEOP_SIM_TESTING.md`](docs/TELEOP_SIM_TESTING.md)
 - [x] **Évaluation finale du modèle mixte** sur réel + synth + relaxed (28/04/2026) — voir [`CHANGELOG.md` § 1.12.0](CHANGELOG.md). Verdict : 47.3 % réel / 91.9 % synth, distal keypoints (link4-6) = bottleneck restant.
-- [ ] **Capturer 5–10 K poses réelles bras-étendu** + retrain mixte v2 (cible : ≥ 70 % détection sur réel) — étape suivante
+- [x] **Test cheap d'ajout cam3** dans le mix (extrinsèques approximatives, 25 epochs) — voir [`CHANGELOG.md` § 1.13.0](CHANGELOG.md). Verdict : trade-off cam0↔cam3 sans gain net, calibration cam3 nécessaire.
+- [ ] **Calibrer cam0 + cam3** (chessboard OpenCV) puis retrain v3 — étape suivante
 - [ ] **Self-supervised labeling** : FK + caméra calibrée → annotations GT automatiques sur réel
 - [ ] Fine-tune sur données réelles auto-annotées
 
@@ -704,6 +705,11 @@ cd /tmp/DREAM && pip install -e . -r requirements.txt
 | DREAM eval (b) strict synth val — 91.9 % det | 28/04/2026 | ✅ Régression -6.4 pts contrôlée |
 | DREAM eval (c) relaxed réel — 48.0 % det | 28/04/2026 | ❌ Médianes explosées (peaks low-conf = bruit) |
 | Diagnostic distal keypoints (link4-6) bottleneck | 28/04/2026 | ✅ Cf. CHANGELOG 1.12.0 + SESSION_RESUME |
+| Convert cam3 → NDDS (extrinsèques approximatives) | 28/04/2026 PM | ✅ 2000 frames |
+| Eval croisée v1 sur cam3 — 25.1 % / 237 px | 28/04/2026 PM | ⚠️ Zéro cross-view generalization |
+| Build `mixed_v2_cam03` (18K = cam0 ×3 + cam3 ×3 + 6K synth) | 28/04/2026 PM | ✅ |
+| Retrain v2 25 epochs (2h35) | 28/04/2026 PM | ✅ Val 0.000356 |
+| Eval v2 cam0 / cam3 / synth | 28/04/2026 PM | 🟰 Trade-off cam0↔cam3, calibration cam3 nécessaire pour v3 |
 | Domain randomization v2/v3 (worlds) | 15/04/2026 | ✅ OK |
 | Documentation ARCHITECTURE.md rewrite | 16/04/2026 | ✅ OK |
 | Gripper adaptatif intégré (pro_adaptive_gripper) | 15/04/2026 | ✅ OK |

@@ -88,5 +88,5 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 
 ---
 
-**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.12.0 (DREAM eval finale)
-**Mise à jour :** 28 avril 2026 — DREAM eval finale (3 splits) sur le checkpoint mixte e50, diagnostic distal keypoints confirmé
+**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3)
+**Mise à jour :** 28 avril 2026 (PM) — test cheap d'inclusion cam3 dans le mix : signal clair, calibration cam3 nécessaire pour v3

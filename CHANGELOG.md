@@ -7,6 +7,78 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.13.0] - 2026-04-28 (après-midi)
+
+### 🧪 DREAM — test cheap d'ajout de cam3 dans le mix (extrinsèques approximatives)
+
+Hypothèse à valider : la 2ᵉ caméra réelle (`cam3`, vue latérale) — restée hors du mix v1 parce que ses extrinsèques n'étaient pas calibrées — pourrait débloquer les distal keypoints (link4–link6) en exposant le modèle à une vue où le foreshortening n'écrase pas le bras. Test "cheap" : on réutilise les extrinsèques approximatives existantes dans `convert_to_ndds.py` (sans calibration chessboard) et on retrain pour voir le signal.
+
+### Ajouté
+
+- `/tmp/dream_data/real_cam3` — 2000 frames NDDS générées via `convert_to_ndds.py --source real --cameras cam3` avec les extrinsèques approximatives (`xyz=(0, 0.5, 0.3)`, `rpy=(0, 0.2, -π/2)`) et fx=610 partagé avec cam0.
+- `/tmp/dream_data/mixed_v2_cam03` — mix par symlinks : 2K cam0 ×3 + 2K cam3 ×3 + 6K synth subset = 18K total (même taille que `mixed_real_synth` v1 pour comparaison directe).
+- `training/checkpoints_dream/vgg_mixed_v2_cam03/` — checkpoint après 25 epochs (2h35 sur RTX 4000 Ada). Train loss finale 0.000256, val loss 0.000356 (vs v1 e25 val=0.000334 — légèrement plus haut, cohérent avec annotations cam3 bruitées).
+
+### Mesuré (3 évaluations sur le même checkpoint v2)
+
+| Eval | v1 (`vgg_mixed_real_synth` e50) | **v2 (`vgg_mixed_v2_cam03` e25)** | Δ |
+|------|----------------------------------|------------------------------------|---|
+| cam0 strict (real_cam0 split=all) | 47.3 % det · 2.78 px med | **40.2 %** det · 2.77 px med | **-7.1 pts** ⚠️ |
+| cam3 strict (real_cam3 split=all) | 25.1 % det · 237 px med ❌ | **35.1 %** det · **2.75 px** med (proximaux) | **+10 pts det**, erreur OVERALL ÷22 ✅ |
+| synth val (synthetic split=val 1000f) | 91.9 % det · 2.72 px med | **93.1 %** det · 2.93 px med | +1.2 pts ✅ |
+
+#### Détail per-keypoint v2 sur cam0
+
+| Keypoint | v1 e50 | v2 e25 | Note |
+|----------|--------|--------|------|
+| base | 0 % | 0.8 % | non détecté |
+| link1 / link2 | 100 % @ 2.78 | 100 % @ 2.76 | identique |
+| link3 | 88.8 % @ 2.20 | 72 % @ 5.83 | **régression -16.8 pts** |
+| link4 | 35.6 % @ 81 | **3.0 % @ 112** | **effondrement** |
+| link5 | 3.8 % @ 7 | 5.0 % @ 254 | détection ↗, erreur ↗↗ |
+| link6 | 3.0 % @ 62 | 0.6 % @ 293 | régression nette |
+
+#### Détail per-keypoint v2 sur cam3
+
+| Keypoint | baseline (v1 sur cam3) | v2 e25 |
+|----------|------------------------|--------|
+| base | 2.2 % @ 249 | 0.4 % @ 312 |
+| link1 / link2 | 1.6–1.8 % @ 95 | **100 % @ 2.75** ✅ |
+| link3 | 20.4 % @ 167 | **41.2 % @ 5.68** ✅ |
+| link4 | 48.6 % @ 210 | 0.8 % @ 235 |
+| link5 | 50 % @ 240 | 2.6 % @ 243 |
+| link6 | 51 % @ 330 | 0.6 % @ 291 |
+
+Logs : `/tmp/eval_v2_cam0.log`, `/tmp/eval_v2_cam3.log`, `/tmp/eval_v2_synth.log`, `/tmp/eval_cam3_baseline.log` (eval croisée du v1 sur cam3, point de référence).
+
+### Verdict
+
+- ✅ **Le modèle PEUT apprendre cam3** : link1 et link2 passent de 1.6 % à 100 % détection avec une médiane 2.75 px (équivalent cam0). La preuve que les images cam3 contiennent l'info utile pour le pipeline DREAM.
+- ✅ **Le synth ne souffre pas** (+1.2 pts) — le doublement de la diversité réelle n'a pas écrasé les features synthétiques.
+- ⚠️ **Mais cam0 régresse de 7 pts** sur les distal (link3 -16.8, link4 -32.6, link5/link6 effondrés). Le modèle a appris du bruit dans les annotations cam3 et ce bruit s'est propagé sur les distal partout.
+- 🟰 **Bilan net** : on échange perf cam0 contre perf cam3 sans gain global. Le test cheap a délivré son signal : **les extrinsèques cam3 approximatives sont effectivement load-bearing**.
+
+### Décision pour la prochaine session
+
+**Calibrer cam3 proprement** (chessboard OpenCV pour intrinsèques + extrinsèques mesurées physiquement ou par PnP sur le checkpoint v1) **avant le retrain v3**. Sinon on plafonnera autour de 35–40 % per-cam avec des trade-offs cam0↔cam3 systématiques.
+
+Plan v3 (post-calibration) :
+
+1. Calibration chessboard cam0 + cam3 (5 min/cam, OpenCV).
+2. Mesure ou PnP des extrinsèques cam3 par rapport à la base du robot.
+3. Refactor `convert_to_ndds.py` : `REAL_CAMERA_INTRINSICS` devient par-cam (dict `{cam0: K0, cam3: K3}`), update `REAL_CAMERA_TRANSFORMS["cam3"]` avec les valeurs mesurées.
+4. Régénérer `real_cam0_v3` + `real_cam3_v3` avec les bonnes annotations.
+5. Build `mixed_v3` : même structure (2K cam0 ×3 + 2K cam3 ×3 + 6K synth = 18K).
+6. Retrain 50 epochs (au lieu de 25 — la val loss n'avait pas plateauté).
+7. Cible : ≥ 50 % cam0 + ≥ 50 % cam3 simultanément.
+
+### Inchangé
+
+- Aucune modification de code dans `mycobot_gateway` ni `mycobot_description`. Pipeline pick-and-place, sorting, téléop : intacts.
+- Le checkpoint `vgg_mixed_real_synth` (v1 e50, baseline 47.3 % cam0) reste celui à utiliser pour toute inférence en attendant v3.
+
+---
+
 ## [1.12.0] - 2026-04-28
 
 ### 🧪 DREAM — évaluation finale du modèle mixte sur tous les splits
