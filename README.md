@@ -1,17 +1,37 @@
 # MyCobot 320 Pi — ROS2 Control & Vision-Based Pose Estimation
 
-**Plateforme complète pour contrôle robotique et estimation de pose par vision CNN**
+**Plateforme de recherche pour le MyCobot 320 Pi 6-DoF — substrat d'un POC ABMI digital-twin / VLA / AI-physics**
 
-Ce projet intègre :
-- Un **bridge ROS2 TCP** pour contrôler un MyCobot 320 Pi depuis un PC distant
-- Une **simulation Gazebo Harmonic** avec gripper adaptatif, 4 caméras et domain randomization
-- Un **pipeline ML DREAM** : keypoint detection (VGG-19) → belief maps → PnP → pose 3D
-- Une **téléopération par la main** (Wilor + Orbbec Astra) avec dashboard de tuning et rapport Excel — adapté du pipeline R5A / LeRobot. **Pipeline validé sur robot physique le 22/04/2026**
-- Des **datasets** synthétiques (Gazebo, 50K frames) et réels (caméras Pi, 4K images) via Git LFS
+Ce dépôt intègre :
+- Un **bridge ROS2 TCP** Tour ↔ Raspberry Pi pour contrôler le robot physique (`10.10.0.223`)
+- Un **digital twin Gazebo Harmonic** : URDF + gripper adaptatif + 4 caméras + worlds randomisés
+- Un **pipeline DREAM** (NVlabs) de pose-estimation par keypoints : VGG-19 → belief maps → PnP → pose 6-DoF
+- Une **téléopération par la main** (Astra → Wilor → rosbridge → JTC) avec dashboard ABMI 3-onglets et performance analyzer Excel — *validée sur robot physique le 22/04/2026*
+- Un **pipeline pick-and-place + sorting 4 couleurs** en simulation (`pick_and_place.launch.py`, `sorting_orchestrator`)
+- Une **calibration intrinsèque ChArUco** des caméras (cam_0, cam_3, Astra) avec auto-save et rejet d'outliers — *cam_0 + cam_3 mesurées le 28/04/2026*
+- Des **datasets** Git LFS : 50 K synth (Gazebo, randomized v1/v2) + 4 K réels (Arducam Pi cam_0/cam_3)
 
-> Pour reprendre le développement, voir [`SESSION_RESUME.md`](SESSION_RESUME.md)
-> Documentation technique détaillée dans [`DEVELOPMENT_SUMMARY.md`](DEVELOPMENT_SUMMARY.md)
-> Pour la téléopération (pipeline, filtres, dashboard, rapport de perf) : [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md)
+> Pour reprendre le développement → [`SESSION_RESUME.md`](SESSION_RESUME.md)
+> Roadmap POC (Isaac Sim, VLA, AI physics) → [`CLAUDE.md § POC direction`](CLAUDE.md)
+> Manuel téléop → [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) · Manuel calibration → [`docs/CAMERA_CALIBRATION.md`](docs/CAMERA_CALIBRATION.md)
+
+---
+
+## 📑 Table des matières
+
+- [Architecture](#-architecture) — diagramme des 3 chemins de commande (GUI/CLI · téléop main · vision DREAM)
+- [Packages & Composants](#-packages--composants) — `mycobot_gateway`, `mycobot_description`, `training/`, `teleop/`, `datasets/`, `scripts/`, `docs/`
+- [Quick Start](#-quick-start) — prérequis, installation, démarrage robot + contrôles + sorting
+- [Pipeline Vision / Pose Estimation](#-pipeline-vision--pose-estimation) — DREAM, résultats par checkpoint, tests réalisés, pistes pour la suite
+- [Datasets](#-datasets) — synthétique 50 K + réel 4 K via Git LFS
+- [Modes de Contrôle](#-modes-de-contrôle) — GUI · sliders · clavier · CLI · sync RViz
+- [Téléopération par la main](#%EF%B8%8F-téléopération-par-la-main) — pipeline Astra→Wilor→robot avec validation physique
+- [Pick-and-place (Gazebo)](#-pick-and-place-gazebo) — pipeline mono + sorting 4 couleurs
+- [Structure du Projet](#-structure-du-projet) — arborescence complète
+- [Configuration Réseau](#-configuration-réseau) — IP Tour ↔ Pi, ports TCP
+- [Troubleshooting](#%EF%B8%8F-troubleshooting) — conda/ROS2, TCP, Git LFS
+- [Documentation](#-documentation) — index des fichiers `docs/`
+- [License](#-license) · [Contributeurs](#-contributeurs)
 
 ---
 
@@ -345,7 +365,7 @@ python /tmp/DREAM/scripts/train_network.py \
 
 ---
 
-## � Datasets
+## 💾 Datasets
 
 > ⚠️ Les images sont stockées via **Git LFS**. Après `git clone`, exécutez `git lfs pull`.
 
