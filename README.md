@@ -301,13 +301,17 @@ Image 640×480 → VGG-19 → 6 stages cascadés → 7 belief maps 100×100
 | Build `mixed_v2_cam03` (cam0 + cam3 + synth) | 28/04/2026 PM | ✅ 18K symlinks |
 | Retrain v2 25 epochs sur mixed_v2_cam03 | 28/04/2026 PM | ✅ 2h35, val=0.000356 |
 | Eval v2 cam0 / cam3 / synth | 28/04/2026 PM | 🟰 cam0 -7.1 pts, cam3 +10 pts, synth +1.2 pts |
+| **Calibration intrinsèque cam_0 + cam_3** (ChArUco) | 28/04/2026 soir | ✅ cam_0 RMS 0.67 px / cam_3 RMS 0.68 px — voir [docs/CAMERA_CALIBRATION.md](docs/CAMERA_CALIBRATION.md) |
+| **Finding K dataset DREAM** | 28/04/2026 soir | ❌ `fx=fy=610` du `_camera_settings.json` faux de ~14 % vs caméras physiques (cam_0: fx=525.67) — cause probable du gap distal |
 
 ### Pistes pour la suite
 
 > Mise à jour 28/04/2026 (PM) : test cheap cam0+cam3 fait. Verdict = **calibrer cam3 avant tout retrain v3**. Sans calibration on échange perf cam0 contre perf cam3 sans gain global.
+>
+> Mise à jour 28/04/2026 (soir) : **points 1 + 2 faits** sur la branche `feature/calibration-cam`. cam_0 mesurée à fx=525.67 fy=529.70 cx=317.73 cy=226.00 (RMS 0.67 px) ; cam_3 mesurée à fx=496.31 fy=494.14 cx=313.37 cy=248.01 (RMS 0.68 px). Le `fx=fy=610` du `_camera_settings.json` du dataset DREAM est **faux de ~14 %** par rapport aux deux Arducams physiques — c'est probablement la cause majeure du gap distal observé en 1.11.0/1.12.0. Voir [`docs/CAMERA_CALIBRATION.md`](docs/CAMERA_CALIBRATION.md). Astra **différée** (logistique : board jamais dans le frame, FOV trop large, capteur RGB trop "soft" pour les patterns 4×4 — à refaire avec setup mural fixe).
 
-1. **🔴 Calibrer cam3** (chessboard OpenCV pour intrinsèques + extrinsèques mesurées physiquement ou par PnP sur le checkpoint v1).
-2. **🔴 Calibrer cam0** par la même occasion (vérifier fx=610).
+1. ~~**🔴 Calibrer cam3**~~ ✅ fait — `training/calibration/cam_3.{npz, meta.json}` (RMS 0.68 px, 21 vues).
+2. ~~**🔴 Calibrer cam0**~~ ✅ fait — `training/calibration/cam_0.{npz, meta.json}` (RMS 0.67 px, 18 vues). **Confirmé** : `fx=610` du dataset est faux.
 3. **🔴 Refactor `training/dream/convert_to_ndds.py`** : `REAL_CAMERA_INTRINSICS` devient un dict par-cam, `REAL_CAMERA_TRANSFORMS["cam3"]` mis à jour avec les valeurs calibrées.
 4. **🔴 Régénérer `real_cam0_v3` + `real_cam3_v3`** + build `mixed_v3` (18K même structure que v2).
 5. **🔴 Retrain v3 50 epochs** (vs 25 en v2 — la val loss n'avait pas plateauté). **Cible** : ≥ 50 % cam0 + ≥ 50 % cam3 simultanément.
