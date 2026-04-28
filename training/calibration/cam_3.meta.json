@@ -1,0 +1,63 @@
+{
+  "name": "cam_3",
+  "created_at_epoch_s": 1777384156.8639638,
+  "camera_index": 0,
+  "preset": "arducam",
+  "resolution": [
+    640,
+    480
+  ],
+  "dictionary": "DICT_4X4_1000",
+  "board": {
+    "squares_x": 6,
+    "squares_y": 9,
+    "square_length_m": 0.03,
+    "marker_length_m": 0.024
+  },
+  "capture": {
+    "min_markers": 6,
+    "min_charuco": 12,
+    "min_sharpness": 80.0,
+    "grid_cols": 4,
+    "grid_rows": 3,
+    "max_per_cell": 4
+  },
+  "results": {
+    "rms_reprojection_error_px": 0.6779964787032801,
+    "accepted_views": 21,
+    "fx": 496.307502700341,
+    "fy": 494.142967106682,
+    "cx": 313.37381079861257,
+    "cy": 248.00566176810372,
+    "dist_coeffs": [
+      5.399640617927605,
+      18.846349148011207,
+      -0.007850835931329425,
+      -0.01512005797204871,
+      -48.22688992042555,
+      5.16254192619812,
+      18.290971544217406,
+      -46.55038368896115,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "settings_applied": {
+    "auto_exposure": "off",
+    "exposure": 80.0,
+    "gain": 0.0,
+    "auto_wb": "off",
+    "wb_temperature": 4600.0,
+    "autofocus": "off",
+    "focus": 50.0,
+    "brightness": null,
+    "contrast": null,
+    "saturation": null,
+    "sharpness": null,
+    "fourcc": null
+  }
+}
