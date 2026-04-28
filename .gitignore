@@ -45,3 +45,4 @@ training/dream/checkpoints_dream/
 *.pkl
 *.onnx
 .claude/scheduled_tasks.lock
+training/calibration/__pycache__/

@@ -1,8 +1,8 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 28 avril 2026 (après-midi — test cheap cam3 dans le mix, signal clair mais calibration manquante)
-> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3)
-> **Branche active :** `main`
+> **Date de dernière mise à jour :** 28 avril 2026 (soir — calibration intrinsèque cam_0 + cam_3 mesurée)
+> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3) · 1.14.0-pre (calibration intrinsèque)
+> **Branche active :** `feature/calibration-cam` (à reprendre demain pour points 2 et 3)
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.223` (pas `.225` comme certains anciens docs)
 
@@ -20,7 +20,70 @@ source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
 
 ---
 
-## État actuel (28 avril 2026 — après-midi)
+## État actuel (28 avril 2026 — soir)
+
+### 🧭 Reprise pour demain — lire en premier
+
+Branche active : **`feature/calibration-cam`**. Deux Arducams calibrées (intrinsèques mesurés). Plan validé :
+
+- **Point 2 — Régénérer les GT** du dataset `/tmp/dream_data/real_cam0/` avec les K mesurés au lieu des `fx=fy=610` codés en dur. Les fichiers JSON NDDS contiennent les `projected_location` calculées avec la mauvaise matrice. À recalculer avec FK + nouveaux `K`. Voir [`training/dream/convert_to_ndds.py`](training/dream/convert_to_ndds.py).
+- **Point 3 — Ré-évaluer DREAM** sur le dataset GT-corrigé. Si la détection link4-6 monte significativement, l'écart `fx=610` était la cause majeure. Sinon → collecte v2.
+- **Différé** — Calibration Astra. Logistique trop fragile aujourd'hui. À refaire en session dédiée avec board fixé au mur + Astra sur trépied.
+
+### Ce qui a été accompli aujourd'hui (28/04 soir)
+
+#### 1. Tooling de calibration intrinsèque
+
+Branche `feature/calibration-cam` créée. Sous [`training/calibration/`](training/calibration/) :
+
+- `calibrate_camera.py` — calibrateur ChArUco (UVC ou OpenNI) avec gating qualité (markers + sharpness + coverage grid + diversité temporelle), rejet d'outliers per-view-error, **auto-save** quand target atteint, **save-on-quit** fallback ≥ 12 vues, support `--source v4l2` (Arducam) et `--source astra` (via wrapper OpenNI). CLAHE optionnel (`--clahe`).
+- `generate_board.py` — génère un PNG ChArUco à imprimer aux dimensions exactes (DPI configurable).
+- `probe_charuco.py` — probe diagnostique single-frame (a servi à débusquer 2 régressions cv2 4.6 : `DetectorParameters()` et `CharucoBoard((sx,sy),...)` segfault — fix par fallback legacy `_create()`).
+- `probe_astra.py` — probe spécifique Astra (4 modes : raw, CLAHE, swap-RB, swap-RB+CLAHE) sur 15 s.
+
+#### 2. Calibrations mesurées
+
+| Caméra | Vues | RMS px | fx | fy | cx | cy | Note |
+|--------|------|--------|----|----|----|----|------|
+| **cam_0** | 18 | **0.67** | 525.67 | 529.70 | 317.73 | 226.00 | — |
+| **cam_3** | 21 | **0.68** | 496.31 | 494.14 | 313.37 | 248.01 | premier essai cy=42 archivé en `cam_3.bad.*` |
+
+Outputs : `training/calibration/cam_{0,3}.{npz,meta.json,snapshot.png}`.
+
+#### 3. Comparaison avec le dataset DREAM — **finding majeur**
+
+| Param | Dataset existant | cam_0 mesuré | cam_3 mesuré | Écart |
+|-------|------------------|--------------|---------------|-------|
+| fx | 610 | 525.67 | 496.31 | **−13.8 % (cam_0)** |
+| fy | 610 | 529.70 | 494.14 | **−13.2 %** |
+| cx | 320 | 317.73 | 313.37 | −0.7 % |
+| cy | 240 | 226.00 | 248.01 | **−5.8 %** |
+
+**Implication** : les `projected_location` GT du dataset `real_cam0` ont été calculées avec un `fx=610` qui ne correspond à AUCUNE caméra physique. Pour un point 3D à distance D, le pixel projeté est **faux d'un facteur ~14 %**. Cette erreur croît avec la distance au centre image → cohérent avec les link4-6 (loin du centre quand le bras est étendu) à 3-36 % de détection en 1.12.0. Le réseau a entraîné sur des **GT erronés** sur les distal — il ne peut pas converger sur les bonnes positions.
+
+**Probablement la cause majeure** du gap distal. Si la régénération GT débloque ça, pas besoin de capturer un nouveau dataset.
+
+#### 4. Calibration Astra — différée
+
+Tentatives multiples sans succès :
+- 640×480 RGB888 standard : 5-6 markers détectés sur 27 → trop peu pour `interpolateCornersCharuco`
+- 1280×720 RGB888 @30 fps : USB 2.0 saturé (663 Mbps > 480 disponibles) → image corrompue (rayures multicolores)
+- 1280×720 RGB888 @15 fps : refusé par le firmware Astra (seulement @30 fps listé pour cette résolution)
+- 1280×720 GRAY8 @30 fps : démarre, mais grabber freeze sans frames après quelques secondes
+- `findChessboardCorners` + `findChessboardCornersSB` : 0 corners (capteur Astra trop "soft" pour le damier ou board hors champ pendant que l'utilisateur tape au clavier)
+
+Custom HD grabber compilé dans `/tmp/oni_grabber_hd.cpp` (non committed). À reprendre avec setup physique stable (board mural fixe, Astra sur trépied).
+
+### Prochaines actions
+
+1. **🔴 Régénérer les GT** du dataset `real_cam0` avec K cam_0 mesurés. Recalculer `projected_location` via FK + `cv2.projectPoints(..., K, dist)`.
+2. **🔴 Ré-évaluer DREAM** sur GT-corrigé avec checkpoint e50. Comparer link4-6 detection.
+3. **🟡 Si gap subsiste** : retrain mixte v2 sur dataset corrigé (×5 oversample + 8K synth).
+4. **🟢 Plus tard** : calibration Astra avec setup stable.
+
+---
+
+## État précédent (28 avril 2026 — après-midi)
 
 ### 🧭 Reprise pour la prochaine session — lire en premier
 
