@@ -205,10 +205,13 @@ Le projet utilise **deux approches** de pose estimation, la seconde (DREAM) éta
   Image → VGG-19 → 7 belief maps → keypoints 2D → PnP → pose
 
   VGG synth-only 20K : 97% det synth, 3.1px médiane ✅
-  VGG synth-only 50K : 98.3% det synth, 3.15px ✅ / 13.2% det réel ❌
-  VGG mixte 18K (10K réel ×5 + 8K synth, 50 epochs) : entraîné ✅
-        → évaluation real-world en cours
+  VGG synth-only 50K : 98.3% det synth, 3.15px ✅ / 26% det réel ❌
+  VGG mixte 18K (10K réel ×5 + 8K synth, 50 epochs) :
+        synth val : 91.9% det, 2.72px médiane ✅ (régression -6.4 pts vs synth-only, contrôlée)
+        réel all  : 47.3% det, 2.78px médiane proximaux ✅✅ (+21 pts vs synth-only)
+        bottleneck restant : link4-6 sur réel (link6 à 3.0% / 61.6 px médiane)
   Fine-tune custom (σ=4 / σ=2)  : ❌ deux échecs documentés
+  Relaxed thresholding (peak=0.001) : ❌ +0.7 pt det mais médianes explosées (peaks low-conf = bruit)
 ```
 
 ### Approche DREAM (active)
@@ -228,11 +231,35 @@ Image 640×480 → VGG-19 → 6 stages cascadés → 7 belief maps 100×100
 | Modèle | Dataset entraînement | Eval synth | Eval réel | Notes |
 |--------|----------------------|------------|-----------|-------|
 | VGG base (synth-only) | 20K synth (5K poses × 4 vues) | 97% det · 3.1 px | ~26% det | val=0.000438, baseline DREAM |
-| VGG augmenté (synth-only) | 20K synth + augmentation aggressive | 97% det · 3.1 px | 22.9 → 25.7% det | val=0.000667, gain marginal |
-| VGG weighted (50K synth) | 50K synth + loss pondérée par keypoint | **98.3% det · 3.15 px** | **13.2% det · 172 px** | meilleure perf synth, gap sim-to-real majeur |
+| VGG augmenté (synth-only) | 20K synth + augmentation agressive | 97% det · 3.1 px | 22.9 → 25.7% det | val=0.000667, gain marginal |
+| VGG weighted (50K synth) | 50K synth + loss pondérée par keypoint | **98.3% det · 3.15 px** | **26% det · 128 px** | meilleur perf synth, gap sim-to-real majeur |
 | VGG fine-tune v1 (σ=4) | 2K réel, single-stage | — | **0% det** | ❌ pics belief écrasés, modèle mort |
 | VGG fine-tune v2 (σ=2) | 2K réel, MSE direct | — | **0% det** | ❌ belief maps effondrées (max ≈ 0) |
-| **VGG mixte (DREAM natif)** | **18K = 2K réel ×5 + 8K synth, 50 epochs** | _en cours_ | **🔄 à évaluer** | val=0.000474 dès epoch 1 — checkpoint dispo |
+| **VGG mixte (DREAM natif, e50)** | **18K = 2K réel ×5 + 8K synth, 50 epochs** | **91.9% det · 2.72 px** | **47.3% det · 2.78 px (proximaux)** | ✅ **+21 pts réel** vs synth-only, régression contrôlée -6.4 pts sur synth |
+| └─ relaxed (peak_thresh=0.001) | (même checkpoint, threshold abaissé) | — | 48.0% det · base 328 px ⚠️ | ❌ peaks low-conf = bruit, hypothèse réfutée |
+
+**Détail eval mixte e50 sur réel par keypoint** (28/04/2026, 500 frames de `real_cam0`) :
+
+| Keypoint | Det% | Médiane px | Note |
+|----------|------|------------|------|
+| base | 0 % | n/a | baseline pas détecté en mode strict |
+| link1 / link2 | 100 % | 2.78 / 2.79 | ✅ proximaux parfaits |
+| link3 | 88.8 % | 2.20 | ✅ |
+| link4 | 35.6 % | 81.23 | ⚠️ bottleneck distal |
+| link5 | 3.8 % | 7.28 | ⚠️ |
+| link6 (EE) | 3.0 % | 61.6 | ⚠️ |
+
+**Détail eval mixte e50 sur synth val** (1000 frames de `synthetic`) :
+
+| Keypoint | Det% | Médiane px |
+|----------|------|------------|
+| base / link1 / link2 | 99.9–100 % | 2.54–2.62 |
+| link3 | 94.4 % | 6.68 |
+| link4 | 90.1 % | 10.40 |
+| link5 | 85.7 % | 13.48 |
+| link6 (EE) | 73.2 % | 18.59 |
+
+> Adéquation pick-and-place (cible ±5 mm) : ✅ proximaux sur réel (2–3 px ≈ 3–5 mm) · ❌ distal sur réel encore loin du seuil. Sur synth, link3-6 utilisables uniquement pour de la téléopération souple, pas pour du pick précis.
 
 **Métriques par keypoint sur le meilleur synth-only (VGG-aug, eval synthétique)** :
 
@@ -264,21 +291,24 @@ Image 640×480 → VGG-19 → 6 stages cascadés → 7 belief maps 100×100
 | Fine-tune custom v2 (σ=2) | 16/04/2026 | ❌ belief effondrées |
 | Dataset mixte 18K créé (2K×5 + 8K) | 16/04/2026 | ✅ |
 | Training mixte natif 50 epochs | 16/04/2026 | ✅ checkpoint sauvegardé |
-| **Évaluation modèle mixte sur réel** | _à venir_ | 🔄 ROUGE — étape bloquante |
+| Resume training e25→e50 (option 1) | 23/04/2026 | ⚠️ détection inchangée 47.3 %, val loss plafond |
+| **Eval finale (a) strict réel** | 28/04/2026 | ✅ 47.3 % confirmé |
+| **Eval finale (b) strict synth val** | 28/04/2026 | ✅ 91.9 % — régression -6.4 pts contrôlée |
+| **Eval finale (c) relaxed réel** | 28/04/2026 | ❌ 48.0 % mais médianes explosées |
 
 ### Pistes pour la suite
 
-1. **🔴 Évaluer le checkpoint mixte** sur `real_cam0` — premier indicateur si l'oversampling 5× a comblé le domain gap (cible : ≥ 50% détection sur réel) :
-   ```bash
-   source ~/ros_jazzy/venv_dream/bin/activate
-   python training/dream/evaluate_dream.py \
-     --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
-     --data /tmp/dream_data/real_cam0 --split all
-   ```
-2. **🔴 Si détection < 50% sur réel** → self-supervised labeling : utiliser les angles lus du robot + FK + intrinsèques caméra pour générer automatiquement des keypoints GT sur des images réelles, puis fine-tune sur ces annotations auto.
-3. **🟡 Vérifier la collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/` (worlds randomized_v2 — 6 lights, 12 clutter objects) et lancer un training combiné v2 + réel.
-4. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — substitution de Gazebo par Isaac Sim + Isaac Lab pour rendu photoréaliste, devrait fermer le gap sim-to-real à la racine plutôt que par oversampling.
-5. **🟢 Bench pose-driven pick-and-place sur robot réel** une fois la détection stabilisée — réutiliser le pipeline `pick_and_place_node.py` (déjà validé en sim) avec la pose DREAM en boucle de feedback.
+> Mise à jour 28/04/2026 : éval finale faite. Verdict = **option 2 (collecte poses bras-étendu)** est désormais la priorité. Hypothèse "filtre de confiance trop strict" définitivement réfutée par l'éval relaxed.
+
+1. **🔴 Adapter `training/capture_real.py`** — biaiser le sampler vers `|j2| < 30°` + `j3 ∈ [60°, 110°]` (configs où link4-6 sont visibles et bien séparés sur la grille pixel), garder le FK safety actuel.
+2. **🔴 Capturer 5–10 K poses réelles** sous `/tmp/dream_data/real_cam0_v2/` (séparé du v1 pour rester comparable au baseline 47.3 %).
+3. **🔴 Merger** `real_cam0_v2` (×5 oversample) + `synthetic` subset → `mixed_v2` via `training/dream/merge_and_convert.py`.
+4. **🔴 Retrain mixte v2** (50 époques, DREAM natif). **Cible** : détection ≥ 70 % tous keypoints sur réel, link6 médiane ≤ 10 px (seuil minimum pour pose-driven pick-and-place sur robot réel).
+5. **🟡 Si retrain v2 < 70 %** → fallback self-supervised labeling : FK + angles joints lus → keypoints 3D → projection 2D → annotations GT automatiques sur images réelles → fine-tune sur ces annotations auto.
+6. **🟡 Vérifier collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/` (worlds `randomized_v2.sdf` — 6 lights, 12 clutter objects).
+7. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — Isaac Sim + Isaac Lab pour rendu photoréaliste, devrait fermer le gap sim-to-real à la racine plutôt que par oversampling.
+8. **🟢 Tester l'inférence DREAM en sim Gazebo** (`pick_and_place.launch.py`) avec le checkpoint mixte actuel — devrait être nettement meilleur que le synth-only sur les link4-6.
+9. **🟢 Bench pose-driven pick-and-place sur robot réel** une fois la détection ≥ 70 %.
 
 ### Entraînement DREAM (natif)
 

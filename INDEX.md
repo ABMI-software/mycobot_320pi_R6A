@@ -88,5 +88,5 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 
 ---
 
-**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.7.0 (legacy DREAM)
-**Mise à jour :** 23 avril 2026 — merge `feature/teleoperation` + `feature/pick-and-place-sorting` → `main`
+**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.12.0 (DREAM eval finale)
+**Mise à jour :** 28 avril 2026 — DREAM eval finale (3 splits) sur le checkpoint mixte e50, diagnostic distal keypoints confirmé

@@ -7,6 +7,54 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.12.0] - 2026-04-28
+
+### 🧪 DREAM — évaluation finale du modèle mixte sur tous les splits
+
+Reprise de l'évaluation après installation des dépendances (`pandas` ajouté à `venv_dream`). Trois passes sur `vgg_mixed_real_synth/best_network.pth` (= e50) couvrent désormais **(a) réel strict, (b) synthétique strict, (c) réel relaxed**, ce qui ferme le diagnostic ouvert depuis 1.11.0.
+
+### Mesuré (3 évaluations, 28/04/2026)
+
+| Eval | Dataset | Split | Frames | Det rate | OVERALL méd. | link6 det% / méd. |
+|------|---------|-------|--------|----------|--------------|--------------------|
+| (a) strict | `real_cam0` | all | 500/2000 | **47.3 %** | 2.78 px | 3.0 % / 61.6 px |
+| (b) strict | `synthetic` | val | 1000/4000 | **91.9 %** | 2.72 px | 73.2 % / 18.59 px |
+| (c) relaxed (peak=0.001) | `real_cam0` | all | 500/2000 | **48.0 %** | 2.78 px | 8.6 % / 170.7 px |
+
+Logs bruts : `/tmp/eval_a_real_strict.log`, `/tmp/eval_b_synth_val.log`, `/tmp/eval_c_real_relaxed.log`.
+
+### Verdict
+
+- **Le mix-training a fonctionné comme attendu** : gain massif sur réel (+21 pts vs synth-only `vgg_weighted_50k_e50` à 26 %) au prix d'une régression contrôlée sur synth (-6.4 pts vs synth-only à 98.3 %). Le modèle n'a *pas* oublié le synth.
+- **Le relaxed thresholding ne débloque rien** : +0.7 pt de détection sur réel, mais base passe à 28 % avec une médiane d'erreur de **328 px** (largeur image = 640) et link6 à 170 px. Les peaks à conf < 0.01 sont du bruit, pas des bonnes prédictions masquées. Hypothèse définitivement réfutée.
+- **Bottleneck identifié** : les *distal keypoints* (link4–link6) restent l'obstacle sur réel. Sur synth val, link6 est déjà à 73.2 % seulement (vs 100 % pour base/link1/link2) — le modèle peine sur les keypoints éloignés du repère même sur du synth, et sur réel cette difficulté s'effondre à 3 %.
+- Conclusion = ce qui était prescrit en 1.11.0 §"Prochaine session" : **enrichir le dataset réel avec des poses bras-étendu** pour exposer le modèle à plus de configurations distal.
+
+### Comparaison avec le baseline synth-only (`vgg_weighted_50k_e50`)
+
+| Métrique | synth-only e50 | **mixte e50** | Δ |
+|----------|----------------|---------------|---|
+| Détection synth val | 98.3 % | 91.9 % | -6.4 pts |
+| Détection réel all | 26.0 % | **47.3 %** | **+21.3 pts** |
+| link6 médiane réel | n/d (5.6 % det) | 61.6 px | gain net en détection mais erreur élevée |
+
+### Ajouté
+
+- `pandas` dans `venv_dream` (utilisé par `evaluate_dream.py` pour exporter les résultats par-keypoint).
+
+### Pas changé
+
+- Aucune modification de code ni de checkpoints. La doc `docs/TELEOP_SIM_TESTING.md`, le pipeline pick-and-place, le pipeline de téléop : intacts.
+
+### Prochaines actions (priorité)
+
+1. **🔴 Capturer 5–10 K poses réelles supplémentaires** biaisées vers bras-étendu (cf. CHANGELOG 1.11.0 §"Prochaine session" pour le plan détaillé). Adapter `training/capture_real.py` pour favoriser `|j2| < 30°` + `j3 ∈ [60°, 110°]` (configurations où link4-6 sont visibles et bien séparés).
+2. **🔴 Retrain mixte v2** sur le dataset enrichi (~30 K frames, 50 epochs natif DREAM).
+3. **🟡 Cible** : détection ≥ 70 % tous keypoints sur réel, link6 médiane ≤ 10 px — seuil minimum pour passer au pose-driven pick-and-place sur robot réel.
+4. **🟢 Optionnel** : tester l'inférence DREAM en sim Gazebo via `ros2 launch mycobot_gateway pick_and_place.launch.py` (le checkpoint mixte y sera meilleur que le synth-only pour les link4-6, à confirmer).
+
+---
+
 ## [1.11.0] - 2026-04-23 (soir)
 
 ### 🎯 Pose estimation — diagnostic complet + option 1 épuisée
