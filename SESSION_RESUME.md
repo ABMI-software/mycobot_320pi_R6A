@@ -1,7 +1,7 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 28 avril 2026 (matin — DREAM eval finale, 3 splits, diagnostic distal confirmé)
-> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.12.0 (DREAM eval finale)
+> **Date de dernière mise à jour :** 28 avril 2026 (après-midi — test cheap cam3 dans le mix, signal clair mais calibration manquante)
+> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3)
 > **Branche active :** `main`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.223` (pas `.225` comme certains anciens docs)
@@ -20,15 +20,23 @@ source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
 
 ---
 
-## État actuel (28 avril 2026 — matin)
+## État actuel (28 avril 2026 — après-midi)
 
 ### 🧭 Reprise pour la prochaine session — lire en premier
 
-DREAM eval finale terminée ce matin. Le checkpoint mixte e50 (`vgg_mixed_real_synth`) est désormais évalué sur les **3 splits attendus**. Verdict + comparaison synth-only ↔ mixte ci-dessous.
+Test cheap d'ajout de cam3 dans le mix terminé. Le retrain v2 (`vgg_mixed_v2_cam03`, 25 epochs sur 18K = 6K cam0 ×3 + 6K cam3 ×3 + 6K synth) a délivré son signal :
 
-**Décision actée** : passer à l'**option 2** = collecte de poses réelles supplémentaires biaisées vers bras étendu. Le chemin (a) reste recommandé : capturer `real_cam0_v2` séparément, merger avec le synthétique → `mixed_v2` → retrain.
+- ✅ **cam3 a appris** (link1/2 passent de 1.6 % à 100 % détection avec 2.75 px médiane)
+- ⚠️ **cam0 a régressé** (47.3 % → 40.2 %, distal effondrés)
+- 🟰 **Bilan net** : on échange perf cam0 contre perf cam3 sans gain global
 
-Avant de capturer, adapter `training/capture_real.py` pour favoriser `|j2| < 30°` + `j3 ∈ [60°, 110°]` (configs où link4-6 sont visibles et bien séparés sur la grille pixel).
+**Conclusion** : les images cam3 contiennent l'info utile, mais les **extrinsèques approximatives** (`xyz=(0, 0.5, 0.3)`, `rpy=(0, 0.2, -π/2)`) sont effectivement load-bearing — elles introduisent du bruit GT qui dégrade les distal partout.
+
+**Décision actée** : passer en chemin (A) propre = **calibrer cam3** (chessboard OpenCV pour intrinsèques + extrinsèques mesurées physiquement ou par PnP sur le checkpoint v1) **avant** le retrain v3.
+
+En parallèle, l'option 2 d'origine (collecte de poses bras étendu sur cam0) reste valide mais devient secondaire — la valeur marginale de plus de cam0 est moindre qu'une 2ᵉ caméra exploitable.
+
+Avant de calibrer, plan v3 détaillé dans CHANGELOG 1.13.0 § "Décision pour la prochaine session".
 
 Commande rapide pour reproduire l'éval (résultats attendus dans le tableau ci-dessous) :
 ```bash
@@ -48,7 +56,29 @@ python training/dream/evaluate_dream_relaxed.py \
   --peak-thresh 0.001 --next-best-score 0.05
 ```
 
-### Ce qui a été accompli aujourd'hui (28/04/2026)
+### Ce qui a été accompli aujourd'hui (28/04/2026 — après-midi)
+
+#### 1. Test cheap : ajout cam3 dans le mix sans calibration
+
+- Génération `/tmp/dream_data/real_cam3` (2000 frames NDDS, extrinsèques approximatives existantes).
+- **Eval croisée préalable** du checkpoint v1 sur cam3 : 25.1 % détection, OVERALL **237 px** d'erreur — confirme que le modèle n'a aucune cross-view generalization.
+- Build `mixed_v2_cam03` (18K = 6K cam0 ×3 + 6K cam3 ×3 + 6K synth, symlinks).
+- Retrain DREAM natif 25 epochs (2h35 sur RTX 4000 Ada). Val loss 0.000356 (vs v1 e25 0.000334 — légèrement plus haute, cohérent avec annotations cam3 bruitées).
+- 3 évals finales :
+
+| Eval | v1 e50 | **v2 e25** | Δ |
+|------|--------|------------|---|
+| cam0 strict | 47.3 % / 2.78 px | **40.2 %** / 2.77 px | -7.1 pts ⚠️ |
+| cam3 strict | 25.1 % / 237 px | **35.1 %** / 2.75 px (proximaux) | +10 pts, erreur ÷22 ✅ |
+| synth val | 91.9 % / 2.72 px | **93.1 %** / 2.93 px | +1.2 pts ✅ |
+
+#### 2. Verdict du test cheap
+
+- ✅ Le modèle apprend cam3 (link1/2 à 100 % @ 2.75 px) — **les images cam3 contiennent l'info utile**.
+- ⚠️ Mais cam0 régresse de 7 pts sur les distal (link3 -16.8, link4 -32.6, link5/link6 effondrés). Les extrinsèques cam3 approximatives propagent du bruit qui dégrade les distal partout.
+- 🟰 **Pas de gain net** : trade-off perf cam0 ↔ perf cam3. La calibration propre devient nécessaire avant le retrain v3.
+
+### Ce qui a été accompli ce matin (28/04/2026 — matin)
 
 #### 1. Dépendances `venv_dream` complétées
 
@@ -274,23 +304,31 @@ Le modèle DREAM VGG atteint **97% de détection à 3.1px médiane** sur les don
 | 28/04/2026 | DREAM eval (b) strict synth val — 91.9 % det | ✅ Régression contrôlée vs synth-only |
 | 28/04/2026 | DREAM eval (c) relaxed réel (peak=0.001) — 48.0 % | ❌ Médianes explosées, hypothèse réfutée |
 | 28/04/2026 | Verdict diagnostic complet : distal keypoints = bottleneck | ✅ Cf. CHANGELOG 1.12.0 |
+| 28/04/2026 (PM) | Convert cam3 → NDDS (extrinsèques approximatives) | ✅ 2000 frames |
+| 28/04/2026 (PM) | Eval croisée v1 sur cam3 : 25.1 % / 237 px d'erreur | ✅ Confirme zéro cross-view generalization |
+| 28/04/2026 (PM) | Build `mixed_v2_cam03` (18K) + retrain 25 epochs | ✅ 2h35, val=0.000356 |
+| 28/04/2026 (PM) | Eval v2 : cam0 -7.1 pts, cam3 +10 pts, synth +1.2 pts | 🟰 Trade-off, calibration cam3 nécessaire |
 
 ### Ce qui reste à faire
 
-> Mise à jour 28/04 : éval finale du checkpoint mixte e50 = **47.3 % réel / 91.9 % synth**, distal keypoints (link4-6) = bottleneck. Le relaxed thresholding ne débloque rien (cf. §"Ce qui a été accompli aujourd'hui"). On passe à l'option 2 (collecte de poses bras étendu).
+> Mise à jour 28/04 (PM) : test cheap cam0+cam3 fait. Signal clair : **cam3 utile mais extrinsèques approximatives load-bearing**. Plan v3 = **calibrer cam3 avant retrain**. Les résultats détaillés sont dans CHANGELOG 1.13.0.
 
-1. **[ROUGE] Adapter `training/capture_real.py`** pour biaiser le sampler vers des poses où les distal keypoints couvrent plus de la grille pixel :
-   - `|j2| < 30°` (épaule pas trop pliée)
-   - `j3 ∈ [60°, 110°]` (avant-bras à l'horizontale ou levé)
-   - garder le FK safety actuel
-2. **[ROUGE] Capturer 5–10 K nouvelles poses** sous `/tmp/dream_data/real_cam0_v2/` (séparé du v1 pour rester comparable au baseline 47.3 %).
-3. **[ROUGE] Merger** `real_cam0_v2` (×5 oversample) + `synthetic` (8K subset) → `mixed_v2` via `training/dream/merge_and_convert.py`.
-4. **[ROUGE] Retrain** mixte v2 (50 époques, DREAM natif) → checkpoint `vgg_mixed_real_synth_v2`.
-5. **[ROUGE] Cible** : détection ≥ 70 % tous keypoints sur réel, link6 médiane ≤ 10 px (seuil minimum pour pose-driven pick-and-place sur robot réel).
-6. **[JAUNE] Vérifier collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/` — utiliser le worlds `randomized_v2.sdf` (déjà en place, plus diverse).
-7. **[JAUNE] Si retrain v2 < 70 %** → fallback self-supervised labeling : FK + angles joints lus → keypoints 3D → projection 2D → annotations GT automatiques sur images réelles → fine-tune sur ces annotations auto.
-8. **[VERT] Tester l'inférence DREAM en sim Gazebo** (`pick_and_place.launch.py`) avec le checkpoint mixte actuel — devrait être nettement meilleur que le synth-only sur les link4-6.
-9. **[VERT] Bench test robot réel** une fois détection > 70 %.
+1. **[ROUGE] Calibrer cam3** :
+   - Intrinsèques : chessboard OpenCV (~5 min, donne fx, fy, cx, cy spécifiques à cam3)
+   - Extrinsèques : soit mesure physique au mètre + équerre, soit PnP sur 1 image de chessboard placée sur la base du robot, soit PnP sur les détections proximales du checkpoint v1 (link1/link2 à 100 % détection sur cam0 → applicable à cam3)
+2. **[ROUGE] Calibrer cam0** par la même occasion (vérification de fx=610) — 5 min de plus.
+3. **[ROUGE] Refactor `training/dream/convert_to_ndds.py`** :
+   - `REAL_CAMERA_INTRINSICS` devient un dict `{cam0: K0, cam3: K3}`
+   - Update `REAL_CAMERA_TRANSFORMS["cam3"]` avec les valeurs calibrées
+   - Utiliser le bon K par cam dans `convert_real()`
+4. **[ROUGE] Régénérer** `real_cam0_v3` + `real_cam3_v3` avec les bonnes annotations.
+5. **[ROUGE] Build `mixed_v3`** : même structure (2K cam0 ×3 + 2K cam3 ×3 + 6K synth = 18K).
+6. **[ROUGE] Retrain 50 epochs** (au lieu de 25 — la val loss n'avait pas plateauté à e25 sur v2). Output : `training/checkpoints_dream/vgg_mixed_v3/`.
+7. **[ROUGE] Cible** : ≥ 50 % cam0 + ≥ 50 % cam3 simultanément, sans le trade-off observé en v2.
+8. **[JAUNE] Si v3 dépasse 50 %** → augmenter dataset (capture poses bras-étendu sur les 2 caméras) puis retrain v4 → cible 70 %.
+9. **[JAUNE] Vérifier collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/` — utiliser le worlds `randomized_v2.sdf`.
+10. **[VERT] Tester l'inférence DREAM en sim Gazebo** (`pick_and_place.launch.py`) avec le checkpoint v1 actuel (toujours le meilleur sur cam0).
+11. **[VERT] Bench test robot réel** une fois détection ≥ 70 %.
 
 ---
 

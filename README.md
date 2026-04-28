@@ -235,8 +235,9 @@ Image 640×480 → VGG-19 → 6 stages cascadés → 7 belief maps 100×100
 | VGG weighted (50K synth) | 50K synth + loss pondérée par keypoint | **98.3% det · 3.15 px** | **26% det · 128 px** | meilleur perf synth, gap sim-to-real majeur |
 | VGG fine-tune v1 (σ=4) | 2K réel, single-stage | — | **0% det** | ❌ pics belief écrasés, modèle mort |
 | VGG fine-tune v2 (σ=2) | 2K réel, MSE direct | — | **0% det** | ❌ belief maps effondrées (max ≈ 0) |
-| **VGG mixte (DREAM natif, e50)** | **18K = 2K réel ×5 + 8K synth, 50 epochs** | **91.9% det · 2.72 px** | **47.3% det · 2.78 px (proximaux)** | ✅ **+21 pts réel** vs synth-only, régression contrôlée -6.4 pts sur synth |
+| **VGG mixte v1 (DREAM natif, e50)** | **18K = 2K cam0 ×5 + 8K synth, 50 epochs** | **91.9% det · 2.72 px** | **47.3% det · 2.78 px (proximaux)** | ✅ **+21 pts réel** vs synth-only, régression contrôlée -6.4 pts sur synth |
 | └─ relaxed (peak_thresh=0.001) | (même checkpoint, threshold abaissé) | — | 48.0% det · base 328 px ⚠️ | ❌ peaks low-conf = bruit, hypothèse réfutée |
+| **VGG mixte v2 (cam0 + cam3, e25)** | **18K = 2K cam0 ×3 + 2K cam3 ×3 + 6K synth** | 93.1% det · 2.93 px | cam0: **40.2%** (-7.1 pts) · cam3: **35.1%** (+10 pts vs eval croisée v1) | 🟰 trade-off cam0↔cam3, extrinsèques cam3 approximatives load-bearing → calibration nécessaire |
 
 **Détail eval mixte e50 sur réel par keypoint** (28/04/2026, 500 frames de `real_cam0`) :
 
@@ -295,20 +296,26 @@ Image 640×480 → VGG-19 → 6 stages cascadés → 7 belief maps 100×100
 | **Eval finale (a) strict réel** | 28/04/2026 | ✅ 47.3 % confirmé |
 | **Eval finale (b) strict synth val** | 28/04/2026 | ✅ 91.9 % — régression -6.4 pts contrôlée |
 | **Eval finale (c) relaxed réel** | 28/04/2026 | ❌ 48.0 % mais médianes explosées |
+| Eval croisée v1 sur cam3 (extr. approx.) | 28/04/2026 PM | ⚠️ 25.1 % / 237 px — zéro cross-view generalization |
+| Convert cam3 → NDDS (extr. approx.) | 28/04/2026 PM | ✅ 2000 frames |
+| Build `mixed_v2_cam03` (cam0 + cam3 + synth) | 28/04/2026 PM | ✅ 18K symlinks |
+| Retrain v2 25 epochs sur mixed_v2_cam03 | 28/04/2026 PM | ✅ 2h35, val=0.000356 |
+| Eval v2 cam0 / cam3 / synth | 28/04/2026 PM | 🟰 cam0 -7.1 pts, cam3 +10 pts, synth +1.2 pts |
 
 ### Pistes pour la suite
 
-> Mise à jour 28/04/2026 : éval finale faite. Verdict = **option 2 (collecte poses bras-étendu)** est désormais la priorité. Hypothèse "filtre de confiance trop strict" définitivement réfutée par l'éval relaxed.
+> Mise à jour 28/04/2026 (PM) : test cheap cam0+cam3 fait. Verdict = **calibrer cam3 avant tout retrain v3**. Sans calibration on échange perf cam0 contre perf cam3 sans gain global.
 
-1. **🔴 Adapter `training/capture_real.py`** — biaiser le sampler vers `|j2| < 30°` + `j3 ∈ [60°, 110°]` (configs où link4-6 sont visibles et bien séparés sur la grille pixel), garder le FK safety actuel.
-2. **🔴 Capturer 5–10 K poses réelles** sous `/tmp/dream_data/real_cam0_v2/` (séparé du v1 pour rester comparable au baseline 47.3 %).
-3. **🔴 Merger** `real_cam0_v2` (×5 oversample) + `synthetic` subset → `mixed_v2` via `training/dream/merge_and_convert.py`.
-4. **🔴 Retrain mixte v2** (50 époques, DREAM natif). **Cible** : détection ≥ 70 % tous keypoints sur réel, link6 médiane ≤ 10 px (seuil minimum pour pose-driven pick-and-place sur robot réel).
-5. **🟡 Si retrain v2 < 70 %** → fallback self-supervised labeling : FK + angles joints lus → keypoints 3D → projection 2D → annotations GT automatiques sur images réelles → fine-tune sur ces annotations auto.
-6. **🟡 Vérifier collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/` (worlds `randomized_v2.sdf` — 6 lights, 12 clutter objects).
-7. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — Isaac Sim + Isaac Lab pour rendu photoréaliste, devrait fermer le gap sim-to-real à la racine plutôt que par oversampling.
-8. **🟢 Tester l'inférence DREAM en sim Gazebo** (`pick_and_place.launch.py`) avec le checkpoint mixte actuel — devrait être nettement meilleur que le synth-only sur les link4-6.
-9. **🟢 Bench pose-driven pick-and-place sur robot réel** une fois la détection ≥ 70 %.
+1. **🔴 Calibrer cam3** (chessboard OpenCV pour intrinsèques + extrinsèques mesurées physiquement ou par PnP sur le checkpoint v1).
+2. **🔴 Calibrer cam0** par la même occasion (vérifier fx=610).
+3. **🔴 Refactor `training/dream/convert_to_ndds.py`** : `REAL_CAMERA_INTRINSICS` devient un dict par-cam, `REAL_CAMERA_TRANSFORMS["cam3"]` mis à jour avec les valeurs calibrées.
+4. **🔴 Régénérer `real_cam0_v3` + `real_cam3_v3`** + build `mixed_v3` (18K même structure que v2).
+5. **🔴 Retrain v3 50 epochs** (vs 25 en v2 — la val loss n'avait pas plateauté). **Cible** : ≥ 50 % cam0 + ≥ 50 % cam3 simultanément.
+6. **🟡 Si v3 < 50 % per-cam** → revenir à l'option historique : capture poses bras-étendu sur `cam0` (`|j2| < 30°` + `j3 ∈ [60°, 110°]`), retrain v4.
+7. **🟡 Vérifier collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/` (worlds `randomized_v2.sdf`).
+8. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — Isaac Sim + Isaac Lab pour rendu photoréaliste, devrait fermer le gap sim-to-real à la racine plutôt que par oversampling.
+9. **🟢 Tester l'inférence DREAM en sim Gazebo** (`pick_and_place.launch.py`) avec le checkpoint **v1** (toujours le meilleur sur cam0).
+10. **🟢 Bench pose-driven pick-and-place sur robot réel** une fois la détection ≥ 70 %.
 
 ### Entraînement DREAM (natif)
 
