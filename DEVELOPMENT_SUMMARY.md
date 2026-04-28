@@ -346,7 +346,8 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 - [x] **Pick-and-place sorting 4 couleurs** end-to-end (HSV + IK + bins) — `pick_and_place_sorting.launch.py`, validé 23/04/2026
 - [x] **Téléopération main → bras réel** validée sur le MyCobot 320 Pi physique (22/04/2026, gains 1.2/1.2/1.6/0.25, latence ~150–250 ms)
 - [x] Procédure de validation **sim-only** documentée — [`docs/TELEOP_SIM_TESTING.md`](docs/TELEOP_SIM_TESTING.md)
-- [ ] **Évaluer le modèle mixte** sur données réelles (objectif : >50% détection) — étape bloquante restante
+- [x] **Évaluation finale du modèle mixte** sur réel + synth + relaxed (28/04/2026) — voir [`CHANGELOG.md` § 1.12.0](CHANGELOG.md). Verdict : 47.3 % réel / 91.9 % synth, distal keypoints (link4-6) = bottleneck restant.
+- [ ] **Capturer 5–10 K poses réelles bras-étendu** + retrain mixte v2 (cible : ≥ 70 % détection sur réel) — étape suivante
 - [ ] **Self-supervised labeling** : FK + caméra calibrée → annotations GT automatiques sur réel
 - [ ] Fine-tune sur données réelles auto-annotées
 
@@ -698,6 +699,11 @@ cd /tmp/DREAM && pip install -e . -r requirements.txt
 | Pick-and-place sorting 4 couleurs (HSV + IK) | 23/04/2026 | ✅ 4/4 couleurs sortées ~95 s |
 | URDF caméras reshapées (corps + objectif + LED) | 23/04/2026 | ✅ Plus de confusion HSV |
 | Doc validation sim-only `TELEOP_SIM_TESTING.md` | 23/04/2026 | ✅ Crée + référencée |
+| Install `pandas` dans `venv_dream` | 28/04/2026 | ✅ |
+| DREAM eval (a) strict réel — 47.3 % det | 28/04/2026 | ✅ Baseline reproduit |
+| DREAM eval (b) strict synth val — 91.9 % det | 28/04/2026 | ✅ Régression -6.4 pts contrôlée |
+| DREAM eval (c) relaxed réel — 48.0 % det | 28/04/2026 | ❌ Médianes explosées (peaks low-conf = bruit) |
+| Diagnostic distal keypoints (link4-6) bottleneck | 28/04/2026 | ✅ Cf. CHANGELOG 1.12.0 + SESSION_RESUME |
 | Domain randomization v2/v3 (worlds) | 15/04/2026 | ✅ OK |
 | Documentation ARCHITECTURE.md rewrite | 16/04/2026 | ✅ OK |
 | Gripper adaptatif intégré (pro_adaptive_gripper) | 15/04/2026 | ✅ OK |

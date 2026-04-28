@@ -1,7 +1,7 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 23 avril 2026 (soir — diagnostic DREAM pose estimation + scaffold Claude Code)
-> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.11.0 (pose-est diagnostic + tooling)
+> **Date de dernière mise à jour :** 28 avril 2026 (matin — DREAM eval finale, 3 splits, diagnostic distal confirmé)
+> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.12.0 (DREAM eval finale)
 > **Branche active :** `main`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.223` (pas `.225` comme certains anciens docs)
@@ -20,26 +20,70 @@ source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
 
 ---
 
-## État actuel (23 avril 2026 — soir)
+## État actuel (28 avril 2026 — matin)
 
-### 🧭 Reprise pour demain — lire en premier
+### 🧭 Reprise pour la prochaine session — lire en premier
 
-La pose estimation (DREAM) est **l'urgence actuelle**. Les tests sur la tour et la simulation téléop + sorting sont validés.
+DREAM eval finale terminée ce matin. Le checkpoint mixte e50 (`vgg_mixed_real_synth`) est désormais évalué sur les **3 splits attendus**. Verdict + comparaison synth-only ↔ mixte ci-dessous.
 
-**Question en attente pour demain** : on passe à l'option 2 (collecte de plus de données réelles, biaisée vers des poses bras étendu). Deux chemins possibles :
+**Décision actée** : passer à l'**option 2** = collecte de poses réelles supplémentaires biaisées vers bras étendu. Le chemin (a) reste recommandé : capturer `real_cam0_v2` séparément, merger avec le synthétique → `mixed_v2` → retrain.
 
-- **(a) recommandé** : garder `/tmp/dream_data/real_cam0/` intact (baseline mesurable) et capturer un nouveau dataset 5-10 K poses sous `real_cam0_v2` → merger avec le synthétique pour un `mixed_v2` → retrain.
-- **(b)** : étendre `real_cam0` in-place.
+Avant de capturer, adapter `training/capture_real.py` pour favoriser `|j2| < 30°` + `j3 ∈ [60°, 110°]` (configs où link4-6 sont visibles et bien séparés sur la grille pixel).
 
-Avant de capturer, ouvrir `training/capture_real.py` et identifier le sampler de poses — il faut biaiser vers des poses où J3/J4/J5 sont loin du repos pour que les distal keypoints couvrent plus de la grille de pixels.
-
-Commande rapide pour confirmer l'état DREAM (doit reporter 47.3% de détection globale, link6 à 3.0% @ 62px) :
+Commande rapide pour reproduire l'éval (résultats attendus dans le tableau ci-dessous) :
 ```bash
 source ~/ros_jazzy/venv_dream/bin/activate
+# (a) strict réel
 python training/dream/evaluate_dream.py \
   --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
   --data /tmp/dream_data/real_cam0 --split all
+# (b) strict synth val
+python training/dream/evaluate_dream.py \
+  --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
+  --data /tmp/dream_data/synthetic --split val --max-samples 1000
+# (c) relaxed réel
+python training/dream/evaluate_dream_relaxed.py \
+  --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
+  --data /tmp/dream_data/real_cam0 --split all \
+  --peak-thresh 0.001 --next-best-score 0.05
 ```
+
+### Ce qui a été accompli aujourd'hui (28/04/2026)
+
+#### 1. Dépendances `venv_dream` complétées
+
+- `pandas 3.0.2` ajouté (manquant pour `evaluate_dream.py`). Le reste (cv2, ruamel.yaml, tqdm, albumentations, torch+cu124, PyYAML, typeguard, PIL) déjà en place — vérifié au démarrage.
+
+#### 2. DREAM — évaluation finale (3 passes) du checkpoint mixte e50
+
+| Eval | Dataset | Split | Frames | Det rate | OVERALL méd. | base / link6 det% | link6 médiane |
+|------|---------|-------|--------|----------|--------------|--------------------|----------------|
+| **(a) strict** | `real_cam0` | all | 500/2000 | **47.3 %** | 2.78 px | 0 % / 3.0 % | 61.6 px |
+| **(b) strict** | `synthetic` | val | 1000/4000 | **91.9 %** | 2.72 px | 99.9 % / 73.2 % | 18.59 px |
+| **(c) relaxed** (peak=0.001) | `real_cam0` | all | 500/2000 | **48.0 %** | 2.78 px | 28 % (mais 328 px !) / 8.6 % | 170.7 px |
+
+Logs : `/tmp/eval_a_real_strict.log`, `/tmp/eval_b_synth_val.log`, `/tmp/eval_c_real_relaxed.log`.
+
+#### 3. Comparaison synth-only ↔ mixte
+
+| Métrique | `vgg_weighted_50k_e50` (synth-only) | **`vgg_mixed_real_synth_e50`** | Δ |
+|----------|--------------------------------------|--------------------------------|---|
+| Détection synth val | 98.3 % | 91.9 % | -6.4 pts (régression contrôlée) |
+| Détection réel all | 26.0 % | **47.3 %** | **+21.3 pts** |
+| link6 sur réel (det / méd.) | 5.6 % @ 395 px | 3.0 % @ 61.6 px | détection ≈ identique, **erreur ÷6** |
+
+#### 4. Verdict
+
+- **Le mix-training a fonctionné** : +21 pts sur réel sans détruire le synth. Le modèle a appris des features réelles, pas écrasé celles de la simulation.
+- **Le relaxed thresholding ne débloque rien** : +0.7 pt mais médianes catastrophiques (base 328 px, link6 170 px). Confirmation définitive — les peaks low-conf sont du bruit, pas des bonnes prédictions cachées par un filtre trop strict.
+- **Bottleneck identifié** : *distal keypoints (link4–link6)*. Sur synth val déjà link6 n'est qu'à 73.2 %. Sur réel ça s'effondre à 3 %. Le modèle peine partout sur les distal mais c'est dramatique sur réel.
+- Conclusion = ce qui était prescrit en 1.11.0 : enrichir le réel avec poses bras étendu.
+
+### Ce qui a été accompli avant (récap)
+
+#### 23/04/2026 — soir
+
+> ⚠️ **Section historique conservée pour traçabilité.** Le diagnostic DREAM décrit ci-dessous est complété par les 3 évals du 28/04 (au-dessus).
 
 ### Ce qui a été accompli aujourd'hui (23/04/2026)
 
@@ -225,27 +269,28 @@ Le modèle DREAM VGG atteint **97% de détection à 3.1px médiane** sur les don
 | 23/04/2026 | `color_object_detector` (HSV + back-projection top camera) | ✅ 4/4 couleurs détectées |
 | 23/04/2026 | `sorting_orchestrator` (boucle sur détections, gz `set_pose` carry) | ✅ Cycle complet ~95 s |
 | 23/04/2026 | URDF caméras reshapées (corps + objectif + LED, plus de cubes 3 cm colorés) | ✅ |
+| 28/04/2026 | Install `pandas` dans `venv_dream` | ✅ |
+| 28/04/2026 | DREAM eval (a) strict réel — 47.3 % det confirmé | ✅ Baseline 1.11.0 reproduit |
+| 28/04/2026 | DREAM eval (b) strict synth val — 91.9 % det | ✅ Régression contrôlée vs synth-only |
+| 28/04/2026 | DREAM eval (c) relaxed réel (peak=0.001) — 48.0 % | ❌ Médianes explosées, hypothèse réfutée |
+| 28/04/2026 | Verdict diagnostic complet : distal keypoints = bottleneck | ✅ Cf. CHANGELOG 1.12.0 |
 
 ### Ce qui reste à faire
 
-1. **[ROUGE] Évaluer le modèle mixte** sur données réelles :
-   ```bash
-   source ~/ros_jazzy/venv_dream/bin/activate
-   python training/dream/evaluate_dream.py \
-     --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
-     --data /tmp/dream_data/real_cam0 --split all
-   ```
+> Mise à jour 28/04 : éval finale du checkpoint mixte e50 = **47.3 % réel / 91.9 % synth**, distal keypoints (link4-6) = bottleneck. Le relaxed thresholding ne débloque rien (cf. §"Ce qui a été accompli aujourd'hui"). On passe à l'option 2 (collecte de poses bras étendu).
 
-2. **[ROUGE] Si detection < 50%** sur réel → implémentation self-supervised labeling :
-   - FK + angles joints lus → keypoints 3D → projection 2D → annotations GT automatiques
-   - Fine-tune sur ces données réelles auto-annotées
-
-3. **[JAUNE] Vérifier collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/`
-
-4. **[VERT] Pick-and-place Gazebo (mono-objet)** : pipeline `pick_and_place.launch.py` validé
-   et étendu en multi-objet par couleur (`pick_and_place_sorting.launch.py`)
-
-5. **[VERT] Bench test robot réel** une fois detection > 50%
+1. **[ROUGE] Adapter `training/capture_real.py`** pour biaiser le sampler vers des poses où les distal keypoints couvrent plus de la grille pixel :
+   - `|j2| < 30°` (épaule pas trop pliée)
+   - `j3 ∈ [60°, 110°]` (avant-bras à l'horizontale ou levé)
+   - garder le FK safety actuel
+2. **[ROUGE] Capturer 5–10 K nouvelles poses** sous `/tmp/dream_data/real_cam0_v2/` (séparé du v1 pour rester comparable au baseline 47.3 %).
+3. **[ROUGE] Merger** `real_cam0_v2` (×5 oversample) + `synthetic` (8K subset) → `mixed_v2` via `training/dream/merge_and_convert.py`.
+4. **[ROUGE] Retrain** mixte v2 (50 époques, DREAM natif) → checkpoint `vgg_mixed_real_synth_v2`.
+5. **[ROUGE] Cible** : détection ≥ 70 % tous keypoints sur réel, link6 médiane ≤ 10 px (seuil minimum pour pose-driven pick-and-place sur robot réel).
+6. **[JAUNE] Vérifier collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/` — utiliser le worlds `randomized_v2.sdf` (déjà en place, plus diverse).
+7. **[JAUNE] Si retrain v2 < 70 %** → fallback self-supervised labeling : FK + angles joints lus → keypoints 3D → projection 2D → annotations GT automatiques sur images réelles → fine-tune sur ces annotations auto.
+8. **[VERT] Tester l'inférence DREAM en sim Gazebo** (`pick_and_place.launch.py`) avec le checkpoint mixte actuel — devrait être nettement meilleur que le synth-only sur les link4-6.
+9. **[VERT] Bench test robot réel** une fois détection > 70 %.
 
 ---
 
