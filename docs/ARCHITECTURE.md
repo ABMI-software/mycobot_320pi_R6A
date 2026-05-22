@@ -233,6 +233,7 @@ capture_real.py
 |--------|------|
 | `training/dream/convert_to_ndds.py` | Convertit le format custom → NDDS |
 | `training/dream/merge_and_convert.py` | Fusionne réel+synth avec oversampling → NDDS |
+| `training/dream/merge_ndds.py` | Fusionne deux datasets déjà au format NDDS (real + synth) avec re-indexation |
 | `training/dream/visualize_ndds.py` | Vérifie visuellement les keypoints GT |
 | `training/dream/mycobot_fk.py` | Forward Kinematics (DH parameters) |
 | `training/dream/mycobot_ik.py` | Inverse Kinematics numérique (Jacobien) |
