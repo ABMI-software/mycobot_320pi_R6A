@@ -1,0 +1,4 @@
+usage: evaluate_dream.py [-h] --weights WEIGHTS --data DATA
+                         [--split {train,val,all}] [--max-samples MAX_SAMPLES]
+                         [--viz-dir VIZ_DIR] [--max-viz MAX_VIZ] [--visualize]
+evaluate_dream.py: error: the following arguments are required: --weights/-w, --data/-d
