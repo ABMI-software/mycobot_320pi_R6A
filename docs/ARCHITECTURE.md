@@ -239,7 +239,9 @@ capture_real.py
 | `training/dream/evaluate_dream.py` | Évaluation modèle (+ filtre sentinel -999.99) |
 | `scripts/train_pipeline.sh` | Pipeline automatisé : merge → NDDS → training |
 | `scripts/monitor_collection.sh` | Suivi en temps réel de la collecte Gazebo |
-
+| `training/dream/evaluate_grid.py` | Évaluation automatique sur tous les checkpoints `vgg_grid_*`, résultats sauvegardés dans `grid_search_results.txt` |
+| `training/dream/train_dream_ultimate.py` | Training VGG weighted loss + cosine LR, weights link5=3.0 link6=5.0 (v1) |
+| `training/dream/train_dream_ultimate_v2.py` | Training VGG weighted loss + cosine LR + strong augmentation sim-to-real, weights link5=1.5 link6=6.0 (v2) |
 ---
 
 ## Modèles entraînés — Historique
