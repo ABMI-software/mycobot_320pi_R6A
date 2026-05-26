@@ -342,6 +342,8 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 - [x] Domain Randomization v2 (6 lights, 12 clutter, 3 murs)
 - [x] Fine-tuning custom — tentatives v1/v2 échouées (belief map collapse, sigma mismatch)
 - [x] Entraînement mixte réel+synth via DREAM natif (18K frames, 50 epochs, terminé 16/04/2026)
+- [x] **Grid search weighted loss** (68 configs, 40h45) — w4=1.5, w5=1.5, w6=6.0 optimal (21/05/2026)
+- [x] **vgg_ultimate_v2_e50** — 97.7% overall, 92.6% link6, epoch 20/50 (21/05/2026)
 - [x] **Pick-and-place mono-objet** end-to-end (cube rouge → zone verte) — `pick_and_place.launch.py`
 - [x] **Pick-and-place sorting 4 couleurs** end-to-end (HSV + IK + bins) — `pick_and_place_sorting.launch.py`, validé 23/04/2026
 - [x] **Téléopération main → bras réel** validée sur le MyCobot 320 Pi physique (22/04/2026, gains 1.2/1.2/1.6/0.25, latence ~150–250 ms)
@@ -607,6 +609,11 @@ Epoch 7 : val_loss = 95.97    ← explosion massive
 | `training/dream/infer_dream.py` | Inférence : détection keypoints + résolution PnP |
 | `training/dream/visualize_ndds.py` | Visualisation des annotations keypoints sur images |
 | `training/dream/manip_configs/mycobot320.yaml` | Configuration des 7 keypoints (noms, frames URDF) |
+| `training/dream/train_dream_grid_search.py` | Grid search 64 combinaisons de weights |
+| `training/dream/evaluate_grid.py` | Évaluation automatisée des runs grid search |
+| `training/dream/train_dream_ultimate_v2.py` | Training final w=[1,1,1,1,1.5,1.5,6.0] ⭐ |
+| `training/dream/train_dream_ultimate.py` | Training final w=[1,1,1,1,1.5,3.0,5.0] |
+| `training/dream/merge_ndds.py` | Fusion réel + synthétique déjà en NDDS |
 
 ### Checkpoints DREAM (dans .gitignore)
 
@@ -617,6 +624,11 @@ Epoch 7 : val_loss = 95.97    ← explosion massive
 | `checkpoints_dream/vgg_augmented_e25/` | VGG augmenté (25 époques, meilleur E22, val=0.000667) |
 | `checkpoints_dream/vgg_weighted_50k_e50/` | VGG 50K synth (50 époques, 98.3% det synth, 13.2% réel) |
 | `checkpoints_dream/vgg_mixed_real_synth/` | VGG mixte 18K (10K réel×5 + 8K synth, terminé — à évaluer) |
+| `checkpoints_dream/vgg_ultimate_e30/` | VGG weighted [1,1,1,1,1.5,3.0,5.0] — 97.5% det synth, 28/30 |
+| `checkpoints_dream/vgg_ultimate_e50/` | VGG weighted [1,1,1,1,1.5,3.0,5.0] — 96.9% det synth, 35/50 |
+| `checkpoints_dream/vgg_ultimate_v2_e30/` | VGG weighted [1,1,1,1,1.5,1.5,6.0] — 97.5% det synth, 27/30 |
+| `checkpoints_dream/vgg_ultimate_v2_e50/` |  VGG weighted [1,1,1,1,1.5,1.5,6.0] — **97.7% det synth, 92.6% link6**, 20/50 |
+| `checkpoints_dream/vgg_grid_*/` | 68 runs grid search (5 epochs chacun, 20K synth) |
 
 ### Tentatives de fine-tuning (❌ ÉCHOUÉES)
 
@@ -704,6 +716,8 @@ cd /tmp/DREAM && pip install -e . -r requirements.txt
 | Anti-collision FK collecteur synthétique | 15/04/2026 | ✅ OK |
 | Scripts train_pipeline.sh + monitor_collection.sh | 16/04/2026 | ✅ OK |
 | merge_and_convert.py | 16/04/2026 | ✅ OK |
+| DREAM — Grid search 68 configs weighted loss (20K synth) | 21/05/2026 | ✅ w4=1.5, w5=1.5, w6=6.0 optimal — 40h45 total |
+| DREAM — vgg_ultimate_v2_e50 (97.7% record) | 21/05/2026 | ✅ Nouveau record synth, epoch 20/50, 2h52 |
 
 ---
 
@@ -743,6 +757,7 @@ pkill -f bridge_pi
 - **Simulation Gazebo + données synthétiques:** 31 mars 2026
 - **Pipeline IA + capture réelle + diagnostic:** 1-2 avril 2026
 - **DREAM keypoint pose estimation:** 3 avril 2026
+- **Grid search weighted loss + nouveau record 97.7%:** 21 mai 2026
 
 ---
 
