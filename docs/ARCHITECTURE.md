@@ -330,39 +330,49 @@ ANGLES: [0.0, 8.0, -127.0, 40.0, 0.0, 0.0]
 mycobot_R6A/
 ├── mycobot_gateway/                 # 📦 ROS2 : contrôle + vision
 │   ├── mycobot_gateway/
-│   │   ├── bridge_tour.py           # TCP client → Pi
-│   │   ├── dream_inference_node.py  # Inférence DREAM temps réel
-│   │   ├── pick_and_place_node.py   # State machine pick & place
-│   │   ├── synthetic_data_collector_v2.py  # Collecte + randomization
-│   │   └── vision/                  # Modules ArUco, etc.
-│   ├── launch/                      # 12 fichiers launch
-│   └── scripts/                     # Scripts Pi (bridge, caméra)
+│   │   ├── bridge_tour.py
+│   │   ├── dream_inference_node.py
+│   │   ├── pick_and_place_node.py
+│   │   ├── synthetic_data_collector_v2.py
+│   │   └── vision/
+│   ├── launch/
+│   └── scripts/
 │
 ├── mycobot_description/             # 📦 ROS2 : modèle 3D
-│   ├── urdf/320_pi/                 # URDF + meshes STL
-│   └── worlds/                      # Mondes Gazebo SDF
-│       ├── randomized.sdf           # Monde simple
+│   ├── urdf/320_pi/
+│   └── worlds/
+│       ├── randomized.sdf
 │       └── randomized_v2.sdf        # 6 lights + 12 clutter
 │
 ├── training/                        # 🧠 Pipeline ML
-│   ├── train.py                     # Legacy ResNet multi-view
-│   ├── model.py                     # PoseResNet / MultiViewPoseResNet
-│   ├── dataset.py                   # Datasets single/multi-view
-│   ├── capture_real.py              # Capture données réelles
+│   ├── train.py
+│   ├── model.py
+│   ├── dataset.py
+│   ├── capture_real.py
 │   └── dream/                       # 🧠 DREAM pipeline (actif)
-│       ├── train_dream_weighted.py  # Training pondéré par keypoint
+│       ├── train_dream_weighted.py  # Training pondéré (base B3)
+│       ├── train_dream_grid_search.py  # ← Grid search 64 combis 
 │       ├── evaluate_dream.py        # Évaluation + filtre sentinel
-│       ├── finetune_real.py         # Fine-tuning custom (expérimental)
-│       ├── infer_dream.py           # Inférence single-image
-│       ├── mycobot_fk.py            # Forward Kinematics DH
-│       ├── mycobot_ik.py            # Inverse Kinematics Jacobien
-│       ├── convert_to_ndds.py       # Conversion → NDDS
+│       ├── evaluate_grid.py         # ← Éval automatisée des 68 runs 
+│       ├── train_dream_ultimate_v2.py  # ← w=[1,1,1,1,1.5,1.5,6.0]  BEST
+│       ├── train_dream_ultimate.py  # ← w=[1,1,1,1,1.5,3.0,5.0]  
+│       ├── merge_ndds.py            # ← Fusion réel + synthétique NDDS 
+│       ├── finetune_real.py
+│       ├── infer_dream.py
+│       ├── mycobot_fk.py
+│       ├── mycobot_ik.py
+│       ├── convert_to_ndds.py
 │       └── checkpoints_dream/       # Modèles entraînés
+│           ├── vgg_ultimate_e30/    # 97.5% 
+│           ├── vgg_ultimate_e50/    # 96.9% — plus précis en médiane px
+│           ├── vgg_ultimate_v2_e30/ # 97.5%
+│           ├── vgg_ultimate_v2_e50/ # 97.7% — MEILLEUR MODÈLE
+│           └── vgg_grid_*/          # 68 runs grid search (5 epochs chacun)
 │
 ├── datasets/                        # 📊 Données (Git LFS)
 │   ├── synthetic_dataset/           # 20K images Gazebo
 │   └── real_dataset/                # 4K images Pi
 │
-├── docs/                            # 📖 Documentation
-└── scripts/                         # 🔧 Utilitaires bash
+├── docs/
+└── scripts/
 ```
