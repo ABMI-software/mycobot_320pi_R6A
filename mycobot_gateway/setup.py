@@ -59,6 +59,16 @@ setup(
             # Hand teleoperation (trajectory → JSON bridge for real robot)
             'trajectory_to_robot_bridge = mycobot_gateway.trajectory_to_robot_bridge:main',
             'gripper_to_robot_bridge = mycobot_gateway.gripper_to_robot_bridge:main',
+
+            # ── Benchmark de précision ──────────────────────────────────────
+            # Localizer ArUco (robot réel) : détecte workspace + objet
+            'aruco_localizer = mycobot_gateway.aruco_localizer_node:main',
+            # Localizer Gazebo (simulation) : publie pose GT Gazebo
+            'gz_sim_localizer = mycobot_gateway.gz_sim_localizer_node:main',
+            # FK EE pose (commun sim + réel) : /joint_states → /fk/ee_pose
+            'fk_ee_pose = mycobot_gateway.fk_ee_pose_node:main',
+            # Orchestrateur benchmark : grille 9 cibles + rapport CSV
+            'precision_benchmark = mycobot_gateway.precision_benchmark_node:main',
         ],
     },
 )
