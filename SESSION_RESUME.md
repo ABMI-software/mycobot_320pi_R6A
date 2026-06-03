@@ -1,10 +1,21 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 3 juin 2026 (pick-and-place ArUco — pipeline sim + réel scaffoldé)
+> **Date de dernière mise à jour :** 3 juin 2026 (pick-and-place ArUco — implementation Gazebo + reel)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0-pre (calibration) · 1.15.0-pre (pick-and-place ArUco)
 > **Branche active :** `feature/pick-and-place`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
-> **Pi réelle :** `10.10.0.223` (pas `.225` comme certains anciens docs)
+> **Pi réelle :** `10.10.0.221` (pas `.223`/`.225` comme certains anciens docs)
+
+---
+
+## Handoff pick-and-place (a lire en premier pour la prochaine session)
+
+- Handoff detaille du 3 juin 2026 : [`docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md`](docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md)
+- Contient :
+  - ce qui a ete implemente aujourd'hui (sim + reel),
+  - l'etat exact de validation,
+  - les commandes de reprise,
+  - le plan de test onsite avec interfaces graphiques.
 
 ---
 
@@ -16,6 +27,55 @@ conda deactivate
 
 source /opt/ros/jazzy/setup.bash
 source ~/ros_jazzy/install/setup.bash
+```
+
+---
+
+## État actuel (3 juin 2026 — nuit — pick-and-place Gazebo visual debug)
+
+### Ce qui a été accompli (session de débogage visuel Gazebo)
+
+- **Ouverture GUI Gazebo** : modifié `pick_and_place_aruco.launch.py` pour retirer le flag `-s` (server-only)
+  et activer l'affichage graphique via `DISPLAY=:1`.
+- **Marqueurs ArUco texturés** :
+  - Généré 5 PNG ArUco DICT_4X4_1000 (IDs 0,1,2,3,10) via OpenCV, stockés dans
+    `mycobot_description/worlds/textures/` et `materials/textures/`.
+  - Remplacé les cubes colorés génériques dans `precision_benchmark.sdf` par des
+    dalles 10×10 cm avec texture PBR (`albedo_map`) portant les vrais patterns ArUco.
+  - Cube cible rouge conservé + face supérieure avec texture ArUco ID 10.
+- **Correction tremblement HOME** :
+  - `HOME_ANGLES` dans `pick_and_place_aruco_node.py` : `[0,0,0,0,0,0]` → `[0,-0.8,1.4,-0.8,0,0]` rad
+    (position stable au-dessus du workspace, évite l'instabilité gravitationnelle).
+  - URDF `mycobot_pro_320_pi_benchmark.urdf` : `initial_value` des joints 2/3/4 mis
+    à jour pour correspondre, évitant le tremblement avant la première commande.
+- **Correction suivi cube pendant transport** :
+  - Ajout de `_gripper_base_world()` : calcule la position de `gripper_base` en frame
+    monde via la chaîne FK complète + transform fixe `joint6output_to_gripper_base`.
+  - `_do_grasp()` et SETTLING-carrying utilisent maintenant `gripper_base_world` au lieu
+    de `ee_pos + 0.02` (le cube ne flotte plus au-dessus du bras).
+  - **Limite connue** : l'IK ne contraint pas l'orientation ; la pince pointe latéralement
+    (~5 cm en Y) à la position de saisie. Fix complet = IK avec contrainte d'orientation.
+- CMakeLists.txt : `materials/` ajouté à l'install list.
+
+### Décisions prises
+
+- Textures ArUco stockées dans `worlds/textures/` (chemin relatif direct, sans `..`) :
+  Gazebo Harmonic ne résout pas `../` dans les `albedo_map` PBR.
+- `HOME_ANGLES` aligné avec `initial_value` URDF pour une initialisation stable.
+
+### Prochaines actions
+
+1. [ROUGE] IK avec contrainte d'orientation → pince pointe vers le bas au pick/place
+2. [JAUNE] Imprimer marqueurs ArUco réels + test sur banc avec caméra
+3. [VERT] `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
+
+### Commande rapide de reprise (sim avec GUI)
+
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+export DISPLAY=:1
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
 ```
 
 ---

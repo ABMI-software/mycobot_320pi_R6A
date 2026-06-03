@@ -7,6 +7,48 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.15.1-pre] - 2026-06-03 — branche `feature/pick-and-place`
+
+### Pick-and-place Gazebo — débug visuel (GUI + ArUco textures + HOME stable)
+
+#### Modifié
+
+- [`launch/pick_and_place_aruco.launch.py`](mycobot_gateway/launch/pick_and_place_aruco.launch.py) :
+  flag `-s` (server-only) retiré → Gazebo ouvre sa GUI graphique (`DISPLAY=:1` requis).
+
+- [`mycobot_description/worlds/precision_benchmark.sdf`](mycobot_description/worlds/precision_benchmark.sdf) :
+  - Marqueurs workspace (IDs 0-3) : cubes colorés → dalles 10×10 cm avec texture PBR
+    ArUco `DICT_4X4_1000` (albedo_map PNG 240×240 px, bordure blanche imprimée).
+  - Cube cible (ID 10) : corps rouge conservé + face supérieure avec texture ArUco ID 10.
+
+- [`mycobot_gateway/pick_and_place_aruco_node.py`](mycobot_gateway/mycobot_gateway/pick_and_place_aruco_node.py) :
+  - `HOME_ANGLES` : `[0,0,0,0,0,0]` → `[0,-0.8,1.4,-0.8,0,0]` rad — position stable
+    au-dessus du workspace, élimine le tremblement sous gravité.
+  - Ajout `_gripper_base_world()` : position de `gripper_base` en frame monde via FK
+    complète + transform fixe (`joint6output_to_gripper_base: xyz=[0,-0.007,0.056]`).
+  - `_do_grasp()` et SETTLING-carrying : `ee_pos + 0.02` → `gripper_base_world + 0.025`
+    (cube suit le point de saisie réel, ne flotte plus au-dessus du bras).
+
+- [`urdf/320_pi/mycobot_pro_320_pi_benchmark.urdf`](mycobot_description/urdf/320_pi/mycobot_pro_320_pi_benchmark.urdf) :
+  `initial_value` pour joints 2/3/4 mis à `[-0.8, 1.4, -0.8]` — correspond à
+  `HOME_ANGLES`, robot stable dès le spawn.
+
+#### Ajouté
+
+- `mycobot_description/worlds/textures/aruco_4x4_{0000..0003,0010}.png` — 5 PNG ArUco
+  générés via OpenCV (`DICT_4X4_1000`, 200 px + bordure 20 px).
+- `mycobot_description/materials/textures/` — même jeu de PNG (copie de référence).
+- `CMakeLists.txt` : `materials/` ajouté à la liste `install(DIRECTORY ...)`.
+
+#### Limitation connue
+
+L'IK (`inverse_kinematics_position`) optimise uniquement la position de link6, pas
+l'orientation de la pince. À la position de saisie, la pince pointe latéralement
+(~5 cm en Y), pas verticalement vers le bas. Correction future : IK avec contrainte
+d'orientation ou champ TCP configurable.
+
+---
+
 ## [1.15.0-pre] - 2026-06-03 — branche `feature/pick-and-place`
 
 ### Pick-and-place ArUco — pipeline complet sim + robot réel

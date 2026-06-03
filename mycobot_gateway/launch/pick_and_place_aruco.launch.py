@@ -81,15 +81,14 @@ def generate_launch_description() -> LaunchDescription:
         output="screen",
     )
 
-    # ── Gazebo Harmonic (mode serveur, sans GUI Qt) ───────────────────────────
-    # -s = server-only, évite le crash Qt "could not connect to display"
-    # Retirer -s si vous souhaitez la visualisation (DISPLAY doit être défini)
+    # ── Gazebo Harmonic (avec GUI) ────────────────────────────────────────────
+    # DISPLAY doit être défini (ex. :1). Retirer "-s" pour ouvrir la fenêtre GUI.
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(gz_pkg, "launch", "gz_sim.launch.py")
         ),
         launch_arguments={
-            "gz_args": f"-r -s {world_path}",
+            "gz_args": f"-r {world_path}",
             "on_exit_shutdown": "true",
         }.items(),
     )

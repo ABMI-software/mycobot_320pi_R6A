@@ -30,7 +30,9 @@ Paramètres ROS2 :
   mode           : "sim" ou "real"                       (défaut : "sim")
   place_x/y/z    : position de dépose en m               (défaut : 0.20/-0.18/0.04)
   approach_height: hauteur au-dessus pick/place en m      (défaut : 0.12)
-  grasp_z_offset : offset Z pour saisie (sous l'objet)   (défaut : 0.005)
+    object_diameter: diamètre de l'objet en m               (défaut : 0.06)
+    grasp_z_offset : marge de prise au-dessus de la base m  (défaut : 0.005)
+    min_pick_z     : borne basse de sécurité pour pick_z m  (défaut : 0.0)
   settle_time    : attente stabilisation par segment (s)  (défaut : 2.0)
   gz_world       : nom du monde Gazebo                    (défaut : precision_benchmark)
   gz_object      : nom du modèle à téléporter            (défaut : target_cube)
@@ -79,7 +81,9 @@ JOINT_NAMES = [
     "joint6output_to_joint6",
 ]
 
-HOME_ANGLES = np.zeros(6, dtype=np.float64)
+# Position initiale stable au-dessus du workspace (évite l'instabilité à [0,0,0,0,0,0]).
+# [j1=0°, j2=-46°, j3=80°, j4=-46°, j5=0°, j6=0°]
+HOME_ANGLES = np.array([0.0, -0.8, 1.4, -0.8, 0.0, 0.0], dtype=np.float64)
 
 
 class State(enum.Enum):
@@ -106,7 +110,9 @@ class PickAndPlaceArucoNode(Node):
         self.declare_parameter("place_y",         -0.18)
         self.declare_parameter("place_z",          0.04)
         self.declare_parameter("approach_height",  0.12)
+        self.declare_parameter("object_diameter",  0.06)
         self.declare_parameter("grasp_z_offset",   0.005)
+        self.declare_parameter("min_pick_z",       0.0)
         self.declare_parameter("settle_time",      2.0)
         self.declare_parameter("gz_world",        "precision_benchmark")
         self.declare_parameter("gz_object",       "target_cube")
@@ -120,7 +126,9 @@ class PickAndPlaceArucoNode(Node):
             self.get_parameter("place_z").value,
         ], dtype=np.float64)
         self._approach_h    = float(self.get_parameter("approach_height").value)
+        self._obj_diam      = float(self.get_parameter("object_diameter").value)
         self._grasp_z_off   = float(self.get_parameter("grasp_z_offset").value)
+        self._min_pick_z    = float(self.get_parameter("min_pick_z").value)
         self._settle        = float(self.get_parameter("settle_time").value)
         self._gz_world      = self.get_parameter("gz_world").value
         self._gz_object     = self.get_parameter("gz_object").value
@@ -160,7 +168,8 @@ class PickAndPlaceArucoNode(Node):
         self.get_logger().info(
             f"[pick_and_place_aruco] mode={self._mode} "
             f"place={np.round(self._place, 3)} "
-            f"approach_h={self._approach_h}m settle={self._settle}s"
+            f"approach_h={self._approach_h}m obj_diam={self._obj_diam}m "
+            f"settle={self._settle}s"
         )
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
@@ -247,6 +256,22 @@ class PickAndPlaceArucoNode(Node):
         positions, _ = forward_kinematics(angles)
         return np.array(positions["mycobot320_link6"])
 
+    # ── Position TCP (gripper_base) en frame monde ────────────────────────────
+
+    def _gripper_base_world(self) -> Optional[np.ndarray]:
+        """Retourne la position de gripper_base en frame monde via FK complète.
+
+        La jonction joint6output_to_gripper_base est fixe : xyz=[0,-0.007,0.056]
+        dans le frame link6. On applique la translation après la rotation de link6.
+        """
+        if self._joint_pos is None:
+            return self._ee_pos
+        _, transforms = forward_kinematics(self._joint_pos)
+        T6 = transforms[6]                             # world→link6 (4×4)
+        p_local = np.array([0.0, -0.007, 0.056, 1.0]) # gripper_base origin in link6
+        gb_world = (T6 @ p_local)[:3]
+        return gb_world
+
     # ── Grasp simulation via gz service ───────────────────────────────────────
 
     def _gz_set_pose(self, model: str, x: float, y: float, z: float) -> None:
@@ -309,14 +334,17 @@ class PickAndPlaceArucoNode(Node):
 
         elif self._state == State.SETTLING:
             if self._now() < self._settle_deadline:
-                # En mode sim, suivre l'EE avec l'objet pendant le transport
-                if self._carrying and self._mode == "sim" and self._ee_pos is not None:
-                    self._gz_set_pose(
-                        self._gz_object,
-                        float(self._ee_pos[0]),
-                        float(self._ee_pos[1]),
-                        float(self._ee_pos[2]) + 0.02,
-                    )
+                # En mode sim, suivre le gripper_base avec l'objet pendant le transport.
+                # Le cube est placé légèrement au-dessus du gripper_base (cube demi-hauteur).
+                if self._carrying and self._mode == "sim":
+                    gb = self._gripper_base_world()
+                    if gb is not None:
+                        self._gz_set_pose(
+                            self._gz_object,
+                            float(gb[0]),
+                            float(gb[1]),
+                            float(gb[2]) + 0.025,   # demi-hauteur cube 4cm
+                        )
                 return
             self._advance_plan()
 
@@ -337,9 +365,19 @@ class PickAndPlaceArucoNode(Node):
     def _build_plan(self) -> None:
         obj = self._object_pos.copy()
 
+        # Pose ArUco objet = sommet de l'objet (marqueur collé dessus).
+        # On descend donc d'un diamètre complet pour viser la base de l'objet,
+        # puis on ajoute une petite marge verticale de sécurité.
+        pick_z = obj[2] - self._obj_diam + self._grasp_z_off
+        pick_z = max(self._min_pick_z, pick_z)
+        self.get_logger().info(
+            f"Pick height computed from object geometry: "
+            f"obj_z={obj[2]:.3f}m -> pick_z={pick_z:.3f}m"
+        )
+
         # Waypoints cartésiens
         approach_pick  = obj.copy();  approach_pick[2]  += self._approach_h
-        grasp_pos      = obj.copy();  grasp_pos[2]      -= self._grasp_z_off
+        grasp_pos      = obj.copy();  grasp_pos[2]      = pick_z
         lift_pos       = obj.copy();  lift_pos[2]       += self._approach_h
 
         place          = self._place.copy()
@@ -422,12 +460,15 @@ class PickAndPlaceArucoNode(Node):
 
         if not self._grasp_done:
             if self._mode == "sim":
-                # Téléporte l'objet sur l'EE
-                ee = self._ee_pos if self._ee_pos is not None else self._object_pos
-                if ee is not None:
+                # Téléporte l'objet au niveau du gripper_base (point de saisie réel).
+                gb = self._gripper_base_world()
+                target = gb if gb is not None else self._ee_pos
+                if target is not None:
                     self._gz_set_pose(
                         self._gz_object,
-                        float(ee[0]), float(ee[1]), float(ee[2]) + 0.02,
+                        float(target[0]),
+                        float(target[1]),
+                        float(target[2]) + 0.025,   # demi-hauteur cube (4cm/2 + marge)
                     )
             else:
                 self._gripper("gripper_close")
