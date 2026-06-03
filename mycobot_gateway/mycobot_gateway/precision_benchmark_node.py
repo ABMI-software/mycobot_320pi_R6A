@@ -50,7 +50,6 @@ import os
 import sys
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -58,13 +57,19 @@ import rclpy
 from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64, String
+from std_msgs.msg import String
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from builtin_interfaces.msg import Duration
 
 # ── import IK ────────────────────────────────────────────────────────────────
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_FK_DIR    = str(_REPO_ROOT / "training" / "dream")
-if _FK_DIR not in sys.path:
-    sys.path.insert(0, _FK_DIR)
+_DREAM_DIR_ALT = '/home/genji/ros_jazzy/src/mycobot_R6A/training/dream'
+_DREAM_DIR = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', '..', '..', 'training', 'dream'
+))
+for _p in [_DREAM_DIR, _DREAM_DIR_ALT]:
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from mycobot_fk import forward_kinematics           # type: ignore  # noqa: E402
 from mycobot_ik import inverse_kinematics_position  # type: ignore  # noqa: E402
@@ -85,7 +90,7 @@ HOME_ANGLES = np.zeros(6, dtype=np.float64)
 DEFAULT_GRID: List[Tuple[float, float]] = [
     (x, y)
     for x in (0.15, 0.22, 0.28)
-    for y in (-0.10, 0.00, 0.10)
+    for y in (-0.10, 0.04, 0.10)
 ]
 
 
@@ -116,12 +121,12 @@ class PrecisionBenchmarkNode(Node):
         self.declare_parameter("settle_time", 2.0)
         self.declare_parameter("grid_z",      0.06)
         self.declare_parameter("use_aruco",   True)
-        self.declare_parameter("output_dir",  str(Path.home()))
+        self.declare_parameter("output_dir",  os.path.expanduser("~"))
 
         self._settle_time = float(self.get_parameter("settle_time").value)
         self._grid_z      = float(self.get_parameter("grid_z").value)
         self._use_aruco   = bool(self.get_parameter("use_aruco").value)
-        self._output_dir  = Path(self.get_parameter("output_dir").value)
+        self._output_dir  = self.get_parameter("output_dir").value
 
         # ── état ──
         self._state          = State.INIT
@@ -141,12 +146,10 @@ class PrecisionBenchmarkNode(Node):
         self._aruco_target: Optional[np.ndarray] = None
         self._results   : List[dict] = []
 
-        # ── publishers (commandes joints) ──
-        self._joint_pubs: dict[str, rclpy.publisher.Publisher] = {}
-        for jn in JOINT_NAMES:
-            topic = f"/model/mycobot_320/joint/{jn}/cmd_pos"
-            self._joint_pubs[jn] = self.create_publisher(Float64, topic, 1)
-
+        # ── publisher (commandes joints via trajectory controller) ──
+        self._traj_pub = self.create_publisher(
+            JointTrajectory, "/mycobot_controller/joint_trajectory", 1
+        )
         self._pub_status = self.create_publisher(String, "/benchmark/status", 5)
 
         # ── subscribers ──
@@ -159,7 +162,7 @@ class PrecisionBenchmarkNode(Node):
 
         # ── CSV ──
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self._csv_path = self._output_dir / f"benchmark_results_{ts}.csv"
+        self._csv_path = os.path.join(self._output_dir, f"benchmark_results_{ts}.csv")
         self._csv_file = open(self._csv_path, "w", newline="")
         self._csv_writer = csv.DictWriter(self._csv_file, fieldnames=[
             "trial", "type",
@@ -200,20 +203,24 @@ class PrecisionBenchmarkNode(Node):
         except KeyError:
             pass
 
+    def _now(self) -> float:
+        """Retourne le temps courant (sim ou wall) en secondes."""
+        return self.get_clock().now().nanoseconds * 1e-9
+
     # ── machine à états ──────────────────────────────────────────────────────
 
     def _step(self) -> None:  # noqa: C901  (complexité acceptable pour une FSM)
         s = self._state
 
         if s == State.INIT:
+            self._target_idx = 0
             self._publish_status("Initialisation — retour HOME")
             self._send_joints(HOME_ANGLES)
-            self._settle_deadline = time.monotonic() + 3.0
+            self._settle_deadline = self._now() + self._settle_time
             self._state = State.WAIT_HOME
 
         elif s == State.WAIT_HOME:
-            if time.monotonic() >= self._settle_deadline:
-                self._target_idx = 0
+            if self._now() >= self._settle_deadline:
                 self._state = State.NEXT_TARGET
 
         elif s == State.NEXT_TARGET:
@@ -254,11 +261,11 @@ class PrecisionBenchmarkNode(Node):
 
         elif s == State.MOVING:
             self._send_joints(self._current_angles)
-            self._settle_deadline = time.monotonic() + self._settle_time
+            self._settle_deadline = self._now() + self._settle_time
             self._state = State.SETTLING
 
         elif s == State.SETTLING:
-            remaining = self._settle_deadline - time.monotonic()
+            remaining = self._settle_deadline - self._now()
             if remaining > 0:
                 self._publish_status(
                     f"Stabilisation…  ({remaining:.1f}s restantes)"
@@ -271,7 +278,7 @@ class PrecisionBenchmarkNode(Node):
             self._target_idx += 1
             # retour HOME entre chaque cible pour éviter les accumulations d'erreur
             self._send_joints(HOME_ANGLES)
-            self._settle_deadline = time.monotonic() + 2.0
+            self._settle_deadline = self._now() + self._settle_time
             self._state = State.WAIT_HOME
 
         # ── cible ArUco (test de saisie réelle) ───────────────────────────────
@@ -288,11 +295,11 @@ class PrecisionBenchmarkNode(Node):
 
         elif s == State.ARUCO_MOVE:
             self._send_joints(self._current_angles)
-            self._settle_deadline = time.monotonic() + self._settle_time
+            self._settle_deadline = self._now() + self._settle_time
             self._state = State.ARUCO_SETTLE
 
         elif s == State.ARUCO_SETTLE:
-            if time.monotonic() < self._settle_deadline:
+            if self._now() < self._settle_deadline:
                 return
             self._state = State.ARUCO_MEASURE
 
@@ -311,24 +318,79 @@ class PrecisionBenchmarkNode(Node):
 
     # ── IK ───────────────────────────────────────────────────────────────────
 
+    # Limites joints URDF (rad)
+    _JOINT_LIMITS = [
+        (-2.93, 2.93),   # joint2_to_joint1
+        (-2.35, 2.35),   # joint3_to_joint2
+        (-2.53, 2.53),   # joint4_to_joint3
+        (-2.53, 2.53),   # joint5_to_joint4
+        (-2.93, 2.93),   # joint6_to_joint5
+        (-3.14, 3.14),   # joint6output_to_joint6
+    ]
+
+    def _angles_in_limits(self, angles: np.ndarray) -> bool:
+        return all(lo <= a <= hi for a, (lo, hi) in zip(angles, self._JOINT_LIMITS))
+
     def _solve_ik(self, target: np.ndarray) -> Tuple[np.ndarray, bool]:
-        """Lance l'IK numérique. Retourne (angles, success)."""
-        seed = self._joint_pos if self._joint_pos is not None else HOME_ANGLES
-        try:
-            angles, success = inverse_kinematics_position(
-                target_pos=target,
-                initial_angles=seed,
+        """Lance l'IK numérique avec plusieurs seeds. Retourne (angles, success)."""
+        # Seeds : position courante, HOME, et plusieurs configs alternatives
+        seeds = [
+            self._joint_pos if self._joint_pos is not None else HOME_ANGLES,
+            HOME_ANGLES.copy(),
+            np.array([ 0.5,  0.5,  0.5, -0.5,  0.5,  0.0]),
+            np.array([-0.5, -0.5, -0.5,  0.5, -0.5,  0.0]),
+            np.array([ 1.0,  0.3,  0.5, -0.3,  1.0,  0.0]),
+            np.array([ 0.0,  0.5,  1.0, -1.0,  0.0,  0.0]),
+        ]
+        best_angles: Optional[np.ndarray] = None
+        best_residual = float("inf")
+
+        for seed in seeds:
+            try:
+                success, angles, residual = inverse_kinematics_position(
+                    target_xyz=target,
+                    q0=seed,
+                )
+                if not success:
+                    continue
+                angles = np.array(angles, dtype=np.float64)
+                if self._angles_in_limits(angles):
+                    if residual < best_residual:
+                        best_residual = residual
+                        best_angles = angles
+            except Exception:
+                continue
+
+        if best_angles is not None:
+            self.get_logger().debug(
+                f"IK réussi (résidu={best_residual:.6f}): "
+                f"{[f'{a:.3f}' for a in best_angles]}"
             )
-            return angles, bool(success)
-        except Exception as exc:
-            self.get_logger().error(f"IK exception : {exc}")
-            return HOME_ANGLES, False
+            return best_angles, True
+
+        self.get_logger().warning(
+            f"IK: aucune solution dans les limites pour {target}"
+        )
+        return HOME_ANGLES, False
 
     # ── commandes joints ─────────────────────────────────────────────────────
 
     def _send_joints(self, angles: np.ndarray) -> None:
-        for jn, angle in zip(JOINT_NAMES, angles):
-            self._joint_pubs[jn].publish(Float64(data=float(angle)))
+        """Envoie une commande de position via JointTrajectory."""
+        self.get_logger().debug(
+            f"_send_joints: {[f'{a:.3f}' for a in angles]}"
+        )
+        traj = JointTrajectory()
+        traj.header.stamp = self.get_clock().now().to_msg()  # obligatoire avec sim time
+        traj.joint_names = list(JOINT_NAMES)
+        pt = JointTrajectoryPoint()
+        pt.positions = [float(a) for a in angles]
+        # time_from_start = settle_time pour laisser le contrôleur arriver à la cible
+        secs = int(self._settle_time)
+        nsecs = int((self._settle_time - secs) * 1e9)
+        pt.time_from_start = Duration(sec=secs, nanosec=nsecs)
+        traj.points = [pt]
+        self._traj_pub.publish(traj)
 
     # ── mesure ───────────────────────────────────────────────────────────────
 

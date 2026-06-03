@@ -7,6 +7,83 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.15.0-pre] - 2026-06-03 — branche `feature/pick-and-place`
+
+### Pick-and-place ArUco — pipeline complet sim + robot réel
+
+Orchestrateur unifié qui consomme `/aruco/object_pose` (fourni par
+`gz_sim_localizer` en Gazebo ou `aruco_localizer_node` sur robot réel) et
+exécute un cycle pick-place complet via IK numérique + `JointTrajectory`.
+
+#### Ajouté
+
+- [`mycobot_gateway/pick_and_place_aruco_node.py`](mycobot_gateway/mycobot_gateway/pick_and_place_aruco_node.py) —
+  orchestrateur FSM à 9 états (INIT → WAIT_POSE → IK_PLAN → MOVING →
+  SETTLING → GRASP → RELEASE → DONE). Paramètre `mode` :
+  - **`sim`** : grasp émulé par `gz service set_pose` (téléportation Gazebo),
+    l'objet suit l'EE via FK pendant le transport.
+  - **`real`** : commandes gripper JSON sur `/to_robot` (no-op si pas de pince
+    physique — câblé pour le futur).
+  Motion via `/mycobot_controller/joint_trajectory` (ros2_control en sim,
+  `trajectory_to_robot_bridge` sur robot réel) — interface identique.
+
+- [`launch/pick_and_place_aruco.launch.py`](mycobot_gateway/launch/pick_and_place_aruco.launch.py) —
+  pipeline complet Gazebo : `gz_sim` + `ros2_control` + `gz_sim_localizer` +
+  `fk_ee_pose` + `pick_and_place_aruco` (mode sim). Réutilise le monde
+  `precision_benchmark.sdf` (cube cible déjà présent).
+
+- [`launch/pick_and_place_aruco_real.launch.py`](mycobot_gateway/launch/pick_and_place_aruco_real.launch.py) —
+  pipeline robot réel : `bridge_tour` + `trajectory_to_robot_bridge` +
+  `fk_ee_pose` + `aruco_localizer` + `pick_and_place_aruco` (mode real).
+
+#### Architecture du pipeline (sim et réel)
+
+```
+[gz_sim_localizer]          [aruco_localizer]
+ (GT Gazebo)                 (cam_0 + ArUco)
+        ↓                          ↓
+        └──────┬────────────────────┘
+               ↓ /aruco/object_pose
+    [pick_and_place_aruco_node]
+               ↓ JointTrajectory
+    [mycobot_controller]     [trajectory_to_robot_bridge]
+     (ros2_control Gazebo)    (→ /to_robot → bridge_tour → Pi)
+```
+
+#### Commandes de lancement
+
+```bash
+# Simulation Gazebo
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
+
+# Robot réel (prérequis : bridge Pi actif + marqueurs posés)
+ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
+
+# Paramètres utiles
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py \
+    settle_time:=3.0 target_x:=0.25 target_y:=0.05 \
+    place_x:=0.20 place_y:=-0.18
+```
+
+#### Corrigé
+
+- `KeyError: 'angles'` dans l'état `MOVING` : l'index du plan était incrémenté
+  dans `_advance_plan()` **avant** la transition, donc `MOVING` lisait le
+  segment suivant (GRASP, sans clé `angles`). Fix : stocker le segment courant
+  dans `self._current_seg` au moment de la transition et le lire depuis là.
+
+#### État de validation
+
+- Pipeline compilé et import vérifié ✅
+- Validation end-to-end Gazebo : **validée le 3 juin 2026** ✅
+  - Cycle complet `home → approach_pick → grasp_pos → GRASP → lift →
+    approach_place → place_pos → RELEASE → retreat → home_end → DONE`
+  - IK : 6 waypoints, erreur 0.0 mm pour chaque solution
+  - Grasp sim : `gz service set_pose` opérationnel
+- Validation robot réel : **à faire** (prérequis : imprimer marqueurs ArUco)
+
+---
+
 ## [1.14.0-pre] - 2026-04-28 (soir) — branche `feature/calibration-cam`
 
 ### 🎯 Calibration intrinsèque mesurée — finding majeur sur le dataset DREAM
