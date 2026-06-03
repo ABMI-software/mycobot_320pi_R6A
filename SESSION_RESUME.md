@@ -1,8 +1,8 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 28 avril 2026 (soir — calibration intrinsèque cam_0 + cam_3 mesurée)
-> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3) · 1.14.0-pre (calibration intrinsèque)
-> **Branche active :** `feature/calibration-cam` (à reprendre demain pour points 2 et 3)
+> **Date de dernière mise à jour :** 3 juin 2026 (pick-and-place ArUco — pipeline sim + réel scaffoldé)
+> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0-pre (calibration) · 1.15.0-pre (pick-and-place ArUco)
+> **Branche active :** `feature/pick-and-place`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.223` (pas `.225` comme certains anciens docs)
 
@@ -15,8 +15,61 @@
 conda deactivate
 
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/ros_jazzy/install/setup.bash
 ```
+
+---
+
+## État actuel (3 juin 2026 — soir — pick-and-place Gazebo validé)
+
+### Ce qui a été accompli aujourd'hui
+
+- Scaffoldé l'orchestrateur FSM `pick_and_place_aruco_node.py` (10 segments,
+  modes `sim` / `real`, IK numérique, interface `/aruco/object_pose` unifiée)
+- Créé les deux launch files (`pick_and_place_aruco.launch.py` et `_real.launch.py`)
+- Corrigé `KeyError: 'angles'` (FSM lisait le mauvais segment via index déjà incrémenté)
+- **Cycle pick-and-place Gazebo complet validé** : home → approach_pick → grasp_pos
+  → GRASP (gz set_pose) → lift → approach_place → place_pos → RELEASE → retreat
+  → home_end → DONE, IK 0.0 mm d'erreur sur chaque waypoint
+
+### Décisions prises
+
+- Interface commune `gz_sim_localizer` (sim) / `aruco_localizer` (réel) → nœud
+  orchestrateur identique en sim et sur robot
+- `self._current_seg` stocké avant transition MOVING pour éviter off-by-one sur l'index
+
+### Prochaines actions
+
+1. [ROUGE] Imprimer marqueurs ArUco (4 workspace IDs 0-3, 50 mm + 1 objet ID 10, 40 mm)
+2. [JAUNE] `bash scripts/real_robot_preflight.sh` + bridge Pi actif sur 10.10.0.223
+3. [VERT] `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+
+# Simulation (validation déjà passée)
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
+
+# Robot réel (prérequis ci-dessus)
+ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
+```
+
+---
+
+## État actuel (3 juin 2026 — pick-and-place ArUco scaffoldé)
+
+### 🧭 Prochaine action prioritaire
+
+**Valider le pick-and-place en Gazebo :** ✅ validé (voir entrée du soir)
+
+**Ensuite — robot réel (prérequis) :**
+1. Imprimer les 5 marqueurs ArUco (4 workspace IDs 0-3 + 1 objet ID 10)
+2. `bash scripts/real_robot_preflight.sh`
+3. `ssh er@10.10.0.223 'python3 bridge_pi_simple.py'`
+4. `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
 
 ---
 

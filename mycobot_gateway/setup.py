@@ -69,6 +69,11 @@ setup(
             'fk_ee_pose = mycobot_gateway.fk_ee_pose_node:main',
             # Orchestrateur benchmark : grille 9 cibles + rapport CSV
             'precision_benchmark = mycobot_gateway.precision_benchmark_node:main',
+
+            # ── Pick-and-place ArUco (sim + robot réel) ─────────────────────
+            # mode=sim  : gz set_pose emulation + mycobot_controller
+            # mode=real : trajectory_to_robot_bridge + bridge_tour + gripper
+            'pick_and_place_aruco = mycobot_gateway.pick_and_place_aruco_node:main',
         ],
     },
 )

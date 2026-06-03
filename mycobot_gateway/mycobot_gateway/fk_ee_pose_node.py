@@ -17,8 +17,6 @@ from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
-
 import numpy as np
 import rclpy
 from geometry_msgs.msg import PoseStamped, Quaternion
@@ -26,10 +24,14 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
 # ── import du module FK du dépôt ─────────────────────────────────────────────
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_FK_DIR    = str(_REPO_ROOT / "training" / "dream")
-if _FK_DIR not in sys.path:
-    sys.path.insert(0, _FK_DIR)
+_DREAM_DIR_ALT = '/home/genji/ros_jazzy/src/mycobot_R6A/training/dream'
+_DREAM_DIR = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', '..', '..', 'training', 'dream'
+))
+for _p in [_DREAM_DIR, _DREAM_DIR_ALT]:
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from mycobot_fk import forward_kinematics  # type: ignore  # noqa: E402
 

@@ -5,10 +5,11 @@ Pipeline lancé
 --------------
   1. Gazebo Harmonic  →  monde precision_benchmark.sdf
   2. robot_state_publisher  (URDF MyCobot 320 Pi)
-  3. ros_gz_bridge  →  joint_states + commandes joints
-  4. gz_sim_localizer_node  (délai 4s)  →  /aruco/object_pose depuis GT Gazebo
-  5. fk_ee_pose_node  (délai 4s)  →  /fk/ee_pose depuis /joint_states
-  6. precision_benchmark_node  (délai 6s)  →  benchmark 9 cibles + rapport CSV
+  3. ros_gz_bridge  →  /clock + joint_states
+  4. Spawners ros2_control  →  joint_state_broadcaster (3.5s) + mycobot_controller (4.5s)
+  5. gz_sim_localizer_node  (délai 5s)  →  /aruco/object_pose depuis GT Gazebo
+  6. fk_ee_pose_node  (délai 5s)  →  /fk/ee_pose depuis /joint_states
+  7. precision_benchmark_node  (délai 8s)  →  benchmark 9 cibles + rapport CSV
 
 Usage
 -----
@@ -46,7 +47,7 @@ def generate_launch_description() -> LaunchDescription:
     gz_pkg   = get_package_share_directory("ros_gz_sim")
 
     urdf_path  = os.path.join(
-        desc_pkg, "urdf", "320_pi", "mycobot_pro_320_pi_gazebo.urdf"
+        desc_pkg, "urdf", "320_pi", "mycobot_pro_320_pi_benchmark.urdf"
     )
     world_path = os.path.join(desc_pkg, "worlds", "precision_benchmark.sdf")
 
@@ -81,13 +82,13 @@ def generate_launch_description() -> LaunchDescription:
         output="screen",
     )
 
-    # ── Gazebo Harmonic ───────────────────────────────────────────────────────
+    # ── Gazebo Harmonic (mode serveur : pas d'IHM Qt, compatible SSH/VS Code) ─
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(gz_pkg, "launch", "gz_sim.launch.py")
         ),
         launch_arguments={
-            "gz_args": f"-r {world_path}",
+            "gz_args": f"-r -s {world_path}",   # -s = server-only, pas de GUI Qt
             "on_exit_shutdown": "true",
         }.items(),
     )
@@ -113,13 +114,11 @@ def generate_launch_description() -> LaunchDescription:
     bridge_args = [
         "/world/precision_benchmark/model/mycobot_320/joint_state"
         "@sensor_msgs/msg/JointState[gz.msgs.Model",
+        # Horloge Gazebo → ROS (nécessaire pour ros2_control)
+        "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
         # Pose du cube cible (pour gz_sim_localizer)
         "/model/target_cube/pose@geometry_msgs/msg/Pose[gz.msgs.Pose",
     ]
-    for jn in joint_names:
-        bridge_args.append(
-            f"/model/mycobot_320/joint/{jn}/cmd_pos@std_msgs/msg/Float64]gz.msgs.Double"
-        )
 
     gz_bridge = Node(
         package="ros_gz_bridge",
@@ -138,9 +137,38 @@ def generate_launch_description() -> LaunchDescription:
         output="screen",
     )
 
-    # ── gz_sim_localizer : publie /aruco/object_pose (délai 4s) ─────────────
+    controller_cfg = os.path.join(desc_pkg, "config", "controller.yaml")
+
+    # ── ros2_control controller spawners ─────────────────────────────────────
+    jsb_spawner = TimerAction(
+        period=3.5,
+        actions=[
+            Node(
+                package="controller_manager",
+                executable="spawner",
+                arguments=["joint_state_broadcaster",
+                           "--controller-manager", "/controller_manager"],
+                output="screen",
+            ),
+        ],
+    )
+    mycobot_spawner = TimerAction(
+        period=4.5,
+        actions=[
+            Node(
+                package="controller_manager",
+                executable="spawner",
+                arguments=["mycobot_controller",
+                           "--controller-manager", "/controller_manager",
+                           "--param-file", controller_cfg],
+                output="screen",
+            ),
+        ],
+    )
+
+    # ── gz_sim_localizer : publie /aruco/object_pose (délai 5s) ─────────────
     gz_localizer = TimerAction(
-        period=4.0,
+        period=5.0,
         actions=[
             Node(
                 package="mycobot_gateway",
@@ -151,28 +179,30 @@ def generate_launch_description() -> LaunchDescription:
                     "target_y":      LaunchConfiguration("target_y"),
                     "target_z":      LaunchConfiguration("target_z"),
                     "gz_pose_topic": "/gz/model/target_cube/pose",
+                    "use_sim_time":  True,
                 }],
                 output="screen",
             ),
         ],
     )
 
-    # ── fk_ee_pose : publie /fk/ee_pose (délai 4s) ───────────────────────────
+    # ── fk_ee_pose : publie /fk/ee_pose (délai 5s) ───────────────────────────
     fk_node = TimerAction(
-        period=4.0,
+        period=5.0,
         actions=[
             Node(
                 package="mycobot_gateway",
                 executable="fk_ee_pose",
                 name="fk_ee_pose_node",
+                parameters=[{"use_sim_time": True}],
                 output="screen",
             ),
         ],
     )
 
-    # ── benchmark principal (délai 6s) ────────────────────────────────────────
+    # ── benchmark principal (délai 8s) ────────────────────────────────────────
     benchmark_node = TimerAction(
-        period=6.0,
+        period=8.0,
         actions=[
             Node(
                 package="mycobot_gateway",
@@ -182,6 +212,7 @@ def generate_launch_description() -> LaunchDescription:
                     "settle_time": LaunchConfiguration("settle_time"),
                     "use_aruco":   True,
                     "output_dir":  LaunchConfiguration("output_dir"),
+                    "use_sim_time": True,
                 }],
                 output="screen",
             ),
@@ -198,6 +229,8 @@ def generate_launch_description() -> LaunchDescription:
         spawn,
         gz_bridge,
         # Nœuds benchmark (délayés)
+        jsb_spawner,
+        mycobot_spawner,
         fk_node,
         gz_localizer,
         benchmark_node,
