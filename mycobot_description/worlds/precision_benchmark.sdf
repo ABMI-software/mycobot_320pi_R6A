@@ -88,79 +88,97 @@
     </model>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         MARQUEURS WORKSPACE (IDs 0-3)
-         Petits cubes colorés 5×5×5 mm posés à plat sur la table (z=0)
-         Positions exactes utilisées par aruco_localizer_node (repère base)
+         MARQUEURS WORKSPACE ArUco (IDs 0-3)
+         Dalles 10×10 cm avec texture ArUco DICT_4X4_1000 (PNG 240×240).
+         Positions dans le repère base du robot :
+           ID 0 : ( 0.150, -0.150 )   ID 1 : ( 0.150,  0.150 )
+           ID 2 : ( 0.280, -0.150 )   ID 3 : ( 0.280,  0.150 )
          ═══════════════════════════════════════════════════════════════════ -->
 
-    <!-- ID 0 : avant-gauche — BLEU -->
+    <!-- ID 0 : avant-gauche -->
     <model name="ws_marker_0">
       <static>true</static>
-      <pose>0.150 -0.150 0.0025 0 0 0</pose>
+      <pose>0.150 -0.150 0.001 0 0 0</pose>
       <link name="link">
         <visual name="vis">
-          <geometry><box><size>0.050 0.050 0.005</size></box></geometry>
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
           <material>
-            <ambient>0.1 0.2 0.9 1</ambient>
-            <diffuse>0.15 0.25 1.0 1</diffuse>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0 0 0 0</specular>
+            <pbr><metal>
+              <albedo_map>textures/aruco_4x4_0000.png</albedo_map>
+            </metal></pbr>
           </material>
         </visual>
         <collision name="col">
-          <geometry><box><size>0.050 0.050 0.005</size></box></geometry>
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
         </collision>
       </link>
     </model>
 
-    <!-- ID 1 : avant-droit — VERT -->
+    <!-- ID 1 : avant-droit -->
     <model name="ws_marker_1">
       <static>true</static>
-      <pose>0.150 0.150 0.0025 0 0 0</pose>
+      <pose>0.150 0.150 0.001 0 0 0</pose>
       <link name="link">
         <visual name="vis">
-          <geometry><box><size>0.050 0.050 0.005</size></box></geometry>
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
           <material>
-            <ambient>0.1 0.8 0.2 1</ambient>
-            <diffuse>0.15 0.95 0.25 1</diffuse>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0 0 0 0</specular>
+            <pbr><metal>
+              <albedo_map>textures/aruco_4x4_0001.png</albedo_map>
+            </metal></pbr>
           </material>
         </visual>
         <collision name="col">
-          <geometry><box><size>0.050 0.050 0.005</size></box></geometry>
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
         </collision>
       </link>
     </model>
 
-    <!-- ID 2 : arrière-gauche — JAUNE -->
+    <!-- ID 2 : arrière-gauche -->
     <model name="ws_marker_2">
       <static>true</static>
-      <pose>0.280 -0.150 0.0025 0 0 0</pose>
+      <pose>0.280 -0.150 0.001 0 0 0</pose>
       <link name="link">
         <visual name="vis">
-          <geometry><box><size>0.050 0.050 0.005</size></box></geometry>
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
           <material>
-            <ambient>0.9 0.85 0.1 1</ambient>
-            <diffuse>1.0 0.95 0.15 1</diffuse>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0 0 0 0</specular>
+            <pbr><metal>
+              <albedo_map>textures/aruco_4x4_0002.png</albedo_map>
+            </metal></pbr>
           </material>
         </visual>
         <collision name="col">
-          <geometry><box><size>0.050 0.050 0.005</size></box></geometry>
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
         </collision>
       </link>
     </model>
 
-    <!-- ID 3 : arrière-droit — ORANGE -->
+    <!-- ID 3 : arrière-droit -->
     <model name="ws_marker_3">
       <static>true</static>
-      <pose>0.280 0.150 0.0025 0 0 0</pose>
+      <pose>0.280 0.150 0.001 0 0 0</pose>
       <link name="link">
         <visual name="vis">
-          <geometry><box><size>0.050 0.050 0.005</size></box></geometry>
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
           <material>
-            <ambient>0.95 0.50 0.05 1</ambient>
-            <diffuse>1.00 0.60 0.10 1</diffuse>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0 0 0 0</specular>
+            <pbr><metal>
+              <albedo_map>textures/aruco_4x4_0003.png</albedo_map>
+            </metal></pbr>
           </material>
         </visual>
         <collision name="col">
-          <geometry><box><size>0.050 0.050 0.005</size></box></geometry>
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
         </collision>
       </link>
     </model>
@@ -174,12 +192,26 @@
       <static>false</static>
       <pose>0.22 0.00 0.02 0 0 0</pose>
       <link name="link">
-        <visual name="vis">
+        <!-- Corps rouge visible sur 5 faces -->
+        <visual name="vis_body">
           <geometry><box><size>0.04 0.04 0.04</size></box></geometry>
           <material>
             <ambient>0.85 0.10 0.10 1</ambient>
             <diffuse>0.95 0.15 0.15 1</diffuse>
             <specular>0.40 0.10 0.10 1</specular>
+          </material>
+        </visual>
+        <!-- Marqueur ArUco ID 10 sur la face supérieure (décalé 0.021 au-dessus du centre) -->
+        <visual name="vis_aruco">
+          <pose>0 0 0.021 0 0 0</pose>
+          <geometry><box><size>0.038 0.038 0.001</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0 0 0 0</specular>
+            <pbr><metal>
+              <albedo_map>textures/aruco_4x4_0010.png</albedo_map>
+            </metal></pbr>
           </material>
         </visual>
         <collision name="col">
