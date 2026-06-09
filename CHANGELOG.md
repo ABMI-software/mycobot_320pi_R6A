@@ -7,6 +7,50 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.15.2-pre] - 2026-06-09 — branche `feature/pick-and-place`
+
+### Calibration main-œil robot réel — pipeline complet + nœuds caméra
+
+#### Ajouté
+
+- [`mycobot_gateway/calibrate_hand_eye_node.py`](mycobot_gateway/mycobot_gateway/calibrate_hand_eye_node.py) :
+  nœud interactif de calibration main-œil (eye-to-hand). Détecte le marqueur ID 20
+  via ArUco solvePnP, propose un balayage automatique de 30 poses (j4/j5/j6), résout
+  la transformation T_base←cam via OpenCV Tsai, sauvegarde en YAML.
+- [`mycobot_gateway/calibrate_extrinsic_node.py`](mycobot_gateway/mycobot_gateway/calibrate_extrinsic_node.py) :
+  nœud d'étalonnage extrinsèque caméra (PnP sur 4 marqueurs sol fixes).
+- [`mycobot_gateway/reach_target_aruco_node.py`](mycobot_gateway/mycobot_gateway/reach_target_aruco_node.py) :
+  nœud de déplacement du bras vers une cible ArUco localisée par `aruco_localizer_node`.
+- [`mycobot_gateway/orbbec_camera_publisher.py`](mycobot_gateway/mycobot_gateway/orbbec_camera_publisher.py) :
+  publisher dédié caméra Orbbec (OpenCV → `/camera/image_raw`).
+- [`mycobot_gateway/camera_live_view.py`](mycobot_gateway/mycobot_gateway/camera_live_view.py) :
+  visualiseur local (cv2.imshow) du flux `/camera/image_raw`.
+- [`mycobot_gateway/camera_web_view.py`](mycobot_gateway/mycobot_gateway/camera_web_view.py) :
+  serveur HTTP mjpeg du flux caméra (port 8080).
+- [`scripts/aruco_dictionary_probe.py`](scripts/aruco_dictionary_probe.py) :
+  outil diagnostic — détecte quel dictionnaire ArUco correspond au marqueur physique.
+- [`scripts/measure_aruco_workspace.py`](scripts/measure_aruco_workspace.py) :
+  mesure les positions X/Y/Z des marqueurs workspace depuis une image capturée.
+- [`training/calibration/camera_extrinsic.yaml`](training/calibration/camera_extrinsic.yaml) :
+  matrice extrinsèque caméra mesurée (T_base←cam).
+- [`training/calibration/workspace_markers.yaml`](training/calibration/workspace_markers.yaml) :
+  positions XY des marqueurs workspace (IDs 19/25/23/26) en repère base robot.
+
+#### Modifié
+
+- [`mycobot_gateway/aruco_localizer_node.py`](mycobot_gateway/mycobot_gateway/aruco_localizer_node.py) :
+  IDs workspace mis à jour (0-3 → 19/25/23/26), taille 50 mm → 25 mm, positions
+  chargées depuis `workspace_markers.yaml` au lieu d'être codées en dur.
+- [`mycobot_gateway/joint_sync.py`](mycobot_gateway/mycobot_gateway/joint_sync.py) :
+  parsing d'angles unifié — accepte `ANGLES:`, `angles:`, `angles_ok:` ;
+  ignore les réponses d'erreur `-1` (lecture série ratée).
+- [`mycobot_gateway/bridge_tour.py`](mycobot_gateway/mycobot_gateway/bridge_tour.py) :
+  IP par défaut `.225` → `.221` ; logs send/recv abaissés à `debug` (réduit le bruit).
+- [`setup.py`](mycobot_gateway/setup.py) : entry points ajoutés pour
+  `orbbec_camera_publisher`, `camera_live_view`, `camera_web_view`.
+
+---
+
 ## [1.15.1-pre] - 2026-06-03 — branche `feature/pick-and-place`
 
 ### Pick-and-place Gazebo — débug visuel (GUI + ArUco textures + HOME stable)
