@@ -32,6 +32,9 @@ setup(
             # Vision nodes (complex computation on Tour)
             'marker_detector = mycobot_gateway.vision.marker_detector:main',
             'camera_publisher = mycobot_gateway.vision.camera_publisher:main',
+            'orbbec_camera_publisher = mycobot_gateway.orbbec_camera_publisher:main',
+            'camera_live_view = mycobot_gateway.camera_live_view:main',
+            'camera_web_view = mycobot_gateway.camera_web_view:main',
             
             # Robot command interface
             'robot_commander = mycobot_gateway.robot_commander:main',
@@ -74,6 +77,12 @@ setup(
             # mode=sim  : gz set_pose emulation + mycobot_controller
             # mode=real : trajectory_to_robot_bridge + bridge_tour + gripper
             'pick_and_place_aruco = mycobot_gateway.pick_and_place_aruco_node:main',
+            # one-shot reach test (no gripper): /aruco/object_pose -> robot target
+            'reach_target_aruco = mycobot_gateway.reach_target_aruco_node:main',
+
+            # ── Calibration (§3.2 extrinsèque, §3.3 hand-eye) ───────────────
+            'calibrate_extrinsic = mycobot_gateway.calibrate_extrinsic_node:main',
+            'calibrate_hand_eye = mycobot_gateway.calibrate_hand_eye_node:main',
         ],
     },
 )

@@ -1,0 +1,18 @@
+# Positions mesurées des marqueurs sol (repère monde = repère base robot).
+# Repère : X=avant, Y=gauche (REP-103), Z=haut. Origine = centre base robot,
+# Z=0 = table. Unités : mètres. Mesurées au règlet ±1 mm (banc 4 juin 2026).
+#
+# IDs physiques (disposition réelle confirmée par sonde pixel le 9 juin 2026) :
+#   19 = proche-droite   23 = proche-gauche
+#   25 = loin-droite     26 = loin-gauche
+# NB : l'étiquetage initial gauche/droite (« vue depuis le bras ») était inversé
+#      en miroir ; Y a été corrigé (validé : caméra à z=+0.37 m, reproj < 0.6 px).
+#
+# Utilisé par : calibrate_extrinsic (§3.2). Chaque entrée = centre du marqueur.
+frame_id: base_link
+marker_size_m: 0.025
+markers:
+  19: [0.065, -0.241, 0.0]   # proche-droite
+  25: [0.365, -0.241, 0.0]   # loin-droite
+  23: [0.065,  0.241, 0.0]   # proche-gauche
+  26: [0.365,  0.241, 0.0]   # loin-gauche

@@ -3,41 +3,45 @@
 
 Pipeline lancé
 --------------
-  1. bridge_tour       → pont TCP Tour ↔ Pi (10.10.0.223:5005)
+  1. bridge_tour       → pont TCP Tour ↔ Pi (10.10.0.221:5005)
   2. trajectory_to_robot_bridge → /mycobot_controller/joint_trajectory
                                   → JSON /to_robot → bridge_tour → Pi
   3. fk_ee_pose        → /joint_states (Pi) → FK → /fk/ee_pose
-  4. aruco_localizer   → cam_0 → ArUco → /aruco/object_pose
+    4. aruco_localizer   → caméra RGB (depth cam) → ArUco → /aruco/object_pose
   5. pick_and_place_aruco (mode=real) → cycle pick-place complet
 
 Prérequis avant lancement
 --------------------------
-  1. Vérifier ping Pi : ping -c 1 10.10.0.223
+  1. Vérifier ping Pi : ping -c 1 10.10.0.221
   2. Lancer le bridge sur le Pi :
-       ssh er@10.10.0.223 'python3 ~/bridge_pi_simple.py'
-  3. S'assurer que la caméra cam_0 est branchée (USB) et visible.
+      ssh er@10.10.0.221 'python3 ~/bridge_pi_simple.py'
+    3. S'assurer que la depth camera (RGB) est branchée sur la tour et visible.
   4. Imprimer et positionner les marqueurs ArUco :
-       - 4 marqueurs workspace (IDs 0-3, 50 mm, DICT_4X4_1000)
-         aux coins de la zone de travail (voir docs/CAMERA_CALIBRATION.md)
-       - 1 marqueur objet (ID 10, 40 mm) sur le cube à saisir
+       - 4 marqueurs workspace (IDs 0-3, 25 mm, DICT_4X4_1000)
+         aux coins : ID 0 proche-droite, ID 1 proche-gauche,
+                     ID 2 loin-droite,   ID 3 loin-gauche
+       - 1 marqueur objet (ID 10, 25 mm) sur l'objet à saisir
   5. Lancer le preflight : bash scripts/real_robot_preflight.sh
 
 Usage
 -----
   ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
   ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py \
-      settle_time:=3.0 pi_ip:=10.10.0.223
+      settle_time:=3.0 pi_ip:=10.10.0.221 obj_marker_id:=811
 
 Arguments
 ---------
-  pi_ip           : IP du Raspberry Pi                    (défaut : 10.10.0.223)
+  pi_ip           : IP du Raspberry Pi                    (défaut : 10.10.0.221)
   pi_port         : port TCP bridge Pi                    (défaut : 5005)
-  camera_topic    : topic image caméra                   (défaut : /camera/image_raw)
+    camera_topic    : topic image caméra RGB              (défaut : /camera/color/image_raw)
   calib_file      : chemin vers cam_0.npz                (défaut : auto)
+    camera_height_m : hauteur caméra base→cam (m)          (défaut : 0.57)
   settle_time     : attente stabilisation par segment (s) (défaut : 3.0)
   speed           : vitesse pymycobot (1-100)             (défaut : 40)
   place_x/y/z     : position de dépose (m)               (défaut : 0.20/-0.18/0.04)
   approach_height : hauteur approche (m)                  (défaut : 0.12)
+    object_diameter : diamètre objet (m)                    (défaut : 0.06)
+  obj_marker_id    : ID ArUco du marqueur objet             (défaut : 10)
 """
 
 from __future__ import annotations
@@ -53,16 +57,19 @@ from launch_ros.actions import Node
 def generate_launch_description() -> LaunchDescription:
 
     # ── Arguments ─────────────────────────────────────────────────────────────
-    pi_ip_arg    = DeclareLaunchArgument("pi_ip",           default_value="10.10.0.223")
+    pi_ip_arg    = DeclareLaunchArgument("pi_ip",           default_value="10.10.0.221")
     pi_port_arg  = DeclareLaunchArgument("pi_port",         default_value="5005")
-    cam_arg      = DeclareLaunchArgument("camera_topic",    default_value="/camera/image_raw")
+    cam_arg      = DeclareLaunchArgument("camera_topic",    default_value="/camera/color/image_raw")
     calib_arg    = DeclareLaunchArgument("calib_file",      default_value="")
+    cam_h_arg    = DeclareLaunchArgument("camera_height_m", default_value="0.35")
     settle_arg   = DeclareLaunchArgument("settle_time",     default_value="3.0")
     speed_arg    = DeclareLaunchArgument("speed",           default_value="40")
     place_x_arg  = DeclareLaunchArgument("place_x",        default_value="0.20")
     place_y_arg  = DeclareLaunchArgument("place_y",        default_value="-0.18")
     place_z_arg  = DeclareLaunchArgument("place_z",        default_value="0.04")
     app_h_arg    = DeclareLaunchArgument("approach_height", default_value="0.12")
+    obj_d_arg    = DeclareLaunchArgument("object_diameter", default_value="0.06")
+    obj_id_arg   = DeclareLaunchArgument("obj_marker_id",   default_value="10")
 
     # ── bridge_tour : Tour ↔ Pi TCP ───────────────────────────────────────────
     bridge_tour = Node(
@@ -106,11 +113,19 @@ def generate_launch_description() -> LaunchDescription:
         executable="aruco_localizer",
         name="aruco_localizer_node",
         parameters=[{
-            "camera_topic":    LaunchConfiguration("camera_topic"),
-            "calib_file":      LaunchConfiguration("calib_file"),
-            "ws_marker_size":  0.050,
-            "obj_marker_size": 0.040,
-            "obj_marker_id":   10,
+            "camera_topic":         LaunchConfiguration("camera_topic"),
+            "calib_file":           LaunchConfiguration("calib_file"),
+            "camera_height_m":      LaunchConfiguration("camera_height_m"),
+            "ws_marker_size":       0.025,
+            "obj_marker_size":      0.025,
+            "obj_marker_id":        LaunchConfiguration("obj_marker_id"),
+            # Mapping physique confirmé le 4 juin 2026 :
+            #   slot0=proche-gauche  slot1=loin-gauche
+            #   slot2=proche-droite  slot3=loin-droite
+            "auto_workspace_ids":   False,
+            "ws_marker_ids":        [19, 25, 23, 26],
+            "aruco_dict_name":      "DICT_4X4_1000",
+            "aruco_detect_scale":   1.8,
         }],
         output="screen",
     )
@@ -128,6 +143,7 @@ def generate_launch_description() -> LaunchDescription:
             "place_y":         LaunchConfiguration("place_y"),
             "place_z":         LaunchConfiguration("place_z"),
             "approach_height": LaunchConfiguration("approach_height"),
+            "object_diameter": LaunchConfiguration("object_diameter"),
             "pose_timeout":    30.0,
         }],
         output="screen",
@@ -135,8 +151,10 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         pi_ip_arg, pi_port_arg, cam_arg, calib_arg,
+        cam_h_arg,
         settle_arg, speed_arg,
-        place_x_arg, place_y_arg, place_z_arg, app_h_arg,
+        place_x_arg, place_y_arg, place_z_arg, app_h_arg, obj_d_arg,
+        obj_id_arg,
         bridge_tour,
         traj_bridge,
         fk_node,

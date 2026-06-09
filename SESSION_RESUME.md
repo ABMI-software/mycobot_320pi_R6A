@@ -1,15 +1,72 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 3 juin 2026 (pick-and-place ArUco — implementation Gazebo + reel)
-> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0-pre (calibration) · 1.15.0-pre (pick-and-place ArUco)
+> **Date de dernière mise à jour :** 9 juin 2026 (calibration main-œil — nœud hand-eye en cours de validation)
+> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0-pre (calibration) · 1.15.2-pre (pick-and-place ArUco)
 > **Branche active :** `feature/pick-and-place`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.221` (pas `.223`/`.225` comme certains anciens docs)
 
 ---
 
+## État actuel (9 juin 2026 — soir — calibration main-œil sur robot réel)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Nœud `calibrate_hand_eye_node`** : implémenté et lancé sur robot réel.
+  - Souscrit à `/camera/image_raw` (Orbbec, ~5 Hz) + `/joint_states`.
+  - Détecte le marqueur ID 20 (3 cm, DICT_4X4_1000) via ArUco + solvePnP.
+  - Balayage automatique (`a`) : génère 30 poses en perturbant j4/j5/j6 autour
+    de la base, attend 3 s de stabilisation, capture si marqueur visible.
+  - Solve Tsai (OpenCV hand-eye) + sauvegarde `hand_eye_calibration.yaml`.
+- **Validation robot réel** : connexion confirmée à `10.10.0.221:5005`.
+  - Angles lus : `[14.58, -136.05, 20.83, 32.43, -89.64, 0.26]°`.
+  - Marqueur ID 20 détecté à `[0.001, -0.038, 0.510]` m (position stable).
+  - Commande servo release opérationnelle : `ros2 topic pub --once /to_robot std_msgs/msg/String 'data: "stop"'`.
+- **`aruco_localizer_node`** : mis à jour avec les vrais IDs et tailles mesurées
+  (IDs 19/25/23/26, 25 mm) et chargement positions depuis `workspace_markers.yaml`.
+- **`joint_sync.py`** : parsing d'angles refactorisé — accepte `ANGLES:`, `angles:`,
+  `angles_ok:` ; ignore les réponses d'erreur `-1`.
+- **Nodes caméra** : `orbbec_camera_publisher`, `camera_live_view`, `camera_web_view`
+  ajoutés + enregistrés dans `setup.py`.
+- **`calibrate_extrinsic_node`** : nœud d'étalonnage extrinsèque caméra (PnP 4 marqueurs sol).
+- **`reach_target_aruco_node`** : nœud de déplacement vers cible ArUco.
+- **`bridge_tour.py`** : IP par défaut `.225` → `.221` ; logs send/recv passés en `debug`.
+- **Calibration sauvegardée** : `training/calibration/camera_extrinsic.yaml` + `workspace_markers.yaml`.
+
+### Décisions prises
+
+- Pi réelle confirmée à `10.10.0.221` (mettre à jour CLAUDE.md séparément).
+- `aruco_detect_scale = 1.6` pas de callback live → redémarrer le nœud pour changer.
+- Marqueur ID 20 (3 cm) à 51 cm détectable mais instable (~50 % des frames) :
+  cause probable = éclairage rasant ou légère inclinaison. Pas bloquant pour le balayage.
+
+### Prochaines actions
+
+1. [ROUGE] Lancer le balayage auto (`a`) avec le marqueur stable face caméra — collecter ≥ 20 échantillons.
+2. [ROUGE] Lancer `s` pour résoudre et sauvegarder `hand_eye_calibration.yaml`.
+3. [JAUNE] Valider la calibration : envoyer une pose connue, comparer position prédite vs réelle.
+4. [VERT] Commiter `scripts/real_robot_preflight.sh` (IP `.221`) sur `feature/teleoperation`.
+5. [VERT] Mettre à jour `CLAUDE.md` : Pi IP `10.10.0.223` → `10.10.0.221`.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate && source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+# Terminal 1 — bridge
+ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
+# Terminal 2 — nœud hand-eye (log vers fichier pour surveillance)
+ros2 run mycobot_gateway calibrate_hand_eye_node \
+  --ros-args -p aruco_detect_scale:=2.5 -p marker_size:=0.03 -p marker_id:=20 \
+  2>&1 | tee /tmp/handeye.log
+# Surveiller
+tail -f /tmp/handeye.log | grep -E "VISIBLE|hors champ|Capture|Balayage"
+```
+
+---
+
 ## Handoff pick-and-place (a lire en premier pour la prochaine session)
 
+- Handoff detaille du 4 juin 2026 : [`docs/PICK_AND_PLACE_HANDOFF_2026-06-04.md`](docs/PICK_AND_PLACE_HANDOFF_2026-06-04.md)
 - Handoff detaille du 3 juin 2026 : [`docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md`](docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md)
 - Contient :
   - ce qui a ete implemente aujourd'hui (sim + reel),
