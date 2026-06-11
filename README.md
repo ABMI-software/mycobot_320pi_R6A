@@ -38,8 +38,26 @@ Ce package permet de contrôler un robot MyCobot 320 Pi depuis un PC "Tour" via 
 
 | Package | Description |
 |---------|-------------|
-| `mycobot_gateway` | Bridge TCP, GUI, contrôles (Tour/PC) |
-| `mycobot_description` | URDF, meshes, configs RViz |
+| `mycobot_gateway` | Bridge TCP, GUI, contrôles, collecte données synthétiques (Tour/PC) |
+| `mycobot_description` | URDF, meshes, configs RViz, world Gazebo |
+
+## 🤖 Synthetic Data Pipeline (Gazebo)
+
+Génération de 50 000 images labellisées pour l'entraînement DREAM / pose estimation.
+4 caméras en anneau à 90°, intrinsèques calées sur les Arducam réelles (calibration ChArUco).
+
+```bash
+# Preview (vérification visuelle — 5 poses, ~30 s)
+conda deactivate && source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+ros2 launch mycobot_gateway synthetic_data_preview.launch.py
+# → /tmp/synth_preview/preview_grid.png
+
+# Acquisition complète (50 000 images, ~4-5 h)
+ros2 launch mycobot_gateway synthetic_data.launch.py \
+    num_samples:=12500 output_dir:=/tmp/synth_50k
+```
+
+Voir [docs/SYNTHETIC_DATA.md](docs/SYNTHETIC_DATA.md) pour le détail complet.
 
 ## 🚀 Quick Start
 
