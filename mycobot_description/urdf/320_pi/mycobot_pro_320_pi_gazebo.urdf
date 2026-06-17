@@ -421,12 +421,26 @@
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
-  <!-- ==================== CAMERA FOR SYNTHETIC DATA ==================== -->
+  <!-- ==================== 4 CAMERAS FOR SYNTHETIC DATA ==================== -->
+  <!--                                                                               -->
+  <!-- Intrinsics from ChArUco calibration (feature/calibration-cam, 28/04/2026)    -->
+  <!--   cam_0 intrinsics: fx=525.671 fy=529.700 cx=317.729 cy=226.003  RMS=0.674   -->
+  <!--   cam_3 intrinsics: fx=496.308 fy=494.143 cx=313.374 cy=248.006  RMS=0.678   -->
+  <!--                                                                               -->
+  <!-- Distribution: cam_0 and cam_2 use cam_0 intrinsics                           -->
+  <!--               cam_1 and cam_3 use cam_3 intrinsics                           -->
+  <!--                                                                               -->
+  <!-- Placement (90-degree symmetric ring at z=0.4 m):                             -->
+  <!--   cam_0: (  0.8,  0.0, 0.4) front  — rpy=(0,  0.30,  3.1416)               -->
+  <!--   cam_1: (  0.0,  0.8, 0.4) left   — rpy=(0,  0.30, -1.5708)               -->
+  <!--   cam_2: ( -0.7,  0.0, 0.4) back   — rpy=(0,  0.50,  0.0   )               -->
+  <!--   cam_3: (  0.0, -0.8, 0.4) right  — rpy=(0,  0.30,  1.5708)               -->
 
   <!-- Camera mount (fixed in the world, looking at the robot).
        Visual is shaped like a real CCTV/IP camera so it doesn't look
        like one of the colored sort cubes: a dark-gray body box plus a
        black lens cylinder protruding along the optical axis (+X). -->
+  <!-- cam_0: front view, cam_0 intrinsics -->
   <link name="camera_link">
     <visual name="body">
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -456,170 +470,134 @@
       </material>
     </visual>
     <inertial>
-      <mass value="0.01"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
     </inertial>
   </link>
-
-  <!-- ===== CAMERA 1 (front) — original position ===== -->
+  <!-- ===== CAMERA 1 (front) — cam_0 intrinsics ===== -->
   <joint name="world_to_camera" type="fixed">
-    <parent link="world"/>
-    <child link="camera_link"/>
-    <!-- x=0.8 forward, z=0.4 height, pitched down toward robot -->
-    <origin xyz="0.8 0.0 0.4" rpy="0 0.3 3.1416"/>
+    <parent link="world"/><child link="camera_link"/>
+    <origin xyz="0.8 0.0 0.4" rpy="0 0.30 3.1416"/>
   </joint>
-
   <gazebo reference="camera_link">
     <sensor name="synth_camera" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
       <visualize>true</visualize>
       <camera>
-        <horizontal_fov>1.047</horizontal_fov>
-        <image>
-          <width>640</width>
-          <height>480</height>
-          <format>R8G8B8</format>
-        </image>
-        <clip>
-          <near>0.05</near>
-          <far>10.0</far>
-        </clip>
+        <horizontal_fov>1.0937</horizontal_fov>  <!-- 2*atan(640/(2*525.671)) -->
+        <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+        <clip><near>0.05</near><far>10.0</far></clip>
+        <intrinsics>
+          <fx>525.671</fx><fy>529.700</fy>
+          <cx>317.729</cx><cy>226.003</cy>
+          <s>0</s>
+        </intrinsics>
       </camera>
       <topic>synth_camera/image</topic>
     </sensor>
   </gazebo>
 
-  <!-- ===== CAMERA 2 (right side, 90° from front) ===== -->
-  <link name="camera_link_right">
-    <visual name="body">
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><box size="0.06 0.04 0.04"/></geometry>
-      <material name="camera_body_dark2"><color rgba="0.15 0.15 0.18 1.0"/></material>
-    </visual>
-    <visual name="lens">
-      <origin xyz="0.035 0 0" rpy="0 1.5708 0"/>
-      <geometry><cylinder radius="0.013" length="0.025"/></geometry>
-      <material name="camera_lens_black2"><color rgba="0.05 0.05 0.05 1.0"/></material>
-    </visual>
-    <visual name="led">
-      <origin xyz="0.030 0.013 0.013" rpy="0 0 0"/>
-      <geometry><sphere radius="0.0025"/></geometry>
-      <material name="camera_led_red2"><color rgba="0.9 0.05 0.05 1.0"/></material>
+  <!-- cam_1: left view, cam_3 intrinsics -->
+  <link name="camera_link_1">
+    <visual>
+      <geometry><box size="0.03 0.03 0.03"/></geometry>
+      <material name="cam1_green"><color rgba="0.2 0.8 0.2 1.0"/></material>
     </visual>
     <inertial>
-      <mass value="0.01"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
     </inertial>
   </link>
-
-  <joint name="world_to_camera_right" type="fixed">
-    <parent link="world"/>
-    <child link="camera_link_right"/>
-    <origin xyz="0.0 0.8 0.4" rpy="0 0.3 -1.5708"/>
+  <joint name="world_to_camera_1" type="fixed">
+    <parent link="world"/><child link="camera_link_1"/>
+    <origin xyz="0.0 0.8 0.4" rpy="0 0.30 -1.5708"/>
   </joint>
-
-  <gazebo reference="camera_link_right">
-    <sensor name="synth_camera_right" type="camera">
+  <gazebo reference="camera_link_1">
+    <sensor name="synth_camera_1" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
-      <visualize>false</visualize>
+      <visualize>true</visualize>
       <camera>
-        <horizontal_fov>1.047</horizontal_fov>
+        <horizontal_fov>1.1454</horizontal_fov>  <!-- 2*atan(640/(2*496.308)) -->
         <image><width>640</width><height>480</height><format>R8G8B8</format></image>
         <clip><near>0.05</near><far>10.0</far></clip>
+        <intrinsics>
+          <fx>496.308</fx><fy>494.143</fy>
+          <cx>313.374</cx><cy>248.006</cy>
+          <s>0</s>
+        </intrinsics>
       </camera>
-      <topic>synth_camera_right/image</topic>
+      <topic>synth_camera_1/image</topic>
     </sensor>
   </gazebo>
 
-  <!-- ===== CAMERA 3 (left side, -90° from front) ===== -->
-  <link name="camera_link_left">
-    <visual name="body">
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><box size="0.06 0.04 0.04"/></geometry>
-      <material name="camera_body_dark3"><color rgba="0.15 0.15 0.18 1.0"/></material>
-    </visual>
-    <visual name="lens">
-      <origin xyz="0.035 0 0" rpy="0 1.5708 0"/>
-      <geometry><cylinder radius="0.013" length="0.025"/></geometry>
-      <material name="camera_lens_black3"><color rgba="0.05 0.05 0.05 1.0"/></material>
-    </visual>
-    <visual name="led">
-      <origin xyz="0.030 0.013 0.013" rpy="0 0 0"/>
-      <geometry><sphere radius="0.0025"/></geometry>
-      <material name="camera_led_red3"><color rgba="0.9 0.05 0.05 1.0"/></material>
+  <!-- cam_2: back view, cam_0 intrinsics -->
+  <!-- Steeper pitch (0.50 rad) because distance is 0.7 m vs 0.8 m for front cam   -->
+  <link name="camera_link_2">
+    <visual>
+      <geometry><box size="0.03 0.03 0.03"/></geometry>
+      <material name="cam2_red"><color rgba="0.8 0.2 0.2 1.0"/></material>
     </visual>
     <inertial>
-      <mass value="0.01"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
     </inertial>
   </link>
-
-  <joint name="world_to_camera_left" type="fixed">
-    <parent link="world"/>
-    <child link="camera_link_left"/>
-    <origin xyz="0.0 -0.8 0.4" rpy="0 0.3 1.5708"/>
+  <joint name="world_to_camera_2" type="fixed">
+    <parent link="world"/><child link="camera_link_2"/>
+    <origin xyz="-0.7 0.0 0.4" rpy="0 0.50 0.0"/>
   </joint>
-
-  <gazebo reference="camera_link_left">
-    <sensor name="synth_camera_left" type="camera">
+  <gazebo reference="camera_link_2">
+    <sensor name="synth_camera_2" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
-      <visualize>false</visualize>
+      <visualize>true</visualize>
       <camera>
-        <horizontal_fov>1.047</horizontal_fov>
+        <horizontal_fov>1.0937</horizontal_fov>  <!-- cam_0 intrinsics -->
         <image><width>640</width><height>480</height><format>R8G8B8</format></image>
         <clip><near>0.05</near><far>10.0</far></clip>
+        <intrinsics>
+          <fx>525.671</fx><fy>529.700</fy>
+          <cx>317.729</cx><cy>226.003</cy>
+          <s>0</s>
+        </intrinsics>
       </camera>
-      <topic>synth_camera_left/image</topic>
+      <topic>synth_camera_2/image</topic>
     </sensor>
   </gazebo>
 
-  <!-- ===== CAMERA 4 (overhead, looking straight down) ===== -->
-  <link name="camera_link_top">
-    <visual name="body">
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><box size="0.06 0.04 0.04"/></geometry>
-      <material name="camera_body_dark4"><color rgba="0.15 0.15 0.18 1.0"/></material>
-    </visual>
-    <visual name="lens">
-      <origin xyz="0.035 0 0" rpy="0 1.5708 0"/>
-      <geometry><cylinder radius="0.013" length="0.025"/></geometry>
-      <material name="camera_lens_black4"><color rgba="0.05 0.05 0.05 1.0"/></material>
-    </visual>
-    <visual name="led">
-      <origin xyz="0.030 0.013 0.013" rpy="0 0 0"/>
-      <geometry><sphere radius="0.0025"/></geometry>
-      <material name="camera_led_red4"><color rgba="0.9 0.05 0.05 1.0"/></material>
+  <!-- cam_3: right view, cam_3 intrinsics -->
+  <link name="camera_link_3">
+    <visual>
+      <geometry><box size="0.03 0.03 0.03"/></geometry>
+      <material name="cam3_yellow"><color rgba="0.8 0.8 0.2 1.0"/></material>
     </visual>
     <inertial>
-      <mass value="0.01"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/><origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
     </inertial>
   </link>
-
-  <joint name="world_to_camera_top" type="fixed">
-    <parent link="world"/>
-    <child link="camera_link_top"/>
-    <origin xyz="0.0 0.0 1.2" rpy="0 1.5708 0"/>
+  <joint name="world_to_camera_3" type="fixed">
+    <parent link="world"/><child link="camera_link_3"/>
+    <origin xyz="0.0 -0.8 0.4" rpy="0 0.30 1.5708"/>
   </joint>
-
-  <gazebo reference="camera_link_top">
-    <sensor name="synth_camera_top" type="camera">
+  <gazebo reference="camera_link_3">
+    <sensor name="synth_camera_3" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
-      <visualize>false</visualize>
+      <visualize>true</visualize>
       <camera>
-        <horizontal_fov>1.047</horizontal_fov>
+        <horizontal_fov>1.1454</horizontal_fov>  <!-- cam_3 intrinsics -->
         <image><width>640</width><height>480</height><format>R8G8B8</format></image>
         <clip><near>0.05</near><far>10.0</far></clip>
+        <intrinsics>
+          <fx>496.308</fx><fy>494.143</fy>
+          <cx>313.374</cx><cy>248.006</cy>
+          <s>0</s>
+        </intrinsics>
       </camera>
-      <topic>synth_camera_top/image</topic>
+      <topic>synth_camera_3/image</topic>
     </sensor>
   </gazebo>
 
