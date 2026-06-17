@@ -1,216 +1,22 @@
-# 📚 Index de Documentation - MyCobot Gateway Bridge# 📚 Index de Documentation - MyCobot Gateway Bridge
+# 📚 Index de Documentation — MyCobot 320 Pi R6A
 
+Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte centrale vers tous les autres documents.
 
+## 🎯 Par où commencer ?
 
-Bienvenue dans la documentation du bridge ROS2 pour MyCobot !Bienvenue dans la documentation du bridge ROS2 pour MyCobot !
+### Première utilisation
+- **[README.md](README.md)** — Vue d'ensemble, architecture, quick start, commandes principales
+- **[docs/QUICKSTART.md](docs/QUICKSTART.md)** — Démarrage en 3 étapes
+- **[CLAUDE.md](CLAUDE.md)** — Onboarding pour les sessions Claude Code + roadmap POC (Isaac Sim, VLA, etc.)
 
+### Système distribué (PC Tour ↔ Pi)
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Architecture détaillée Tour/Pi + nœuds + topics
+- **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — Guide de déploiement complet
 
-
-## 🎯 Par où commencer ?## 🎯 Par où commencer ?
-
-
-
-### Première utilisation### Première utilisation
-
-👉 **[docs/QUICKSTART.md](docs/QUICKSTART.md)** — Démarrage en 3 étapes👉 **[QUICKSTART.md](QUICKSTART.md)** — Démarrage en 3 étapes
-
-
-
-### 🆕 Système distribué (Vision + Robot)### 🆕 Système distribué (Vision + Robot)
-
-👉 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Architecture Tour/Pi👉 **[ARCHITECTURE.md](ARCHITECTURE.md)** — Architecture Tour/Pi
-
-👉 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — Guide de déploiement complet👉 **[DEPLOYMENT.md](DEPLOYMENT.md)** — Guide de déploiement complet
-
-
-
-### Problème à résoudre ?### Problème à résoudre ?
-
-👉 **[scripts/diagnose.sh](scripts/diagnose.sh)** — Script de diagnostic automatique👉 **[diagnose.sh](diagnose.sh)** — Script de diagnostic automatique
-
-
-
-### Besoin d'aide ?### Besoin d'aide ?
-
-👉 **[mycobot_gateway/README.md](mycobot_gateway/README.md)** — Documentation complète👉 **[mycobot_gateway/README.md](mycobot_gateway/README.md)** — Documentation complète
-
-
-
-------
-
-
-
-## 📁 Structure du Projet## 🆕 Système Distribué (v0.1.0)
-
-
-
-```### Architecture
-
-mycobot_R6A/```
-
-├── INDEX.md                      # 📖 Ce fichierTour (PC)                          Raspberry Pi
-
-├── bridge_pi_debug.py            # ⭐ Serveur TCP (à copier sur Pi)┌─────────────────────┐            ┌─────────────────────┐
-
-││ • camera_publisher  │            │                     │
-
-├── mycobot_gateway/              # 📦 Package ROS2│ • marker_detector   │──TCP/IP──▶│ • bridge_pi         │
-
-│   ├── mycobot_gateway/│ • robot_commander   │            │ • MyCobot control   │
-
-│   │   ├── __init__.py│ • bridge_tour       │◀──────────│                     │
-
-│   │   ├── bridge_tour.py        # ⭐ Client TCP (Tour)└─────────────────────┘            └─────────────────────┘
-
-│   │   ├── robot_commander.py```
-
-│   │   └── command_executor_pi.py
-
-│   ├── scripts/### Nouveaux Nodes (Tour)
-
-│   │   ├── bridge_tour           # Wrapper exécutable| Node | Description |
-
-│   │   ├── bridge_pi_standalone.py|------|-------------|
-
-│   │   └── ...| `camera_publisher` | Capture caméra USB |
-
-│   ├── launch/| `marker_detector` | Détection ArUco + transformation |
-
-│   ├── setup.py| `robot_commander` | Interface commandes interactive |
-
-│   ├── package.xml
-
-│   └── README.md### Launch Files
-
-│```bash
-
-├── docs/                         # 📚 Documentation# Suivi de marqueur complet
-
-│   ├── QUICKSTART.md             # Démarrage rapideros2 launch mycobot_gateway marker_follow.launch.py
-
-│   ├── ROBOT_QUICKSTART.md       # Guide rapide robot
-
-│   ├── ARCHITECTURE.md           # Architecture système# Bridge seul
-
-│   ├── DEPLOYMENT.md             # Guide de déploiementros2 launch mycobot_gateway bridge_only.launch.py
-
-│   ├── TEST_COMPLET.md           # Procédure de test complète
-
-│   ├── TEST_ROBOT_PROCEDURE.md   # Procédure détaillée# Commander interactif
-
-│   ├── SESSION_TEST.md           # Log de session de testros2 launch mycobot_gateway commander.launch.py
-
-│   ├── SUMMARY.md                # Résumé du projet```
-
-│   ├── DEBUG_CONNECTION_GUIDE.md # Guide de débogage
-
-│   ├── BRIDGE_PI_UPGRADE_GUIDE.md---
-
-│   ├── DIAGNOSTIC_ROBOT.txt
-
-│   └── ROBOT_TESTS_GUIDE.txt## 📖 Documentation disponible
-
-│
-
-├── scripts/                      # 🔧 Scripts utilitaires### 🚀 Guides utilisateur
-
-│   ├── quick_commands.sh         # Commandes rapides (source)
-
-│   ├── diagnose.sh               # Diagnostic complet| Fichier | Description |
-
-│   ├── diagnostic_full.sh        # Diagnostic étendu|---------|-------------|
-
-│   ├── check_pi_bridge.sh        # Vérification Pi| **[QUICKSTART.md](QUICKSTART.md)** | Démarrage rapide |
-
-│   ├── test_bridge.sh            # Test du bridge| **[ARCHITECTURE.md](ARCHITECTURE.md)** | 🆕 Architecture distribuée |
-
-│   └── robot_test_interactive.sh # Test interactif| **[DEPLOYMENT.md](DEPLOYMENT.md)** | 🆕 Guide déploiement |
-
-│| **[ROBOT_QUICKSTART.md](ROBOT_QUICKSTART.md)** | Tests robot réel |
-
-├── build/                        # 🔨 Fichiers de build (généré)| **[SUMMARY.md](SUMMARY.md)** | Résumé complet |
-
-├── install/                      # 📦 Package installé (généré)
-
-└── log/                          # 📝 Logs colcon (généré)### 🔧 Scripts utiles
-
-```
-
-| Script | Commande |
-
----|--------|----------|
-
-| **diagnose.sh** | `./diagnose.sh` |
-
-## 🆕 Système Distribué (v0.1.0)| **test_bridge.sh** | `./test_bridge.sh` |
-
-| **quick_commands.sh** | `source quick_commands.sh` |
-
-### Architecture
-
-```---
-
-Tour (PC)                          Raspberry Pi
-
-┌─────────────────────┐            ┌─────────────────────┐## 📂 Structure
-
-│ • camera_publisher  │            │                     │
-
-│ • marker_detector   │──TCP/IP──▶│ • bridge_pi         │```
-
-│ • robot_commander   │            │ • MyCobot control   │mycobot_gateway/
-
-│ • bridge_tour       │◀──────────│                     │├── mycobot_gateway/
-
-└─────────────────────┘            └─────────────────────┘│   ├── bridge_tour.py
-
-```│   ├── robot_commander.py      # 🆕
-
-│   └── vision/                 # 🆕
-
-### Nouveaux Nodes (Tour)│       ├── camera_publisher.py
-
-| Node | Description |│       └── marker_detector.py
-
-|------|-------------|├── scripts/
-
-| `camera_publisher` | Capture caméra USB |│   └── bridge_pi_standalone.py # 🆕 Pour Pi
-
-| `marker_detector` | Détection ArUco + transformation |├── launch/                     # 🆕
-
-| `robot_commander` | Interface commandes interactive |│   ├── marker_follow.launch.py
-
-│   ├── bridge_only.launch.py
-
-### Launch Files│   └── commander.launch.py
-
-```bash└── setup.py
-
-# Suivi de marqueur complet```
-
-ros2 launch mycobot_gateway marker_follow.launch.py
-
----
-
-# Bridge seul
-
-ros2 launch mycobot_gateway bridge_only.launch.py**Version:** 0.1.0 | **Mise à jour:** 26 mars 2026 | **ROS2:** Jazzy
-
-
-# Commander interactif
-ros2 launch mycobot_gateway commander.launch.py
-```
-
----
-
-## ⚙️ Configuration
-
-| Paramètre | Valeur |
-|-----------|--------|
-| IP Raspberry Pi | `10.10.0.218` |
-| Port TCP | `5005` |
-| ROS_DOMAIN_ID | `10` |
-| Port série robot | `/dev/ttyAMA0` |
+### Suivi du projet
+- **[SESSION_RESUME.md](SESSION_RESUME.md)** — Point de départ sessions (état actuel)
+- **[DEVELOPMENT_SUMMARY.md](DEVELOPMENT_SUMMARY.md)** — Résumé technique détaillé
+- **[CHANGELOG.md](CHANGELOG.md)** — Historique versionné (Keep a Changelog, double track téléop 2.x + sorting 1.x)
 
 ---
 
@@ -219,88 +25,79 @@ ros2 launch mycobot_gateway commander.launch.py
 ### 🚀 Démarrage
 | Document | Description |
 |----------|-------------|
+| [README.md](README.md) | Vue d'ensemble + quick start + index principal |
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | Guide de démarrage rapide |
-| [docs/ROBOT_QUICKSTART.md](docs/ROBOT_QUICKSTART.md) | Démarrage pour le robot |
-| [mycobot_gateway/README.md](mycobot_gateway/README.md) | README du package |
+| [docs/ROBOT_QUICKSTART.md](docs/ROBOT_QUICKSTART.md) | Démarrage côté robot physique |
+| [mycobot_gateway/README.md](mycobot_gateway/README.md) | README du package gateway (nœuds, launches, topics) |
+| [mycobot_description/README_GAZEBO.md](mycobot_description/README_GAZEBO.md) | README du package description (URDF, worlds Gazebo, caméras) |
+
+### 🖐️ Téléopération par la main
+| Document | Description |
+|----------|-------------|
+| [docs/TELEOPERATION.md](docs/TELEOPERATION.md) | Pipeline complet (Astra → Wilor → filtres → JTC), historique commits |
+| [docs/TELEOP_ARCHITECTURE_VIZ.md](docs/TELEOP_ARCHITECTURE_VIZ.md) | Visuel détaillé : détection main → mouvement bras (types, unités, latences) |
+| [docs/TELEOP_DASHBOARD.md](docs/TELEOP_DASHBOARD.md) | Manuel du dashboard ABMI 3-onglets (Home / Analytics / Tuning) |
+| [docs/TELEOP_TUNING.md](docs/TELEOP_TUNING.md) | Référence des paramètres + dépannage téléop |
+| [docs/TELEOP_SIM_TESTING.md](docs/TELEOP_SIM_TESTING.md) | **Validation en simulation seule** avant le bras réel : KPIs, scénarios guidés, use cases sim-only (téléop, pick mono, sorting, RoM) |
+| [docs/REAL_ROBOT_TEST_PROCEDURE.md](docs/REAL_ROBOT_TEST_PROCEDURE.md) | Protocole de calibration sécurisé sur robot physique (validé 22/04/2026) |
+
+### 🎯 Pick-and-place / sorting (Gazebo)
+| Document | Description |
+|----------|-------------|
+| [mycobot_description/README_GAZEBO.md](mycobot_description/README_GAZEBO.md) | Worlds disponibles : `pick_and_place.sdf` (mono) + `pick_and_place_sorting.sdf` (4 couleurs / 4 bacs) + visuels caméra |
+| [mycobot_gateway/README.md](mycobot_gateway/README.md) | Nœuds `pick_and_place_node`, `color_object_detector`, `sorting_orchestrator` + launches associés |
+| [README.md § Pick-and-place](README.md) | Section synthétique avec diagramme du pipeline sorting et résultats de validation 23/04/2026 |
+
+### 🧠 Intelligence Artificielle
+| Document | Description |
+|----------|-------------|
+| [training/README.md](training/README.md) | Pipeline ML (régression directe legacy + DREAM actif) |
+| [training/dream/README.md](training/dream/README.md) | Module DREAM keypoint detection — VGG-19, weighted loss, training mixte (10K réel + 8K synth) |
+| [docs/SYNTHETIC_DATA.md](docs/SYNTHETIC_DATA.md) | Pipeline données synthétiques Gazebo + domain randomization v2 |
+| [datasets/README.md](datasets/README.md) | Documentation des datasets (synthétique 50K + réel 4K via Git LFS) |
+
+### 📷 Calibration intrinsèque caméras (`feature/calibration-cam`)
+| Document | Description |
+|----------|-------------|
+| [docs/CAMERA_CALIBRATION.md](docs/CAMERA_CALIBRATION.md) | **Manuel d'utilisation** — pourquoi calibrer, board à imprimer, workflow Arducam + Astra, troubleshooting, intégration DREAM |
+| [training/calibration/calibrate_camera.py](training/calibration/calibrate_camera.py) | Calibrateur ChArUco unifié — UVC (`--source v4l2`) ou Astra OpenNI (`--source astra`), auto-save, rejet outliers, presets caméra |
+| [training/calibration/generate_board.py](training/calibration/generate_board.py) | Génère un PNG ChArUco prêt à imprimer (DPI configurable) |
+| [training/calibration/probe_charuco.py](training/calibration/probe_charuco.py) | Probe diagnostique single-frame |
+| [training/calibration/probe_astra.py](training/calibration/probe_astra.py) | Probe Astra 15s (4 modes : raw / CLAHE / swap-RB / swap-RB+CLAHE) |
+| [training/calibration/cam_0.npz](training/calibration/cam_0.npz) · [.meta.json](training/calibration/cam_0.meta.json) | **K mesuré cam_0** : fx=525.67 fy=529.70 cx=317.73 cy=226.00 (RMS 0.67 px, 18 vues) |
+| [training/calibration/cam_3.npz](training/calibration/cam_3.npz) · [.meta.json](training/calibration/cam_3.meta.json) | **K mesuré cam_3** : fx=496.31 fy=494.14 cx=313.37 cy=248.01 (RMS 0.68 px, 21 vues) |
 
 ### 🏗️ Architecture
 | Document | Description |
 |----------|-------------|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture du système |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture du système (3 chemins de commande : GUI/CLI, téléop main, vision DREAM) |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Guide de déploiement |
-| [docs/SUMMARY.md](docs/SUMMARY.md) | Résumé du projet |
+| [docs/SUMMARY.md](docs/SUMMARY.md) | Résumé court du projet |
 
-### 🧪 Tests
+### 🧪 Tests & Procédures
 | Document | Description |
 |----------|-------------|
-| [docs/TEST_COMPLET.md](docs/TEST_COMPLET.md) | Procédure de test complète |
-| [docs/TEST_ROBOT_PROCEDURE.md](docs/TEST_ROBOT_PROCEDURE.md) | Procédure détaillée |
-| [docs/SESSION_TEST.md](docs/SESSION_TEST.md) | Log de session de test |
-| [docs/ROBOT_TESTS_GUIDE.txt](docs/ROBOT_TESTS_GUIDE.txt) | Guide de tests robot |
+| [docs/TELEOP_SIM_TESTING.md](docs/TELEOP_SIM_TESTING.md) | **Validation en simulation seule** (téléop, pick-and-place mono + sorting, RoM, synthetic data smoke test) |
+| [docs/REAL_ROBOT_TEST_PROCEDURE.md](docs/REAL_ROBOT_TEST_PROCEDURE.md) | Protocole sur robot physique |
+| [docs/TEST_COMPLET.md](docs/TEST_COMPLET.md) | Procédure de test complète (legacy) |
+| [docs/TEST_ROBOT_PROCEDURE.md](docs/TEST_ROBOT_PROCEDURE.md) | Procédure détaillée robot (legacy) |
+| [scripts/real_robot_preflight.sh](scripts/real_robot_preflight.sh) | Preflight 5 étapes avant toute session physique |
 
 ### 🐛 Débogage
 | Document | Description |
 |----------|-------------|
 | [docs/DEBUG_CONNECTION_GUIDE.md](docs/DEBUG_CONNECTION_GUIDE.md) | Guide de débogage connexion |
-| [docs/DIAGNOSTIC_ROBOT.txt](docs/DIAGNOSTIC_ROBOT.txt) | Diagnostic robot |
 | [docs/BRIDGE_PI_UPGRADE_GUIDE.md](docs/BRIDGE_PI_UPGRADE_GUIDE.md) | Mise à jour bridge Pi |
 
----
-
-## 🔧 Scripts utilitaires
-
-| Script | Usage |
-|--------|-------|
-| `source scripts/quick_commands.sh` | Charge les commandes rapides |
-| `./scripts/diagnose.sh` | Diagnostic complet |
-| `./scripts/diagnostic_full.sh` | Diagnostic étendu |
-| `./scripts/check_pi_bridge.sh` | Vérifie le bridge Pi |
-| `./scripts/test_bridge.sh` | Test du bridge |
-| `./scripts/robot_test_interactive.sh` | Test interactif |
+### 🔬 Roadmap POC (Isaac Sim, VLA, AI physics)
+| Document | Description |
+|----------|-------------|
+| [CLAUDE.md § POC direction](CLAUDE.md) | Migration Isaac Sim, fine-tune VLA (OpenVLA / π0), benchmarks LeRobot |
+| [.claude/skills/isaac-sim-integration/SKILL.md](.claude/skills/isaac-sim-integration/SKILL.md) | Plan de migration Gazebo → Isaac Sim |
+| [.claude/skills/dream-workflow/SKILL.md](.claude/skills/dream-workflow/SKILL.md) | Workflow DREAM end-to-end |
+| [.claude/skills/lerobot-dataset/SKILL.md](.claude/skills/lerobot-dataset/SKILL.md) | Format LeRobot pour datasets épisodiques VLA |
 
 ---
 
-## ❓ FAQ
-
-**Q: Comment lancer le bridge ?**
-```bash
-# Sur Pi
-source /opt/ros/galactic/setup.bash
-python3 bridge_pi_debug.py
-
-# Sur Tour
-conda deactivate
-source /opt/ros/jazzy/setup.bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
-source install/setup.bash
-export ROS_DOMAIN_ID=10
-ros2 run mycobot_gateway bridge_tour
-```
-
-**Q: Puis-je utiliser ROS2 avec conda activé ?**
-**R:** Non ! Toujours faire `conda deactivate` avant ROS2
-
-**Q: Comment envoyer une commande au robot ?**
-```bash
-ros2 topic pub --once /to_robot std_msgs/msg/String "{data: 'ping'}"
-```
-
----
-
-## 📊 Commandes disponibles
-
-| Commande | Description | Exemple |
-|----------|-------------|---------|
-| `ping` | Test connexion | `ping` → `pong` |
-| `status` | État du robot | `status` → `status:ok` |
-| `get_angles` | Lire les angles | `get_angles` → `angles:[0,0,0,0,0,0]` |
-| `set_led:R,G,B` | Changer la LED | `set_led:255,0,0` (rouge) |
-| `go_home:SPEED` | Position zéro | `go_home:20` |
-| `set_angle:J,A,S` | Bouger un joint | `set_angle:1,30,20` |
-| `set_angles:A1,A2,A3,A4,A5,A6:S` | Tous les joints | `set_angles:0,0,0,0,0,0:20` |
-
----
-
-**Version** : 0.0.1  
-**Dernière mise à jour** : 26 mars 2026  
-**Auteur** : José BERNARDO
+**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3) · 1.14.0-pre (calibration cam0/cam3 mesurée — `feature/calibration-cam`)
+**Mise à jour :** 28 avril 2026 (soir) — calibration intrinsèque cam_0 + cam_3, finding fx=610 du dataset DREAM faux de ~14 % vs caméras physiques
