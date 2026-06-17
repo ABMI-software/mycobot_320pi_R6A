@@ -1,10 +1,78 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 28 avril 2026 (après-midi — test cheap cam3 dans le mix, signal clair mais calibration manquante)
-> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3)
-> **Branche active :** `main`
+> **Date de dernière mise à jour :** 9 juin 2026 (calibration main-œil — nœud hand-eye en cours de validation)
+> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0-pre (calibration) · 1.15.2-pre (pick-and-place ArUco)
+> **Branche active :** `feature/pick-and-place`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
-> **Pi réelle :** `10.10.0.223` (pas `.225` comme certains anciens docs)
+> **Pi réelle :** `10.10.0.221` (pas `.223`/`.225` comme certains anciens docs)
+
+---
+
+## État actuel (9 juin 2026 — soir — calibration main-œil sur robot réel)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Nœud `calibrate_hand_eye_node`** : implémenté et lancé sur robot réel.
+  - Souscrit à `/camera/image_raw` (Orbbec, ~5 Hz) + `/joint_states`.
+  - Détecte le marqueur ID 20 (3 cm, DICT_4X4_1000) via ArUco + solvePnP.
+  - Balayage automatique (`a`) : génère 30 poses en perturbant j4/j5/j6 autour
+    de la base, attend 3 s de stabilisation, capture si marqueur visible.
+  - Solve Tsai (OpenCV hand-eye) + sauvegarde `hand_eye_calibration.yaml`.
+- **Validation robot réel** : connexion confirmée à `10.10.0.221:5005`.
+  - Angles lus : `[14.58, -136.05, 20.83, 32.43, -89.64, 0.26]°`.
+  - Marqueur ID 20 détecté à `[0.001, -0.038, 0.510]` m (position stable).
+  - Commande servo release opérationnelle : `ros2 topic pub --once /to_robot std_msgs/msg/String 'data: "stop"'`.
+- **`aruco_localizer_node`** : mis à jour avec les vrais IDs et tailles mesurées
+  (IDs 19/25/23/26, 25 mm) et chargement positions depuis `workspace_markers.yaml`.
+- **`joint_sync.py`** : parsing d'angles refactorisé — accepte `ANGLES:`, `angles:`,
+  `angles_ok:` ; ignore les réponses d'erreur `-1`.
+- **Nodes caméra** : `orbbec_camera_publisher`, `camera_live_view`, `camera_web_view`
+  ajoutés + enregistrés dans `setup.py`.
+- **`calibrate_extrinsic_node`** : nœud d'étalonnage extrinsèque caméra (PnP 4 marqueurs sol).
+- **`reach_target_aruco_node`** : nœud de déplacement vers cible ArUco.
+- **`bridge_tour.py`** : IP par défaut `.225` → `.221` ; logs send/recv passés en `debug`.
+- **Calibration sauvegardée** : `training/calibration/camera_extrinsic.yaml` + `workspace_markers.yaml`.
+
+### Décisions prises
+
+- Pi réelle confirmée à `10.10.0.221` (mettre à jour CLAUDE.md séparément).
+- `aruco_detect_scale = 1.6` pas de callback live → redémarrer le nœud pour changer.
+- Marqueur ID 20 (3 cm) à 51 cm détectable mais instable (~50 % des frames) :
+  cause probable = éclairage rasant ou légère inclinaison. Pas bloquant pour le balayage.
+
+### Prochaines actions
+
+1. [ROUGE] Lancer le balayage auto (`a`) avec le marqueur stable face caméra — collecter ≥ 20 échantillons.
+2. [ROUGE] Lancer `s` pour résoudre et sauvegarder `hand_eye_calibration.yaml`.
+3. [JAUNE] Valider la calibration : envoyer une pose connue, comparer position prédite vs réelle.
+4. [VERT] Commiter `scripts/real_robot_preflight.sh` (IP `.221`) sur `feature/teleoperation`.
+5. [VERT] Mettre à jour `CLAUDE.md` : Pi IP `10.10.0.223` → `10.10.0.221`.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate && source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+# Terminal 1 — bridge
+ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
+# Terminal 2 — nœud hand-eye (log vers fichier pour surveillance)
+ros2 run mycobot_gateway calibrate_hand_eye_node \
+  --ros-args -p aruco_detect_scale:=2.5 -p marker_size:=0.03 -p marker_id:=20 \
+  2>&1 | tee /tmp/handeye.log
+# Surveiller
+tail -f /tmp/handeye.log | grep -E "VISIBLE|hors champ|Capture|Balayage"
+```
+
+---
+
+## Handoff pick-and-place (a lire en premier pour la prochaine session)
+
+- Handoff detaille du 4 juin 2026 : [`docs/PICK_AND_PLACE_HANDOFF_2026-06-04.md`](docs/PICK_AND_PLACE_HANDOFF_2026-06-04.md)
+- Handoff detaille du 3 juin 2026 : [`docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md`](docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md)
+- Contient :
+  - ce qui a ete implemente aujourd'hui (sim + reel),
+  - l'etat exact de validation,
+  - les commandes de reprise,
+  - le plan de test onsite avec interfaces graphiques.
 
 ---
 
@@ -15,12 +83,177 @@
 conda deactivate
 
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/ros_jazzy/install/setup.bash
 ```
 
 ---
 
-## État actuel (28 avril 2026 — après-midi)
+## État actuel (3 juin 2026 — nuit — pick-and-place Gazebo visual debug)
+
+### Ce qui a été accompli (session de débogage visuel Gazebo)
+
+- **Ouverture GUI Gazebo** : modifié `pick_and_place_aruco.launch.py` pour retirer le flag `-s` (server-only)
+  et activer l'affichage graphique via `DISPLAY=:1`.
+- **Marqueurs ArUco texturés** :
+  - Généré 5 PNG ArUco DICT_4X4_1000 (IDs 0,1,2,3,10) via OpenCV, stockés dans
+    `mycobot_description/worlds/textures/` et `materials/textures/`.
+  - Remplacé les cubes colorés génériques dans `precision_benchmark.sdf` par des
+    dalles 10×10 cm avec texture PBR (`albedo_map`) portant les vrais patterns ArUco.
+  - Cube cible rouge conservé + face supérieure avec texture ArUco ID 10.
+- **Correction tremblement HOME** :
+  - `HOME_ANGLES` dans `pick_and_place_aruco_node.py` : `[0,0,0,0,0,0]` → `[0,-0.8,1.4,-0.8,0,0]` rad
+    (position stable au-dessus du workspace, évite l'instabilité gravitationnelle).
+  - URDF `mycobot_pro_320_pi_benchmark.urdf` : `initial_value` des joints 2/3/4 mis
+    à jour pour correspondre, évitant le tremblement avant la première commande.
+- **Correction suivi cube pendant transport** :
+  - Ajout de `_gripper_base_world()` : calcule la position de `gripper_base` en frame
+    monde via la chaîne FK complète + transform fixe `joint6output_to_gripper_base`.
+  - `_do_grasp()` et SETTLING-carrying utilisent maintenant `gripper_base_world` au lieu
+    de `ee_pos + 0.02` (le cube ne flotte plus au-dessus du bras).
+  - **Limite connue** : l'IK ne contraint pas l'orientation ; la pince pointe latéralement
+    (~5 cm en Y) à la position de saisie. Fix complet = IK avec contrainte d'orientation.
+- CMakeLists.txt : `materials/` ajouté à l'install list.
+
+### Décisions prises
+
+- Textures ArUco stockées dans `worlds/textures/` (chemin relatif direct, sans `..`) :
+  Gazebo Harmonic ne résout pas `../` dans les `albedo_map` PBR.
+- `HOME_ANGLES` aligné avec `initial_value` URDF pour une initialisation stable.
+
+### Prochaines actions
+
+1. [ROUGE] IK avec contrainte d'orientation → pince pointe vers le bas au pick/place
+2. [JAUNE] Imprimer marqueurs ArUco réels + test sur banc avec caméra
+3. [VERT] `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
+
+### Commande rapide de reprise (sim avec GUI)
+
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+export DISPLAY=:1
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
+```
+
+---
+
+## État actuel (3 juin 2026 — soir — pick-and-place Gazebo validé)
+
+### Ce qui a été accompli aujourd'hui
+
+- Scaffoldé l'orchestrateur FSM `pick_and_place_aruco_node.py` (10 segments,
+  modes `sim` / `real`, IK numérique, interface `/aruco/object_pose` unifiée)
+- Créé les deux launch files (`pick_and_place_aruco.launch.py` et `_real.launch.py`)
+- Corrigé `KeyError: 'angles'` (FSM lisait le mauvais segment via index déjà incrémenté)
+- **Cycle pick-and-place Gazebo complet validé** : home → approach_pick → grasp_pos
+  → GRASP (gz set_pose) → lift → approach_place → place_pos → RELEASE → retreat
+  → home_end → DONE, IK 0.0 mm d'erreur sur chaque waypoint
+
+### Décisions prises
+
+- Interface commune `gz_sim_localizer` (sim) / `aruco_localizer` (réel) → nœud
+  orchestrateur identique en sim et sur robot
+- `self._current_seg` stocké avant transition MOVING pour éviter off-by-one sur l'index
+
+### Prochaines actions
+
+1. [ROUGE] Imprimer marqueurs ArUco (4 workspace IDs 0-3, 50 mm + 1 objet ID 10, 40 mm)
+2. [JAUNE] `bash scripts/real_robot_preflight.sh` + bridge Pi actif sur 10.10.0.223
+3. [VERT] `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+
+# Simulation (validation déjà passée)
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
+
+# Robot réel (prérequis ci-dessus)
+ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
+```
+
+---
+
+## État actuel (3 juin 2026 — pick-and-place ArUco scaffoldé)
+
+### 🧭 Prochaine action prioritaire
+
+**Valider le pick-and-place en Gazebo :** ✅ validé (voir entrée du soir)
+
+**Ensuite — robot réel (prérequis) :**
+1. Imprimer les 5 marqueurs ArUco (4 workspace IDs 0-3 + 1 objet ID 10)
+2. `bash scripts/real_robot_preflight.sh`
+3. `ssh er@10.10.0.223 'python3 bridge_pi_simple.py'`
+4. `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
+
+---
+
+## État actuel (28 avril 2026 — soir)
+
+### 🧭 Reprise pour demain — lire en premier
+
+Branche active : **`feature/calibration-cam`**. Deux Arducams calibrées (intrinsèques mesurés). Plan validé :
+
+- **Point 2 — Régénérer les GT** du dataset `/tmp/dream_data/real_cam0/` avec les K mesurés au lieu des `fx=fy=610` codés en dur. Les fichiers JSON NDDS contiennent les `projected_location` calculées avec la mauvaise matrice. À recalculer avec FK + nouveaux `K`. Voir [`training/dream/convert_to_ndds.py`](training/dream/convert_to_ndds.py).
+- **Point 3 — Ré-évaluer DREAM** sur le dataset GT-corrigé. Si la détection link4-6 monte significativement, l'écart `fx=610` était la cause majeure. Sinon → collecte v2.
+- **Différé** — Calibration Astra. Logistique trop fragile aujourd'hui. À refaire en session dédiée avec board fixé au mur + Astra sur trépied.
+
+### Ce qui a été accompli aujourd'hui (28/04 soir)
+
+#### 1. Tooling de calibration intrinsèque
+
+Branche `feature/calibration-cam` créée. Sous [`training/calibration/`](training/calibration/) :
+
+- `calibrate_camera.py` — calibrateur ChArUco (UVC ou OpenNI) avec gating qualité (markers + sharpness + coverage grid + diversité temporelle), rejet d'outliers per-view-error, **auto-save** quand target atteint, **save-on-quit** fallback ≥ 12 vues, support `--source v4l2` (Arducam) et `--source astra` (via wrapper OpenNI). CLAHE optionnel (`--clahe`).
+- `generate_board.py` — génère un PNG ChArUco à imprimer aux dimensions exactes (DPI configurable).
+- `probe_charuco.py` — probe diagnostique single-frame (a servi à débusquer 2 régressions cv2 4.6 : `DetectorParameters()` et `CharucoBoard((sx,sy),...)` segfault — fix par fallback legacy `_create()`).
+- `probe_astra.py` — probe spécifique Astra (4 modes : raw, CLAHE, swap-RB, swap-RB+CLAHE) sur 15 s.
+
+#### 2. Calibrations mesurées
+
+| Caméra | Vues | RMS px | fx | fy | cx | cy | Note |
+|--------|------|--------|----|----|----|----|------|
+| **cam_0** | 18 | **0.67** | 525.67 | 529.70 | 317.73 | 226.00 | — |
+| **cam_3** | 21 | **0.68** | 496.31 | 494.14 | 313.37 | 248.01 | premier essai cy=42 archivé en `cam_3.bad.*` |
+
+Outputs : `training/calibration/cam_{0,3}.{npz,meta.json,snapshot.png}`.
+
+#### 3. Comparaison avec le dataset DREAM — **finding majeur**
+
+| Param | Dataset existant | cam_0 mesuré | cam_3 mesuré | Écart |
+|-------|------------------|--------------|---------------|-------|
+| fx | 610 | 525.67 | 496.31 | **−13.8 % (cam_0)** |
+| fy | 610 | 529.70 | 494.14 | **−13.2 %** |
+| cx | 320 | 317.73 | 313.37 | −0.7 % |
+| cy | 240 | 226.00 | 248.01 | **−5.8 %** |
+
+**Implication** : les `projected_location` GT du dataset `real_cam0` ont été calculées avec un `fx=610` qui ne correspond à AUCUNE caméra physique. Pour un point 3D à distance D, le pixel projeté est **faux d'un facteur ~14 %**. Cette erreur croît avec la distance au centre image → cohérent avec les link4-6 (loin du centre quand le bras est étendu) à 3-36 % de détection en 1.12.0. Le réseau a entraîné sur des **GT erronés** sur les distal — il ne peut pas converger sur les bonnes positions.
+
+**Probablement la cause majeure** du gap distal. Si la régénération GT débloque ça, pas besoin de capturer un nouveau dataset.
+
+#### 4. Calibration Astra — différée
+
+Tentatives multiples sans succès :
+- 640×480 RGB888 standard : 5-6 markers détectés sur 27 → trop peu pour `interpolateCornersCharuco`
+- 1280×720 RGB888 @30 fps : USB 2.0 saturé (663 Mbps > 480 disponibles) → image corrompue (rayures multicolores)
+- 1280×720 RGB888 @15 fps : refusé par le firmware Astra (seulement @30 fps listé pour cette résolution)
+- 1280×720 GRAY8 @30 fps : démarre, mais grabber freeze sans frames après quelques secondes
+- `findChessboardCorners` + `findChessboardCornersSB` : 0 corners (capteur Astra trop "soft" pour le damier ou board hors champ pendant que l'utilisateur tape au clavier)
+
+Custom HD grabber compilé dans `/tmp/oni_grabber_hd.cpp` (non committed). À reprendre avec setup physique stable (board mural fixe, Astra sur trépied).
+
+### Prochaines actions
+
+1. **🔴 Régénérer les GT** du dataset `real_cam0` avec K cam_0 mesurés. Recalculer `projected_location` via FK + `cv2.projectPoints(..., K, dist)`.
+2. **🔴 Ré-évaluer DREAM** sur GT-corrigé avec checkpoint e50. Comparer link4-6 detection.
+3. **🟡 Si gap subsiste** : retrain mixte v2 sur dataset corrigé (×5 oversample + 8K synth).
+4. **🟢 Plus tard** : calibration Astra avec setup stable.
+
+---
+
+## État précédent (28 avril 2026 — après-midi)
 
 ### 🧭 Reprise pour la prochaine session — lire en premier
 
