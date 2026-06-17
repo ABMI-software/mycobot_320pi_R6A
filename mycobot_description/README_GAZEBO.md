@@ -32,6 +32,38 @@ shipped with ROS2 Jazzy) using the `ros_gz_sim` bridge stack.
 sudo apt install ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
 ```
 
+## Worlds disponibles
+
+| Fichier SDF | Description |
+|-------------|-------------|
+| `worlds/randomized.sdf` | Table + fond simple (monde de base) |
+| `worlds/randomized_v2.sdf` | 6 lumières, 12 objets clutter (cubes/cylindres/sphères), 3 murs — domain randomization avancée |
+| `worlds/pick_and_place.sdf` | Table 0.8×0.8 m + cube cible rouge + zone de dépose verte (mono-objet) |
+| `worlds/pick_and_place_sorting.sdf` | Table 1.0×0.6 m + 4 objets dynamiques (cube R, cube B, cylindre G, boîte Y) côté +X + 4 bacs colorés à parois côté −X (multi-objet par couleur) |
+
+## Visuels caméra (URDF Gazebo)
+
+Les 4 caméras embarquées dans le URDF (`mycobot_pro_320_pi_gazebo.urdf` —
+`camera_link`, `camera_link_right`, `camera_link_left`, `camera_link_top`)
+sont représentées par un corps gris foncé (boîte 0.06×0.04×0.04 m) +
+un objectif noir cylindrique aligné sur l'axe optique (+X) + une LED rouge.
+Cette forme « caméra de surveillance » les rend visuellement distinctes des
+objets colorés à trier — important pour le pipeline `color_object_detector`
+qui segmente la scène par couleur.
+
+## Gripper adaptatif
+
+Le gripper `pro_adaptive_gripper` d'Elephant Robotics est intégré au URDF Gazebo.
+Ses joints sont **fixés** (pas de support `mimic` dans Gazebo Harmonic). Le mesh
+`link6_2022.dae` est utilisé pour la compatibilité avec les maillages du gripper.
+
+```
+urdf/pro_adaptive_gripper/
+├── gripper_base.dae
+├── left_1.dae, left_2.dae, left_3.dae
+└── right_1.dae, right_2.dae, right_3.dae
+```
+
 ## Quick Start
 
 ```bash
@@ -40,7 +72,7 @@ env -i HOME=$HOME PATH="/usr/bin:/bin:/opt/ros/jazzy/bin" DISPLAY=$DISPLAY bash
 
 # 2. Source ROS2 + workspace
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source install/setup.bash
 
 # 3. Launch Gazebo
 ros2 launch mycobot_description gazebo_sim.launch.py

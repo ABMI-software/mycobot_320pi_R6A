@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "description": "Project-wide Claude Code settings for MyCobot 320 Pi R6A. Per-user overrides live in settings.local.json (not committed).",
+  "permissions": {
+    "allow": [
+      "Bash(colcon build*)",
+      "Bash(ros2 topic list)",
+      "Bash(ros2 topic info*)",
+      "Bash(ros2 topic hz*)",
+      "Bash(ros2 topic echo* --once)",
+      "Bash(ros2 node list)",
+      "Bash(ros2 service list)",
+      "Bash(ros2 pkg list)",
+      "Bash(ros2 doctor)",
+      "Bash(python3 -m py_compile*)",
+      "Bash(python3 -c*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git show*)",
+      "Bash(git blame*)",
+      "Bash(ping -c 1 10.10.0.223)",
+      "Bash(nc -zv 10.10.0.223 5005)",
+      "Bash(ls*)",
+      "Bash(cat*)",
+      "Read(//home/genji/ros_jazzy/src/mycobot_R6A/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)",
+      "Bash(sudo rm*)"
+    ]
+  }
+}

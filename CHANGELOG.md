@@ -7,6 +7,169 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.15.2-pre] - 2026-06-09 — branche `feature/pick-and-place`
+
+### Calibration main-œil robot réel — pipeline complet + nœuds caméra
+
+#### Ajouté
+
+- [`mycobot_gateway/calibrate_hand_eye_node.py`](mycobot_gateway/mycobot_gateway/calibrate_hand_eye_node.py) :
+  nœud interactif de calibration main-œil (eye-to-hand). Détecte le marqueur ID 20
+  via ArUco solvePnP, propose un balayage automatique de 30 poses (j4/j5/j6), résout
+  la transformation T_base←cam via OpenCV Tsai, sauvegarde en YAML.
+- [`mycobot_gateway/calibrate_extrinsic_node.py`](mycobot_gateway/mycobot_gateway/calibrate_extrinsic_node.py) :
+  nœud d'étalonnage extrinsèque caméra (PnP sur 4 marqueurs sol fixes).
+- [`mycobot_gateway/reach_target_aruco_node.py`](mycobot_gateway/mycobot_gateway/reach_target_aruco_node.py) :
+  nœud de déplacement du bras vers une cible ArUco localisée par `aruco_localizer_node`.
+- [`mycobot_gateway/orbbec_camera_publisher.py`](mycobot_gateway/mycobot_gateway/orbbec_camera_publisher.py) :
+  publisher dédié caméra Orbbec (OpenCV → `/camera/image_raw`).
+- [`mycobot_gateway/camera_live_view.py`](mycobot_gateway/mycobot_gateway/camera_live_view.py) :
+  visualiseur local (cv2.imshow) du flux `/camera/image_raw`.
+- [`mycobot_gateway/camera_web_view.py`](mycobot_gateway/mycobot_gateway/camera_web_view.py) :
+  serveur HTTP mjpeg du flux caméra (port 8080).
+- [`scripts/aruco_dictionary_probe.py`](scripts/aruco_dictionary_probe.py) :
+  outil diagnostic — détecte quel dictionnaire ArUco correspond au marqueur physique.
+- [`scripts/measure_aruco_workspace.py`](scripts/measure_aruco_workspace.py) :
+  mesure les positions X/Y/Z des marqueurs workspace depuis une image capturée.
+- [`training/calibration/camera_extrinsic.yaml`](training/calibration/camera_extrinsic.yaml) :
+  matrice extrinsèque caméra mesurée (T_base←cam).
+- [`training/calibration/workspace_markers.yaml`](training/calibration/workspace_markers.yaml) :
+  positions XY des marqueurs workspace (IDs 19/25/23/26) en repère base robot.
+
+#### Modifié
+
+- [`mycobot_gateway/aruco_localizer_node.py`](mycobot_gateway/mycobot_gateway/aruco_localizer_node.py) :
+  IDs workspace mis à jour (0-3 → 19/25/23/26), taille 50 mm → 25 mm, positions
+  chargées depuis `workspace_markers.yaml` au lieu d'être codées en dur.
+- [`mycobot_gateway/joint_sync.py`](mycobot_gateway/mycobot_gateway/joint_sync.py) :
+  parsing d'angles unifié — accepte `ANGLES:`, `angles:`, `angles_ok:` ;
+  ignore les réponses d'erreur `-1` (lecture série ratée).
+- [`mycobot_gateway/bridge_tour.py`](mycobot_gateway/mycobot_gateway/bridge_tour.py) :
+  IP par défaut `.225` → `.221` ; logs send/recv abaissés à `debug` (réduit le bruit).
+- [`setup.py`](mycobot_gateway/setup.py) : entry points ajoutés pour
+  `orbbec_camera_publisher`, `camera_live_view`, `camera_web_view`.
+
+---
+
+## [1.15.1-pre] - 2026-06-03 — branche `feature/pick-and-place`
+
+### Pick-and-place Gazebo — débug visuel (GUI + ArUco textures + HOME stable)
+
+#### Modifié
+
+- [`launch/pick_and_place_aruco.launch.py`](mycobot_gateway/launch/pick_and_place_aruco.launch.py) :
+  flag `-s` (server-only) retiré → Gazebo ouvre sa GUI graphique (`DISPLAY=:1` requis).
+
+- [`mycobot_description/worlds/precision_benchmark.sdf`](mycobot_description/worlds/precision_benchmark.sdf) :
+  - Marqueurs workspace (IDs 0-3) : cubes colorés → dalles 10×10 cm avec texture PBR
+    ArUco `DICT_4X4_1000` (albedo_map PNG 240×240 px, bordure blanche imprimée).
+  - Cube cible (ID 10) : corps rouge conservé + face supérieure avec texture ArUco ID 10.
+
+- [`mycobot_gateway/pick_and_place_aruco_node.py`](mycobot_gateway/mycobot_gateway/pick_and_place_aruco_node.py) :
+  - `HOME_ANGLES` : `[0,0,0,0,0,0]` → `[0,-0.8,1.4,-0.8,0,0]` rad — position stable
+    au-dessus du workspace, élimine le tremblement sous gravité.
+  - Ajout `_gripper_base_world()` : position de `gripper_base` en frame monde via FK
+    complète + transform fixe (`joint6output_to_gripper_base: xyz=[0,-0.007,0.056]`).
+  - `_do_grasp()` et SETTLING-carrying : `ee_pos + 0.02` → `gripper_base_world + 0.025`
+    (cube suit le point de saisie réel, ne flotte plus au-dessus du bras).
+
+- [`urdf/320_pi/mycobot_pro_320_pi_benchmark.urdf`](mycobot_description/urdf/320_pi/mycobot_pro_320_pi_benchmark.urdf) :
+  `initial_value` pour joints 2/3/4 mis à `[-0.8, 1.4, -0.8]` — correspond à
+  `HOME_ANGLES`, robot stable dès le spawn.
+
+#### Ajouté
+
+- `mycobot_description/worlds/textures/aruco_4x4_{0000..0003,0010}.png` — 5 PNG ArUco
+  générés via OpenCV (`DICT_4X4_1000`, 200 px + bordure 20 px).
+- `mycobot_description/materials/textures/` — même jeu de PNG (copie de référence).
+- `CMakeLists.txt` : `materials/` ajouté à la liste `install(DIRECTORY ...)`.
+
+#### Limitation connue
+
+L'IK (`inverse_kinematics_position`) optimise uniquement la position de link6, pas
+l'orientation de la pince. À la position de saisie, la pince pointe latéralement
+(~5 cm en Y), pas verticalement vers le bas. Correction future : IK avec contrainte
+d'orientation ou champ TCP configurable.
+
+---
+
+## [1.15.0-pre] - 2026-06-03 — branche `feature/pick-and-place`
+
+### Pick-and-place ArUco — pipeline complet sim + robot réel
+
+Orchestrateur unifié qui consomme `/aruco/object_pose` (fourni par
+`gz_sim_localizer` en Gazebo ou `aruco_localizer_node` sur robot réel) et
+exécute un cycle pick-place complet via IK numérique + `JointTrajectory`.
+
+#### Ajouté
+
+- [`mycobot_gateway/pick_and_place_aruco_node.py`](mycobot_gateway/mycobot_gateway/pick_and_place_aruco_node.py) —
+  orchestrateur FSM à 9 états (INIT → WAIT_POSE → IK_PLAN → MOVING →
+  SETTLING → GRASP → RELEASE → DONE). Paramètre `mode` :
+  - **`sim`** : grasp émulé par `gz service set_pose` (téléportation Gazebo),
+    l'objet suit l'EE via FK pendant le transport.
+  - **`real`** : commandes gripper JSON sur `/to_robot` (no-op si pas de pince
+    physique — câblé pour le futur).
+  Motion via `/mycobot_controller/joint_trajectory` (ros2_control en sim,
+  `trajectory_to_robot_bridge` sur robot réel) — interface identique.
+
+- [`launch/pick_and_place_aruco.launch.py`](mycobot_gateway/launch/pick_and_place_aruco.launch.py) —
+  pipeline complet Gazebo : `gz_sim` + `ros2_control` + `gz_sim_localizer` +
+  `fk_ee_pose` + `pick_and_place_aruco` (mode sim). Réutilise le monde
+  `precision_benchmark.sdf` (cube cible déjà présent).
+
+- [`launch/pick_and_place_aruco_real.launch.py`](mycobot_gateway/launch/pick_and_place_aruco_real.launch.py) —
+  pipeline robot réel : `bridge_tour` + `trajectory_to_robot_bridge` +
+  `fk_ee_pose` + `aruco_localizer` + `pick_and_place_aruco` (mode real).
+
+#### Architecture du pipeline (sim et réel)
+
+```
+[gz_sim_localizer]          [aruco_localizer]
+ (GT Gazebo)                 (cam_0 + ArUco)
+        ↓                          ↓
+        └──────┬────────────────────┘
+               ↓ /aruco/object_pose
+    [pick_and_place_aruco_node]
+               ↓ JointTrajectory
+    [mycobot_controller]     [trajectory_to_robot_bridge]
+     (ros2_control Gazebo)    (→ /to_robot → bridge_tour → Pi)
+```
+
+#### Commandes de lancement
+
+```bash
+# Simulation Gazebo
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
+
+# Robot réel (prérequis : bridge Pi actif + marqueurs posés)
+ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
+
+# Paramètres utiles
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py \
+    settle_time:=3.0 target_x:=0.25 target_y:=0.05 \
+    place_x:=0.20 place_y:=-0.18
+```
+
+#### Corrigé
+
+- `KeyError: 'angles'` dans l'état `MOVING` : l'index du plan était incrémenté
+  dans `_advance_plan()` **avant** la transition, donc `MOVING` lisait le
+  segment suivant (GRASP, sans clé `angles`). Fix : stocker le segment courant
+  dans `self._current_seg` au moment de la transition et le lire depuis là.
+
+#### État de validation
+
+- Pipeline compilé et import vérifié ✅
+- Validation end-to-end Gazebo : **validée le 3 juin 2026** ✅
+  - Cycle complet `home → approach_pick → grasp_pos → GRASP → lift →
+    approach_place → place_pos → RELEASE → retreat → home_end → DONE`
+  - IK : 6 waypoints, erreur 0.0 mm pour chaque solution
+  - Grasp sim : `gz service set_pose` opérationnel
+- Validation robot réel : **à faire** (prérequis : imprimer marqueurs ArUco)
+
+---
+
 ## [1.14.0-pre] - 2026-04-28 (soir) — branche `feature/calibration-cam`
 
 ### 🎯 Calibration intrinsèque mesurée — finding majeur sur le dataset DREAM

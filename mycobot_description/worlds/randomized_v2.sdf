@@ -1,0 +1,371 @@
+<?xml version="1.0" ?>
+<!--
+  Domain-randomized Gazebo world v2 for aggressive sim-to-real transfer.
+
+  v2 improvements:
+  - 3 directional lights + 3 point lights (all randomizable)
+  - More diverse clutter objects (10+) with varied geometries
+  - Multiple background surfaces (walls, floor)
+  - Table with collision for realistic occlusions
+-->
+<sdf version="1.9">
+  <world name="randomized_v2">
+
+    <!-- Physics -->
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+
+    <!-- ============== LIGHTS ============== -->
+
+    <!-- Sun (main directional, randomizable) -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.85 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.3 -0.9</direction>
+    </light>
+
+    <!-- Fill light (softer, opposite side) -->
+    <light type="directional" name="fill_light">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 8 0 0 0</pose>
+      <diffuse>0.4 0.4 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.5 -0.3 -0.7</direction>
+    </light>
+
+    <!-- Back light (rim effect) -->
+    <light type="directional" name="back_light">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 6 0 0 0</pose>
+      <diffuse>0.25 0.25 0.3 1</diffuse>
+      <specular>0.05 0.05 0.05 1</specular>
+      <direction>0.8 0.0 -0.5</direction>
+    </light>
+
+    <!-- Warm point light (near robot, randomizable position) -->
+    <light type="point" name="warm_point">
+      <cast_shadows>false</cast_shadows>
+      <pose>1.0 0.5 1.5 0 0 0</pose>
+      <diffuse>0.6 0.5 0.3 1</diffuse>
+      <specular>0.1 0.1 0.05 1</specular>
+      <attenuation>
+        <range>5</range>
+        <constant>0.5</constant>
+        <linear>0.2</linear>
+        <quadratic>0.05</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- Cool point light (opposite side) -->
+    <light type="point" name="cool_point">
+      <cast_shadows>false</cast_shadows>
+      <pose>-0.5 -0.8 1.2 0 0 0</pose>
+      <diffuse>0.3 0.35 0.55 1</diffuse>
+      <specular>0.05 0.05 0.1 1</specular>
+      <attenuation>
+        <range>4</range>
+        <constant>0.6</constant>
+        <linear>0.25</linear>
+        <quadratic>0.06</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- Overhead spot (randomizable) -->
+    <light type="point" name="overhead_spot">
+      <cast_shadows>true</cast_shadows>
+      <pose>0.0 0.0 2.0 0 0 0</pose>
+      <diffuse>0.5 0.5 0.45 1</diffuse>
+      <specular>0.15 0.15 0.15 1</specular>
+      <attenuation>
+        <range>6</range>
+        <constant>0.4</constant>
+        <linear>0.15</linear>
+        <quadratic>0.04</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- ============== GROUND ============== -->
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>20 20</size></plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>20 20</size></plane>
+          </geometry>
+          <material>
+            <ambient>0.55 0.55 0.52 1</ambient>
+            <diffuse>0.6 0.6 0.57 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ============== BACKGROUND SURFACES ============== -->
+
+    <!-- Back wall -->
+    <model name="back_wall">
+      <static>true</static>
+      <pose>-1.5 0 0.75 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.05 3.0 1.5</size></box></geometry>
+          <material>
+            <ambient>0.45 0.45 0.50 1</ambient>
+            <diffuse>0.5 0.5 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Left wall -->
+    <model name="left_wall">
+      <static>true</static>
+      <pose>0 -1.5 0.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>3.0 0.05 1.0</size></box></geometry>
+          <material>
+            <ambient>0.3 0.4 0.6 1</ambient>
+            <diffuse>0.35 0.45 0.65 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Right wall -->
+    <model name="right_wall">
+      <static>true</static>
+      <pose>0 1.5 0.6 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>3.0 0.05 1.2</size></box></geometry>
+          <material>
+            <ambient>0.5 0.45 0.4 1</ambient>
+            <diffuse>0.55 0.5 0.45 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ============== TABLE ============== -->
+
+    <model name="table">
+      <static>true</static>
+      <pose>0 0 -0.02 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.6 0.6 0.04</size></box></geometry>
+          <material>
+            <ambient>0.35 0.25 0.15 1</ambient>
+            <diffuse>0.45 0.32 0.2 1</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry><box><size>0.6 0.6 0.04</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ============== CLUTTER OBJECTS ============== -->
+    <!-- 10+ distractor objects at various positions around the workspace -->
+
+    <!-- Red box near robot -->
+    <model name="clutter_box_1">
+      <static>true</static>
+      <pose>0.4 0.5 0.05 0 0 0.3</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.1 0.08 0.1</size></box></geometry>
+          <material>
+            <ambient>0.7 0.2 0.2 1</ambient>
+            <diffuse>0.8 0.25 0.25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Green tall box -->
+    <model name="clutter_box_2">
+      <static>true</static>
+      <pose>-0.3 0.4 0.075 0 0 -0.5</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.12 0.06 0.15</size></box></geometry>
+          <material>
+            <ambient>0.2 0.6 0.3 1</ambient>
+            <diffuse>0.25 0.7 0.35 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Blue cylinder -->
+    <model name="clutter_cylinder_1">
+      <static>true</static>
+      <pose>0.3 -0.4 0.1 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><cylinder><radius>0.05</radius><length>0.2</length></cylinder></geometry>
+          <material>
+            <ambient>0.2 0.3 0.7 1</ambient>
+            <diffuse>0.25 0.35 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Yellow flat box (on table) -->
+    <model name="clutter_box_3">
+      <static>true</static>
+      <pose>0.2 -0.15 0.015 0 0 0.8</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.15 0.1 0.03</size></box></geometry>
+          <material>
+            <ambient>0.7 0.65 0.1 1</ambient>
+            <diffuse>0.8 0.75 0.15 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Orange sphere -->
+    <model name="clutter_sphere_1">
+      <static>true</static>
+      <pose>-0.15 0.35 0.04 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><sphere><radius>0.04</radius></sphere></geometry>
+          <material>
+            <ambient>0.8 0.45 0.1 1</ambient>
+            <diffuse>0.9 0.5 0.15 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Purple thin cylinder (pen-like) -->
+    <model name="clutter_cylinder_2">
+      <static>true</static>
+      <pose>0.15 0.25 0.01 0 1.5 0.4</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><cylinder><radius>0.008</radius><length>0.18</length></cylinder></geometry>
+          <material>
+            <ambient>0.5 0.2 0.6 1</ambient>
+            <diffuse>0.6 0.25 0.7 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- White box (background) -->
+    <model name="clutter_box_4">
+      <static>true</static>
+      <pose>-0.5 -0.3 0.1 0 0 1.2</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.2 0.15 0.2</size></box></geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.85 0.85 0.85 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Dark grey small cube -->
+    <model name="clutter_box_5">
+      <static>true</static>
+      <pose>0.25 0.1 0.025 0 0 0.6</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <material>
+            <ambient>0.25 0.25 0.25 1</ambient>
+            <diffuse>0.3 0.3 0.3 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Teal cylinder (mug-like) -->
+    <model name="clutter_cylinder_3">
+      <static>true</static>
+      <pose>-0.2 -0.2 0.04 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><cylinder><radius>0.035</radius><length>0.08</length></cylinder></geometry>
+          <material>
+            <ambient>0.15 0.5 0.55 1</ambient>
+            <diffuse>0.2 0.6 0.65 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Pink sphere (small ball) -->
+    <model name="clutter_sphere_2">
+      <static>true</static>
+      <pose>0.1 -0.3 0.025 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><sphere><radius>0.025</radius></sphere></geometry>
+          <material>
+            <ambient>0.8 0.3 0.5 1</ambient>
+            <diffuse>0.9 0.35 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Brown box (cardboard-like, large background) -->
+    <model name="clutter_box_6">
+      <static>true</static>
+      <pose>0.6 0.0 0.15 0 0 0.1</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.25 0.3 0.3</size></box></geometry>
+          <material>
+            <ambient>0.5 0.35 0.2 1</ambient>
+            <diffuse>0.6 0.42 0.25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Metallic grey cylinder (tool-like) -->
+    <model name="clutter_cylinder_4">
+      <static>true</static>
+      <pose>-0.1 0.15 0.01 1.57 0 0.7</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><cylinder><radius>0.012</radius><length>0.14</length></cylinder></geometry>
+          <material>
+            <ambient>0.5 0.5 0.55 1</ambient>
+            <diffuse>0.6 0.6 0.65 1</diffuse>
+            <specular>0.4 0.4 0.4 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
