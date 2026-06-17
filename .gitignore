@@ -37,3 +37,12 @@ Thumbs.db
 .env
 venv/
 .venv/
+
+# Training checkpoints & artifacts
+training/checkpoints*/
+training/dream/checkpoints_dream/
+*.pth
+*.pkl
+*.onnx
+.claude/scheduled_tasks.lock
+training/calibration/__pycache__/
