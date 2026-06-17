@@ -16,6 +16,8 @@ setup(
         (os.path.join('lib', package_name), glob('scripts/*')),
         # Launch files
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
+        # Gazebo world files
+        (os.path.join('share', package_name, 'worlds'), glob('worlds/*.sdf')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
