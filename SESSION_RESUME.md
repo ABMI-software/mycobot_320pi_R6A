@@ -20,6 +20,71 @@ source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
 
 ---
 
+## État actuel (17 juin 2026 — après-midi — lancement téléopération robot réel)
+
+### Ce qui a été accompli aujourd'hui
+
+Session consacrée au démarrage de la chaîne de téléopération sur robot réel. Cinq
+blocages successifs rencontrés et corrigés avant d'obtenir l'infrastructure (T1 rosbridge
++ T2 bridge robot) opérationnelle :
+
+1. **`mycobot_description` introuvable au lancement** (`PackageNotFoundError`).
+   - Cause double : overlay top-level périmé (dernier build `--packages-select mycobot_gateway`
+     seul → `mycobot_description` tombé hors de `AMENT_PREFIX_PATH`) **et** `CMakeCache.txt`
+     empoisonné par le Python de conda lors d'un build fait sans `conda deactivate`
+     (`package.xml` non parsé — `catkin_pkg`/`empy` absents côté conda).
+   - Correctif : `rm -rf build/mycobot_description install/mycobot_description`, `conda deactivate`,
+     puis rebuild des deux paquets ensemble. Overlay reconstruit, les deux paquets résolus.
+
+2. **Launch XML chargé comme du Python** (`invalid syntax (rosbridge_websocket_launch.xml, line 1)`).
+   - Cause : [`mycobot_teleop.launch.py`](mycobot_gateway/launch/mycobot_teleop.launch.py) incluait
+     le `.xml` de rosbridge via `PythonLaunchDescriptionSource` → tentative d'`exec()` du XML.
+   - Correctif : remplacé par `AnyLaunchDescriptionSource` (auto-détection du format). L'include
+     Gazebo (`.py`) ligne 87 laissé tel quel.
+
+3. **Confusion sur l'IP de la Pi.** `.225` (défaut du launch) = morte ; `.223` (docs) = vivante
+   mais sans bridge ; **`.219` = bridge actif** (port 5005 ouvert, preflight 5/5 OK,
+   `get_angles` → `[49.65, -0.08, 0.0, 0.26, 0.26, 0.26]`).
+   → IP réelle du jour confirmée empiriquement : **`10.10.0.219`**.
+
+4. **Stacks de contrôle résiduels connectés au robot vivant.** Deux `bridge_tour` simultanés
+   (workspaces `ros_jazzy` **et** `Osama_ws`) + un `trajectory_to_robot_bridge` tenaient le lien
+   TCP vers `.219:5005`, avec 3 nœuds fantômes `/bridge_tour` dans le démon ROS2. Nettoyés
+   (kill des 4 PID, redémarrage du démon) avant de lancer une T2 propre.
+
+5. **`roslibpy` absent de l'env conda `hand-teleop`** (dashboard T4 + script T3).
+   - Correctif : `pip install roslibpy` dans `hand-teleop` (→ 2.0.0).
+
+### Décisions prises
+
+- **Pi réelle du jour = `10.10.0.219`** (vérifiée : ping + port 5005 + preflight + get_angles).
+  Les docs divergent (`.221`/`.223`/`.225`) — à réconcilier.
+- T2 lancée avec `target:=real pi_ip:=10.10.0.219 rosbridge:=false` (T1 possède déjà 9090).
+- `--no-gripper` rappelé obligatoire pour T3 (robot sans pince).
+- Tous les terminaux arrêtés proprement en fin de session (lien robot relâché, 9090 fermé).
+
+### Prochaines actions
+
+1. [ROUGE] Corriger le défaut `pi_ip` du launch (`.225` morte → `.219`) et réconcilier l'IP
+   dans CLAUDE.md / `docs/ARCHITECTURE.md`.
+2. [JAUNE] Reprendre T3/T4/T5 (caméra Astra + dashboard + performance_analyzer) avec le preset
+   🐢 Safe-start.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate && source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+# T1 — rosbridge
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+# T2 — bridge robot réel (rosbridge:=false car T1 possède 9090)
+ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=real pi_ip:=10.10.0.219 rosbridge:=false
+# T3 — téléop (conda hand-teleop) — --no-gripper OBLIGATOIRE
+conda activate hand-teleop && cd ~/ros_jazzy/src/mycobot_R6A/teleop
+python3 mycobot_teleop.py --camera astra --ros --use-rosbridge --no-gripper
+```
+
+---
+
 ## État actuel (22 avril 2026 — soir)
 
 ### ✅ MILESTONE : premier test physique réussi
