@@ -12,7 +12,10 @@ install(DIRECTORY
   urdf
   config
   launch
+  worlds
+  materials
   DESTINATION share/${PROJECT_NAME}
+  FILES_MATCHING PATTERN "*"
 )
 
 if(BUILD_TESTING)

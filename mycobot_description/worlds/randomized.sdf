@@ -1,0 +1,180 @@
+<?xml version="1.0" ?>
+<!--
+  Domain-randomized Gazebo world for synthetic data collection.
+
+  Features:
+  - Directional sun with randomisable direction
+  - Ground plane with texturable surface
+  - Several coloured background objects for visual variety
+  - Physics settings tuned for pose-estimation data collection
+-->
+<sdf version="1.9">
+  <world name="randomized">
+
+    <!-- Physics -->
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+
+    <!-- Sun (main directional light) -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.85 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.3 -0.9</direction>
+    </light>
+
+    <!-- Secondary fill light (softer, from opposite side) -->
+    <light type="directional" name="fill_light">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 8 0 0 0</pose>
+      <diffuse>0.4 0.4 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.5 -0.3 -0.7</direction>
+    </light>
+
+    <!-- Point light (warm, positioned near robot) -->
+    <light type="point" name="warm_point">
+      <cast_shadows>false</cast_shadows>
+      <pose>1.0 0.5 1.5 0 0 0</pose>
+      <diffuse>0.6 0.5 0.3 1</diffuse>
+      <specular>0.1 0.1 0.05 1</specular>
+      <attenuation>
+        <range>5</range>
+        <constant>0.5</constant>
+        <linear>0.2</linear>
+        <quadratic>0.05</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- Ground plane -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.55 0.55 0.52 1</ambient>
+            <diffuse>0.6 0.6 0.57 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Background objects for visual clutter / domain randomization -->
+
+    <!-- Back wall (grey) -->
+    <model name="back_wall">
+      <static>true</static>
+      <pose>-1.5 0 0.75 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.05 3.0 1.5</size></box></geometry>
+          <material>
+            <ambient>0.45 0.45 0.50 1</ambient>
+            <diffuse>0.5 0.5 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Side panel (blue-ish) -->
+    <model name="side_panel">
+      <static>true</static>
+      <pose>0 -1.5 0.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>3.0 0.05 1.0</size></box></geometry>
+          <material>
+            <ambient>0.3 0.4 0.6 1</ambient>
+            <diffuse>0.35 0.45 0.65 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Small table / pedestal under robot -->
+    <model name="table">
+      <static>true</static>
+      <pose>0 0 -0.02 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.6 0.6 0.04</size></box></geometry>
+          <material>
+            <ambient>0.35 0.25 0.15 1</ambient>
+            <diffuse>0.45 0.32 0.2 1</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry><box><size>0.6 0.6 0.04</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- Random clutter boxes -->
+    <model name="clutter_box_1">
+      <static>true</static>
+      <pose>0.4 0.5 0.05 0 0 0.3</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.1 0.08 0.1</size></box></geometry>
+          <material>
+            <ambient>0.7 0.2 0.2 1</ambient>
+            <diffuse>0.8 0.25 0.25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="clutter_box_2">
+      <static>true</static>
+      <pose>-0.3 0.4 0.075 0 0 -0.5</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.12 0.06 0.15</size></box></geometry>
+          <material>
+            <ambient>0.2 0.6 0.3 1</ambient>
+            <diffuse>0.25 0.7 0.35 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="clutter_cylinder">
+      <static>true</static>
+      <pose>0.3 -0.4 0.1 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><cylinder><radius>0.05</radius><length>0.2</length></cylinder></geometry>
+          <material>
+            <ambient>0.2 0.3 0.7 1</ambient>
+            <diffuse>0.25 0.35 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

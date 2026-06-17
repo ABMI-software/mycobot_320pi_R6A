@@ -1,0 +1,4 @@
+#!/usr/bin/python3
+"""Color-based object detector wrapper script."""
+from mycobot_gateway.color_object_detector import main
+main()
