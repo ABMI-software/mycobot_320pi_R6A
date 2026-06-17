@@ -7,6 +7,26 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.2.1] - 2026-06-17 — téléopération : correctif de lancement
+
+### Corrigé
+
+- [`mycobot_gateway/launch/mycobot_teleop.launch.py`](mycobot_gateway/launch/mycobot_teleop.launch.py) :
+  l'include de `rosbridge_websocket_launch.xml` utilisait `PythonLaunchDescriptionSource`
+  (le XML était `exec()` comme du Python → `invalid syntax ... line 1`). Remplacé par
+  `AnyLaunchDescriptionSource` qui auto-détecte le format. L'include Gazebo (`.py`) inchangé.
+
+### Notes (opérations d'environnement, non liées au code)
+
+- `mycobot_description` ne se résolvait plus au lancement : overlay top-level périmé +
+  `CMakeCache.txt` empoisonné par le Python conda. Résolu par rebuild propre des deux
+  paquets (`conda deactivate` d'abord). Rappel : toujours `conda deactivate` avant `colcon build`.
+- `roslibpy` installé dans l'env conda `hand-teleop` (dashboard + script téléop) → 2.0.0.
+- IP Pi réelle du jour vérifiée : `10.10.0.219` (les défauts `.225` / docs `.221`/`.223`
+  sont obsolètes — à réconcilier dans CLAUDE.md et `docs/ARCHITECTURE.md`).
+
+---
+
 ## [2.2.0] - 2026-04-23
 
 ### 🎨 Dashboard ABMI + boutons dynamiques
