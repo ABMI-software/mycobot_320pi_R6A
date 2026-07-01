@@ -15,7 +15,52 @@
 conda deactivate
 
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/mycobot_320pi_R6A/install/setup.bash   # ← chemin correct (pas ~/ros_jazzy/)
+```
+
+---
+
+## État actuel (1 juillet 2026 — matin)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Tests unitaires `mycobot_teleop.py`** : 71 tests écrits dans `teleop/test_mycobot_teleop.py`, tous verts. Couvrent `clamp`, `map_range`, `maybe_reverse`, `xyz_to_joints_deg` (axis routing, gains, inversions, clampage limites), `get_xyz_from_pose`/`get_rot_from_pose`, `RosBridgeArmPublisher` (TFS, gain callback, gripper normalization, `send_deg`). Tournent sans conda env via stubs `sys.modules`. Committés sur `feature/teleoperation` (commit `a6c29092`).
+- **Correction chemin workspace** : `~/ros_jazzy/` dans toute la doc est faux — le workspace est `~/mycobot_320pi_R6A/` (build/install au racine du repo).
+- **Installation rosbridge** : `ros-jazzy-rosbridge-server` n'était pas installé. Installé via `sudo apt update && sudo apt install ros-jazzy-rosbridge-server`.
+- **Blocker ABI rosbridge** : au lancement, crash `undefined symbol: _ZN8eprosima7fastcdr3Cdr9serializeEj` dans `librosbridge_msgs__rosidl_typesupport_fastrtps_c.so` — conflit de version `fastcdr`. Workaround testé : lancer rosbridge **sans** `source ~/mycobot_320pi_R6A/install/setup.bash` (juste `/opt/ros/jazzy`). Résultat non confirmé — session interrompue avant validation.
+
+### Décisions prises
+
+- Toujours utiliser `~/mycobot_320pi_R6A/install/setup.bash`, jamais `~/ros_jazzy/`
+- Tests teleop sur `feature/teleoperation`, pas sur `main`
+- Téléop sim avec webcam PC : `--camera auto --cam-idx 0 --no-gripper`
+
+### Prochaines actions
+
+1. [ROUGE] Résoudre le crash ABI rosbridge (tester sans overlay, ou `sudo apt upgrade ros-jazzy-*`)
+2. [JAUNE] Une fois rosbridge OK : lancer T2 (Gazebo `target:=sim`) puis T3 (mycobot_teleop webcam PC)
+3. [VERT] Valider le pipeline complet sim avec caméra PC (recalibrate → mouvements)
+
+### Commande rapide de reprise
+
+```bash
+# T1 — rosbridge (sans overlay pour éviter le crash ABI)
+conda deactivate
+source /opt/ros/jazzy/setup.bash
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+
+# T2 — Gazebo sim
+conda deactivate
+source /opt/ros/jazzy/setup.bash
+source ~/mycobot_320pi_R6A/install/setup.bash
+export GZ_SIM_RESOURCE_PATH=~/mycobot_320pi_R6A/install/mycobot_description/share
+ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim
+
+# T3 — téléop webcam PC
+conda activate hand-teleop
+cd ~/mycobot_320pi_R6A/teleop
+python3 mycobot_teleop.py --camera auto --cam-idx 0 --ros --use-rosbridge \
+    --time-from-start 0.25 --x-gain 1.2 --y-gain 1.2 --z-gain 1.6 --no-gripper
 ```
 
 ---
