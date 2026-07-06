@@ -255,7 +255,10 @@ capture_real.py
 | `vgg_weighted_50k_e50` | 50K synth | 50 | 98.3% det, 3.15px med | 13.2% det, 172px | +1M frames |
 | `vgg_finetuned_real_e30` | Mixed (custom v1) | 30 | ❌ 0% | ❌ 0% | Bug: sigma=4, single-stage |
 | `vgg_finetuned_real_v2` | Mixed (custom v2) | 30 | ❌ 0% | ❌ 0% | Bug: belief map collapse |
-| **`vgg_mixed_real_synth`** | **18K mixed native** | **25** | **À évaluer** | **À évaluer** | DREAM natif, terminé |
+| `vgg_mixed_real_synth` | 18K mixed native | 25 | — | — | Abandonné, remplacé par v4 mix |
+| `vgg_ultimate_v2_e50` | 20K synth | 50 | 97.7% det | ~26% det | Record avant v4, weights `[1,1,1,1,1.5,1.5,6.0]` |
+| `vgg_ultimate_v4_e50` | 50K synth (intrinsèques corrigées) | 50 | **99.4% det, 2.61px** | ≈27% det | Record synthétique actuel, voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](../training/dream/VGG_ULTIMATE_V4_50K.md) |
+| **`vgg_ultimate_v4_mix_ft`** | **Mix synth 50K + real 3cam ×5** | **30** | **en cours** | **en cours** | Fine-tune depuis v4, `scale_limit=0.3`, voir [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](../training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md) |
 
 ### Pipeline legacy (ResNet)
 

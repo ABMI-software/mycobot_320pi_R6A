@@ -69,9 +69,11 @@ Two architectures were tested:
 | Model | Synthetic | Real |
 |-------|-----------|------|
 | VGG synth-only (20K) | 97% det, 3.1px | ~26% det |
-| VGG synth-only (50K) | 98.3% det, 3.15px | 13.2% det, 172px |
+| VGG synth-only (50K, ancien) | 98.3% det, 3.15px | 13.2% det, 172px |
 | VGG-aug + augmentation | ~97% det | 25.7% det (marginal improvement) |
-| **VGG mixed (18K)** | — | **À évaluer** |
+| vgg_ultimate_v2_e50 | 97.7% det | ~26% det |
+| **vgg_ultimate_v4_e50** | **99.4% det, 2.61px mean** (see [`../VGG_ULTIMATE_V4_50K.md`](../VGG_ULTIMATE_V4_50K.md)) | ≈27% det |
+| vgg_ultimate_v4_mix_ft (in progress) | in progress | in progress — see [`../FINETUNE_MIX_REAL3CAM_PLAN.md`](../FINETUNE_MIX_REAL3CAM_PLAN.md) |
 
 **Belief maps are 10× weaker on real images** (peaks 0.02–0.25) vs synthetic (0.5–1.0).
 Aggressive augmentation (HueSaturation, GaussianBlur, CLAHE, CoarseDropout) gave only

@@ -91,8 +91,13 @@ python training/dream/evaluate_dream.py \
 | Modèle | Dataset entraîn. | Eval synth | Eval réel |
 |--------|-------------------|------------|-----------|
 | VGG synth-only (20K) | 20K synth | 97% det, 3.1px | ~26% det |
-| VGG synth-only (50K) | 50K synth | 98.3% det, 3.15px | 13.2% det, 172px |
-| **VGG mixte (18K)** | 10K réel + 8K synth | terminé | **À évaluer** |
+| VGG synth-only (50K, ancien) | 50K synth | 98.3% det, 3.15px | 13.2% det, 172px |
+| vgg_ultimate_v2_e50 | 20K synth | 97.7% det | ~26% det |
+| **vgg_ultimate_v4_e50** | 50K synth (intrinsèques corrigées) | **99.4% det, 2.61px** | ≈27% det |
+| vgg_ultimate_v4_mix_ft (en cours) | mix synth 50K + real 3cam ×5 | en cours | en cours |
+
+Détails : [`dream/VGG_ULTIMATE_V4_50K.md`](dream/VGG_ULTIMATE_V4_50K.md),
+[`dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](dream/FINETUNE_MIX_REAL3CAM_PLAN.md).
 
 ### Résultats Grid Search — Weighted Loss (20K synthetic)
 
