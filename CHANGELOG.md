@@ -7,6 +7,27 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.12.0] - 2026-07-06
+
+### 🎯 Pose estimation — record synthétique 99.4% (v4) + fine-tune mixte réel en cours
+
+`vgg_ultimate_v4_e50` (50K synthétique, intrinsèques caméra corrigées) évalué à
+**99.4% de détection** (2.61px erreur moyenne), dépassant le précédent record
+v2 (97.7%). Voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](../training/dream/VGG_ULTIMATE_V4_50K.md).
+
+Le transfert sim-to-real reste bloqué à ≈27% sur `real_3cam_ndds` malgré ce
+gain. Un fine-tune depuis `best_network.pth` sur un mix synthétique 50K + réel
+3 caméras ×5 (`train_dream_ultimate_v4_mix.py`, `scale_limit=0.3`, 30 epochs)
+est en cours pour combler l'écart — voir
+[`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](../training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md).
+
+### Modifié — Documentation
+
+- [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) — historique modèles DREAM à jour (v4, mix fine-tune)
+- [`training/README.md`](../training/README.md), [`training/dream/README.md`](../training/dream/README.md) — tableaux de résultats à jour
+
+---
+
 ## [1.11.0] - 2026-04-23 (soir)
 
 ### 🎯 Pose estimation — diagnostic complet + option 1 épuisée
