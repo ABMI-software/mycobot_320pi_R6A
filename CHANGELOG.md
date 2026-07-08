@@ -42,6 +42,33 @@ brique glue keypoints → angles (reprojection-min sur la FK existante
 [`training/dream/mycobot_fk.py`](../training/dream/mycobot_fk.py) /
 [`training/dream/mycobot_ik.py`](../training/dream/mycobot_ik.py)).
 
+### Ajouté — outillage pose estimation eye-to-hand (astra RGB-D)
+
+Pipeline complet keypoints → angles → courbe d'écart par joint, caméra astra
+fixe devant le bras. Validé en simulation ; premier run réel en cours.
+
+- [`training/dream/estimate_angles_from_keypoints.py`](../training/dream/estimate_angles_from_keypoints.py)
+  — remonte des keypoints DREAM aux angles j1..j6. Mode 2D (reprojection, `cv2`)
+  et **mode 3D** (depth → correspondance 3D). Self-tests : le 3D récupère
+  j1–j4 à <2° **sans amorçage** (la profondeur supprime la fragilité mono) ;
+  j5 faible, **j6 non observable** (keypoint sur l'axe de j6 — limite structurelle).
+- [`training/calibration/oni_grabber_rgbd.cpp`](../training/calibration/oni_grabber_rgbd.cpp)
+  — grabber OpenNI Astra : couleur + depth aligné couleur (D2C) + FOV (intrinsèques)
+  vers `/dev/shm`. Extension du grabber couleur existant.
+- [`training/calibration/calibrate_astra_extrinsic_shm.py`](../training/calibration/calibrate_astra_extrinsic_shm.py)
+  — extrinsèque `T_base_camera` par recalage 3D (Kabsch) sur les marqueurs sol,
+  sans ChArUco. Sort `astra_extrinsic.yaml` + `cam_astra.npz`.
+- [`training/calibration/check_astra_markers.py`](../training/calibration/check_astra_markers.py),
+  [`training/calibration/astra_preview.py`](../training/calibration/astra_preview.py)
+  — aide au cadrage / preview live couleur+depth.
+- [`training/dream/capture_astra_rgbd.py`](../training/dream/capture_astra_rgbd.py)
+  — dataset RGB-D + encodeurs (mouvement calqué sur `capture_real_3cam` :
+  home d'abord, `speed=25`, `settle=3s`). Réutilise le bridge TCP validé.
+- [`training/dream/plot_angle_error_curve.py`](../training/dream/plot_angle_error_curve.py)
+  — le livrable : DREAM → depth → angles vs encodeurs → courbe d'écart par joint.
+- [`training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md`](../training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md)
+  — procédure de calibration extrinsèque.
+
 ### Modifié — Documentation
 
 - [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) — historique modèles DREAM : `vgg_ultimate_v4_mix_ft_e30` finalisé (91,6% réel), date à jour.
