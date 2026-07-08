@@ -31,7 +31,14 @@ source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
   base/link1/link2 100%, link3 97,3%, link4 89,8%, link5 75,7%, link6 78,4% ;
   erreur médiane overall 2,91px. Les distaux (link5/6) restent le point faible
   relatif. Plan : `training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`.
-- Docs à jour : `docs/ARCHITECTURE.md` (historique modèles), `CHANGELOG.md` (1.13.0).
+- **Pipeline eye-to-hand construit et validé en sim** : `estimate_angles_from_keypoints.py`
+  (modes 2D + 3D depth ; 3D récupère j1–j4 <2° sans amorçage, j6 non observable),
+  grabber RGB-D `oni_grabber_rgbd.cpp` (depth aligné couleur via `/dev/shm`),
+  calibration extrinsèque 3D `calibrate_astra_extrinsic_shm.py`, capture
+  `capture_astra_rgbd.py`, courbe `plot_angle_error_curve.py`.
+- **Dataset astra RGB-D capturé** : 90 poses (`dream_data/real_astra_rgbd`,
+  color+depth+encodeurs), mouvement calqué sur capture_real_3cam.
+- Docs à jour : `docs/ARCHITECTURE.md`, `CHANGELOG.md` (1.13.0), `CALIBRATION_ASTRA_EXTRINSIC.md`.
 
 ### Décisions prises
 
@@ -47,25 +54,30 @@ source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
 - La cinématique nécessaire existe déjà : `training/dream/mycobot_fk.py` (FK +
   projection keypoints) et `training/dream/mycobot_ik.py` (IK position/pose).
 
-### Prochaines actions
+### Prochaines actions — pour tracer la courbe d'écart sur le réel
 
-1. **[ROUGE]** Confirmer l'état de la calibration extrinsèque `T_base_camera` de
-   la caméra fixe eye-to-hand — c'est le premier maillon, tout en dépend. Nodes
-   dispo : `mycobot_gateway/mycobot_gateway/calibrate_extrinsic_node.py`,
-   `calibrate_hand_eye_node.py`.
-2. **[JAUNE]** Écrire la brique glue keypoints → angles (reprojection-min via
-   `mycobot_fk.forward_kinematics` + `project_keypoints`).
-3. **[VERT]** Générer la courbe d'écart par joint (validation d'abord en sim,
-   où DREAM est à 99,4% et la vérité encodeur est exacte), puis sur le réel.
+1. **[ROUGE]** Remettre la lib DREAM `/tmp/DREAM` (effacée au reboot, aucune
+   inférence possible sans elle) — re-cloner NVlabs DREAM.
+2. **[ROUGE]** Calibrer l'extrinsèque astra : poser les 4 marqueurs sol, lancer
+   `oni_grabber_rgbd` + `calibrate_astra_extrinsic_shm.py` → `astra_extrinsic.yaml`
+   + `cam_astra.npz`. Viser < 5 mm de résidu (voir `CALIBRATION_ASTRA_EXTRINSIC.md`).
+3. **[VERT]** Tracer : `plot_angle_error_curve.py` sur `dream_data/real_astra_rgbd`
+   (90 poses déjà capturées) avec les poids `vgg_ultimate_v4_mix_ft_e30`.
 
 ### Commande rapide de reprise
 
 ```bash
+# 1) grabber (terminal A)
+cd ~/Osama_ws/src/mycobot_R6A/training/calibration && ./oni_grabber_rgbd
+# 2) courbe (une fois /tmp/DREAM remis + calibration faite)
 source ~/ros_jazzy/venv_dream/bin/activate
-# éval du modèle réel de référence (mix fine-tune) — 3 caméras complètes
-python training/dream/evaluate_dream.py \
-  --weights training/checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/best_network.pth \
-  --data training/dream_data/real_3cam_val_ndds --max-samples 1500
+cd ~/Osama_ws/src/mycobot_R6A/training
+python3 dream/plot_angle_error_curve.py \
+  --dataset dream/dream_data/real_astra_rgbd \
+  --weights checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/best_network.pth \
+  --extrinsic ../calibration/astra_extrinsic.yaml \
+  --intrinsics-npz ../calibration/cam_astra.npz \
+  --out dream/dream_data/real_astra_rgbd/angle_error_curve.png
 ```
 
 ---
