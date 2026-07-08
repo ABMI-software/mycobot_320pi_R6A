@@ -7,6 +7,48 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.13.0] - 2026-07-08
+
+### 🎯 Pose estimation — sim-to-real comblé : réel 91.6% (fine-tune mixte terminé)
+
+Le fine-tune mixte annoncé en 1.12.0 est **terminé et validé**.
+`vgg_ultimate_v4_mix_ft_e30`
+(`checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/best_network.pth`) fait passer la
+détection réelle de **≈27% (v4 synth-only) à 91,6%** sur `real_3cam_val_ndds`
+(1500 frames jamais vues, 3 caméras), sans régression synthétique.
+
+- **Détection par keypoint** (3 caméras, 1500 frames) : base/link1/link2 100%,
+  link3 97,3%, link4 89,8%, link5 75,7%, link6 78,4% — overall **91,6%**.
+- **Erreur médiane** : overall 2,91px (base ~1,6 · link3 7,2 · link4 15,9 ·
+  link5 21,9 · link6 27,4). Les distaux restent le point faible relatif mais ont
+  le plus progressé pendant le fine-tune (+27–33% de MSE).
+- Entraînement : depuis le checkpoint v4 (`--pretrained`), mix 50K synth + réel
+  oversamplé ×5, `scale_limit=0.3`, poids kp `[1,1,1,1,1.5,1.5,6.0]`, 30 epochs
+  (best 27), val_loss 0,000942, 13,8 h.
+- **Biais d'échantillonnage corrigé** : `evaluate_dream.py` en défaut 500 frames
+  tombait à 100% sur arducam (step=3,0 en phase avec l'ordre des caméras) ;
+  `--max-samples 1500` rétablit les 3 caméras et améliore les distaux.
+
+Plan et méthodo : [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](../training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md).
+
+### 🔭 Prochaine direction — pose estimation eye-to-hand + visual servoing
+
+Cadre fixé pour la suite : caméra **fixe eye-to-hand** placée devant le bras
+→ DREAM estime les keypoints → conversion en angles articulaires → **courbe
+d'écart par joint** (angles estimés vs encodeurs réels) comme livrable
+d'évaluation, puis **visual servoing** pour le pick-and-place. Maillons manquants
+identifiés : calibration extrinsèque `T_base_camera` de la caméra fixe, puis
+brique glue keypoints → angles (reprojection-min sur la FK existante
+[`training/dream/mycobot_fk.py`](../training/dream/mycobot_fk.py) /
+[`training/dream/mycobot_ik.py`](../training/dream/mycobot_ik.py)).
+
+### Modifié — Documentation
+
+- [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) — historique modèles DREAM : `vgg_ultimate_v4_mix_ft_e30` finalisé (91,6% réel), date à jour.
+- [`SESSION_RESUME.md`](../SESSION_RESUME.md) — entrée datée 8 juillet 2026 (état pose estimation + direction eye-to-hand).
+
+---
+
 ## [1.12.0] - 2026-07-06
 
 ### 🎯 Pose estimation — record synthétique 99.4% (v4) + fine-tune mixte réel en cours

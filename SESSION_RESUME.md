@@ -20,6 +20,56 @@ source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
 
 ---
 
+## État actuel (8 juillet 2026 — après-midi)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Sim-to-real DREAM comblé.** Le fine-tune mixte `vgg_ultimate_v4_mix_ft_e30`
+  (`checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/best_network.pth`) atteint
+  **91,6% de détection réelle** (3 caméras, 1500 frames jamais vues), contre
+  ≈27% pour le v4 synth-only et 99,4% en synthétique. Détail par keypoint :
+  base/link1/link2 100%, link3 97,3%, link4 89,8%, link5 75,7%, link6 78,4% ;
+  erreur médiane overall 2,91px. Les distaux (link5/6) restent le point faible
+  relatif. Plan : `training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`.
+- Docs à jour : `docs/ARCHITECTURE.md` (historique modèles), `CHANGELOG.md` (1.13.0).
+
+### Décisions prises
+
+- **Direction pose estimation : eye-to-hand.** Une caméra **fixe devant le bras**
+  observe tout le bras et estime sa pose (paradigme DREAM), pas eye-in-hand.
+- **Livrable demandé par l'encadrant : courbe d'écart par joint** — comparer les
+  angles estimés par la caméra (DREAM → keypoints → angles) aux encodeurs réels,
+  joint par joint (j1…j6), en degrés.
+- **Ordre de construction validé** : (1) calibration extrinsèque `T_base_camera`,
+  (2) brique glue keypoints → angles (reprojection-min sur la FK existante),
+  (3) courbe d'écart, (4) visual servoing pick-and-place — dans cet ordre, le
+  servoing seulement une fois la courbe jugée exploitable.
+- La cinématique nécessaire existe déjà : `training/dream/mycobot_fk.py` (FK +
+  projection keypoints) et `training/dream/mycobot_ik.py` (IK position/pose).
+
+### Prochaines actions
+
+1. **[ROUGE]** Confirmer l'état de la calibration extrinsèque `T_base_camera` de
+   la caméra fixe eye-to-hand — c'est le premier maillon, tout en dépend. Nodes
+   dispo : `mycobot_gateway/mycobot_gateway/calibrate_extrinsic_node.py`,
+   `calibrate_hand_eye_node.py`.
+2. **[JAUNE]** Écrire la brique glue keypoints → angles (reprojection-min via
+   `mycobot_fk.forward_kinematics` + `project_keypoints`).
+3. **[VERT]** Générer la courbe d'écart par joint (validation d'abord en sim,
+   où DREAM est à 99,4% et la vérité encodeur est exacte), puis sur le réel.
+
+### Commande rapide de reprise
+
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+# éval du modèle réel de référence (mix fine-tune) — 3 caméras complètes
+python training/dream/evaluate_dream.py \
+  --weights training/checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/best_network.pth \
+  --data training/dream_data/real_3cam_val_ndds --max-samples 1500
+```
+
+---
+
 ## État actuel (23 avril 2026 — soir)
 
 ### 🧭 Reprise pour demain — lire en premier
