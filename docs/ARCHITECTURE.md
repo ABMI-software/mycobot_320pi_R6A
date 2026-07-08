@@ -1,6 +1,6 @@
 # 🏗️ Architecture du Projet MyCobot 320 Pi — R6A
 
-> Dernière mise à jour : 21 avril 2026
+> Dernière mise à jour : 8 juillet 2026
 
 ## Vue d'ensemble
 
@@ -258,7 +258,7 @@ capture_real.py
 | `vgg_mixed_real_synth` | 18K mixed native | 25 | — | — | Abandonné, remplacé par v4 mix |
 | `vgg_ultimate_v2_e50` | 20K synth | 50 | 97.7% det | ~26% det | Record avant v4, weights `[1,1,1,1,1.5,1.5,6.0]` |
 | `vgg_ultimate_v4_e50` | 50K synth (intrinsèques corrigées) | 50 | **99.4% det, 2.61px** | ≈27% det | Record synthétique actuel, voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](../training/dream/VGG_ULTIMATE_V4_50K.md) |
-| **`vgg_ultimate_v4_mix_ft`** | **Mix synth 50K + real 3cam ×5** | **30** | **en cours** | **en cours** | Fine-tune depuis v4, `scale_limit=0.3`, voir [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](../training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md) |
+| **`vgg_ultimate_v4_mix_ft_e30`** | **Mix synth 50K + real 3cam ×5** | **30 (best 27)** | ~99.4% det (pas de régression) | **91.6% det, 2.91px méd** | Fine-tune depuis v4, `scale_limit=0.3`, poids `[1,1,1,1,1.5,1.5,6.0]`, val_loss 0.000942. **Comble l'écart sim-to-real** (27% → 91.6%). Voir [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](../training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md) |
 
 ### Pipeline legacy (ResNet)
 
