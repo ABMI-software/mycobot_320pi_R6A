@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+from mycobot_gateway.dream_validation_dashboard import main
+
+if __name__ == '__main__':
+    main()

@@ -52,6 +52,9 @@ setup(
             'dream_inference = mycobot_gateway.dream_inference_node:main',
             'pick_and_place = mycobot_gateway.pick_and_place_node:main',
 
+            # DREAM vs encoders real-time validation dashboard (PyQt)
+            'dream_validation_dashboard = mycobot_gateway.dream_validation_dashboard:main',
+
             # Multi-object color sorting (Gazebo)
             'color_object_detector = mycobot_gateway.color_object_detector:main',
             'sorting_orchestrator = mycobot_gateway.sorting_orchestrator:main',
