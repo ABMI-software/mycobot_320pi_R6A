@@ -568,3 +568,101 @@ mycobot_R6A/
 ---
 
 *Dernière mise à jour : 21 avril 2026*
+## État actuel (13 juillet 2026 — après-midi)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Dashboard PyQt de validation temps réel DREAM vs encodeurs** (Dashboard 1 des
+  3 demandés en réunion "Validation Modèle IA — Cercles EndEffector") :
+  `mycobot_gateway/mycobot_gateway/dream_validation_dashboard.py`. En-tête avec
+  logo ABMI, flux caméra en direct, grand cercle vert = position joint reconstruite
+  depuis les encodeurs (FK), petit cercle magenta = détection DREAM brute, erreur
+  par keypoint en px.
+- **Décision explicite : pas d'extrinsèque caméra pré-calibrée.** La pose caméra
+  est résolue à chaque frame par PnP (intrinsèque Arducam `cam_3.meta.json` +
+  angles encodeurs courants + détections DREAM), jamais depuis un fichier figé.
+- **Ambiguïté confirmée** en testant `training/dream/dream_angle_solver.py`
+  (solveur angles+pose caméra conjoint, sans ancrage) : erreur de reprojection
+  quasi nulle atteignable avec >60° d'erreur angulaire — le problème est mal posé
+  à vue unique sans ancrage de pose caméra. Cohérent avec le constat déjà posé le
+  8 juillet (`estimate_angles_from_keypoints.py` a besoin d'une extrinsèque fixe
+  pour être bien posé). Solveur conservé, non branché.
+- Dashboards 2 (pilotage/KPI) et 3 (courbes 6 joints) : onglets placeholder en
+  attendant une décision sur l'ancrage de pose (calibration une fois par session,
+  ou triangulation multi-caméra).
+- Testé en aveugle sans matériel réel (messages ROS2 synthétiques + Qt offscreen) :
+  overlay, calcul d'erreur, rendu — tous validés.
+
+### Prochaines actions
+
+1. [ROUGE] Tester Dashboard 1 sur le robot réel (caméra Arducam + `/joint_states`
+   + `dream_inference_node` adapté à `/camera/image_raw` — actuellement câblé
+   Gazebo `/synth_camera/image` uniquement).
+2. [JAUNE] Décider de l'ancrage de pose caméra pour Dashboards 2/3 (calibration
+   session unique vs triangulation multi-cam, voir `dream_angle_solver.py`).
+3. [VERT] Une fois l'ancrage choisi, implémenter Dashboard 2 (port `simple_gui.py`
+   en PyQt + KPI précision/répétabilité/latence) et Dashboard 3 (courbes 6 joints).
+
+### Commande rapide de reprise
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash
+cd ~/ros_jazzy && colcon build --packages-select mycobot_gateway --symlink-install
+source install/setup.bash
+ros2 run mycobot_gateway dream_validation_dashboard
+```
+
+---
+
+## État actuel (8 juillet 2026 — soir)
+
+### Ce qui a été accompli aujourd'hui (soir)
+
+- **Cartographie eye-to-hand sur les 3 caméras.** Constat clé : **détection ≠
+  récupération d'angles** (deux problèmes séparés).
+  - Détection real_3cam (`keypoint_accuracy_curve.py`, par caméra) : svpro 98% ·
+    astra 95% · arducam 89%. → la **caméra astra est bonne** ; l'astra fraîche à
+    48% = **placement** hors-domaine, pas la caméra.
+  - Angles : caméra **mono** (arducam/svpro, sans depth) mal conditionnée (7–24°
+    même amorcée) ; **depth (astra) indispensable** pour j1–j4 <2°.
+- **Plateforme visual-servoing** livrée : `visual_servoing_platform.py` (6 fenêtres
+  joint réel vs estimé + écart) et `visual_servoing_dashboard.py` (avancé : vue
+  caméra avec squelette FK-vérité + keypoints IA superposés + 6 courbes + barre
+  d'état). Modes **live** (robot+caméra) et **rejeu** (dataset).
+- **Courbe 1 — précision keypoints, SANS calibration** (`keypoint_accuracy_curve.py`) :
+  synth ~2,9px/100% ; real_3cam proximaux 1,6px, distaux jusqu'à 10,5px. C'est « la
+  courbe avant de calibrer » (évalue le modèle seul).
+- **Self-calibration marker-free** codée (`self_calibrate_arducam.py`, RANSAC) mais
+  **prouvée circulaire** : elle absorbe le biais DREAM → le squelette vérité suit
+  les détections décalées, pas le vrai bras. → extrinsèque **indépendant (ArUco)
+  nécessaire** pour un dashboard/courbe honnêtes.
+- **`ik_reach_point.py`** validé sur robot réel : point → IK → angles (résidu IK
+  0 mm), écart mécanique **1°** (le plancher physique).
+
+### Décisions prises (soir)
+
+- **Arducam mono écartée** pour la courbe en degrés (pas de depth + distaux faibles, 89%).
+- **Astra = meilleur choix caméra unique** (95% in-domain + depth). Reste à régler son placement.
+- Courbe en degrés + dashboard honnête **bloqués** tant qu'il n'y a pas d'extrinsèque
+  indépendant (self-cal circulaire insuffisant).
+
+### Prochaines actions (soir)
+
+1. [ROUGE] **4 ArUco → extrinsèque indépendant** (IDs 19/23/25/26, une photo) —
+   débloque dashboard honnête **et** courbe degrés, sur n'importe quelle caméra.
+2. [ROUGE] Sinon **astra + fine-tune** sur le nouveau placement (seul chemin sans marqueurs).
+3. [VERT] Puis `plot_angle_error_curve.py` (mode 3D astra / 2D arducam) + dashboard live.
+
+### Commande rapide de reprise (soir)
+
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+cd ~/Osama_ws/src/mycobot_R6A/training/dream
+# démo dashboard (rejeu — extrinsèque self-cal encore approximatif)
+python3 visual_servoing_dashboard.py --mode replay --dataset dream_data/real_arducam \
+  --weights checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/best_network.pth \
+  --extrinsic ../calibration/arducam_extrinsic_selfcal.yaml --intrinsics-npz ../calibration/cam_0.npz
+```
+
+---
+
