@@ -109,7 +109,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │   │   ├── sorting_orchestrator.py             # Pick-and-place multi-couleur (boucle 4 objets)
 │   │   ├── trajectory_to_robot_bridge.py       # JointTrajectory rad → JSON deg (téléop réel)
 │   │   ├── gripper_to_robot_bridge.py          # Bridge gripper (no-op tant que pas de pince)
-│   │   └── synthetic_data_collector_v2.py      # Collecte Gazebo + anti-collision FK
+│   │   └── synthetic_data_collector_v3.py      # Génération dataset 50k (filtre capsule, domain randomization)
 │   ├── scripts/
 │   │   ├── bridge_pi_simple.py     # Script Pi (serveur TCP robot)
 │   │   └── pi_camera_server.py     # Script Pi (serveur TCP caméras)
@@ -132,19 +132,20 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │   ├── dataset.py                  # Legacy: datasets single/multi-view
 │   ├── train.py                    # Legacy: régression directe (abandonné)
 │   ├── predict.py                  # Legacy: inférence régression
-│   ├── capture_real.py             # Capture données réelles (FK safety)
+│   ├── capture_real_3cam.py        # Capture réelle 3 caméras synchronisées (ArduCam+SVPRO+Astra) → real_3cam
+│   ├── capture_session.sh          # Lanceur capture_real_3cam.py
 │   └── dream/                      # DREAM pipeline (actif)
 │       ├── mycobot_fk.py           # Forward Kinematics DH + projection
 │       ├── mycobot_ik.py           # Inverse Kinematics Jacobien
+│       ├── dream_angle_solver.py   # Récupère les angles articulaires depuis les keypoints 2D
 │       ├── convert_to_ndds.py      # Conversion → NDDS
-│       ├── merge_and_convert.py    # Fusion réel+synth → NDDS
-│       ├── train_dream.py          # Wrapper entraînement
-│       ├── train_dream_augmented.py# Entraînement + augmentation agressive
-│       ├── train_dream_weighted.py # Entraînement pondéré par keypoint
+│       ├── merge_ndds.py           # Fusion deux datasets déjà NDDS (synth + réel ×5 oversamplé)
+│       ├── train_dream_ultimate_v4.py       # 🎯 Entraînement 50k synthétique from scratch (record 99.4%)
+│       ├── train_dream_ultimate_v4_mix.py   # 🎯 Fine-tune mixte 50k synth + real_3cam ×5 (91.6% réel)
 │       ├── evaluate_dream.py       # Évaluation + filtre sentinel -999.99
 │       ├── infer_dream.py          # Inférence single-image + PnP
 │       ├── visualize_ndds.py       # Vérification visuelle annotations
-│       ├── finetune_real.py        # Fine-tuning expérimental (⚠️ ne fonctionne pas)
+│       ├── finetune_real.py        # Fine-tuning expérimental (⚠️ ne fonctionne pas — voir Leçons apprises)
 │       └── manip_configs/mycobot320.yaml
 │
 ├── datasets/                       # Données (Git LFS)
@@ -348,14 +349,16 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 - [x] **Pick-and-place sorting 4 couleurs** end-to-end (HSV + IK + bins) — `pick_and_place_sorting.launch.py`, validé 23/04/2026
 - [x] **Téléopération main → bras réel** validée sur le MyCobot 320 Pi physique (22/04/2026, gains 1.2/1.2/1.6/0.25, latence ~150–250 ms)
 - [x] Procédure de validation **sim-only** documentée — [`docs/TELEOP_SIM_TESTING.md`](docs/TELEOP_SIM_TESTING.md)
-- [ ] **Évaluer le modèle mixte** sur données réelles (objectif : >50% détection) — étape bloquante restante
-- [ ] **Self-supervised labeling** : FK + caméra calibrée → annotations GT automatiques sur réel
-- [ ] Fine-tune sur données réelles auto-annotées
+- [x] **Dataset synthétique 50k (v3)** — 12.5K poses × 4 caméras, filtre anti-collision capsule, couverture 100% du réel, intrinsèques corrigées (02/07/2026)
+- [x] **vgg_ultimate_v4_e50** — **99.4% détection synth, 2.61px moyenne** (13920/14000), nouveau record, 06/07/2026 — voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](training/dream/VGG_ULTIMATE_V4_50K.md)
+- [x] **Évaluer le modèle mixte sur données réelles** — `vgg_ultimate_v4_mix_ft_e30` (50K synth + 6K réel real_3cam ×5 oversampling → ~80K), **91.6% détection réel** (9618/10500, 1500 frames jamais vues), sans régression synthétique — écart sim-to-real fermé (27% → 91.6%), 08/07/2026 — voir [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md)
+- [ ] Fermer l'écart **angulaire** J1-J6 (le gap de détection est fermé, pas l'angle : cible 0.5-0.9°, mesuré 10-20× ça — J6 structurellement non-observable, J5 faiblement observable)
 
 ### Moyen terme
 - [x] Nœud ROS2 d'inférence DREAM (`dream_inference_node.py`)
 - [x] Pipeline pick-and-place simulation (`pick_and_place_node.py`)
-- [ ] **Bench test robot réel** une fois detection > 50%
+- [x] **Bench test détection réel** — 91.6% atteint, largement au-delà de l'objectif initial de 50%
+- [ ] **Pose estimation eye-to-hand + courbe d'écart par joint** (angles DREAM vs encodeurs) — outillage en place, calibration extrinsèque caméra fixe en cours
 - [ ] Intégration MoveIt2 pour planification de trajectoire
 
 ### Long terme
@@ -582,6 +585,13 @@ Epoch 7 : val_loss = 95.97    ← explosion massive
 
 ### Transfert Sim-to-Real
 
+> **Mise à jour 08/07/2026 — écart fermé.** Ce qui suit (jusqu'à "Pistes pour
+> réduire le domain gap") décrit l'état **avant** le fine-tune mixte
+> `vgg_ultimate_v4_mix_ft_e30`, conservé comme diagnostic historique.
+> Résultat final : **91.6% détection réel** (contre ~26-27% ici), voir
+> [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md)
+> et [`training/dream/README.md`](training/dream/README.md) pour les tableaux complets.
+
 | Métrique | Synthétique | Réel |
 |----------|-------------|------|
 | Taux de détection | 97% | ~26% |
@@ -595,6 +605,20 @@ Epoch 7 : val_loss = 95.97    ← explosion massive
 2. **Fine-tuning sur données réelles annotées** (auto-labeling via FK + caméra calibrée)
 3. **Self-supervised labeling** : utiliser les angles lus du robot + FK + intrinsèques caméra pour générer les keypoints GT sur images réelles
 4. **Style transfer** (CycleGAN) entre images Gazebo et réelles
+
+**Ce qui a effectivement fermé l'écart (08/07/2026)** : ni la domain randomization
+avancée seule ni le style transfer, mais un **fine-tune mixte** — 50K synthétique
+(v4, intrinsèques corrigées) + 6K réel (`real_3cam`, 2000 poses × 3 caméras)
+oversamplé ×5 → 30K, fusionnés en ~80K frames, `scale_limit` élargi de 0.1 à 0.3
+(couvre l'écart de focale mesuré jusqu'à +23,5% pour l'astra), fine-tune 30 epochs
+depuis `vgg_ultimate_v4_e50/best_network.pth`. Évalué sur 1500 frames réelles
+jamais vues (500 poses × 3 caméras, split par pose pour éviter toute fuite) :
+**91.6% détection** (9618/10500), sans régression synthétique (toujours 99.4%).
+
+| Modèle | Dataset | Synthétique | Réel |
+|--------|---------|-------------|------|
+| vgg_ultimate_v4_e50 (06/07/2026) | 50K synth v3 | **99.4% det, 2.61px** | ≈27% det |
+| **vgg_ultimate_v4_mix_ft_e30 (08/07/2026)** | 50K synth + 6K réel ×5 → ~80K | 99.4% det (pas de régression) | **91.6% det, 2.91px médiane** |
 
 ### Fichiers du module DREAM
 
@@ -611,9 +635,12 @@ Epoch 7 : val_loss = 95.97    ← explosion massive
 | `training/dream/manip_configs/mycobot320.yaml` | Configuration des 7 keypoints (noms, frames URDF) |
 | `training/dream/train_dream_grid_search.py` | Grid search 64 combinaisons de weights |
 | `training/dream/evaluate_grid.py` | Évaluation automatisée des runs grid search |
-| `training/dream/train_dream_ultimate_v2.py` | Training final w=[1,1,1,1,1.5,1.5,6.0] ⭐ |
+| `training/dream/train_dream_ultimate_v2.py` | Training w=[1,1,1,1,1.5,1.5,6.0] sur 20K (97.7% synth, ancien record) |
 | `training/dream/train_dream_ultimate.py` | Training final w=[1,1,1,1,1.5,3.0,5.0] |
 | `training/dream/merge_ndds.py` | Fusion réel + synthétique déjà en NDDS |
+| `training/dream/train_dream_ultimate_v4.py` | 🎯 Training 50K synth v3 from scratch — **record actuel 99.4%** |
+| `training/dream/train_dream_ultimate_v4_mix.py` | 🎯 Fine-tune mixte 50K synth + real_3cam ×5 — **91.6% réel, écart fermé** |
+| `training/dream/dream_angle_solver.py` | Récupère les angles articulaires (rad) depuis les keypoints 2D détectés |
 
 ### Checkpoints DREAM (dans .gitignore)
 
@@ -627,8 +654,10 @@ Epoch 7 : val_loss = 95.97    ← explosion massive
 | `checkpoints_dream/vgg_ultimate_e30/` | VGG weighted [1,1,1,1,1.5,3.0,5.0] — 97.5% det synth, 28/30 |
 | `checkpoints_dream/vgg_ultimate_e50/` | VGG weighted [1,1,1,1,1.5,3.0,5.0] — 96.9% det synth, 35/50 |
 | `checkpoints_dream/vgg_ultimate_v2_e30/` | VGG weighted [1,1,1,1,1.5,1.5,6.0] — 97.5% det synth, 27/30 |
-| `checkpoints_dream/vgg_ultimate_v2_e50/` |  VGG weighted [1,1,1,1,1.5,1.5,6.0] — **97.7% det synth, 92.6% link6**, 20/50 |
+| `checkpoints_dream/vgg_ultimate_v2_e50/` |  VGG weighted [1,1,1,1,1.5,1.5,6.0] — 97.7% det synth, 92.6% link6, 20/50 (ancien record) |
 | `checkpoints_dream/vgg_grid_*/` | 68 runs grid search (5 epochs chacun, 20K synth) |
+| `output/checkpoints_dream/vgg_ultimate_v4_e50/` | **50K synth v3, from scratch — 99.4% det synth, 2.61px, val_loss 0.000750 — record actuel** |
+| `output/checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/` | **Fine-tune mixte 50K synth + real_3cam ×5 — 91.6% det réel, val_loss 0.000942, best epoch 27/30 — modèle actif** |
 
 ### Tentatives de fine-tuning (❌ ÉCHOUÉES)
 
@@ -718,6 +747,10 @@ cd /tmp/DREAM && pip install -e . -r requirements.txt
 | merge_and_convert.py | 16/04/2026 | ✅ OK |
 | DREAM — Grid search 68 configs weighted loss (20K synth) | 21/05/2026 | ✅ w4=1.5, w5=1.5, w6=6.0 optimal — 40h45 total |
 | DREAM — vgg_ultimate_v2_e50 (97.7% record) | 21/05/2026 | ✅ Nouveau record synth, epoch 20/50, 2h52 |
+| DREAM — Génération dataset synthétique 50k v3 (12.5K poses × 4 caméras) | 02/07/2026 | ✅ Couverture 100% du réel, filtre capsule |
+| DREAM — Training vgg_ultimate_v4_e50 (50K synth, from scratch) | 02–06/07/2026 | ✅ **99.4% det synth, 2.61px — nouveau record** |
+| DREAM — Recalage extrinsèques caméras réelles (arducam/svpro/astra) | 03/07/2026 | ✅ Débloque le fine-tune mixte |
+| DREAM — Fine-tune mixte vgg_ultimate_v4_mix_ft_e30 (50K synth + 6K réel ×5, 13.8h) | 03–08/07/2026 | ✅ **91.6% det réel — écart sim-to-real fermé (27%→91.6%)** |
 
 ---
 
