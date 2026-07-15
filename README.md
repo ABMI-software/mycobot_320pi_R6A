@@ -76,7 +76,7 @@ Ce projet intègre :
 │                                                ┌─────────────────┐                   │
 │                                                │  MyCobot 320 Pi │                   │
 │                                                └─────────────────┘                   │
-│                          RASPBERRY PI (10.10.0.223)                                  │
+│                          RASPBERRY PI (10.10.0.221)                                  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -133,7 +133,7 @@ source install/setup.bash
 
 ```bash
 # Sur le Pi — Terminal 1 : bridge robot
-ssh er@10.10.0.223
+ssh er@10.10.0.221
 python3 bridge_pi_simple.py
 
 # Sur le Pi — Terminal 2 : serveur caméras
@@ -200,15 +200,17 @@ Le projet utilise **deux approches** de pose estimation, la seconde (DREAM) éta
   ❌ Bloqué à ~32° MAE sur données réelles (robot trop petit)
 
 ═══════════════════════════════════════════════════════════════
-  Phase 2 : DREAM Keypoint Detection  [ACTIF]
+  Phase 2 : DREAM Keypoint Detection  [ACTIF — écart sim-to-real comblé]
 ═══════════════════════════════════════════════════════════════
   Image → VGG-19 → 7 belief maps → keypoints 2D → PnP → pose
 
   VGG synth-only 20K : 97% det synth, 3.1px médiane ✅
-  VGG synth-only 50K : 98.3% det synth, 3.15px ✅ / 13.2% det réel ❌
-  VGG mixte 18K (10K réel ×5 + 8K synth, 50 epochs) : entraîné ✅
-        → évaluation real-world en cours
-  Fine-tune custom (σ=4 / σ=2)  : ❌ deux échecs documentés
+  VGG synth-only 50K (v4, 2026-07-06) : 99.4% det synth, 2.61px ✅
+  Fine-tune custom (σ=4 / σ=2)  : ❌ deux échecs documentés (abandonné, voir plus bas)
+  VGG mix fine-tune (v4_mix_ft_e30, 2026-07-08) :
+        50K synth + 6K réel ×5 oversampling → ~80K frames
+        99.4% det synth (pas de régression) / 91.6% det réel ✅
+        → écart sim-to-real fermé (27% → 91.6%)
 ```
 
 ### Approche DREAM (active)
@@ -229,23 +231,43 @@ Image 640×480 → VGG-19 → 6 stages cascadés → 7 belief maps 100×100
 |--------|----------------------|------------|-----------|-------|
 | VGG base (synth-only) | 20K synth (5K poses × 4 vues) | 97% det · 3.1 px | ~26% det | val=0.000438, baseline DREAM |
 | VGG augmenté (synth-only) | 20K synth + augmentation aggressive | 97% det · 3.1 px | 22.9 → 25.7% det | val=0.000667, gain marginal |
-| VGG weighted (50K synth) | 50K synth + loss pondérée par keypoint | **98.3% det · 3.15 px** | **13.2% det · 172 px** | meilleure perf synth, gap sim-to-real majeur |
-| VGG fine-tune v1 (σ=4) | 2K réel, single-stage | — | **0% det** | ❌ pics belief écrasés, modèle mort |
-| VGG fine-tune v2 (σ=2) | 2K réel, MSE direct | — | **0% det** | ❌ belief maps effondrées (max ≈ 0) |
-| **VGG mixte (DREAM natif)** | **18K = 2K réel ×5 + 8K synth, 50 epochs** | _en cours_ | **🔄 à évaluer** | val=0.000474 dès epoch 1 — checkpoint dispo |
+| VGG weighted (50K synth) | 50K synth + loss pondérée par keypoint | 98.3% det · 3.15 px | 13.2% det · 172 px | meilleure perf synth (ancien), gap sim-to-real majeur |
+| VGG fine-tune v1 (σ=4) | 2K réel, single-stage | — | 0% det | ❌ pics belief écrasés, modèle mort |
+| VGG fine-tune v2 (σ=2) | 2K réel, MSE direct | — | 0% det | ❌ belief maps effondrées (max ≈ 0) |
+| **vgg_ultimate_v4_e50** (2026-07-06) | 50K synth v3 (intrinsèques corrigées, filtre capsule) | **99.4% det · 2.61 px** (13920/14000) | ≈27% det | Record synthétique — voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](training/dream/VGG_ULTIMATE_V4_50K.md) |
+| **vgg_ultimate_v4_mix_ft_e30** (2026-07-08) | 50K synth + 6K réel (real_3cam) ×5 oversampling → ~80K | 99.4% det (pas de régression) | **91.6% det · 2.91 px médiane** (9618/10500, 1500 frames jamais vues, 3 caméras) | **Écart sim-to-real fermé** — voir [`training/dream/README.md`](training/dream/README.md#fine-tune-mixte-réel-real_3cam-×5-oversampling--2026-07-03--2026-07-08) |
 
-**Métriques par keypoint sur le meilleur synth-only (VGG-aug, eval synthétique)** :
+**Résultat final — validation synthétique 50k** (`vgg_ultimate_v4_e50`, split val 40000–50000, 2000 frames, 2026-07-06 · meilleure époque **49/50**) :
 
-| Keypoint | Détection | Médiane px | Médiane mm | Erreur ang. |
-|----------|-----------|------------|------------|-------------|
-| base · link1 · link2 | 100% | 2.6–2.8 | 3.7–4.0 | ~0.7° |
-| link3 | 99% | 5.6 | 8.1 | ~2.1° |
-| link4 | 96% | 6.4 | 9.2 | ~3.4° |
-| link5 | 95% | 8.8 | 12.7 | ~8.7° |
-| link6 (EE) | 86% | 10.1 | 14.6 | ~18.3° |
-| **TOTAL** | **97%** | **3.1 px** | **4.5 mm** | **~0.8° médiane** |
+| Keypoint | Mean (px) | Median (px) | Std (px) | Max (px) | Det % |
+|----------|-----------|-------------|----------|----------|-------|
+| base | 3.47 | 3.38 | 0.17 | 3.89 | 100.0% |
+| link1 | 3.20 | 3.17 | 0.21 | 3.64 | 100.0% |
+| link2 | 3.20 | 3.18 | 0.21 | 3.65 | 100.0% |
+| link3 | 1.88 | 1.61 | 2.40 | 51.88 | 99.8% |
+| link4 | 2.11 | 1.69 | 4.55 | 97.69 | 100.0% |
+| link5 | 2.11 | 1.59 | 5.15 | 127.65 | 99.2% |
+| link6 | 2.30 | 1.77 | 5.35 | 112.54 | 97.0% |
+| **OVERALL** | **2.61** | **2.78** | **3.46** | 127.65 | **99.4%** |
 
-> Adéquation pick-and-place (cible ±5 mm) : ✅ joints proximaux · ⚠️ joints intermédiaires · ❌ end-effector (besoin ~3× mieux). Le gain pose-réelle viendra du modèle mixte ou d'un re-training Isaac Sim.
+Précision par seuil : 37.1% <2px · 98.8% <5px · 99.5% <10px · 99.7% <20px · 99.9% <50px. Erreur moyenne par frame : 2.62 ± 2.33 px.
+
+**Résultats finaux — évaluation réelle complète** (`vgg_ultimate_v4_mix_ft_e30`, 1500 frames, 3 caméras, 500 poses jamais vues, 2026-07-08) :
+
+| Keypoint | Mean (px) | Median (px) | Std | Max | Det% |
+|----------|-----------|-------------|-----|-----|------|
+| base | 1.59 | 1.59 | 0.58 | 10.93 | 100.0% |
+| link1 | 1.41 | 1.56 | 1.01 | 17.74 | 100.0% |
+| link2 | 1.41 | 1.56 | 1.01 | 17.74 | 100.0% |
+| link3 | 10.00 | 7.22 | 9.53 | 87.05 | 97.3% |
+| link4 | 21.14 | 15.90 | 19.07 | 161.09 | 89.8% |
+| link5 | 29.20 | 21.85 | 26.40 | 234.99 | 75.7% |
+| link6 | 34.44 | 27.44 | 27.24 | 231.21 | 78.4% |
+| **OVERALL** | **12.82** | **2.91** | **19.95** | 234.99 | **91.6%** (9618/10500) |
+
+Précision par seuil : 35.1% <2px · 54.4% <5px · 64.8% <10px · 78.6% <20px · 94.4% <50px. Erreur moyenne par frame : 12.67 ± 9.28 px (meilleure frame 0.83 px, pire frame 100.25 px).
+
+> Adéquation pick-and-place (cible ±5 mm) : les keypoints proximaux sont largement à niveau ; les distaux (link4/5/6) restent le point faible relatif mais ont le plus progressé pendant le fine-tune (+27–33% de MSE). Prochaine direction : pose estimation eye-to-hand + courbe d'écart par joint (angles DREAM vs encodeurs), voir `CHANGELOG.md` [1.13.0].
 
 ### Tests réalisés (DREAM)
 
@@ -262,35 +284,41 @@ Image 640×480 → VGG-19 → 6 stages cascadés → 7 belief maps 100×100
 | Eval VGG 50K sur réel | 15/04/2026 | ⚠️ 13.2% det, 172 px |
 | Fine-tune custom v1 (σ=4) | 15/04/2026 | ❌ 0% det |
 | Fine-tune custom v2 (σ=2) | 16/04/2026 | ❌ belief effondrées |
-| Dataset mixte 18K créé (2K×5 + 8K) | 16/04/2026 | ✅ |
-| Training mixte natif 50 epochs | 16/04/2026 | ✅ checkpoint sauvegardé |
-| **Évaluation modèle mixte sur réel** | _à venir_ | 🔄 ROUGE — étape bloquante |
+| Génération dataset synthétique 50k v3 (12.5K poses × 4 caméras, filtre capsule) | 02/07/2026 | ✅ couverture 100% du réel |
+| Training `vgg_ultimate_v4_e50` (50 epochs, from scratch) | 02–06/07/2026 | ✅ **99.4% det synth**, 2.61px — record |
+| Recalage extrinsèques caméras réelles (arducam/svpro/astra) | 03/07/2026 | ✅ débloque le fine-tune mixte |
+| Fine-tune mixte `vgg_ultimate_v4_mix_ft_e30` (50K synth + 6K réel ×5, 13.8h) | 03–08/07/2026 | ✅ **91.6% det réel** (1500 frames jamais vues) — écart sim-to-real fermé |
 
 ### Pistes pour la suite
 
-1. **🔴 Évaluer le checkpoint mixte** sur `real_cam0` — premier indicateur si l'oversampling 5× a comblé le domain gap (cible : ≥ 50% détection sur réel) :
-   ```bash
-   source ~/ros_jazzy/venv_dream/bin/activate
-   python training/dream/evaluate_dream.py \
-     --weights training/checkpoints_dream/vgg_mixed_real_synth/best_network.pth \
-     --data /tmp/dream_data/real_cam0 --split all
-   ```
-2. **🔴 Si détection < 50% sur réel** → self-supervised labeling : utiliser les angles lus du robot + FK + intrinsèques caméra pour générer automatiquement des keypoints GT sur des images réelles, puis fine-tune sur ces annotations auto.
-3. **🟡 Vérifier la collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/` (worlds randomized_v2 — 6 lights, 12 clutter objects) et lancer un training combiné v2 + réel.
-4. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — substitution de Gazebo par Isaac Sim + Isaac Lab pour rendu photoréaliste, devrait fermer le gap sim-to-real à la racine plutôt que par oversampling.
-5. **🟢 Bench pose-driven pick-and-place sur robot réel** une fois la détection stabilisée — réutiliser le pipeline `pick_and_place_node.py` (déjà validé en sim) avec la pose DREAM en boucle de feedback.
+L'écart sim-to-real est fermé (27% → 91.6%). Direction actuelle (voir `CHANGELOG.md` [1.13.0]) :
 
-### Entraînement DREAM (natif)
+1. **🔴 Pose estimation eye-to-hand + courbe d'écart par joint** — caméra fixe devant le bras, DREAM → angles articulaires (reprojection-min sur `mycobot_fk.py`/`mycobot_ik.py`) → comparaison angles estimés vs encodeurs réels. Outillage en place (`training/dream/estimate_angles_from_keypoints.py`, `plot_angle_error_curve.py`), calibration extrinsèque `T_base_camera` de la caméra fixe (astra) en cours.
+2. **🟡 Fermer l'écart angulaire J1-J6** — le detection gap est fermé mais l'angle gap ne l'est pas (cible José : 0.5-0.9°, mesuré 10-20× ça). J6 structurellement non-observable (aucun keypoint ne dépend de sa rotation), J5 faiblement observable — nécessite une 2e caméra ou un keypoint supplémentaire en aval de J6. Voir `CLAUDE.md` § DREAM pose-estimation — validation status.
+3. **🟢 Visual servoing** — une fois la courbe d'écart par joint validée, boucler la pose DREAM dans le contrôle pour le pick-and-place.
+4. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — substitution de Gazebo par Isaac Sim + Isaac Lab pour rendu photoréaliste, piste de fond pour la suite du POC.
+
+### Entraînement DREAM (recette actuelle — v4 + fine-tune mixte)
 
 ```bash
+conda deactivate
 source ~/ros_jazzy/venv_dream/bin/activate
-python /tmp/DREAM/scripts/train_network.py \
-  -i /tmp/dream_data/mixed_real_synth \
-  -m /tmp/DREAM/manip_configs/mycobot320.yaml \
-  -ar /tmp/DREAM/arch_configs/dream_vgg_q.yaml \
-  -e 50 -b 32 -lr 0.0001 \
-  -o training/checkpoints_dream/vgg_mixed_real_synth -f
+cd training/dream
+
+# From scratch sur le 50k synthétique (record 99.4%)
+python train_dream_ultimate_v4.py \
+  --data dream_data/synthetic_50k_ndds \
+  --output output/checkpoints_dream/vgg_ultimate_v4_e50 \
+  --epochs 50 --batch-size 8 --workers 8 --patience 5
+
+# Fine-tune mixte depuis ce checkpoint (écart sim-to-real fermé à 91.6%)
+python train_dream_ultimate_v4_mix.py \
+  --data dream_data/<fusion_50k_synth_plus_real3cam_x5> \
+  --pretrained output/checkpoints_dream/vgg_ultimate_v4_e50/best_network.pth \
+  --epochs 30
 ```
+
+Détails et méthodologie complète : [`training/dream/VGG_ULTIMATE_V4_50K.md`](training/dream/VGG_ULTIMATE_V4_50K.md), [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md).
 
 ### Capture de données réelles
 
@@ -298,7 +326,7 @@ python /tmp/DREAM/scripts/train_network.py \
 /home/genji/miniconda/bin/python3 training/capture_real.py \
   --output datasets/real_dataset \
   --num-samples 2000 \
-  --pi-host 10.10.0.223 \
+  --pi-host 10.10.0.221 \
   --settle-time 3.0 --speed 25 --limit-fraction 0.5
 ```
 
@@ -498,7 +526,7 @@ mycobot_R6A/
 | Machine | IP | Ports |
 |---------|-----|-------|
 | PC Tour | 10.10.0.115 | — |
-| Raspberry Pi | 10.10.0.223 | 5005 (robot) + 5006 (caméras) |
+| Raspberry Pi | 10.10.0.221 | 5005 (robot) + 5006 (caméras) |
 
 ```bash
 ros2 launch mycobot_gateway simple_gui.launch.py pi_ip:=<VOTRE_IP_PI>
@@ -516,9 +544,9 @@ conda deactivate
 
 ### Connexion TCP échoue
 ```bash
-ping 10.10.0.223
-nc -zv 10.10.0.223 5005   # robot bridge
-nc -zv 10.10.0.223 5006   # camera server
+ping 10.10.0.221
+nc -zv 10.10.0.221 5005   # robot bridge
+nc -zv 10.10.0.221 5006   # camera server
 ```
 
 ### Git LFS — images manquantes après clone
