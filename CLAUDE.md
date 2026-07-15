@@ -6,7 +6,7 @@
 
 ## Project in one paragraph
 
-A research platform built around a **MyCobot 320 Pi** 6-DoF arm. Today the repo covers (a) direct control via a ROS2/TCP bridge, (b) a Gazebo Harmonic digital twin with synthetic data collection, (c) a vision-based **pose-estimation** pipeline built on NVlabs' DREAM (VGG-19 → belief maps → PnP), and (d) a hand-teleoperation pipeline (Orbbec Astra → Wilor → rosbridge → joints) validated on the physical robot on 22/04/2026. The system runs split across a **PC Tour** (`10.10.0.115`) and a **Raspberry Pi** on the arm (`10.10.0.223` — not `.225`, older docs are wrong).
+A research platform built around a **MyCobot 320 Pi** 6-DoF arm. Today the repo covers (a) direct control via a ROS2/TCP bridge, (b) a Gazebo Harmonic digital twin with synthetic data collection, (c) a vision-based **pose-estimation** pipeline built on NVlabs' DREAM (VGG-19 → belief maps → PnP), and (d) a hand-teleoperation pipeline (Orbbec Astra → Wilor → rosbridge → joints) validated on the physical robot on 22/04/2026. The system runs split across a **PC Tour** (`10.10.0.115`) and a **Raspberry Pi** on the arm (`10.10.0.221` — not `.223` or `.225`, older docs are wrong).
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full diagram, [`SESSION_RESUME.md`](SESSION_RESUME.md) for where active work stands, and [`CHANGELOG.md`](CHANGELOG.md) for the version history.
 
@@ -37,7 +37,7 @@ This repo is not just a control-software project — it's the starting substrate
 1. **Physics-accurate digital twin** → migrate the simulation path from Gazebo/DART to **NVIDIA Isaac Sim + Isaac Lab**, unlocking photorealistic rendering, soft-body gripper physics, and GPU-parallel training envs. See [`.claude/skills/isaac-sim-integration/SKILL.md`](.claude/skills/isaac-sim-integration/).
 2. **AI physics** → use Isaac Sim's differentiable physics and learned world models to train policies that transfer to the real robot without hand-tuned dynamics.
 3. **Vision-Language-Action models** → fine-tune a VLA (OpenVLA / Octo / π0 class) on episodic teleop data, deploy a VLA inference node behind the same ROS2 topics the teleop dashboard already uses. See [`.claude/agents/vla-integrator.md`](.claude/agents/vla-integrator.md).
-4. **Pose estimation at production accuracy** → close the sim-to-real gap for DREAM (currently 97% synthetic / ~26% real) by retraining on Isaac-Sim-generated photorealistic data. See [`.claude/skills/dream-workflow/SKILL.md`](.claude/skills/dream-workflow/).
+4. **Pose estimation at production accuracy** → keypoint detection sim-to-real gap is now closed (`vgg_ultimate_v4_mix_ft_e30`: ~99% synthetic / **91.6% real**, up from ~26%, via a mix-fine-tune on 50K synthetic + real_3cam×5 oversampled). See [`.claude/skills/dream-workflow/SKILL.md`](.claude/skills/dream-workflow/).
 5. **Robot training + standardized benchmarks** → a reproducible loop of (teleop demos → LeRobot dataset → VLA fine-tune → sim eval → real-robot eval). See [`.claude/skills/lerobot-dataset/SKILL.md`](.claude/skills/lerobot-dataset/).
 6. **POC-ready demonstrator** → a single-command launch that shows the full stack (digital twin + VLA policy + real robot + dashboard) running coherently.
 
@@ -88,7 +88,7 @@ cd ~/ros_jazzy && colcon build --packages-select mycobot_gateway mycobot_descrip
 source install/setup.bash
 
 # Control a live robot (bridge must run on the Pi)
-ssh er@10.10.0.223        # Pi — start `python3 bridge_pi_simple.py`
+ssh er@10.10.0.221        # Pi — start `python3 bridge_pi_simple.py`
 ros2 launch mycobot_gateway simple_gui.launch.py
 
 # Gazebo simulation
@@ -127,7 +127,7 @@ More in [`.claude/commands/`](.claude/commands/).
 
 ## Safety — real robot
 
-- Default IP is `10.10.0.223`. Always `ping` before launching anything that commands motion.
+- Default IP is `10.10.0.221`. Always `ping` before launching anything that commands motion.
 - Run [`scripts/real_robot_preflight.sh`](scripts/real_robot_preflight.sh) before each physical session.
 - On `feature/teleoperation`: start every session with the `🐢 Safe start` preset (gains 0.6/0.6/0.6, tfs 0.3). Only go to `⚙️ Nominal` (1.2/1.2/1.6/0.25 — the validated default) once calibration is clean.
 - **Current physical robot has no gripper.** The `--no-gripper` flag on `mycobot_teleop.py` is mandatory.
