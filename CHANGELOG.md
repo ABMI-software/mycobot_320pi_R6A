@@ -185,7 +185,7 @@ Refonte complète de la GUI [`teleop/teleop_dashboard.py`](../teleop/teleop_dash
 
 ### ✅ Premier test sur robot physique validé
 
-Session de validation end-to-end sur le **MyCobot 320 Pi physique** (IP `10.10.0.223`). Le pipeline complet Astra → Wilor → rosbridge → JTC topic → trajectory_to_robot_bridge → bridge_tour → Pi → pymycobot est fonctionnel avec une latence main→bras de ~150–250 ms, imperceptible visuellement. Mouvements coordonnés, pas d'oscillation ni saturation sur les gains initiaux 0.6/0.6/0.6.
+Session de validation end-to-end sur le **MyCobot 320 Pi physique** (IP `10.10.0.221`). Le pipeline complet Astra → Wilor → rosbridge → JTC topic → trajectory_to_robot_bridge → bridge_tour → Pi → pymycobot est fonctionnel avec une latence main→bras de ~150–250 ms, imperceptible visuellement. Mouvements coordonnés, pas d'oscillation ni saturation sur les gains initiaux 0.6/0.6/0.6.
 
 ### Ajouté — Documentation
 
