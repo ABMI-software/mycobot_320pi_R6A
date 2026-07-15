@@ -58,7 +58,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │           │  MyCobot 320 Pi │                                              │
 │           └─────────────────┘                                              │
 │                                                                            │
-│                     RASPBERRY PI (10.10.0.223)                             │
+│                     RASPBERRY PI (10.10.0.221)                             │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -203,7 +203,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 ## 🌐 Communication TCP - Protocole
 
 ### Configuration réseau
-- **IP Raspberry Pi:** `10.10.0.223`
+- **IP Raspberry Pi:** `10.10.0.221`
 - **Port TCP robot:** `5005`
 - **Port TCP caméras:** `5006`
 - **Format commandes:** JSON avec terminaison `\n`
@@ -239,9 +239,9 @@ ros2 launch mycobot_description display.launch.py
 
 ### 2. Communication avec le robot réel
 
-**Sur la Raspberry Pi (10.10.0.223) :**
+**Sur la Raspberry Pi (10.10.0.221) :**
 ```bash
-ssh er@10.10.0.223
+ssh er@10.10.0.221
 # Terminal 1 : bridge robot
 python3 bridge_pi_simple.py
 # Terminal 2 : serveur caméras
@@ -317,7 +317,7 @@ Pipeline validé sur le robot physique le 22/04/2026 — voir [`docs/REAL_ROBOT_
 
 ---
 
-## 📝 Fichiers sur la Raspberry Pi (10.10.0.223)
+## 📝 Fichiers sur la Raspberry Pi (10.10.0.221)
 
 Les scripts standalone à copier sur la Pi :
 

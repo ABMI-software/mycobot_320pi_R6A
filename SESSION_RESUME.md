@@ -4,7 +4,7 @@
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.11.0 (pose-est diagnostic + tooling)
 > **Branche active :** `main`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
-> **Pi réelle :** `10.10.0.223` (pas `.225` comme certains anciens docs)
+> **Pi réelle :** `10.10.0.221` (pas `.223` ni `.225` comme certains anciens docs)
 
 ---
 
@@ -194,13 +194,13 @@ Le fichier `isaac-sim-integration/SKILL.md` contient la roadmap 5-phases pour Is
 
 ### ✅ MILESTONE : premier test physique réussi
 
-Le pipeline complet de téléopération main a été **validé sur le MyCobot 320 Pi physique** (IP 10.10.0.223) dans la session du 22/04/2026 soir. Chaîne testée :
+Le pipeline complet de téléopération main a été **validé sur le MyCobot 320 Pi physique** (IP 10.10.0.221) dans la session du 22/04/2026 soir. Chaîne testée :
 
 ```
 👋 Main opérateur → Astra S → Wilor → mapping → filtres
     → rosbridge → /mycobot_controller/joint_trajectory
     → trajectory_to_robot_bridge → JSON /to_robot
-    → bridge_tour (TCP) → Pi 10.10.0.223:5005
+    → bridge_tour (TCP) → Pi 10.10.0.221:5005
     → bridge_pi_simple.py → pymycobot → servos → 🦾
 ```
 
@@ -239,7 +239,7 @@ Dans [`scripts/`](scripts/) :
 - ✅ Pipeline complet en simulation (Astra → Wilor → filtres → Gazebo JTC)
 - ✅ Dashboard ABMI v2.2 (3 onglets · KPI cards · caméra intégrée · ActionButton dynamiques) + rapport Excel
 - ✅ Filtres R5A/LeRobot portés (EMA + slew 1°/f + gripper deadband chain)
-- ✅ **Pipeline réel validé** (22/04/2026, IP 10.10.0.223)
+- ✅ **Pipeline réel validé** (22/04/2026, IP 10.10.0.221)
 - ✅ Preflight + procédure documentés
 - ⚠️ Axe J6 (doorknob) : mapping `yaw` implémenté, validation visuelle toujours à faire
 - ⚠️ bridge_tour receive_loop : n'affiche pas les `📥 Reçu de Pi` (Pi envoie bien mais logging Tower absent) — non bloquant
