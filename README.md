@@ -320,15 +320,34 @@ python train_dream_ultimate_v4_mix.py \
 
 Détails et méthodologie complète : [`training/dream/VGG_ULTIMATE_V4_50K.md`](training/dream/VGG_ULTIMATE_V4_50K.md), [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md).
 
-### Capture de données réelles
+### Capture de données réelles — 3 caméras (ArduCam + SVPRO + Astra)
+
+Dataset `real_3cam` utilisé pour le fine-tune mixte (91.6%) : capture synchronisée
+sur les 3 caméras réelles, script [`training/capture_real_3cam.py`](training/capture_real_3cam.py),
+lanceur [`training/capture_session.sh`](training/capture_session.sh).
 
 ```bash
-/home/genji/miniconda/bin/python3 training/capture_real.py \
-  --output datasets/real_dataset \
-  --num-samples 2000 \
+# Le plus simple (output horodaté, chemins by-id + exposition/focus déjà réglés)
+bash training/capture_session.sh
+
+# Commande directe (preview + 5 poses de test)
+python3 training/capture_real_3cam.py --preview --num-samples 5 \
+  --output /tmp/dream_data/real_3cam_test \
   --pi-host 10.10.0.221 \
-  --settle-time 3.0 --speed 25 --limit-fraction 0.5
+  --arducam-index /dev/v4l/by-id/usb-Arducam_Technology_Co.__Ltd._Arducam_8mp_SN0001-video-index0 \
+  --svpro-index   /dev/v4l/by-id/usb-5MP_USB_Camera_5MP_USB_Camera_01.00.00-video-index0 \
+  --arducam-exposure 75 --svpro-focus 90 \
+  --speed 25 --settle-time 3.0 --limit-fraction 0.5
 ```
+
+**Toujours** les chemins `/dev/v4l/by-id/…-video-index0` pour ArduCam/SVPRO,
+jamais les index `/dev/videoN` bruts — ils se réassignent au rebranchement.
+`--no-astra` pour sauter l'Astra (pas de `/dev/video`, capture par mémoire
+partagée / oni_grabber). Preview : **ENTER** démarre la capture (le robot
+bouge), **q/ESC** quitte sans toucher le robot.
+
+Détails complets (réglages exposition/focus gravés, dépannage, calibration
+intrinsèques par caméra) : [`training/CAPTURE_3CAM.md`](training/CAPTURE_3CAM.md).
 
 ---
 
