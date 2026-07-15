@@ -482,6 +482,7 @@ mycobot_R6A/
 ├── README.md                       # 👈 Ce fichier
 ├── SESSION_RESUME.md               # Point de départ sessions dev
 ├── DEVELOPMENT_SUMMARY.md          # Résumé technique complet
+├── CHANGELOG.md                    # Historique versionné (Keep a Changelog)
 │
 ├── mycobot_gateway/                # 📦 Package ROS2 — contrôle + vision + sorting
 │   ├── mycobot_gateway/
@@ -491,51 +492,61 @@ mycobot_R6A/
 │   │   ├── simple_gui.py                     # GUI Tkinter
 │   │   ├── slider_control.py                 # Contrôle sliders
 │   │   ├── dream_inference_node.py           # Inférence DREAM + PnP pose
+│   │   ├── dream_validation_dashboard.py     # Dashboard PyQt live DREAM vs encodeurs (KPI, courbes)
 │   │   ├── pick_and_place_node.py            # State machine pick & place mono
 │   │   ├── color_object_detector.py          # HSV + back-projection (top camera)
 │   │   ├── sorting_orchestrator.py           # Pick & place multi-objets par couleur
-│   │   └── synthetic_data_collector_v2.py    # Collecte Gazebo + anti-collision FK
+│   │   └── synthetic_data_collector_v3.py    # Génération dataset synthétique 50k (filtre capsule, domain randomization)
 │   ├── scripts/
 │   │   ├── bridge_pi_simple.py     # Script Pi (serveur robot)
 │   │   └── pi_camera_server.py     # Script Pi (serveur caméras)
-│   └── launch/                     # Fichiers launch ROS2
+│   └── launch/                     # Fichiers launch ROS2 (dont synthetic_data_v3.launch.py)
 │
 ├── mycobot_description/            # 📦 Package ROS2 — URDF/Gazebo
 │   ├── urdf/320_pi/                # Modèle 3D + 4 caméras stylisées (corps + objectif + LED)
 │   ├── urdf/pro_adaptive_gripper/  # Gripper adaptatif (meshes)
 │   ├── config/controller.yaml      # JTC + gripper_position_controller (gz_ros2_control)
 │   └── worlds/
-│       ├── randomized.sdf                # Monde de base (synthetic data v1)
-│       ├── randomized_v2.sdf             # 6 lights + 12 clutter objects (v2)
+│       ├── randomized.sdf                # Monde utilisé pour le 50k synthétique (v3, lumière calée réel)
+│       ├── randomized_v2.sdf             # Variante 6 lights + 12 clutter objects
 │       ├── pick_and_place.sdf            # Cube rouge + zone verte (mono-objet)
 │       └── pick_and_place_sorting.sdf    # 4 objets colorés + 4 bacs colorés
 │
 ├── training/                       # 📦 Pipeline ML/IA
-│   ├── train.py                    # Legacy: régression directe ResNet
-│   ├── predict.py                  # Legacy: inférence régression
-│   ├── capture_real.py             # Capture réelle avec FK safety
+│   ├── train.py                    # Legacy : régression directe ResNet (abandonné)
+│   ├── predict.py                  # Legacy : inférence régression (abandonné)
+│   ├── capture_real_3cam.py        # Capture réelle 3 caméras synchronisées (ArduCam+SVPRO+Astra) → real_3cam
+│   ├── capture_session.sh          # Lanceur capture_real_3cam.py (chemins/expo/focus pré-réglés)
+│   ├── CAPTURE_3CAM.md             # Fiche capture 3 caméras (réglages, dépannage, calibration)
+│   ├── SYNTHETIC_50K_V3.md         # Pipeline génération dataset 50k (filtre anti-collision, distribution, couverture)
 │   └── dream/                      # DREAM keypoint detection (actif)
+│       ├── train_dream_ultimate_v4.py       # 🎯 Entraînement 50k synthétique from scratch (record 99.4%)
+│       ├── train_dream_ultimate_v4_mix.py   # 🎯 Fine-tune mixte 50k synth + real_3cam ×5 (91.6% réel)
+│       ├── VGG_ULTIMATE_V4_50K.md           # Rapport run 50k synthétique (résultats complets)
+│       ├── FINETUNE_MIX_REAL3CAM_PLAN.md    # Méthodologie fine-tune mixte (résultats complets)
 │       ├── evaluate_dream.py       # Évaluation (métriques par keypoint)
-│       ├── convert_to_ndds.py      # Conversion dataset → NDDS
-│       ├── merge_and_convert.py    # Fusion réel+synth → NDDS
-│       ├── mycobot_fk.py           # Forward kinematics + projection
+│       ├── convert_to_ndds.py      # Conversion dataset custom → NDDS
+│       ├── merge_ndds.py           # Fusion deux datasets déjà NDDS (synth + réel ×5 oversamplé)
+│       ├── mycobot_fk.py           # Forward kinematics + projection + KEYPOINT_NAMES
+│       ├── dream_angle_solver.py   # Récupère les angles articulaires depuis les keypoints 2D
 │       ├── infer_dream.py          # Inférence keypoints + PnP
-│       └── finetune_real.py        # Fine-tuning expérimental (⚠️)
+│       └── README.md               # Résultats détaillés + tableaux complets (synth 50k, fine-tune mixte)
 │
-├── datasets/                       # 📦 Données (Git LFS)
-│   ├── real_dataset/               # 2000 poses × 2 caméras
-│   └── synthetic_dataset/          # 5000 poses × 4 caméras
+├── datasets/                       # 📦 Données (Git LFS) — legacy, voir training/dream/dream_data/ pour le pipeline actif
+│   ├── real_dataset/
+│   └── synthetic_dataset/
 │
-├── teleop/                         # 🖐️ Téléopération par la main (env conda)
+├── teleop/                         # 🖐️ Téléopération par la main (env conda hand-teleop)
 │   ├── mycobot_teleop.py           # Script principal : caméra → joints
 │   ├── teleop_dashboard.py         # GUI ttkbootstrap live tuning + plots
 │   ├── performance_analyzer.py     # Rapport Excel avant robot réel
 │   └── orbbec_capture.py           # Wrapper Astra via oni_grabber + shm
 │
 ├── scripts/
+│   ├── real_robot_preflight.sh     # Check pré-vol robot réel (5 étapes)
 │   ├── train_pipeline.sh           # Pipeline merge→NDDS→training automatisé
 │   └── monitor_collection.sh       # Suivi collecte en temps réel
-└── docs/                           # Documentation détaillée
+└── docs/                           # Documentation détaillée (ARCHITECTURE, TELEOPERATION, ...)
 ```
 
 ---
