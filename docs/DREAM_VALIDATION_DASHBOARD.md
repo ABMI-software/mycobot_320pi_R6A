@@ -226,35 +226,17 @@ Le publisher est sain, les abonnés ne reçoivent pas : la perte est **entre les
 avec le nombre de messages reçus, pas avec le nombre de gels : toujours ~10 par 30 s),
 et le **débit médian** est la bonne métrique (la moyenne est écrasée par les gels).
 
-## Correctifs caméra testés puis revertés
-
-Mesurés comme gagnants, **annulés à la demande** — à reprendre si la latence
-redevient un sujet :
-
-| Changement | Gain mesuré |
-|-----------|-------------|
-| `cv2.VideoCapture(i, cv2.CAP_V4L2)` | OpenCV choisissait GStreamer, qui **ignore silencieusement** `FOURCC`/`BUFFERSIZE`/`FPS` (« unhandled property » dans les logs). D'où YUYV, plafonné à **10 fps** contre 30 en MJPG. |
-| `CAP_PROP_BUFFERSIZE = 2` | 1 empêche le double-buffering (13.9 Hz) ; 2/3/4 donnent 27.8 Hz. Une file profonde rend l'image la plus **ancienne**. |
-| `grab()` + stamp + `retrieve()` | Le stamp posé après `read()` **masque la péremption** : il affichait 1.4 ms sur des images périmées. |
-| Relire `CAP_PROP_FOURCC` après le `set` | `cap.set()` renvoie un succès même quand le driver refuse. |
-
-Résultat mesuré de l'ensemble : latence image→keypoints **1485 → 91 ms**, débit
-médian **3.1 → 27.7 Hz**, keypoints **7/7 dans 100% des frames**. Les gels DDS,
-eux, restaient — ils sont indépendants de ces correctifs.
-
 ## Ce qui n'est PAS en cause
 
 - `exposure_dynamic_framerate` : mis à 0, effet nul (1.91 → 2.16 Hz).
 - Le dashboard : il sature un cœur (102% CPU) et double la cadence quand on le
   ferme, mais il ne cause **pas** les gels (identiques avec 0 abonné).
-- `CompressedImage` : envisagé, **abandonné** — le transport n'est pas saturé en
-  volume, c'est le tampon qui est sous-dimensionné. À reconsidérer seulement si
-  `rmem_max` ne suffit pas.
 
 ## Rappels
 
-- **DREAM est déjà installé** (`/tmp/DREAM`, editable dans `venv_dream`). Vérifier
-  avec `import dream` avant d'envisager un clone — `/tmp` peut être vidé au reboot.
+- **DREAM vit dans `/tmp/DREAM`** (editable dans `venv_dream`), et `/tmp` est vidé
+  au reboot : il faut donc **le re-cloner / réinstaller à chaque redémarrage**.
+  Vérifier avec `import dream` ; s'il manque, refaire le clone dans `/tmp/DREAM`.
 - La case **⚠ Mode cohérence** est **OFF par défaut** et doit le rester pour une
   mesure DREAM indépendante. Voir `CLAUDE.md` § 2026-07-15.
 - Le robot **n'a pas de gripper**.
