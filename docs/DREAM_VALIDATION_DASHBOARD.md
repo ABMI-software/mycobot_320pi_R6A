@@ -166,10 +166,61 @@ Case à cocher (panneau manuel). Sortie sous `training/dream/acquisitions/` :
 
 - `manuel/` — nommé d'après le(s) joint(s) changé(s).
 - `auto/` — nommé avec les 6 joints.
+- `…/kalman/` — sous-dossier créé automatiquement quand **Filtrage temporel
+  (Kalman)** est coché au moment de l'écriture. La colonne `dream` y contient la
+  valeur **filtrée** ; sans la case, elle contient la valeur **brute**, dans le
+  dossier parent. Les deux séries restent ainsi comparables sans mélange
+  (rejouer la même pose filtrée/brute → un CSV dans chaque emplacement).
 
 Chaque fichier contient les 6 joints :
 `t_s, enc_J1..6, dream_J1..6, err_J1..6`, capturés sur ~4 s (mouvement + pose
 stabilisée), suivis de deux lignes de résumé `MAE` et `RMSE` par joint.
+
+> ⚠ **Mesurer à l'arrêt, pas pendant le mouvement.** En mode auto, l'acquisition
+> démarre dès l'envoi de la pose : le CSV capture le transitoire où l'encodeur
+> balaie et DREAM peine à suivre (erreur gonflée). Pour une vraie mesure de
+> validation, lire l'erreur une fois la pose **stabilisée**.
+
+### Filtrage temporel (Kalman)
+Case à cocher (panneau KPI). Un filtre **1D à vitesse constante** par joint
+(`KalmanAngle1D`, état `[angle, vitesse]`) lisse **les estimations DREAM
+elles-mêmes** — il ne voit **jamais** l'encodeur. Réglages actuels :
+
+- `q_pos = radians(0.5)²` — bruit de process en position. Bas = plus lisse mais
+  plus de retard ; haut = réactif mais tremble au repos.
+- `_KF_OUTLIER_GATE_SIGMA = 3.0` — rejette une mesure dont l'innovation dépasse
+  3 σ (probable excursion du solveur, pas un vrai mouvement).
+
+**Effet de bord du modèle à vitesse constante :** sur un changement d'angle
+brusque, le filtre accumule de la vitesse et **dépasse** puis redescend (inertie).
+Sur un vrai mouvement commandé, le portail peut aussi **geler** l'ancienne valeur
+en la prenant pour une aberration.
+
+**Correctif — `reset_kalman()`** : quand l'utilisateur commande une pose
+(`SET Angles`, `SET Coords`, `Pose automatique`), les filtres sont **réinitialisés**.
+On *sait* que le grand mouvement qui suit est réel : la prochaine mesure DREAM
+devient la nouvelle base, sans rejet par le portail. Le lissage/rejet reste actif
+le reste du temps (bras au repos).
+
+### Poids solveur — mode cohérence
+`_CONSISTENCY_REG_VEC = [10, 40, 40, 40, 40, 1.5]` (J1→J6). Poids de
+régularisation vers la branche encodeur, utilisés **uniquement** en mode
+cohérence (`use_encoder_seed`) :
+
+- **J1 = 10, J2 = 40** — J2 bascule sur la mauvaise branche monoculaire sous la
+  caméra quasi-zénithale (ambiguïté avant/arrière, ~45° d'erreur à ~10 px) ;
+  l'épingler à l'encodeur ramène ça à ~2-3°.
+- **J3-J5 = 40** — joints distaux faiblement observables : l'angle dérive de
+  dizaines de degrés à reprojection quasi-constante ; le poids fort les tient
+  près de la branche encodeur.
+- **J6 = 1.5** — 0 keypoint observant : reste au seed encodeur quel que soit le
+  poids (rien ne l'en tire).
+
+> Baisser ces poids laisse les keypoints DREAM détectés « tirer » l'angle
+> (raffinement réel), mais ajoute du bruit sur J1/J2 et **ne change rien** aux
+> joints dont les keypoints distaux ne sont pas détectés (rien à raffiner). Le
+> vrai levier pour J3-J6 est la **détection distale** (modèle) ou une **2ᵉ
+> caméra**, pas le poids. Voir `CLAUDE.md` § observabilité.
 
 ---
 

@@ -15,7 +15,258 @@
 conda deactivate
 
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/Osama_ws/install/setup.bash
+```
+
+---
+
+## État actuel (23 juillet 2026 — après-midi)
+
+### Ce qui a été accompli aujourd'hui
+
+Session de **réglage et fiabilisation du dashboard de validation DREAM** (réel,
+`10.10.0.221`), après remise en route de la caméra Arducam.
+
+- **`reset_kalman()`** ajouté : les filtres sont réinitialisés sur `SET Angles`,
+  `SET Coords` et `Pose automatique`. Règle le blocage où la courbe filtrée
+  restait coincée sur l'ancien angle pendant un vrai mouvement commandé (le
+  portail anti-aberration le prenait pour une excursion). Testé OK — J1 0→100°
+  suivi correctement (erreur 0.04°).
+- **CSV filtrés séparés** : sous-dossier `…/kalman/` créé quand le filtre est
+  actif (colonne `dream` = filtrée), brut dans le dossier parent sinon. Vérifié
+  sur `acquisitions/auto/kalman/…csv` — 19 colonnes correctes.
+- **Réglages Kalman/solveur** : `q_pos` 3.0→0.5 ; `_CONSISTENCY_REG_VEC` J1→10,
+  J2→40 (corrige la bascule de branche de J2, ~45°→~2-3°). Labels MAE/RMSE
+  annotés `(J1–J6)`.
+- **Caméra** : décrochage USB (`unable to enumerate`) résolu par changement de
+  port. Backend GStreamer ignore toujours `CAP_PROP_FPS` (cause du FPS bas).
+
+### Décisions prises
+
+- **Le mode libre (`use_encoder_seed=False`) est inutilisable** en monoculaire
+  (branches folles, MAE ~65°) → on garde le mode cohérence (seed encodeur).
+- **Baisser les poids n'aide pas J3-J6** : leurs keypoints distaux ne sont
+  souvent **pas détectés** → rien à raffiner. Le vrai levier est la **détection
+  distale (modèle)** ou une **2ᵉ caméra**, pas le réglage solveur.
+- **Restylage PyQt6/thème sombre : annulé.** Maquette produite puis abandonnée à
+  la demande ; le dashboard reste en PyQt5, look d'origine.
+- **Anti-saut pour pick-and-place** : à mettre dans la **couche trajectoire**
+  (limite de vitesse), pas dans le lissage de perception (qui cacherait l'erreur).
+
+### Prochaines actions
+
+1. [ROUGE] Améliorer la **détection distale** (link4/5/6) — c'est le vrai
+   plafond de J3-J6, pas le solveur.
+2. [JAUNE] Optionnel : bouton **« Copier position actuelle »** dans SET Coords
+   (évite les cibles IK inatteignables → LED bleu).
+3. [VERT] Optionnel : acquisition auto qui **attend la stabilisation** avant
+   d'enregistrer (mesure DREAM à l'arrêt, sans transitoire).
+
+### Commande rapide de reprise
+
+```bash
+deactivate
+source /opt/ros/jazzy/setup.bash
+source ~/Osama_ws/install/setup.bash
+# 5 nœuds — voir docs/DREAM_VALIDATION_LAUNCH.md
+ros2 run mycobot_gateway dream_validation_dashboard
+```
+
+---
+
+## État actuel (17 juillet 2026 — après-midi)
+
+### Ce qui a été accompli aujourd'hui
+
+Session de **diagnostic** (aucun code applicatif modifié ce jour — lecture,
+mesures, interprétation des topics) sur la chaîne de validation DREAM live.
+
+- **Chaîne de lancement du dashboard remise en route** : au démarrage seuls
+  `camera_publisher` et `dream_inference` tournaient ; `joint_sync` et
+  `bridge_tour` manquaient (d'où encodeurs à 0 et `SET Angles` sans effet).
+  Relancés → `/joint_states` et `/from_robot` de nouveau vivants. Procédure de
+  référence : [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md).
+- **Lecture des topics** confirmée conforme au code : `/dream/keypoints` =
+  7×`[u,v,valid]` + `sec,nanosec,inference_ms` ; le réseau DREAM ne prédit **que
+  des keypoints 2D**, les angles J1-J6 sont reconstruits *après coup* par le
+  solveur `least_squares` (`dream_angle_solver.py`, reprojection FK vs détections).
+- **Cause du bas débit vision isolée (matériel confirmé)** : la caméra tourne en
+  **YUYV plafonné à 10 fps** (le `set(FOURCC, MJPG)` est ignoré par le backend
+  GStreamer), le timer tire à 30 Hz → warnings `⚠️ Dropped frame`. S'ajoutent
+  l'exposition manuelle=75 devenue trop sombre (image quasi noire, pixels 11-49)
+  et `net.core.rmem_max`=208 Ko sous-dimensionné (gels DDS de ~2.8 s). Résultat
+  live : 2-4 keypoints/7 au lieu de 91.6 %, débit DREAM ~1.8 Hz.
+- **Gripper « force effect » branché** : support Pi présent
+  (`bridge_pi_simple.py` : `gripper_open`/`gripper_close` via `set_gripper_state`),
+  mais **`bridge_tour` et le dashboard ne connaissent pas le gripper** (zéro
+  occurrence). API `set_gripper_state` générique tout-ou-rien — pas sûre pour un
+  gripper à contrôle de force. Non testé (bridge Pi tombé en fin de session).
+
+### Décisions prises
+
+- Tester le gripper **isolément** (bras à l'arrêt, commande TCP unique) avant tout
+  test combiné vision+gripper — ne pas mêler deux inconnues.
+- Correctifs caméra (MJPG/V4L2, exposition, `rmem_max`) connus et déjà mesurés
+  gagnants dans une session passée puis revertés — à ré-appliquer sur décision.
+
+### Prochaines actions
+
+1. [ROUGE] Relancer `bridge_pi_simple.py` sur le Pi (port 5005 fermé) et repasser
+   `scripts/real_robot_preflight.sh` en 5/5.
+2. [ROUGE] Confirmer modèle exact du gripper + s'il est monté sur la bride J6
+   (visible arducam → rouvre la piste « keypoint aval J6 » pour l'observabilité).
+3. [JAUNE] Remettre la chaîne caméra en état nominal (MJPG/V4L2 + exposition +
+   `rmem_max`) puis vérifier que le 91.6 % détection se retrouve en direct.
+4. [VERT] Mettre à jour les 6 docs affirmant « robot sans gripper / `--no-gripper`
+   obligatoire » — **après** validation physique du gripper, pas avant.
+
+### Commande rapide de reprise
+
+```bash
+ssh er@10.10.0.221            # puis: python3 bridge_pi_simple.py
+bash scripts/real_robot_preflight.sh
+```
+
+---
+
+## État actuel (13 juillet 2026 — après-midi)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Dashboard unique PyQt** (les 3 dashboards demandés en réunion "Validation
+  Modèle IA — Cercles EndEffector" fusionnés dans une seule fenêtre, pas
+  d'onglets) : `mycobot_gateway/mycobot_gateway/dream_validation_dashboard.py`.
+  - Vue caméra live : squelette encodeur (vert, gros cercles + liaisons) vs
+    squelette DREAM brut (magenta, petits cercles), erreur par keypoint en px.
+  - Panneau pilotage manuel (angles FK + coordonnées IK, boutons SET, verrouillage
+    /libération servos `🔒 Fixer` / `🔓 Relâcher`).
+  - Panneau KPI : précision (RMS reprojection px), répétabilité (jitter encodeur),
+    temps de réponse commande→confirmation, tableau angulaire Encodeur/DREAM/Erreur
+    par joint + RMS globale (J1-J6) et RMS sur joints observables (J1-J5).
+  - 6 courbes temps réel (une par joint) : encodeur (plein) vs DREAM (pointillé).
+  - **Toujours pas d'extrinsèque caméra pré-calibrée** — pose caméra résolue par
+    PnP à partir de l'intrinsèque Arducam + encodeurs + détections DREAM,
+    jamais depuis un fichier figé.
+- **Ancre de pose de session robustifiée** : au lieu de figer la pose caméra sur
+  le premier frame (risque : une détection bruitée fixe une mauvaise pose pour
+  toute la session), accumulation de 30 solves PnP (encodeur connu) au démarrage
+  et ancrage sur la **médiane** rvec/tvec.
+- **Estimation d'angles DREAM indépendante** (`training/dream/dream_angle_solver.py`,
+  `solve_joint_angles_fixed_pose`) : ancre de pose figée + régularisation légère
+  (poids 1.5 px/rad) vers l'estimation DREAM de la frame précédente (pas
+  l'encodeur), pour une courbe DREAM temporellement lissée et réellement
+  indépendante plutôt que recollée à l'encodeur chaque frame.
+- **J6 structurellement non observable, confirmé mathématiquement** : dans
+  `mycobot_fk.forward_kinematics`, la position d'un keypoint ne dépend jamais
+  de la rotation de son propre joint — donc aucun des 7 keypoints DREAM ne porte
+  d'information sur J6. Badge `⚠` permanent sur J6 dans le tableau KPI.
+  J4/J5 (peu de keypoints porteurs : 2 et 1 respectivement) reçoivent un badge
+  **dynamique**, basé sur l'erreur de reprojection live des keypoints dont ils
+  dépendent (seuil 15px) — affiché seulement quand réellement dégradé sur le
+  frame courant, pas en permanence.
+- **Validation offline chiffrée sur données réelles** (nouveau script
+  `training/dream/validate_angle_solver_real.py`) : rejoue le pipeline complet
+  (inférence DREAM + ancre multi-frame + solveur) sur les 2500 poses réelles de
+  `training/dream_data/real_3cam` (5 sessions, caméra arducam), avec vérité
+  terrain encodeur. Résultats sur 2343 poses tenues à l'écart :
+  - Détections DREAM brutes (px, vs vérité reprojetée) : base/link1/link2 ~2.5px
+    (bon), link3 ~11px, **link4/5/6 22-34px RMS, jusqu'à 250px sur les pires
+    frames** — confirme le "distal keypoint problem" déjà documenté, maintenant
+    quantifié sur données réelles.
+  - Angles, warm-start encodeur (meilleur cas) : RMS J1=15.8° J2=13.7° J3=28.4°
+    J4=34.3° J5=33.8° J6=0.0° (figé par construction) — RMS globale J1-J5 26.7°.
+  - Warm-start à froid (q_init=0, pire cas) : RMS globale 40.2°.
+  - Conclusion : la sensibilité aux distales explique directement la hiérarchie
+    d'erreur par joint (J4/J5 vus par 1-2 keypoints seulement, sans redondance
+    pour moyenner le bruit). Ce n'est pas un bug de solveur — augmenter le poids
+    de régularisation masquerait le problème (collerait DREAM à l'encodeur) sans
+    le résoudre.
+- **Test live sur robot réel** (arducam + encodeurs, checkpoint
+  `vgg_ultimate_v4_mix_ft_e30`) : pipeline temps réel opérationnelle de bout en
+  bout, mais reconstruction articulaire **pas encore validée**. Malgré une
+  erreur de reprojection visuelle modérée, RMS angulaire mesurée à **17,93° sur
+  les joints observables** (J1-J5) — cohérent avec le test offline mais encore
+  trop élevé pour être exploitable.
+- Corrections de bugs découverts en testant sur robot réel : parsing des
+  réponses bridge dans `joint_sync.py` (`/joint_states` restait à zéro — format
+  `ANGLES:` en majuscules non reconnu) et `dream_validation_dashboard.py`
+  (même bug + coalescence multi-lignes TCP) ; résolution de checkpoint et de
+  symlink dans `dream_inference_node.py` ; polling périodique manquant pour
+  `get_coords` (lecture position figée) ; validation bornes image pour les
+  keypoints DREAM (sentinelle "non détecté" lue comme détection confiante hors
+  cadre).
+
+### Prochaines actions
+
+1. [ROUGE] Investiguer la stabilité du solveur d'angles (pourquoi 17,93° en
+   live alors que l'ancre + régularisation sont en place), la fréquence
+   d'inférence DREAM, et les ambiguïtés liées à la vue monoculaire quasi
+   zénithale (J1 confondu avec un biais de lacet caméra).
+2. [JAUNE] Évaluer si une 2e caméra (svpro/astra) réduit l'ambiguïté de vue
+   unique — question posée en session, pas encore tranchée.
+3. [VERT] Une fois la reconstruction articulaire validée : mise à jour
+   documentaire IP `10.10.0.223` → `10.10.0.221` (identifiée, pas encore faite),
+   puis commit/push final.
+
+### Commande rapide de reprise
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash
+cd ~/Osama_ws && colcon build --packages-select mycobot_gateway --symlink-install
+source install/setup.bash
+ros2 run mycobot_gateway dream_validation_dashboard
+```
+
+---
+
+## État actuel (8 juillet 2026 — soir)
+
+### Ce qui a été accompli aujourd'hui (soir)
+
+- **Cartographie eye-to-hand sur les 3 caméras.** Constat clé : **détection ≠
+  récupération d'angles** (deux problèmes séparés).
+  - Détection real_3cam (`keypoint_accuracy_curve.py`, par caméra) : svpro 98% ·
+    astra 95% · arducam 89%. → la **caméra astra est bonne** ; l'astra fraîche à
+    48% = **placement** hors-domaine, pas la caméra.
+  - Angles : caméra **mono** (arducam/svpro, sans depth) mal conditionnée (7–24°
+    même amorcée) ; **depth (astra) indispensable** pour j1–j4 <2°.
+- **Plateforme visual-servoing** livrée : `visual_servoing_platform.py` (6 fenêtres
+  joint réel vs estimé + écart) et `visual_servoing_dashboard.py` (avancé : vue
+  caméra avec squelette FK-vérité + keypoints IA superposés + 6 courbes + barre
+  d'état). Modes **live** (robot+caméra) et **rejeu** (dataset).
+- **Courbe 1 — précision keypoints, SANS calibration** (`keypoint_accuracy_curve.py`) :
+  synth ~2,9px/100% ; real_3cam proximaux 1,6px, distaux jusqu'à 10,5px. C'est « la
+  courbe avant de calibrer » (évalue le modèle seul).
+- **Self-calibration marker-free** codée (`self_calibrate_arducam.py`, RANSAC) mais
+  **prouvée circulaire** : elle absorbe le biais DREAM → le squelette vérité suit
+  les détections décalées, pas le vrai bras. → extrinsèque **indépendant (ArUco)
+  nécessaire** pour un dashboard/courbe honnêtes.
+- **`ik_reach_point.py`** validé sur robot réel : point → IK → angles (résidu IK
+  0 mm), écart mécanique **1°** (le plancher physique).
+
+### Décisions prises (soir)
+
+- **Arducam mono écartée** pour la courbe en degrés (pas de depth + distaux faibles, 89%).
+- **Astra = meilleur choix caméra unique** (95% in-domain + depth). Reste à régler son placement.
+- Courbe en degrés + dashboard honnête **bloqués** tant qu'il n'y a pas d'extrinsèque
+  indépendant (self-cal circulaire insuffisant).
+
+### Prochaines actions (soir)
+
+1. [ROUGE] **4 ArUco → extrinsèque indépendant** (IDs 19/23/25/26, une photo) —
+   débloque dashboard honnête **et** courbe degrés, sur n'importe quelle caméra.
+2. [ROUGE] Sinon **astra + fine-tune** sur le nouveau placement (seul chemin sans marqueurs).
+3. [VERT] Puis `plot_angle_error_curve.py` (mode 3D astra / 2D arducam) + dashboard live.
+
+### Commande rapide de reprise (soir)
+
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+cd ~/Osama_ws/src/mycobot_R6A/training/dream
+# démo dashboard (rejeu — extrinsèque self-cal encore approximatif)
+python3 visual_servoing_dashboard.py --mode replay --dataset dream_data/real_arducam \
+  --weights checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/best_network.pth \
+  --extrinsic ../calibration/arducam_extrinsic_selfcal.yaml --intrinsics-npz ../calibration/cam_0.npz
 ```
 
 ---
@@ -347,7 +598,7 @@ Le modèle DREAM VGG atteint **97% de détection à 3.1px médiane** sur les don
 
 | Ressource | Chemin |
 |-----------|--------|
-| Projet | `/home/genji/ros_jazzy/src/mycobot_R6A/` |
+| Projet | `/home/genji/Osama_ws/src/mycobot_R6A/` |
 | Venv DREAM | `/home/genji/ros_jazzy/venv_dream/` |
 | DREAM lib | `/tmp/DREAM/` |
 | Data synth 50K | `/tmp/dream_data/synthetic_50k/` |
@@ -398,7 +649,7 @@ python training/dream/evaluate_dream.py \
 ```bash
 conda deactivate
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/Osama_ws/install/setup.bash
 
 # Monde randomized_v2 (6 lights, 12 objets clutter)
 ros2 launch mycobot_gateway synthetic_data_v3.launch.py num_samples:=7500
@@ -431,7 +682,7 @@ python /tmp/DREAM/scripts/train_network.py \
 ```bash
 conda deactivate
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/Osama_ws/install/setup.bash
 
 # Mono-objet (cube rouge → bac vert)
 ros2 launch mycobot_gateway pick_and_place.launch.py
@@ -568,101 +819,3 @@ mycobot_R6A/
 ---
 
 *Dernière mise à jour : 21 avril 2026*
-## État actuel (13 juillet 2026 — après-midi)
-
-### Ce qui a été accompli aujourd'hui
-
-- **Dashboard PyQt de validation temps réel DREAM vs encodeurs** (Dashboard 1 des
-  3 demandés en réunion "Validation Modèle IA — Cercles EndEffector") :
-  `mycobot_gateway/mycobot_gateway/dream_validation_dashboard.py`. En-tête avec
-  logo ABMI, flux caméra en direct, grand cercle vert = position joint reconstruite
-  depuis les encodeurs (FK), petit cercle magenta = détection DREAM brute, erreur
-  par keypoint en px.
-- **Décision explicite : pas d'extrinsèque caméra pré-calibrée.** La pose caméra
-  est résolue à chaque frame par PnP (intrinsèque Arducam `cam_3.meta.json` +
-  angles encodeurs courants + détections DREAM), jamais depuis un fichier figé.
-- **Ambiguïté confirmée** en testant `training/dream/dream_angle_solver.py`
-  (solveur angles+pose caméra conjoint, sans ancrage) : erreur de reprojection
-  quasi nulle atteignable avec >60° d'erreur angulaire — le problème est mal posé
-  à vue unique sans ancrage de pose caméra. Cohérent avec le constat déjà posé le
-  8 juillet (`estimate_angles_from_keypoints.py` a besoin d'une extrinsèque fixe
-  pour être bien posé). Solveur conservé, non branché.
-- Dashboards 2 (pilotage/KPI) et 3 (courbes 6 joints) : onglets placeholder en
-  attendant une décision sur l'ancrage de pose (calibration une fois par session,
-  ou triangulation multi-caméra).
-- Testé en aveugle sans matériel réel (messages ROS2 synthétiques + Qt offscreen) :
-  overlay, calcul d'erreur, rendu — tous validés.
-
-### Prochaines actions
-
-1. [ROUGE] Tester Dashboard 1 sur le robot réel (caméra Arducam + `/joint_states`
-   + `dream_inference_node` adapté à `/camera/image_raw` — actuellement câblé
-   Gazebo `/synth_camera/image` uniquement).
-2. [JAUNE] Décider de l'ancrage de pose caméra pour Dashboards 2/3 (calibration
-   session unique vs triangulation multi-cam, voir `dream_angle_solver.py`).
-3. [VERT] Une fois l'ancrage choisi, implémenter Dashboard 2 (port `simple_gui.py`
-   en PyQt + KPI précision/répétabilité/latence) et Dashboard 3 (courbes 6 joints).
-
-### Commande rapide de reprise
-```bash
-conda deactivate
-source /opt/ros/jazzy/setup.bash
-cd ~/ros_jazzy && colcon build --packages-select mycobot_gateway --symlink-install
-source install/setup.bash
-ros2 run mycobot_gateway dream_validation_dashboard
-```
-
----
-
-## État actuel (8 juillet 2026 — soir)
-
-### Ce qui a été accompli aujourd'hui (soir)
-
-- **Cartographie eye-to-hand sur les 3 caméras.** Constat clé : **détection ≠
-  récupération d'angles** (deux problèmes séparés).
-  - Détection real_3cam (`keypoint_accuracy_curve.py`, par caméra) : svpro 98% ·
-    astra 95% · arducam 89%. → la **caméra astra est bonne** ; l'astra fraîche à
-    48% = **placement** hors-domaine, pas la caméra.
-  - Angles : caméra **mono** (arducam/svpro, sans depth) mal conditionnée (7–24°
-    même amorcée) ; **depth (astra) indispensable** pour j1–j4 <2°.
-- **Plateforme visual-servoing** livrée : `visual_servoing_platform.py` (6 fenêtres
-  joint réel vs estimé + écart) et `visual_servoing_dashboard.py` (avancé : vue
-  caméra avec squelette FK-vérité + keypoints IA superposés + 6 courbes + barre
-  d'état). Modes **live** (robot+caméra) et **rejeu** (dataset).
-- **Courbe 1 — précision keypoints, SANS calibration** (`keypoint_accuracy_curve.py`) :
-  synth ~2,9px/100% ; real_3cam proximaux 1,6px, distaux jusqu'à 10,5px. C'est « la
-  courbe avant de calibrer » (évalue le modèle seul).
-- **Self-calibration marker-free** codée (`self_calibrate_arducam.py`, RANSAC) mais
-  **prouvée circulaire** : elle absorbe le biais DREAM → le squelette vérité suit
-  les détections décalées, pas le vrai bras. → extrinsèque **indépendant (ArUco)
-  nécessaire** pour un dashboard/courbe honnêtes.
-- **`ik_reach_point.py`** validé sur robot réel : point → IK → angles (résidu IK
-  0 mm), écart mécanique **1°** (le plancher physique).
-
-### Décisions prises (soir)
-
-- **Arducam mono écartée** pour la courbe en degrés (pas de depth + distaux faibles, 89%).
-- **Astra = meilleur choix caméra unique** (95% in-domain + depth). Reste à régler son placement.
-- Courbe en degrés + dashboard honnête **bloqués** tant qu'il n'y a pas d'extrinsèque
-  indépendant (self-cal circulaire insuffisant).
-
-### Prochaines actions (soir)
-
-1. [ROUGE] **4 ArUco → extrinsèque indépendant** (IDs 19/23/25/26, une photo) —
-   débloque dashboard honnête **et** courbe degrés, sur n'importe quelle caméra.
-2. [ROUGE] Sinon **astra + fine-tune** sur le nouveau placement (seul chemin sans marqueurs).
-3. [VERT] Puis `plot_angle_error_curve.py` (mode 3D astra / 2D arducam) + dashboard live.
-
-### Commande rapide de reprise (soir)
-
-```bash
-source ~/ros_jazzy/venv_dream/bin/activate
-cd ~/Osama_ws/src/mycobot_R6A/training/dream
-# démo dashboard (rejeu — extrinsèque self-cal encore approximatif)
-python3 visual_servoing_dashboard.py --mode replay --dataset dream_data/real_arducam \
-  --weights checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/best_network.pth \
-  --extrinsic ../calibration/arducam_extrinsic_selfcal.yaml --intrinsics-npz ../calibration/cam_0.npz
-```
-
----
-

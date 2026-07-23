@@ -224,18 +224,22 @@ def image_msg_to_bgr(msg: Image) -> np.ndarray:
 _KF_MEASUREMENT_MEDIAN_DEG = [6.9, 6.7, 13.7, 13.6, 10.6, 500.0]
 
 # Per-joint solver regularization used ONLY in consistency mode
-# (use_encoder_seed). J1/J2 are well-observed monocularly, so they keep the
-# nominal light prior (1.5). J3-J5 are the poorly-observed distal joints whose
-# angle drifts tens of degrees at near-constant reprojection (the monocular
-# observability gap); a strong prior (40) pins them near the encoder-seeded
-# branch. The sweep on 150 real poses (scratchpad distal_reg_sweep.py,
-# 2026-07-15) measured w=40 cutting MAE(J1-J5) 18.3->6.2 deg for +2.4px
+# (use_encoder_seed). J1 stays on the nominal light prior (1.5). J2-J5 get a
+# strong prior (40): J3-J5 are the poorly-observed distal joints whose angle
+# drifts tens of degrees at near-constant reprojection (the monocular
+# observability gap), and J2 — though well-observed — flips to the wrong
+# monocular branch under the near-top-down camera (front/back depth ambiguity),
+# reprojecting just as well on the wrong branch (measured ~45 deg error at
+# ~10px reproj, 2026-07-22); pinning it to the encoder branch drops that to
+# ~2-3 deg. The distal sweep on 150 real poses (scratchpad distal_reg_sweep.py,
+# 2026-07-15) measured w=40 cutting MAE(J3-J5) 18.3->6.2 deg for +2.4px
 # reprojection (3.0->5.4px, still inside the detection-noise band) — a
 # consistency/refinement result, NOT an independent DREAM prediction. J6 stays
-# lightly regularized (unobservable regardless). Meaningless outside encoder
-# seeding: with a free (non-encoder) q_init, pinning distal joints to a wrong
-# branch would only lock in the error.
-_CONSISTENCY_REG_VEC = [1.5, 1.5, 40.0, 40.0, 40.0, 1.5]
+# lightly regularized: it has 0 observing keypoints, so it sits at the encoder
+# seed no matter the weight (nothing pulls it off). Meaningless outside encoder
+# seeding: with a free (non-encoder) q_init, pinning joints to a wrong branch
+# would only lock in the error.
+_CONSISTENCY_REG_VEC = [10.0, 40.0, 40.0, 40.0, 40.0, 1.5]
 _KF_OUTLIER_GATE_SIGMA = 3.0  # reject an update whose innovation exceeds this many predicted std devs
 
 # Bruit de process sur la VITESSE. Mesuré 2026-07-20 sur un signal réaliste
@@ -274,7 +278,7 @@ class KalmanAngle1D:
     # case that matters: tracking lag J5 0.1->1.0 s, J4 0.3->1.3 s, and MAE
     # J5 2.70->4.75 deg. At ~1.5 Hz there is no smoothing left to buy without
     # paying for it in lag.
-    def __init__(self, r_deg: float, q_pos: float = np.radians(3.0) ** 2, q_vel: float = _KF_Q_VEL_DEG ** 2):
+    def __init__(self, r_deg: float, q_pos: float = np.radians(0.5) ** 2, q_vel: float = _KF_Q_VEL_DEG ** 2):
         self.x = None            # (2,) [angle_rad, velocity_rad_s]
         self.P = None            # (2,2)
         self.R = np.radians(r_deg) ** 2
@@ -637,6 +641,11 @@ class DashboardNode(Node):
         else:
             out_dir = ACQUISITION_DIR / 'manuel'
             joints = '_'.join(f'joint{j+1}_angle_{tgt[j]:.0f}' for j in self._acq_changed)
+        # Sépare les acquisitions selon l'état du filtre au moment de l'écriture :
+        # colonne `dream` = valeur filtrée si Kalman coché, brute sinon. Le
+        # sous-dossier kalman/ garde les deux séries comparables sans mélange.
+        if self.use_temporal_filter:
+            out_dir = out_dir / 'kalman'
         # UN fichier, TOUS les 6 joints (enc/dream/err), manuel comme auto.
         self._write_joint_csv(out_dir, f'session{self.session_index}_{joints}_{date}.csv',
                               list(range(6)))
@@ -654,6 +663,7 @@ class DashboardNode(Node):
         robot. Si l'acquisition est cochée, capture les 6 joints → un seul CSV."""
         pose = random_joint_angles()
         self.send_angles(pose, speed)
+        self.reset_kalman()
         if self.acquisition_enabled:
             self.start_acquisition(pose, changed=list(range(6)), mode='auto')
         else:
@@ -749,6 +759,15 @@ class DashboardNode(Node):
                 pass
 
     # ── Manual pilot commands (same wire protocol as simple_gui.py) ──
+    def reset_kalman(self):
+        """Vide l'état des filtres : la prochaine mesure DREAM devient la
+        nouvelle base. Appelé quand l'utilisateur commande une pose (SET
+        Angles) — on SAIT que le grand mouvement qui suit est réel, donc le
+        portail anti-aberration ne doit pas le rejeter comme une excursion."""
+        for kf in self._kf_joints:
+            kf.x = None
+            kf._last_t = None
+
     def send_angles(self, angles, speed=50):
         self._publish_cmd({'action': 'send_angles', 'angles': angles, 'speed': speed})
 
@@ -1166,9 +1185,9 @@ class Tab1LiveValidation(QWidget):
         # Sous l'image, tassés : MAE/RMSE angle, RMS reprojection, puis le tableau
         # keypoints. Le format image (640×480) est dessiné dans l'image (HUD).
         stats_row = QHBoxLayout()
-        self.mae_label = QLabel(f'MAE {CURVE_WINDOW_S:.0f}s : — °')
+        self.mae_label = QLabel(f'MAE {CURVE_WINDOW_S:.0f}s (J1–J6) : — °')
         self.mae_label.setFont(QFont('Sans', 10, QFont.Bold))
-        self.rmse_label = QLabel('RMSE : — °')
+        self.rmse_label = QLabel('RMSE (J1–J6) : — °')
         stats_row.addWidget(self.mae_label)
         stats_row.addWidget(self.rmse_label)
         stats_row.addStretch()
@@ -1211,11 +1230,11 @@ class Tab1LiveValidation(QWidget):
         n = self.node
         wstats = n.angle_error_stats_window()
         if wstats is not None:
-            self.mae_label.setText(f'MAE {CURVE_WINDOW_S:.0f}s : {wstats["mae_total"]:.2f}°')
-            self.rmse_label.setText(f'RMSE : {wstats["rms_total"]:.2f}°')
+            self.mae_label.setText(f'MAE {CURVE_WINDOW_S:.0f}s (J1–J6) : {wstats["mae_total"]:.2f}°')
+            self.rmse_label.setText(f'RMSE (J1–J6) : {wstats["rms_total"]:.2f}°')
         else:
-            self.mae_label.setText(f'MAE {CURVE_WINDOW_S:.0f}s : — °')
-            self.rmse_label.setText('RMSE : — °')
+            self.mae_label.setText(f'MAE {CURVE_WINDOW_S:.0f}s (J1–J6) : — °')
+            self.rmse_label.setText('RMSE (J1–J6) : — °')
 
         if n.latest_bgr is None:
             self.reproj_label.setText('RMS reprojection : — px')
@@ -1415,6 +1434,9 @@ class ManualPilotPanel(QWidget):
         angles = [e.value() for e in self.angle_edits]
         # 1) Envoi de la commande EN PREMIER, inconditionnel — jamais bloqué.
         self.node.send_angles(angles, self._speed())
+        # Reset du Kalman : le mouvement commandé est réel, le filtre ne doit
+        # pas le geler comme une aberration (cf. J2 -45° rejeté portail).
+        self.node.reset_kalman()
         # 2) Puis, seulement si demandé, on lance la capture CSV (sans toucher
         #    au chemin d'envoi).
         if self.node.acquisition_enabled:
@@ -1422,6 +1444,7 @@ class ManualPilotPanel(QWidget):
 
     def _on_set_coords(self):
         self.node.send_coords([e.value() for e in self.coord_edits], self._speed())
+        self.node.reset_kalman()
 
     def _on_power_on(self):
         self.node.power_on()
