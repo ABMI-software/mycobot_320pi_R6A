@@ -53,6 +53,8 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 |----------|-------------|
 | [training/README.md](training/README.md) | Pipeline ML (régression directe legacy + DREAM actif) |
 | [training/dream/README.md](training/dream/README.md) | Module DREAM keypoint detection — VGG-19, checkpoint `vgg_ultimate_v4_mix_ft_e30` : 99.4% synthétique (50K), 91.6% réel (fine-tune mixte 50K synth + real_3cam ×5) |
+| [docs/DREAM_VALIDATION_DASHBOARD.md](docs/DREAM_VALIDATION_DASHBOARD.md) | Dashboard PyQt de validation live (caméra vs encodeurs) : filtrage Kalman, poids solveur, mode cohérence, acquisition CSV (dont sous-dossier `kalman/`) |
+| [docs/DREAM_VALIDATION_LAUNCH.md](docs/DREAM_VALIDATION_LAUNCH.md) | Procédure de lancement des 5 nœuds du dashboard + piège `.venv` |
 | [docs/SYNTHETIC_DATA.md](docs/SYNTHETIC_DATA.md) | Pipeline données synthétiques Gazebo + domain randomization v2 |
 | [datasets/README.md](datasets/README.md) | Documentation des datasets (synthétique 50K + réel 4K via Git LFS) |
 

@@ -118,7 +118,7 @@ send_cmd "test_moteur_1"
 ## 🔧 Configuration technique
 
 ### Réseau
-- **Pi** : 10.10.0.218:5005 (serveur TCP)
+- **Pi** : 10.10.0.221:5005 (serveur TCP)
 - **Tour** : 10.10.0.115 (client TCP)
 - **Protocole** : TCP/IP, messages UTF-8 terminés par `\n`
 
