@@ -298,6 +298,37 @@ L'écart sim-to-real est fermé (27% → 91.6%). Direction actuelle (voir `CHANG
 3. **🟢 Visual servoing** — une fois la courbe d'écart par joint validée, boucler la pose DREAM dans le contrôle pour le pick-and-place.
 4. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — substitution de Gazebo par Isaac Sim + Isaac Lab pour rendu photoréaliste, piste de fond pour la suite du POC.
 
+### Validation live — dashboard DREAM (`dream_validation_dashboard.py`)
+
+Outil PyQt qui superpose **en temps réel** la pose estimée par DREAM (caméra seule)
+aux **angles réels des encodeurs**, avec compteur MAE/RMSE par joint et 6 courbes
+encodeur vs DREAM. C'est l'outil qui mesure l'écart angulaire de la piste #1
+ci-dessus.
+
+```bash
+conda deactivate && source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
+ros2 run mycobot_gateway dream_validation_dashboard   # + 4 nœuds (voir doc lancement)
+```
+
+Points clés à comprendre en lisant les courbes :
+
+- **Filtrage temporel (Kalman)** — case à cocher. Un filtre 1D à vitesse constante
+  par joint lisse les estimations DREAM (jamais l'encodeur). Il est **réinitialisé**
+  quand on commande une pose (`SET Angles`/`SET Coords`/auto) pour suivre le vrai
+  mouvement sans le geler. Modèle à vitesse constante → léger dépassement sur les
+  changements brusques (réglé par `q_pos`).
+- **Mode cohérence + poids solveur** (`_CONSISTENCY_REG_VEC`) — le solveur est
+  amorcé sur la branche encodeur (l'image monoculaire ne peut pas lever
+  l'ambiguïté de branche seule) ; les poids épinglent les joints distaux et J2.
+  ⚠ Là où un keypoint distal n'est **pas détecté**, l'angle **recopie l'encodeur**
+  (erreur ≈ 0) — ce n'est **pas** une mesure caméra. Les vraies mesures sont sur
+  J1-J2 (bien observés) ; J5/J6 sont faiblement/non observables.
+- **Acquisition CSV** — sauvegarde les 6 joints (enc/dream/err) ; sous-dossier
+  `kalman/` quand le filtre est actif (série filtrée vs brute séparées).
+
+Doc complète : [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md)
+· lancement des 5 nœuds : [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md).
+
 ### Entraînement DREAM (recette actuelle — v4 + fine-tune mixte)
 
 ```bash
@@ -614,6 +645,8 @@ git lfs pull
 | [`datasets/README.md`](datasets/README.md) | Documentation des datasets |
 | [`training/README.md`](training/README.md) | Documentation pipeline ML |
 | [`training/dream/README.md`](training/dream/README.md) | Module DREAM (keypoints + PnP, training mixte) |
+| [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md) | Dashboard de validation live (caméra vs encodeurs) : filtrage Kalman, poids solveur, mode cohérence, acquisition CSV |
+| [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md) | Lancement des 5 nœuds du dashboard + piège `.venv` |
 
 ---
 
