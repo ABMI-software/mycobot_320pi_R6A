@@ -298,7 +298,7 @@ L'écart sim-to-real est fermé (27% → 91.6%). Direction actuelle (voir `CHANG
 3. **🟢 Visual servoing** — une fois la courbe d'écart par joint validée, boucler la pose DREAM dans le contrôle pour le pick-and-place.
 4. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — substitution de Gazebo par Isaac Sim + Isaac Lab pour rendu photoréaliste, piste de fond pour la suite du POC.
 
-### Validation live — dashboard DREAM (`dream_validation_dashboard.py`)
+### Validation live — dashboard DREAM (`dream_validation_dashboard.py`) — état 2026-07-23
 
 Outil PyQt qui superpose **en temps réel** la pose estimée par DREAM (caméra seule)
 aux **angles réels des encodeurs**, avec compteur MAE/RMSE par joint et 6 courbes
