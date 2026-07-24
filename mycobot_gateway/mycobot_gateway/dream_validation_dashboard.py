@@ -50,7 +50,7 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QIcon, QImage, QPixmap
 from PyQt5.QtWidgets import (
     QApplication, QCheckBox, QDoubleSpinBox, QFrame, QGridLayout, QGroupBox,
-    QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
+    QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QRadioButton,
     QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
 import pyqtgraph as pg
@@ -70,6 +70,7 @@ from mycobot_fk import forward_kinematics, KEYPOINT_NAMES, GAZEBO_INTRINSICS  # 
 from dream_angle_solver import (  # noqa: E402
     solve_joint_angles_and_pose, solve_joint_angles_and_pose_two_pass,
     solve_joint_angles_and_pose_multi_init, solve_joint_angles_and_pose_bounded,
+    solve_joint_angles_multiview,
     JOINT_LOWER, JOINT_UPPER,
 )
 
@@ -195,6 +196,85 @@ def load_arducam_intrinsics():
     return K, dist
 
 
+class CameraView:
+    """État live d'une caméra dans la fusion multi-vues : intrinsèque + topics
+    + dernières données reçues + pose caméra de la frame précédente (warm-start
+    du solveur multi-vues). La caméra primaire (cameras[0]) est aussi reflétée
+    dans les champs self.latest_* du nœud pour que tout le code mono-caméra
+    historique (compte_overlay, chemin mono) marche à l'identique."""
+
+    def __init__(self, name, image_topic, keypoints_topic, K, dist):
+        self.name = name
+        self.image_topic = image_topic
+        self.keypoints_topic = keypoints_topic
+        self.K = K
+        self.dist = dist
+        self.calib_ok = K is not None
+        self.latest_bgr = None
+        self.latest_kp_2d = None
+        self.latest_kp_valid = None
+        self.prev_rvec = None       # pose caméra acceptée à la frame précédente
+        self.prev_tvec = None
+        self._fps_window = []       # horodatages des frames reçues (cadence caméra)
+        self._kp_recv_times = []    # horodatages des keypoints reçus (cadence DREAM)
+        self._last_good_t = 0.0     # dernier instant où la vue avait ≥4 keypoints
+        self._held_kp = None        # dernière position connue de CHAQUE keypoint
+        self._held_t = None         # instant de dernière validité de chaque keypoint
+
+    def note_keypoints_for_display(self, kp, valid):
+        """Mémorise la dernière position valide de chaque keypoint (affichage
+        stable : on continue à dessiner un point ~0.8 s après sa dernière
+        détection, donc il ne clignote pas si une inférence le rate)."""
+        now = time.time()
+        if self._held_kp is None:
+            self._held_kp = np.zeros((7, 2))
+            self._held_t = np.zeros(7)
+        for i in range(7):
+            if valid[i]:
+                self._held_kp[i] = kp[i]
+                self._held_t[i] = now
+
+    def display_keypoints(self, grace=0.8):
+        """(positions (7,2), mask (7,)) à DESSINER : keypoints valides dans les
+        `grace` dernières secondes (tenue anti-clignotement). N'affecte PAS le
+        solveur, qui utilise toujours les détections courantes."""
+        if self._held_kp is None:
+            return self.latest_kp_2d, self.latest_kp_valid
+        mask = (time.time() - self._held_t) < grace
+        return self._held_kp, mask
+
+    def recently_detecting(self, grace=1.0):
+        """True si la vue a détecté ≥4 keypoints dans les `grace` dernières
+        secondes — évite le clignotement quand la détection oscille autour du
+        seuil (7/7 puis 3/7 puis 6/7…)."""
+        return (time.time() - self._last_good_t) < grace
+
+    def note_frame(self, t):
+        self._fps_window.append(t)
+        self._fps_window = [x for x in self._fps_window if x > t - 2.0]
+
+    def note_kp(self, t):
+        self._kp_recv_times.append(t)
+        self._kp_recv_times = [x for x in self._kp_recv_times if x > t - 5.0]
+
+    def fps(self):
+        if len(self._fps_window) < 2:
+            return 0.0
+        span = self._fps_window[-1] - self._fps_window[0]
+        return (len(self._fps_window) - 1) / span if span > 0 else 0.0
+
+    def dream_rate_hz(self):
+        if len(self._kp_recv_times) < 2:
+            return 0.0
+        span = self._kp_recv_times[-1] - self._kp_recv_times[0]
+        return (len(self._kp_recv_times) - 1) / span if span > 0 else 0.0
+
+    def usable(self):
+        return (self.calib_ok and self.latest_kp_2d is not None
+                and self.latest_kp_valid is not None
+                and int(np.sum(self.latest_kp_valid)) >= 4)
+
+
 def image_msg_to_bgr(msg: Image) -> np.ndarray:
     h, w = msg.height, msg.width
     encoding = msg.encoding.lower()
@@ -240,6 +320,16 @@ _KF_MEASUREMENT_MEDIAN_DEG = [6.9, 6.7, 13.7, 13.6, 10.6, 500.0]
 # seeding: with a free (non-encoder) q_init, pinning joints to a wrong branch
 # would only lock in the error.
 _CONSISTENCY_REG_VEC = [10.0, 40.0, 40.0, 40.0, 40.0, 1.5]
+
+# Régularisation SPÉCIFIQUE à la fusion multi-vues. Deux caméras lèvent
+# l'ambiguïté de branche monoculaire qui, en mono, obligeait à épingler fort
+# J2-J5 à l'encodeur (=40). En fusion on relâche donc les joints PROXIMAUX
+# (J1-J3) — bien observés par les deux vues — pour que les CAMÉRAS pilotent
+# l'estimation (vrai résultat de fusion, pas une recopie encodeur). Les
+# distaux (J4-J5) restent modérément tenus (8, pas 40) : la SVPRO oblique ne
+# les détecte souvent pas (4/7), donc rien ne les raffine et un poids trop
+# faible les ferait dériver. J6 reste à 1.5 (structurellement inobservable).
+_FUSION_REG_VEC = [3.0, 3.0, 3.0, 8.0, 8.0, 1.5]
 _KF_OUTLIER_GATE_SIGMA = 3.0  # reject an update whose innovation exceeds this many predicted std devs
 
 # Bruit de process sur la VITESSE. Mesuré 2026-07-20 sur un signal réaliste
@@ -252,6 +342,14 @@ _KF_OUTLIER_GATE_SIGMA = 3.0  # reject an update whose innovation exceeds this m
 # la sortie devient parfaitement plate (ecart-type 0.00°) parce que le filtre
 # rejette aussi les vrais mouvements — courbe flatteuse, mesure vide.
 _KF_Q_VEL_DEG = np.radians(0.1)
+
+# Filtre passe-bas (moyenne exponentielle / EMA) : y = a·x + (1−a)·y_prev.
+# a bas = plus lisse mais plus de retard. Filtre moyenne glissante : moyenne
+# des N dernières estimations (lisse le bruit haute fréquence).
+_EMA_ALPHA = 0.06   # ~2-3 s de constante de temps à la cadence DREAM : très lisse
+                    # au repos, coupe le tremblement image-à-image. Retard visible
+                    # sur un vrai mouvement (assumé : outil de validation à l'arrêt).
+_MA_WINDOW = 20     # ~1.5-2 s de fenêtre : lisse fortement (retard = fenêtre/2).
 
 # Half-height of the per-joint plot window, in degrees around the encoder value.
 # 10 deg keeps the 0.5-0.9 deg target and the measured J2 bias (~11 deg) both
@@ -416,21 +514,29 @@ class DashboardNode(Node):
 
         self.declare_parameter('sim', False)
         self.declare_parameter('camera_topic', '')
+        # Liste de caméras (noms du registry, ex. 'arducam,svpro'). Vide =
+        # mono-caméra arducam legacy (comportement historique inchangé).
+        self.declare_parameter('cameras', '')
         sim = self.get_parameter('sim').value
         camera_topic_param = self.get_parameter('camera_topic').value
+        cameras_param = self.get_parameter('cameras').value
 
-        if sim:
-            self.camera_topic = camera_topic_param or '/synth_camera/image'
-            self.camera_K = GAZEBO_INTRINSICS.copy()
-            self.camera_dist = None
-        else:
-            self.camera_topic = camera_topic_param or '/camera/image_raw'
-            self.camera_K, self.camera_dist = load_arducam_intrinsics()
+        self.cameras = self._build_camera_views(sim, camera_topic_param, cameras_param)
+        self.primary = self.cameras[0]
+        # Alias legacy : tout le code mono-caméra lit ces trois champs.
+        self.camera_topic = self.primary.image_topic
+        self.camera_K = self.primary.K
+        self.camera_dist = self.primary.dist
 
-        self.get_logger().info(
-            f'📷 camera_topic={self.camera_topic}  fx={self.camera_K[0,0]:.1f} '
-            f'fy={self.camera_K[1,1]:.1f} cx={self.camera_K[0,2]:.1f} cy={self.camera_K[1,2]:.1f}'
-        )
+        self.last_fusion_active = False
+        self.n_views_fused = 0
+        self.active_single_source = None   # nom de la caméra portant l'estim. mono
+        self.fusion_src_per_joint = [None] * 6  # caméra dominante par joint (fusion)
+        self.per_cam_kp = []               # [(nom, valid(7,), reproj(7,))] dernière estim.
+
+        names = ', '.join(f'{c.name}(fx={c.K[0,0]:.0f})' for c in self.cameras)
+        mode = 'FUSION' if len([c for c in self.cameras if c.calib_ok]) >= 2 else 'MONO'
+        self.get_logger().info(f'📷 {len(self.cameras)} caméra(s) [{mode}] : {names}')
 
         # ── Live state ──
         self.latest_bgr = None
@@ -482,8 +588,12 @@ class DashboardNode(Node):
         # ── Temporal filter (Kalman, per joint) on DREAM's own estimate ──
         # Toggle kept live (KPIPanel checkbox) like the robust-solver switch —
         # off falls back to the raw two-pass solve, on smooths it over time.
-        self.use_temporal_filter = False
+        # Filtre temporel des courbes DREAM — choix mutuellement exclusif dans
+        # le panneau KPI, DÉCOCHÉ par défaut ('aucun'). Trois filtres au choix.
+        self.filter_mode = 'aucun'   # 'aucun' | 'kalman' | 'passe_bas' | 'moyenne'
         self._kf_joints = [KalmanAngle1D(r_deg) for r_deg in _KF_MEASUREMENT_MEDIAN_DEG]
+        self._ema_state = None       # état passe-bas (EMA) par joint (6,)
+        self._ma_buffers = [deque(maxlen=_MA_WINDOW) for _ in range(6)]  # moyenne glissante
 
         # estimate_dream_angles() is called from both record_curve_sample()
         # and KPIPanel.refresh() every tick — cache per-tick so the solver
@@ -570,6 +680,37 @@ class DashboardNode(Node):
 
         self._init_subscriptions()
 
+    def _build_camera_views(self, sim, camera_topic_param, cameras_param):
+        """Construit la liste des CameraView. sim → 1 vue Gazebo ; sinon la
+        liste `cameras` du registry ; sinon (vide) mono-caméra arducam legacy."""
+        if sim:
+            topic = camera_topic_param or '/synth_camera/image'
+            return [CameraView('sim', topic, '/dream/keypoints',
+                               GAZEBO_INTRINSICS.copy(), None)]
+
+        views = []
+        names = [c.strip() for c in cameras_param.split(',') if c.strip()]
+        if names:
+            from mycobot_gateway.vision.camera_registry import (
+                KNOWN_BY_NAME, load_intrinsics)
+            for name in names:
+                kc = KNOWN_BY_NAME.get(name)
+                if kc is None:
+                    self.get_logger().warn(f'Caméra inconnue ignorée : {name}')
+                    continue
+                K, dist = load_intrinsics(kc.calib_stem)
+                if K is None:
+                    self.get_logger().warn(
+                        f'{name}: intrinsèque {kc.calib_stem} absente — repli arducam')
+                    K, dist = load_arducam_intrinsics()
+                views.append(CameraView(name, kc.image_topic, kc.keypoints_topic, K, dist))
+
+        if not views:
+            topic = camera_topic_param or '/camera/image_raw'
+            K, dist = load_arducam_intrinsics()
+            views = [CameraView('arducam', topic, '/dream/keypoints', K, dist)]
+        return views
+
     def reset_session_stats(self):
         """Remet à zéro les compteurs cumulés depuis le lancement (MAE/RMS
         session, cold-restarts, pose-ruptures). Les courbes et la fenêtre 30s
@@ -641,11 +782,11 @@ class DashboardNode(Node):
         else:
             out_dir = ACQUISITION_DIR / 'manuel'
             joints = '_'.join(f'joint{j+1}_angle_{tgt[j]:.0f}' for j in self._acq_changed)
-        # Sépare les acquisitions selon l'état du filtre au moment de l'écriture :
-        # colonne `dream` = valeur filtrée si Kalman coché, brute sinon. Le
-        # sous-dossier kalman/ garde les deux séries comparables sans mélange.
-        if self.use_temporal_filter:
-            out_dir = out_dir / 'kalman'
+        # Sépare les acquisitions selon le filtre actif à l'écriture : colonne
+        # `dream` = valeur filtrée si un filtre est actif, brute sinon. Le
+        # sous-dossier (kalman/ passe_bas/ moyenne/) garde les séries séparées.
+        if self.filter_mode != 'aucun':
+            out_dir = out_dir / self.filter_mode
         # UN fichier, TOUS les 6 joints (enc/dream/err), manuel comme auto.
         self._write_joint_csv(out_dir, f'session{self.session_index}_{joints}_{date}.csv',
                               list(range(6)))
@@ -676,11 +817,20 @@ class DashboardNode(Node):
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST, depth=1,
         )
-        self.create_subscription(Image, self.camera_topic, self._image_cb, img_qos)
-        self.create_subscription(JointState, '/joint_states', self._joint_cb, 10)
+        # Caméra primaire : callbacks legacy (mettent à jour self.latest_*).
+        self.create_subscription(Image, self.primary.image_topic, self._image_cb, img_qos)
         self.create_subscription(
-            Float64MultiArray, '/dream/keypoints', self._kp_cb, 10)
+            Float64MultiArray, self.primary.keypoints_topic, self._kp_cb, 10)
+        self.create_subscription(JointState, '/joint_states', self._joint_cb, 10)
         self.create_subscription(String, '/dream/status', self._status_cb, 10)
+
+        # Caméras secondaires : chacune écrit dans son propre CameraView pour la
+        # fusion (closures pour capturer la vue).
+        for view in self.cameras[1:]:
+            self.create_subscription(
+                Image, view.image_topic, self._make_image_cb(view), img_qos)
+            self.create_subscription(
+                Float64MultiArray, view.keypoints_topic, self._make_kp_cb(view), 10)
 
         # ── Manual pilot pub/sub ──
         self.cmd_pub = self.create_publisher(String, '/to_robot', 10)
@@ -696,11 +846,38 @@ class DashboardNode(Node):
     # ── Callbacks ──────────────────────────────────────────────
     def _image_cb(self, msg: Image):
         self.latest_bgr = image_msg_to_bgr(msg)
+        self.primary.latest_bgr = self.latest_bgr   # miroir pour la fusion
         self.frame_count += 1
         now = time.time()
         self._fps_window.append(now)
         cutoff = now - 2.0
         self._fps_window = [t for t in self._fps_window if t > cutoff]
+
+    def _make_image_cb(self, view: CameraView):
+        def _cb(msg: Image):
+            view.latest_bgr = image_msg_to_bgr(msg)
+            view.note_frame(time.time())
+        return _cb
+
+    @staticmethod
+    def _parse_keypoints(flat):
+        """(7,2) kp + (7,) valid depuis le layout de dream_inference_node."""
+        n = 7
+        kp = np.zeros((n, 2), dtype=np.float64)
+        valid = np.zeros(n, dtype=bool)
+        for i in range(n):
+            kp[i] = [flat[3 * i], flat[3 * i + 1]]
+            valid[i] = flat[3 * i + 2] > 0.5
+        return kp, valid
+
+    def _make_kp_cb(self, view: CameraView):
+        def _cb(msg: Float64MultiArray):
+            view.latest_kp_2d, view.latest_kp_valid = self._parse_keypoints(msg.data)
+            view.note_kp(time.time())
+            view.note_keypoints_for_display(view.latest_kp_2d, view.latest_kp_valid)
+            if int(np.sum(view.latest_kp_valid)) >= 4:
+                view._last_good_t = time.time()
+        return _cb
 
     def _joint_cb(self, msg: JointState):
         name_to_pos = dict(zip(msg.name, msg.position))
@@ -727,6 +904,8 @@ class DashboardNode(Node):
             valid[i] = flat[3 * i + 2] > 0.5
         self.latest_kp_2d = kp
         self.latest_kp_valid = valid
+        self.primary.latest_kp_2d = kp          # miroir pour la fusion
+        self.primary.latest_kp_valid = valid
         img_stamp_sec, img_stamp_nanosec, inference_ms = flat[21:24]
         self.latest_kp_image_stamp = img_stamp_sec + img_stamp_nanosec * 1e-9
         self.last_dream_inference_ms = inference_ms
@@ -763,10 +942,35 @@ class DashboardNode(Node):
         """Vide l'état des filtres : la prochaine mesure DREAM devient la
         nouvelle base. Appelé quand l'utilisateur commande une pose (SET
         Angles) — on SAIT que le grand mouvement qui suit est réel, donc le
-        portail anti-aberration ne doit pas le rejeter comme une excursion."""
+        portail anti-aberration ne doit pas le rejeter comme une excursion.
+        Réinitialise LES TROIS filtres (Kalman, passe-bas, moyenne glissante)."""
         for kf in self._kf_joints:
             kf.x = None
             kf._last_t = None
+        self._ema_state = None
+        for buf in self._ma_buffers:
+            buf.clear()
+
+    def _apply_filter(self, q_raw, t):
+        """Applique le filtre temporel sélectionné (self.filter_mode) à
+        l'estimation brute q_raw (rad). 'aucun' = passe-tout. Utilisé par tous
+        les chemins (fusion, mono, single-view)."""
+        mode = self.filter_mode
+        if mode == 'kalman':
+            return np.clip(np.array([
+                kf.step(q_raw[j], t) for j, kf in enumerate(self._kf_joints)
+            ]), JOINT_LOWER, JOINT_UPPER)
+        if mode == 'passe_bas':
+            if self._ema_state is None:
+                self._ema_state = np.asarray(q_raw, dtype=np.float64).copy()
+            else:
+                self._ema_state = _EMA_ALPHA * q_raw + (1.0 - _EMA_ALPHA) * self._ema_state
+            return self._ema_state.copy()
+        if mode == 'moyenne':
+            for j in range(6):
+                self._ma_buffers[j].append(float(q_raw[j]))
+            return np.array([np.mean(self._ma_buffers[j]) for j in range(6)])
+        return np.asarray(q_raw, dtype=np.float64)
 
     def send_angles(self, angles, speed=50):
         self._publish_cmd({'action': 'send_angles', 'angles': angles, 'speed': speed})
@@ -852,6 +1056,149 @@ class DashboardNode(Node):
             'err_px': err_px, 'rms_px': rms_px, 'n_valid': int(valid.sum()),
         }
 
+    def _solve_single_view(self, view):
+        """Estimation mono sur UNE vue précise — typiquement la SVPRO quand
+        l'arducam a perdu le bras (résolution d'occlusion : la vue qui voit
+        encore prend le relais). Version allégée du chemin mono primaire :
+        solveur borné + Kalman, warm-start propre à la vue (view.prev_rvec/tvec),
+        sans WarmStartMonitor (propre au flux arducam)."""
+        if self.use_encoder_seed and self.latest_joint_q is not None:
+            q_init = self.latest_joint_q
+            reg_weight = np.array(_CONSISTENCY_REG_VEC)
+        else:
+            q_init = self._prev_dream_q if self._prev_dream_q is not None else self.latest_joint_q
+            reg_weight = 1.5
+
+        t0 = time.time()
+        res = solve_joint_angles_and_pose_bounded(
+            view.latest_kp_2d, view.latest_kp_valid, view.K,
+            q_init=q_init, rvec_init=view.prev_rvec, tvec_init=view.prev_tvec,
+            reg_weight=reg_weight, pose_reg_weight=self.pose_reg_weight,
+            use_two_pass=self.use_robust_solver)
+        t1 = time.time()
+        if res is None:
+            return None
+
+        view.prev_rvec = res['rvec']
+        view.prev_tvec = res['tvec']
+        self.last_fusion_active = False
+        self.active_single_source = view.name
+        self.last_cold_restart_triggered = False
+        self.last_cold_restart_reason = None
+        self.last_pose_bound_hit = res.get('pose_bound_hit', False)
+        self.last_pose_rupture_triggered = res.get('pose_rupture', False)
+        self.last_dream_rejected_kp_idx = res.get('rejected_kp_idx', [])
+        self.last_dream_two_pass_applied = res.get('two_pass_applied', False)
+        self.n_solves += 1
+        self.last_solver_ms = (t1 - t0) * 1000.0
+        self._prev_dream_q = res['q']
+        if self.latest_kp_image_stamp is not None:
+            self.last_pipeline_latency_ms = (t1 - self.latest_kp_image_stamp) * 1000.0
+
+        q_out = self._apply_filter(res['q'], t1)
+        self._dream_q_history.append((t1, q_out))
+        return q_out
+
+    def _solve_view_consistency(self, view):
+        """Résout les 6 angles pour UNE caméra avec la méthodo éprouvée (mode
+        cohérence : seed encodeur + _CONSISTENCY_REG_VEC, solveur borné) — la
+        MÊME que l'arducam en mono, donc pas de bascule de branche. Retourne
+        (q rad, valid (7,), reproj_px (7,)) ou (None, None, None)."""
+        if self.use_encoder_seed and self.latest_joint_q is not None:
+            q_init = self.latest_joint_q
+            reg_weight = np.array(_CONSISTENCY_REG_VEC)
+        else:
+            q_init = self._prev_dream_q if self._prev_dream_q is not None else self.latest_joint_q
+            reg_weight = 1.5
+
+        res = solve_joint_angles_and_pose_bounded(
+            view.latest_kp_2d, view.latest_kp_valid, view.K,
+            q_init=q_init, rvec_init=view.prev_rvec, tvec_init=view.prev_tvec,
+            reg_weight=reg_weight, pose_reg_weight=self.pose_reg_weight,
+            use_two_pass=self.use_robust_solver)
+        if res is None:
+            return None, None, None
+        view.prev_rvec = res['rvec']
+        view.prev_tvec = res['tvec']
+
+        positions, _ = forward_kinematics(res['q'])
+        pts3d = np.array([positions[n] for n in KEYPOINT_NAMES], dtype=np.float64)
+        proj, _ = cv2.projectPoints(pts3d, res['rvec'], res['tvec'], view.K, None)
+        proj = proj.reshape(-1, 2)
+        reproj = np.linalg.norm(proj - np.asarray(view.latest_kp_2d), axis=1)
+        return res['q'], np.asarray(view.latest_kp_valid, bool), reproj
+
+    def _fuse_multiview(self, usable):
+        """Architecture RÉSOUDRE-PUIS-FUSIONNER (demandée) : chaque caméra
+        estime SÉPARÉMENT ses 6 angles avec la méthodo cohérence éprouvée (donc
+        chaque estimation est saine, pas de bascule de branche), PUIS on fusionne
+        JOINT PAR JOINT selon quelle caméra observe le mieux ce joint.
+
+        Un joint m est observé par les keypoints kp[m+2:] (JOINT_OBSERVING_KP).
+        Le poids d'une caméra sur le joint m = nombre de ces keypoints détectés
+        ET bien reprojetés (< seuil px). On prend la moyenne pondérée des
+        estimations par caméra. Conséquence : une caméra qui n'observe pas un
+        joint (occlusion, distaux non détectés) n'a AUCUN poids dessus — donc
+        la fusion ne peut jamais dégrader la meilleure caméra sur ce joint ;
+        elle ne fait que réduire l'erreur (moyennage des vues qui l'observent)
+        et combler l'occlusion (l'autre caméra prend le relais joint par joint).
+        Retourne q_out (rad) ou None si aucune caméra n'a résolu."""
+        t0 = time.time()
+        per_cam = []  # (view, q, valid, reproj_px)
+        for v in usable:
+            q_est, valid, reproj = self._solve_view_consistency(v)
+            if q_est is not None:
+                per_cam.append((v, q_est, valid, reproj))
+        t1 = time.time()
+        if not per_cam:
+            return None
+
+        q_fused = np.zeros(6)
+        src_per_joint = [None] * 6   # caméra dominante par joint (diagnostic)
+        for m in range(6):
+            observers = JOINT_OBSERVING_KP[m]
+            num = den = 0.0
+            best_w, best_cam = -1.0, None
+            for (v, q, valid, reproj) in per_cam:
+                w = sum(1.0 for k in observers
+                        if valid[k] and reproj[k] <= JOINT_CONFIDENCE_PX_THRESHOLD)
+                num += w * q[m]
+                den += w
+                if w > best_w:
+                    best_w, best_cam = w, v
+            if den > 0:
+                q_fused[m] = num / den
+                src_per_joint[m] = best_cam.name if best_cam else None
+            else:
+                # Aucune caméra n'observe m (ex. J6, ou distaux non détectés
+                # partout) : elles sont toutes épinglées à l'encodeur → prendre
+                # la 1re (identiques à ce niveau).
+                q_fused[m] = per_cam[0][1][m]
+
+        self.last_fusion_active = True
+        self.n_views_fused = len(per_cam)
+        self.fusion_src_per_joint = src_per_joint
+        # Détection par caméra (nom, valid(7,), reproj(7,)) : le tableau
+        # keypoints s'en sert pour montrer QUELLE caméra voit chaque keypoint
+        # (un point non vu par l'arducam mais vu par la SVPRO n'est plus
+        # « non détecté »).
+        self.per_cam_kp = [(v.name, valid, reproj) for (v, q, valid, reproj) in per_cam]
+        self.last_solver_ms = (t1 - t0) * 1000.0
+        self.last_cold_restart_triggered = False
+        self.last_cold_restart_reason = None
+        self.last_pose_bound_hit = False
+        self.last_pose_rupture_triggered = False
+        self.last_dream_rejected_kp_idx = []
+        self.last_dream_two_pass_applied = False
+        self.n_solves += 1
+        self._prev_dream_q = q_fused
+        if self.latest_kp_image_stamp is not None:
+            self.last_pipeline_latency_ms = (t1 - self.latest_kp_image_stamp) * 1000.0
+
+        q_out = self._apply_filter(q_fused, t1)
+        self._dream_q_history.append((t1, q_out))
+        return q_out
+
     def estimate_dream_angles(self):
         """DREAM-only joint angle estimate (rad): 6 joint angles AND the
         6-DoF camera pose solved jointly, fresh every frame — no persisted
@@ -906,12 +1253,31 @@ class DashboardNode(Node):
             self._dream_q_cache_valid = True
             return q
 
-        if self.latest_kp_2d is None or self.latest_kp_valid is None:
-            return _finish(None)
-        n_valid = int(self.latest_kp_valid.sum())
-        if n_valid < 4:
+        # ── Sélection des vues exploitables (≥4 kp), TOUTES caméras ────────
+        # Occlusion : l'arducam peut perdre le bras là où la SVPRO le garde (et
+        # inversement). On ne se limite donc PAS à l'arducam — sinon, quand
+        # l'arducam lâche, la détection SVPRO est gâchée et tout passe à « — ».
+        usable = [v for v in self.cameras if v.usable()]
+
+        # ≥2 vues → fusion (un q PARTAGÉ contre toutes les vues ; ce qu'une vue
+        # observe mal est contraint par l'autre). Mécanismes mono (WarmStart,
+        # borne de pose, cold-restart) non applicables → valeurs neutres.
+        if len(usable) >= 2:
+            fused = self._fuse_multiview(usable)
+            if fused is not None:
+                return _finish(fused)
+        self.last_fusion_active = False
+
+        # 1 seule vue exploitable. Primaire (arducam) si elle voit → chemin mono
+        # complet ci-dessous. Sinon, la vue secondaire qui voit ENCORE (SVPRO)
+        # porte l'estimation — c'est la résolution d'occlusion demandée.
+        if not self.primary.usable():
+            if usable:
+                return _finish(self._solve_single_view(usable[0]))
             return _finish(None)
 
+        self.active_single_source = self.primary.name
+        n_valid = int(self.latest_kp_valid.sum())
         if self.use_encoder_seed and self.latest_joint_q is not None:
             # Consistency mode: re-anchor on the encoder branch every frame (see
             # use_encoder_seed field comment). No longer an independent estimate.
@@ -1005,16 +1371,7 @@ class DashboardNode(Node):
         self._prev_dream_tvec = res['tvec']
         self._prev_dream_pose_time = t_solve_end
 
-        if not self.use_temporal_filter:
-            q_out = res['q']
-        else:
-            # Borné aux butées : l'état du filtre inclut une vitesse et la
-            # prédiction l'intègre sans limite, donc une série de mesures
-            # rejetées par la porte anti-outlier faisait diverger la sortie en
-            # rampe (J1 à -900°) alors que le solveur, lui, reste borné.
-            q_out = np.clip(np.array([
-                kf.step(res['q'][j], t_solve_end) for j, kf in enumerate(self._kf_joints)
-            ]), JOINT_LOWER, JOINT_UPPER)
+        q_out = self._apply_filter(res['q'], t_solve_end)
 
         self._dream_q_history.append((t_solve_end, q_out))
         return _finish(q_out)
@@ -1169,18 +1526,37 @@ class Tab1LiveValidation(QWidget):
         self.last_overlay = None
         layout = QVBoxLayout(self)
 
-        cam_title = QLabel('Vue caméra')
+        cam_title = QLabel('Vues caméra')
         cam_title.setFont(QFont('Sans', 13, QFont.Bold))
         layout.addWidget(cam_title)
 
+        # Une vue par caméra, EMPILÉES VERTICALEMENT dans la colonne caméra
+        # (un espace au-dessus de l'autre) — ça garde la largeur de la colonne
+        # inchangée, donc la mise en page du dashboard n'est pas cassée. La
+        # primaire (image_label) porte l'overlay encodeur complet ; les
+        # secondaires montrent leurs keypoints DREAM + la reprojection du q
+        # fusionné dans leur propre vue.
+        prim_title = QLabel(f'Vue {node.primary.name}')
+        prim_title.setFont(QFont('Sans', 11, QFont.Bold))
+        layout.addWidget(prim_title)
         self.image_label = QLabel('En attente d\'image caméra…')
         self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setMinimumSize(320, 240)  # floor only — actual display size
-        # is whatever layout space is available; 640x480 forced the whole
-        # window's minimum size past some screens, causing it to overflow
-        # instead of shrinking to fit (see DashboardWindow.__init__).
+        self.image_label.setMinimumSize(320, 240)  # plancher — la taille réelle
+        # suit l'espace disponible (640x480 forcerait la fenêtre hors écran).
         self.image_label.setStyleSheet('background-color: #111; color: #999;')
         layout.addWidget(self.image_label)
+
+        self.secondary_labels = []
+        for view in node.cameras[1:]:
+            title = QLabel(f'Vue {view.name} (fusion)')
+            title.setFont(QFont('Sans', 11, QFont.Bold))
+            layout.addWidget(title)
+            lbl = QLabel('En attente…')
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setMinimumSize(320, 240)
+            lbl.setStyleSheet('background-color:#111; color:#999;')
+            layout.addWidget(lbl)
+            self.secondary_labels.append((view, lbl))
 
         # Sous l'image, tassés : MAE/RMSE angle, RMS reprojection, puis le tableau
         # keypoints. Le format image (640×480) est dessiné dans l'image (HUD).
@@ -1280,6 +1656,34 @@ class Tab1LiveValidation(QWidget):
             for lbl in self.err_value_labels:
                 lbl.setText('—')
 
+        # En fusion, le tableau reflète TOUTES les caméras : un keypoint vu par
+        # la SVPRO mais pas l'arducam n'est plus « non détecté » — on affiche la
+        # caméra qui le voit le mieux (erreur px la plus basse) et son nom.
+        if n.last_fusion_active and n.per_cam_kp:
+            global_err = []
+            for i in range(len(KEYPOINT_NAMES)):
+                dets = [(name, reproj[i]) for (name, valid, reproj) in n.per_cam_kp if valid[i]]
+                if dets:
+                    # Erreur FUSIONNÉE par keypoint : moyenne des caméras qui le
+                    # voient (comme la détection globale). Étiquette (fusion) si
+                    # ≥2 caméras le voient, sinon le nom de la seule caméra.
+                    err = float(np.mean([d[1] for d in dets]))
+                    tag = 'fusion' if len(dets) > 1 else dets[0][0]
+                    self.err_value_labels[i].setText(f'{err:.1f} ({tag})')
+                    global_err.append(err)
+                else:
+                    self.err_value_labels[i].setText('non détecté')
+            # Détection GLOBALE = union des caméras : un keypoint compte s'il est
+            # vu par AU MOINS une caméra. C'est la vraie couverture de la fusion
+            # (souvent 7/7) vs chaque caméra seule (ici arducam 4/7 + svpro 7/7).
+            per_cam_counts = ' + '.join(
+                f'{name} {int(np.sum(valid))}/7' for (name, valid, reproj) in n.per_cam_kp)
+            if global_err:
+                rms = float(np.sqrt(np.mean(np.square(global_err))))
+                self.reproj_label.setText(
+                    f'Détection globale (fusion) : {len(global_err)}/7 kp · '
+                    f'RMS {rms:.2f} px   [{per_cam_counts}]')
+
         if n.last_pose_rupture_triggered:
             pose_bgr = (32, 0, 176)       # rouge — rupture
         elif n.last_pose_bound_hit:
@@ -1288,6 +1692,54 @@ class Tab1LiveValidation(QWidget):
             pose_bgr = (0, 150, 0)        # vert — stable
         self._draw_hud(frame, n.fps(), n.dream_rate_hz(), pose_bgr)
         self._display_frame(frame)
+
+        for view, lbl in self.secondary_labels:
+            self._refresh_secondary(view, lbl)
+
+    def _refresh_secondary(self, view, lbl):
+        """Vignette d'une caméra secondaire : keypoints DREAM (magenta) + squelette
+        reprojeté du q fusionné (vert) avec la pose caméra propre à cette vue."""
+        if view.latest_bgr is None:
+            return
+        frame = view.latest_bgr.copy()
+
+        def _pt(p):
+            return (int(round(p[0])), int(round(p[1])))
+
+        # Keypoints TENUS (anti-clignotement) : on continue à dessiner un point
+        # ~0.8 s après sa dernière détection, donc le squelette ne clignote pas.
+        kp, val = view.display_keypoints()
+        if kp is not None and val is not None:
+            for i in range(len(KEYPOINT_NAMES) - 1):
+                if val[i] and val[i + 1]:
+                    cv2.line(frame, _pt(kp[i]), _pt(kp[i + 1]), SMALL_COLOR_BGR, 2)
+            for i in range(len(KEYPOINT_NAMES)):
+                if val[i]:
+                    # Points DREAM bien visibles : disque magenta + cerne blanc.
+                    cv2.circle(frame, _pt(kp[i]), 5, (255, 255, 255), -1)
+                    cv2.circle(frame, _pt(kp[i]), 4, SMALL_COLOR_BGR, -1)
+
+        n = self.node
+
+        # HUD identique à l'arducam : Camera FPS / DREAM Hz / format + pastille
+        # « Pose camera » VERTE dès que cette caméra détecte (≥4 kp) et a une
+        # pose — qu'on soit en fusion OU en mono-via-cette-caméra. Ambre
+        # seulement si elle ne suit pas (｟4 kp), pas parce que l'AUTRE caméra
+        # est en panne.
+        pose_bgr = (0, 150, 0) if (view.recently_detecting() and view.prev_rvec is not None) \
+            else (0, 128, 192)
+        self._draw_hud(frame, view.fps(), view.dream_rate_hz(), pose_bgr)
+        if n.last_fusion_active and view.prev_rvec is not None and n._prev_dream_q is not None:
+            positions, _ = forward_kinematics(n._prev_dream_q)
+            pts3d = np.array([positions[nm] for nm in KEYPOINT_NAMES], dtype=np.float64)
+            proj, _ = cv2.projectPoints(pts3d, view.prev_rvec, view.prev_tvec, view.K, view.dist)
+            proj = proj.reshape(-1, 2)
+            for i in range(len(KEYPOINT_NAMES) - 1):
+                cv2.line(frame, _pt(proj[i]), _pt(proj[i + 1]), BIG_COLOR_BGR, 2)
+            for i in range(len(KEYPOINT_NAMES)):
+                cv2.circle(frame, _pt(proj[i]), 5, BIG_COLOR_BGR, 1)
+
+        self._set_scaled(lbl, frame, self._view_max_h())
 
     @staticmethod
     def _draw_hud(frame, fps, dream_hz, pose_bgr):
@@ -1316,16 +1768,27 @@ class Tab1LiveValidation(QWidget):
         cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 3, cv2.LINE_AA)
         cv2.putText(frame, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
 
-    def _display_frame(self, frame_bgr: np.ndarray):
+    def _view_max_h(self):
+        """Hauteur max par vue caméra. Avec ≥1 vue secondaire, on borne chaque
+        vue pour que TOUTES tiennent verticalement en même temps (sinon la 2e
+        passe sous le bord de l'écran — colonne caméra non scrollable)."""
+        return 300 if self.secondary_labels else None
+
+    def _set_scaled(self, lbl, frame_bgr, max_h):
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
         qimg = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
-        # Scale sur la largeur du label et cale sa hauteur pile sur l'image :
-        # ratio 4:3 respecté, aucune bande noire, aucun rognage.
-        pix = QPixmap.fromImage(qimg).scaledToWidth(
-            self.image_label.width(), Qt.SmoothTransformation)
-        self.image_label.setPixmap(pix)
-        self.image_label.setFixedHeight(pix.height())
+        pix = QPixmap.fromImage(qimg)
+        if max_h is not None:
+            # Tient dans (largeur du label, max_h) en gardant le ratio 4:3.
+            pix = pix.scaled(lbl.width(), max_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        else:
+            pix = pix.scaledToWidth(lbl.width(), Qt.SmoothTransformation)
+        lbl.setPixmap(pix)
+        lbl.setFixedHeight(pix.height())
+
+    def _display_frame(self, frame_bgr: np.ndarray):
+        self._set_scaled(self.image_label, frame_bgr, self._view_max_h())
 
 
 class ManualPilotPanel(QWidget):
@@ -1551,10 +2014,19 @@ class KPIPanel(QWidget):
         # jitter on the live curves. Robust 2-pass rejection, pose_reg_weight
         # and consistency mode are all still active in the pipeline — they were
         # removed from the UI once their values were settled, not disabled.
-        self.temporal_filter_checkbox = QCheckBox('Filtrage temporel (Kalman)')
-        self.temporal_filter_checkbox.setChecked(node.use_temporal_filter)
-        self.temporal_filter_checkbox.stateChanged.connect(self._on_temporal_filter_toggle)
-        form_a.addWidget(self.temporal_filter_checkbox)
+        # Filtre temporel des courbes DREAM : choix mutuellement exclusif.
+        # 'Aucun' coché par défaut (aucun filtre imposé).
+        filt_box = QGroupBox('Filtrage temporel des courbes')
+        filt_row = QHBoxLayout(filt_box)
+        self._filter_buttons = {}
+        for mode, label in [('aucun', 'Aucun'), ('kalman', 'Kalman'),
+                            ('passe_bas', 'Passe-bas'), ('moyenne', 'Moyenne gliss.')]:
+            rb = QRadioButton(label)
+            rb.setChecked(node.filter_mode == mode)
+            rb.toggled.connect(lambda checked, m=mode: self._on_filter_mode(m) if checked else None)
+            filt_row.addWidget(rb)
+            self._filter_buttons[mode] = rb
+        form_a.addWidget(filt_box)
 
         # MAE/RMSE ne vivent QUE dans le tableau keypoints (Tab1LiveValidation).
         # Le panneau KPI ne garde que le détail par joint (popup), pas de
@@ -1603,8 +2075,11 @@ class KPIPanel(QWidget):
             f'— Fenêtre {CURVE_WINDOW_S:.0f}s (même échantillons que les graphes) —', window_stats)
         QMessageBox.information(self, 'MAE / RMS par joint (live)', '\n'.join(lines))
 
-    def _on_temporal_filter_toggle(self, state):
-        self.node.use_temporal_filter = bool(state)
+    def _on_filter_mode(self, mode):
+        # Changer de filtre réinitialise l'état des filtres pour éviter un
+        # transitoire (ancien état d'un filtre appliqué au nouveau).
+        self.node.filter_mode = mode
+        self.node.reset_kalman()
 
     @staticmethod
     def _hline():
@@ -1618,8 +2093,17 @@ class KPIPanel(QWidget):
         q_dream = n.estimate_dream_angles()
 
         if q_dream is not None:
-            self.solver_status_label.setText('Solveur angles DREAM : OK')
-            self.solver_status_label.setStyleSheet('')
+            if n.last_fusion_active:
+                self.solver_status_label.setText(
+                    f'Solveur angles DREAM : OK · 🔗 FUSION {n.n_views_fused} vues')
+                self.solver_status_label.setStyleSheet('color:#006098; font-weight:bold;')
+            else:
+                src = n.active_single_source or '?'
+                mode = 'MONO' if len(n.cameras) == 1 else f'MONO via {src}'
+                self.solver_status_label.setText(f'Solveur angles DREAM : OK · {mode}')
+                self.solver_status_label.setStyleSheet(
+                    'color:#a06000; font-weight:bold;'
+                    if src not in (n.primary.name, '?') else '')
         else:
             self.solver_status_label.setText('Solveur angles DREAM : —')
             self.solver_status_label.setStyleSheet('')

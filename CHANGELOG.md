@@ -11,15 +11,53 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **Dashboard DREAM — multi-caméras / fusion (auto-détection)** : le dashboard
+  prend maintenant 1 ou 2 caméras calibrées de façon flexible, sans édition de
+  code. Nouveaux éléments :
+  - `mycobot_gateway/vision/camera_registry.py` — sonde `v4l2-ctl`, identifie
+    arducam/SVPRO, charge et **rescale** leur intrinsèque existante (`cam_3` /
+    `cam_2` 800×600→640×480), fixe l'exposition (arducam 75, SVPRO normale).
+  - **Fusion *solve-then-fuse*** — chaque caméra résout d'abord son propre `q`
+    (mode cohérence par vue), puis on fusionne **par joint**, pondéré par
+    l'observabilité (keypoint observant détecté ET reprojection ≤ 15 px). Le `q`
+    fusionné n'est jamais pire que la meilleure caméra sur chaque joint, et lève
+    l'occlusion (une vue reprend ce que l'autre perd). Remplace le bundle partagé
+    `solve_joint_angles_multiview` (conservé mais inutilisé) qui basculait de
+    branche (J1 −43°). Repli **MONO via {caméra}** si la primaire devient aveugle.
+  - `launch/dream_multicam.launch.py` — launch unique qui auto-détecte les
+    caméras et spawne une branche `camera_publisher + dream_inference` par
+    caméra + `joint_sync` + `bridge_tour` + dashboard.
+  - Dashboard : param `cameras`, badge « 🔗 FUSION N vues » / « MONO via … »,
+    vues empilées **verticalement** (chaque vue secondaire porte le même HUD que
+    la primaire). **Tableau keypoint = fusion** (erreur moyenne des caméras
+    détectant chaque point, `(fusion)`/`(caméra)`/`non détecté`) + ligne
+    **Détection globale (fusion) : N/7 kp** (union des vues).
+  - `camera_publisher` (param `output_topic`) et `dream_inference` (param
+    `output_prefix`) paramétrés pour lancer une instance par caméra.
+  - Astra hors périmètre (pas de nœud V4L2 ni d'intrinsèque PnP).
+  Détails : [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md)
+  § Multi-caméras. ⚠ Fusion 2-cam non encore validée sur matériel réel (SVPRO à
+  brancher) ; chemin mono validé.
+- **Dashboard DREAM — 3 filtres temporels au choix (aucun par défaut)** : groupe
+  de boutons radio `aucun` · `kalman` · `passe_bas` (EMA α=0.3) · `moyenne`
+  (fenêtre glissante 6). Le Kalman n'est **plus** activé d'office. Changer de
+  filtre purge les trois états (`reset_kalman()`). Le sous-dossier CSV suit le
+  filtre actif (`kalman/`, `passe_bas/`, `moyenne/`).
+- **Dashboard DREAM — anti-clignotement** : keypoints secondaires **tenus 0.8 s**
+  après leur dernière détection (`display_keypoints`, affichage seul — le solveur
+  garde les détections réelles) ; pastille de pose verte tant qu'une vue a détecté
+  ≥4 keypoints dans la dernière seconde (`recently_detecting`), corrige la pastille
+  qui jaunissait sans mouvement.
 - **Dashboard DREAM — `reset_kalman()`** : sur `SET Angles` / `SET Coords` /
   `Pose automatique`, les filtres de Kalman sont réinitialisés. Le mouvement
   commandé étant connu comme réel, le portail anti-aberration ne le gèle plus
   (avant : la courbe filtrée restait bloquée sur l'ancien angle, ex. J2 −45°
   rejeté). La prochaine mesure DREAM devient la nouvelle base.
-- **Dashboard DREAM — CSV filtrés séparés** : quand *Filtrage temporel (Kalman)*
-  est coché, les acquisitions vont dans un sous-dossier `…/kalman/` (colonne
-  `dream` = valeur filtrée) ; sans la case, valeur brute dans le dossier parent.
-  Les deux séries restent comparables sans mélange.
+- **Dashboard DREAM — CSV filtrés séparés** : quand un filtre temporel est actif,
+  les acquisitions vont dans un sous-dossier au nom du filtre (`…/kalman/`,
+  `passe_bas/`, `moyenne/` — colonne `dream` = valeur filtrée) ; sans filtre,
+  valeur brute dans le dossier parent. Les deux séries restent comparables sans
+  mélange.
 - [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md) — procédure
   de lancement des 5 nœuds du dashboard de validation DREAM, table de diagnostic
   (quel symptôme → quel nœud manquant), et le piège `.venv` qui casse toute

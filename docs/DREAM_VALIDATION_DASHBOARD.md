@@ -76,6 +76,24 @@ ros2 run mycobot_gateway dream_validation_dashboard
 Côté Pi, `bridge_pi_simple.py` doit tourner. Vérification :
 `ping -c1 10.10.0.221` puis `bash scripts/real_robot_preflight.sh`.
 
+## Alternative — un seul launch (auto-détection 1 ou 2 caméras)
+
+Depuis 2026-07-23, un launch unique remplace les 5 terminaux et **détecte tout
+seul** les caméras branchées (voir § Multi-caméras plus bas) :
+
+```bash
+ros2 launch mycobot_gateway dream_multicam.launch.py
+# forcer une caméra :  ... cameras:=arducam
+# autre checkpoint :   ... model_name:=vgg_ultimate_v4_mix_ft_e30
+```
+
+Il sonde `v4l2-ctl`, spawne une branche `camera_publisher + dream_inference` par
+caméra reconnue (chacune avec **son** intrinsèque et **son** exposition), puis
+`joint_sync`, `bridge_tour` et le dashboard. Toujours `deactivate` le `.venv`
+d'abord (le launch tourne via `/usr/bin/python3`, mais un `.venv` en tête de
+`PATH` casse quand même `python3`). Les 5 nœuds manuels restent valables pour
+déboguer une branche isolément.
+
 ## Diagnostic
 
 | Ce que montre le dashboard | Nœud manquant / cause | Action |
@@ -166,11 +184,12 @@ Case à cocher (panneau manuel). Sortie sous `training/dream/acquisitions/` :
 
 - `manuel/` — nommé d'après le(s) joint(s) changé(s).
 - `auto/` — nommé avec les 6 joints.
-- `…/kalman/` — sous-dossier créé automatiquement quand **Filtrage temporel
-  (Kalman)** est coché au moment de l'écriture. La colonne `dream` y contient la
-  valeur **filtrée** ; sans la case, elle contient la valeur **brute**, dans le
-  dossier parent. Les deux séries restent ainsi comparables sans mélange
-  (rejouer la même pose filtrée/brute → un CSV dans chaque emplacement).
+- `…/<filtre>/` — sous-dossier créé automatiquement (`kalman/`, `passe_bas/` ou
+  `moyenne/`) selon le **filtre temporel** actif au moment de l'écriture. La
+  colonne `dream` y contient la valeur **filtrée** ; sans filtre (`aucun`, défaut),
+  elle contient la valeur **brute**, dans le dossier parent. Les deux séries
+  restent ainsi comparables sans mélange (rejouer la même pose filtrée/brute → un
+  CSV dans chaque emplacement).
 
 Chaque fichier contient les 6 joints :
 `t_s, enc_J1..6, dream_J1..6, err_J1..6`, capturés sur ~4 s (mouvement + pose
@@ -181,20 +200,23 @@ stabilisée), suivis de deux lignes de résumé `MAE` et `RMSE` par joint.
 > balaie et DREAM peine à suivre (erreur gonflée). Pour une vraie mesure de
 > validation, lire l'erreur une fois la pose **stabilisée**.
 
-### Filtrage temporel (Kalman)
-Case à cocher (panneau KPI). Un filtre **1D à vitesse constante** par joint
-(`KalmanAngle1D`, état `[angle, vitesse]`) lisse **les estimations DREAM
-elles-mêmes** — il ne voit **jamais** l'encodeur. Réglages actuels :
+### Filtrage temporel des courbes (3 filtres — aucun par défaut)
+Groupe de **boutons radio** (panneau KPI, cadre « Filtrage temporel des
+courbes ») : `aucun` · `kalman` · `passe_bas` · `moyenne`. **`aucun` est le défaut
+volontaire** — le Kalman n'est **plus** activé d'office. Tous lissent **les
+estimations DREAM elles-mêmes** — jamais l'encodeur. Changer de filtre appelle
+`reset_kalman()` (purge des trois états, pas de transitoire au basculement).
 
-- `q_pos = radians(0.5)²` — bruit de process en position. Bas = plus lisse mais
-  plus de retard ; haut = réactif mais tremble au repos.
-- `_KF_OUTLIER_GATE_SIGMA = 3.0` — rejette une mesure dont l'innovation dépasse
-  3 σ (probable excursion du solveur, pas un vrai mouvement).
+| Filtre | Modèle | Réglage | Comportement |
+|--------|--------|---------|--------------|
+| **kalman** | 1D vitesse constante (`KalmanAngle1D`, état `[angle, vitesse]`) | `q_pos = radians(0.5)²`, portail `_KF_OUTLIER_GATE_SIGMA = 3.0` σ | Très lisse au repos ; **dépasse** sur un saut d'angle (inertie de vitesse) |
+| **passe_bas** | EMA `y = α·x + (1-α)·y_prev` | `_EMA_ALPHA = 0.3` | Sans dépassement, retard constant ; simple et prévisible |
+| **moyenne** | Moyenne glissante des N dernières valeurs | `_MA_WINDOW = 6` | Le plus lisse ; retard = fenêtre/2 ; suit un plateau par palier |
 
-**Effet de bord du modèle à vitesse constante :** sur un changement d'angle
-brusque, le filtre accumule de la vitesse et **dépasse** puis redescend (inertie).
-Sur un vrai mouvement commandé, le portail peut aussi **geler** l'ancienne valeur
-en la prenant pour une aberration.
+**Effet de bord du Kalman (vitesse constante) :** sur un changement d'angle
+brusque, le filtre accumule de la vitesse et **dépasse** puis redescend. Sur un
+vrai mouvement commandé, le portail peut aussi **geler** l'ancienne valeur en la
+prenant pour une aberration → d'où le `reset_kalman()` ci-dessous.
 
 **Correctif — `reset_kalman()`** : quand l'utilisateur commande une pose
 (`SET Angles`, `SET Coords`, `Pose automatique`), les filtres sont **réinitialisés**.
@@ -221,6 +243,82 @@ cohérence (`use_encoder_seed`) :
 > joints dont les keypoints distaux ne sont pas détectés (rien à raffiner). Le
 > vrai levier pour J3-J6 est la **détection distale** (modèle) ou une **2ᵉ
 > caméra**, pas le poids. Voir `CLAUDE.md` § observabilité.
+
+---
+
+## Multi-caméras — fusion (auto-détection), 2026-07-23/24
+
+Le dashboard prend **1 ou 2 caméras** de façon flexible : brancher une 2ᵉ caméra
+calibrée suffit, aucune édition de code. But : lever les ambiguïtés monoculaires
+(branche J2, joints distaux J3-J5) et l'**occlusion** — ce qu'une vue observe mal
+ou pas du tout, l'autre le contraint.
+
+### Caméras reconnues (`vision/camera_registry.py`)
+
+| Caméra | Identité V4L2 | Intrinsèque | Exposition |
+|--------|---------------|-------------|------------|
+| **arducam** | carte contient « arducam » | `training/calibration/cam_3.meta.json` (fx≈496, 640×480) | manuelle **75** |
+| **svpro** | carte contient « svpro » | `cam_2.meta.json` (calibrée 800×600, **rescalée** auto → 640×480) | normale (auto) |
+
+> **Pas de recalibration** : les deux intrinsèques existent déjà. Le registry
+> charge celle de chaque caméra et rescale à la résolution de capture. L'**Astra**
+> est hors périmètre (pas de nœud V4L2, pas d'intrinsèque PnP — voir `CLAUDE.md`
+> 2026-07-13). Topics : arducam garde les noms legacy (`/camera/image_raw`,
+> `/dream/keypoints`) ; SVPRO publie sur `/camera_svpro/image_raw`,
+> `/dream_svpro/keypoints`.
+
+### Ce que fait la fusion — architecture *solve-then-fuse*
+
+- **1 caméra calibrée** → mode MONO, comportement historique inchangé.
+- **≥2 caméras exploitables** (chacune ≥4 keypoints) → mode **FUSION**, en **deux
+  temps** :
+  1. **Résolution séparée par caméra** — chaque vue résout son propre `q` avec le
+     mode cohérence (`_solve_view_consistency`, seed encodeur + `_CONSISTENCY_REG_VEC`,
+     `reproj_px` retournée). Une caméra ne pollue jamais le fit de l'autre.
+  2. **Fusion par joint, pondérée par l'observabilité** — pour chaque joint on ne
+     retient que les caméras dont **le keypoint qui observe ce joint** est détecté
+     ET reprojette sous `JOINT_CONFIDENCE_PX_THRESHOLD = 15 px`, puis on moyenne.
+     Résultat : le `q` fusionné n'est **jamais pire** que la meilleure caméra sur
+     chaque joint, et une occlusion sur une vue est reprise par l'autre.
+- **Repli mono** : si la primaire (arducam) devient aveugle mais qu'une autre vue
+  reste exploitable, l'estimation bascule sur elle (`_solve_single_view`, badge
+  **MONO via svpro**) au lieu de tout afficher « — ».
+
+> *Pourquoi solve-then-fuse et pas un bundle partagé ?* Le bundle (un `q` unique
+> résolu contre toutes les vues, `solve_joint_angles_multiview` — import conservé)
+> **basculait de branche** (J1 = −43°) : une vue à mauvaise branche monoculaire
+> tirait le fit partagé. Résoudre chaque vue d'abord, puis fusionner par joint,
+> supprime ce couplage. MAE retombée à ~1.1-1.9° en fusion.
+
+Le mode cohérence (`use_encoder_seed`) et `_CONSISTENCY_REG_VEC` s'appliquent
+par vue. Les mécanismes mono (WarmStartMonitor, borne de pose, cold-restart) ne
+s'appliquent pas en fusion.
+
+### Affichage multi-vues
+
+- **Vues empilées verticalement** (arducam en haut, SVPRO dessous — en colonne
+  pour ne pas casser la mise en page). Chaque vue secondaire porte le **même HUD**
+  que la primaire (`Caméra : FPS`, `DREAM : Hz`, pastille santé de pose), pas un
+  compteur « DREAM svpro : X/7 ».
+- **Tableau keypoint = fusion** : par keypoint, erreur **moyenne des caméras qui
+  le détectent**, étiquetée `(fusion)` si ≥2, sinon `(nom caméra)`, sinon
+  `non détecté`. Ligne de synthèse **Détection globale (fusion) : N/7 kp · RMS X px
+  [arducam A/7 + svpro B/7]** = union des deux caméras.
+- **Badge KPI** : **🔗 FUSION N vues** ou **MONO via {source}**.
+
+### Anti-clignotement (stabilité visuelle), 2026-07-24
+
+- **Keypoints tenus** : chaque keypoint secondaire reste affiché **0.8 s** après sa
+  dernière détection (`display_keypoints(grace=0.8)`) — si une inférence rate un
+  point, il ne disparaît/réapparaît plus. **Affichage seul** : le solveur/la fusion
+  utilisent toujours les détections **réelles** courantes, la mesure d'angle reste
+  honnête.
+- **Pastille de pose** : verte tant que la vue a détecté ≥4 keypoints dans la
+  dernière **1 s** (`recently_detecting(grace=1.0)` + `prev_rvec` posé), au lieu de
+  virer au jaune dès qu'une frame rate. Corrige la pastille qui jaunissait « alors
+  que rien n'a bougé ».
+
+Voir `docs/DREAM_VALIDATION_LAUNCH.md` pour le graphe des topics multi-branches.
 
 ---
 

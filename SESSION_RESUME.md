@@ -1,6 +1,6 @@
 # SESSION RESUME — MyCobot 320 Pi R6A
 
-> **Date de dernière mise à jour :** 23 avril 2026 (soir — diagnostic DREAM pose estimation + scaffold Claude Code)
+> **Date de dernière mise à jour :** 24 juillet 2026 (soir — fusion multi-caméras solve-then-fuse + filtres temporels + anti-clignotement)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.11.0 (pose-est diagnostic + tooling)
 > **Branche active :** `main`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
@@ -16,6 +16,114 @@ conda deactivate
 
 source /opt/ros/jazzy/setup.bash
 source ~/Osama_ws/install/setup.bash
+```
+
+---
+
+## État actuel (24 juillet 2026 — soir)
+
+### Ce qui a été accompli
+
+**Fusion multi-caméras robuste + stabilité des courbes/affichage.** Suite directe
+du multi-caméras du 23/07, sur retours en session live avec l'arducam + SVPRO.
+
+- **Fusion *solve-then-fuse*** — abandon du bundle partagé (`solve_joint_angles_multiview`,
+  qui basculait de branche : J1 −43°). Désormais chaque caméra résout son `q`
+  séparément (mode cohérence par vue), puis fusion **par joint** pondérée par
+  l'observabilité (keypoint observant détecté + reproj ≤ 15 px). MAE fusion
+  ~1.1-1.9° ; l'occlusion d'une vue est reprise par l'autre. Repli **MONO via {caméra}**
+  si la primaire (arducam) devient aveugle.
+- **Affichage fusion** — vues empilées **verticalement**, HUD identique sur chaque
+  vue secondaire (Caméra FPS / DREAM Hz / pastille pose). **Tableau keypoint =
+  fusion** (erreur moyenne des caméras détectant le point) + **Détection globale
+  (fusion) : N/7 kp** (union arducam + SVPRO).
+- **3 filtres temporels au choix** — boutons radio `aucun`(défaut) / `kalman` /
+  `passe_bas` (EMA) / `moyenne` (glissante). Kalman **plus** activé d'office (retour
+  utilisateur). Sous-dossier CSV = nom du filtre.
+- **Anti-clignotement** — keypoints secondaires tenus 0.8 s après détection
+  (affichage seul, solveur intact) ; pastille pose verte tant qu'une vue a détecté
+  ≥4 kp dans la dernière seconde (fin des faux jaunes « sans avoir bougé »).
+- **Exposition arducam** — balayage 60/70/75/90 mesuré (`scratchpad/exposure_test.py`) :
+  la détection DREAM reste ~4.8-5.0/7 quelle que soit l'expo → **garder 75** (ton
+  d'entraînement session4).
+
+### Décisions prises
+
+- **Pas de commit** (demandé) — docs mises à jour uniquement.
+- **SVPRO « propre »** : aucun réglage d'exposition/luminosité/focus (contrairement
+  à l'arducam=75). Cause de la SVPRO sombre = backend GStreamer + une expo=75
+  manuelle coincée dans le device par un conflit d'index → corrigé (backend V4L2 +
+  `set_auto_exposure()` forcé au démarrage).
+- **Astra toujours exclue** (pas de V4L2/intrinsèque PnP). J6 structurellement
+  inobservable (pas de gripper). Le vrai levier J3-J6 reste le **placement caméra**
+  ou une détection distale, pas les poids solveur.
+
+### Prochaines actions
+
+1. [ROUGE] Valider la fusion 2-cam **sur matériel réel** dans plusieurs poses (bras
+   à plat où l'arducam décroche → la SVPRO doit reprendre).
+2. [JAUNE] Réfléchir au **placement physique** des 2 caméras (recouvrement de FOV)
+   pour lever l'ambiguïté de branche J1/J2 dans les poses dures.
+3. [VERT] Commiter quand l'utilisateur le demande (branche `feature/pose-training`).
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+export PATH="$(echo "$PATH" | tr ':' '\n' | grep -v '\.venv' | paste -sd:)"; unset VIRTUAL_ENV
+source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
+pkill -f dream_validation_dashboard; sleep 1
+ros2 launch mycobot_gateway dream_multicam.launch.py
+```
+
+---
+
+## État actuel (23 juillet 2026 — soir)
+
+### Ce qui a été accompli
+
+**Dashboard DREAM rendu multi-caméras (flexible 1 ou 2 vues, auto-détection).**
+Objectif : améliorer la détection/observabilité en fusionnant plusieurs caméras,
+sans rien casser du mono.
+
+- **`vision/camera_registry.py`** (nouveau) — sonde `v4l2-ctl`, reconnaît
+  arducam/SVPRO, charge et **rescale** leur intrinsèque déjà calibrée
+  (arducam=`cam_3`, SVPRO=`cam_2` 800×600→640×480), exposition par caméra
+  (arducam 75, SVPRO normale). Testé : détecte l'arducam (fx=496).
+- **`dream_angle_solver.solve_joint_angles_multiview`** (nouveau) — `q` partagé +
+  une pose caméra par vue, résidu combiné. Testé synthétique : fusion 2 vues
+  MAE 2.30° vs mono 2.58°.
+- **`launch/dream_multicam.launch.py`** (nouveau) — un seul launch qui
+  auto-détecte et spawne N branches parallèles + nœuds partagés + dashboard.
+  `ros2 launch ... --show-args` OK.
+- **Dashboard** — param `cameras`, branche fusion dans `estimate_dream_angles`
+  (`_fuse_multiview`), vignettes par caméra secondaire, badge « 🔗 FUSION N vues ».
+  Mono par défaut = comportement historique inchangé.
+- **`camera_publisher`/`dream_inference`** paramétrés par caméra (`output_topic`
+  / `output_prefix`). Build colcon OK dans `~/Osama_ws`.
+
+### Décisions prises
+
+- **Astra exclue** de la fusion : pas de nœud V4L2 ni d'intrinsèque PnP (cf.
+  CLAUDE.md 2026-07-13). Fusion = arducam + SVPRO, les deux calibrées.
+- **Pas de recalibration** : les intrinsèques `cam_2`/`cam_3` existent déjà ; le
+  registry les charge/rescale automatiquement.
+- **Rétrocompatibilité stricte** : topics arducam legacy conservés
+  (`/camera/image_raw`, `/dream/keypoints`), SVPRO sur topics namespacés.
+
+### Prochaines actions
+
+1. [ROUGE] **Valider la fusion 2-cam sur matériel** : brancher la SVPRO, relancer
+   `dream_multicam.launch.py`, vérifier mode FUSION + gain MAE réel. Non testé.
+2. [JAUNE] Retirer le `.venv` du PATH avant lancement (`deactivate` inopérant ici).
+3. [VERT] Après validation → commit (docs déjà à jour) sur `feature/pick-and-place-osama`.
+
+### Commande rapide de reprise
+
+```bash
+# PATH sans .venv, puis :
+source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
+ros2 launch mycobot_gateway dream_multicam.launch.py
 ```
 
 ---
