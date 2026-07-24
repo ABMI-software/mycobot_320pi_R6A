@@ -94,10 +94,54 @@ python training/dream/evaluate_dream.py \
 | VGG synth-only (50K, ancien) | 50K synth | 98.3% det, 3.15px | 13.2% det, 172px |
 | vgg_ultimate_v2_e50 | 20K synth | 97.7% det | ~26% det |
 | **vgg_ultimate_v4_e50** | 50K synth (intrinsèques corrigées) | **99.4% det, 2.61px** | ≈27% det |
-| vgg_ultimate_v4_mix_ft (en cours) | mix synth 50K + real 3cam ×5 | en cours | en cours |
+| **vgg_ultimate_v4_mix_ft_e30** | mix **80K** (synth 50K + real 3cam ×5) | ≈99% det | **91.6% det** |
 
 Détails : [`dream/VGG_ULTIMATE_V4_50K.md`](dream/VGG_ULTIMATE_V4_50K.md),
-[`dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](dream/FINETUNE_MIX_REAL3CAM_PLAN.md).
+[`dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](dream/FINETUNE_MIX_REAL3CAM_PLAN.md),
+holdout réel : [`dream/REAL3CAM_SESSION6_HOLDOUT.md`](dream/REAL3CAM_SESSION6_HOLDOUT.md).
+
+### Quel script pour quel run ? (50K synth → 80K mixte)
+
+| Étape | Script | Données | Départ | Sortie |
+|-------|--------|---------|--------|--------|
+| **1. Base synthétique (99.4%)** | [`dream/train_dream_ultimate_v4.py`](dream/train_dream_ultimate_v4.py) | `dream_data/synthetic_50k_ndds` (**50K**, split 40K/10K) | **from scratch** | `vgg_ultimate_v4_e50` |
+| **2. Fine-tune mixte (91.6% réel)** | [`dream/train_dream_ultimate_v4_mix.py`](dream/train_dream_ultimate_v4_mix.py) | `dream_data/mix_synth50k_real3camx5_ndds` (**80K** = 50K synth + real_3cam ×5 suréchantillonné, split 64K/8K/8K) | `--pretrained …/vgg_ultimate_v4_e50/best_network.pth` | **`vgg_ultimate_v4_mix_ft_e30`** |
+
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+cd training/dream
+
+# 1 — base synthétique 50K (99.4% synth)
+python train_dream_ultimate_v4.py \
+  --data dream_data/synthetic_50k_ndds \
+  --output output/checkpoints_dream/vgg_ultimate_v4_e50 \
+  --epochs 50 --batch-size 8 --workers 8 --patience 5
+
+# 2 — fine-tune datamixte 80K (91.6% réel) — départ = base ci-dessus
+python train_dream_ultimate_v4_mix.py \
+  --data dream_data/mix_synth50k_real3camx5_ndds \
+  --pretrained output/checkpoints_dream/vgg_ultimate_v4_e50/best_network.pth \
+  --output output/checkpoints_dream/vgg_ultimate_v4_mix_ft_e30 \
+  --epochs 30 --batch-size 8 --workers 8
+```
+
+> Le « **80K** » = le dataset **mixte** (data-mixte) : 50K synthétiques + les
+> captures real_3cam ×5 pour équilibrer réel/synthétique. Le fine-tune part de la
+> base 50K (pas from-scratch) pour ne pas perdre l'acquis synthétique (99.4%).
+
+### Contenu d'un checkpoint (`checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/`)
+
+| Fichier | Rôle |
+|---------|------|
+| `best_network.pth` (~88 Mo) | poids du meilleur epoch (chargé par `dream_inference`) |
+| `best_network.yaml` | config : `data_path`, archi VGG, hyperparams, **loss** val (~0.00094 MSE), `pretrained` |
+| `epoch_10/20/30.pth`+`.yaml` | snapshots intermédiaires |
+| `learning_curve_final.png` | courbe train / val / test |
+| `training_log.pkl` | historique par epoch (losses, per-kp val, LR, split 64K/8K/8K, seed) |
+
+⚠️ Le checkpoint stocke la **loss** (MSE), **pas** le « 91.6% » : ce taux de
+détection vient de l'**évaluation** a posteriori (`evaluate_dream.py` sur le
+holdout réel), voir [`dream/REAL3CAM_SESSION6_HOLDOUT.md`](dream/REAL3CAM_SESSION6_HOLDOUT.md).
 
 ### Résultats Grid Search — Weighted Loss (20K synthetic)
 
