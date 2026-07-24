@@ -267,6 +267,11 @@ ou pas du tout, l'autre le contraint.
 > `/dream/keypoints`) ; SVPRO publie sur `/camera_svpro/image_raw`,
 > `/dream_svpro/keypoints`.
 
+Graphe ROS2 live (2 caméras, mode FUSION), une branche
+`camera_publisher → image → dream_inference → keypoints` par caméra convergeant
+vers le dashboard :
+![Graphe ROS2 multi-caméras](../training/dream/rqt_dream_multicam.png)
+
 ### Ce que fait la fusion — architecture *solve-then-fuse*
 
 - **1 caméra calibrée** → mode MONO, comportement historique inchangé.

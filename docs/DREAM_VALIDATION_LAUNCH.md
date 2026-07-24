@@ -87,6 +87,9 @@ joint_sync ─ /joint_states                                                    
 bridge_tour ↔ TCP 5005 ↔ Pi ─ /from_robot, /to_robot                                                 ┘
 ```
 
+Rendu `rqt_graph` du graphe live (2 caméras, mode FUSION) :
+[`training/dream/rqt_dream_multicam.png`](../training/dream/rqt_dream_multicam.png).
+
 Chaque `camera_publisher` prend son topic via le param `output_topic` ; chaque
 `dream_inference` publie sous le préfixe `output_prefix` (`/dream` vs
 `/dream_svpro`). Inspecter en direct : `rqt_graph`, `ros2 node list`,
