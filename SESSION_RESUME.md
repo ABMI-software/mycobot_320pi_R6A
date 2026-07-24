@@ -22,17 +22,19 @@ source ~/Osama_ws/install/setup.bash
 
 ## État actuel (24 juillet 2026 — soir)
 
-### Ce qui a été accompli
+### Ce qui a changé par rapport au 23/07
 
-**Fusion multi-caméras robuste + stabilité des courbes/affichage.** Suite directe
-du multi-caméras du 23/07, sur retours en session live avec l'arducam + SVPRO.
+> Le **build initial** multi-caméras (registry, launch, branches parallèles) est
+> décrit dans l'entrée du **23/07 (soir)** plus bas — non répété ici. Cette entrée
+> ne liste que les **évolutions** apportées le 24/07 en session live (arducam + SVPRO).
 
-- **Fusion *solve-then-fuse*** — abandon du bundle partagé (`solve_joint_angles_multiview`,
+- **Fusion *solve-then-fuse*** (remplace le bundle partagé du 23/07) — abandon de
+  `solve_joint_angles_multiview` (`q` partagé, qui basculait de branche : J1 −43°).
   qui basculait de branche : J1 −43°). Désormais chaque caméra résout son `q`
-  séparément (mode cohérence par vue), puis fusion **par joint** pondérée par
-  l'observabilité (keypoint observant détecté + reproj ≤ 15 px). MAE fusion
-  ~1.1-1.9° ; l'occlusion d'une vue est reprise par l'autre. Repli **MONO via {caméra}**
-  si la primaire (arducam) devient aveugle.
+  Désormais chaque caméra résout son `q` séparément (mode cohérence par vue), puis
+  fusion **par joint** pondérée par l'observabilité (keypoint observant détecté +
+  reproj ≤ 15 px). MAE fusion ~1.1-1.9° ; l'occlusion d'une vue est reprise par
+  l'autre. Repli **MONO via {caméra}** si la primaire (arducam) devient aveugle.
 - **Affichage fusion** — vues empilées **verticalement**, HUD identique sur chaque
   vue secondaire (Caméra FPS / DREAM Hz / pastille pose). **Tableau keypoint =
   fusion** (erreur moyenne des caméras détectant le point) + **Détection globale
@@ -49,7 +51,8 @@ du multi-caméras du 23/07, sur retours en session live avec l'arducam + SVPRO.
 
 ### Décisions prises
 
-- **Pas de commit** (demandé) — docs mises à jour uniquement.
+- **Commité + poussé** sur `feature/pick-and-place-osama` (`a955a561` → `7d70aa98`) :
+  code (dashboard multicam, solve-then-fuse, 3 filtres) + docs + graphe ROS2 PNG.
 - **SVPRO « propre »** : aucun réglage d'exposition/luminosité/focus (contrairement
   à l'arducam=75). Cause de la SVPRO sombre = backend GStreamer + une expo=75
   manuelle coincée dans le device par un conflit d'index → corrigé (backend V4L2 +
@@ -64,7 +67,8 @@ du multi-caméras du 23/07, sur retours en session live avec l'arducam + SVPRO.
    à plat où l'arducam décroche → la SVPRO doit reprendre).
 2. [JAUNE] Réfléchir au **placement physique** des 2 caméras (recouvrement de FOV)
    pour lever l'ambiguïté de branche J1/J2 dans les poses dures.
-3. [VERT] Commiter quand l'utilisateur le demande (branche `feature/pose-training`).
+3. [VERT] Éventuel merge de `feature/pick-and-place-osama` (ou report du travail
+   DREAM vers `feature/pose-training` selon la discipline de branches).
 
 ### Commande rapide de reprise
 
@@ -118,20 +122,11 @@ sans rien casser du mono.
 - **Rétrocompatibilité stricte** : topics arducam legacy conservés
   (`/camera/image_raw`, `/dream/keypoints`), SVPRO sur topics namespacés.
 
-### Prochaines actions
-
-1. [ROUGE] **Valider la fusion 2-cam sur matériel** : brancher la SVPRO, relancer
-   `dream_multicam.launch.py`, vérifier mode FUSION + gain MAE réel. Non testé.
-2. [JAUNE] Retirer le `.venv` du PATH avant lancement (`deactivate` inopérant ici).
-3. [VERT] Après validation → commit (docs déjà à jour) sur `feature/pick-and-place-osama`.
-
-### Commande rapide de reprise
-
-```bash
-# PATH sans .venv, puis :
-source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
-ros2 launch mycobot_gateway dream_multicam.launch.py
-```
+> **Suite → voir l'entrée du 24/07 (soir)** en tête de fichier : le bundle partagé
+> `solve_joint_angles_multiview` construit ici a été remplacé par la fusion
+> *solve-then-fuse*, les 3 filtres et l'anti-clignotement ont été ajoutés, et le
+> tout a été commité + poussé. Prochaines actions et commande de reprise à jour
+> là-bas.
 
 ---
 
