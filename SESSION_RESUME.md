@@ -73,8 +73,15 @@ conda deactivate
 export PATH="$(echo "$PATH" | tr ':' '\n' | grep -v '\.venv' | paste -sd:)"; unset VIRTUAL_ENV
 source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
 pkill -f dream_validation_dashboard; sleep 1
-ros2 launch mycobot_gateway dream_multicam.launch.py
+ros2 launch mycobot_gateway dream_multicam.launch.py   # auto-détecte 1 ou 2 caméras
 ```
+
+**Ce que ça affiche** : 2 vues empilées (arducam + svpro) avec HUD FPS/DREAM Hz,
+6 courbes encodeur vs DREAM, tableau keypoint **fusionné** + « Détection globale
+(fusion) N/7 kp », badge « 🔗 FUSION N vues » (ou « MONO via {caméra} »). Graphe
+ROS2 : [`training/dream/rqt_dream_multicam.png`](training/dream/rqt_dream_multicam.png).
+**Diagnostic** (symptôme → nœud manquant, piège `.venv`) :
+[`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md).
 
 ---
 
