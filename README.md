@@ -298,33 +298,44 @@ L'écart sim-to-real est fermé (27% → 91.6%). Direction actuelle (voir `CHANG
 3. **🟢 Visual servoing** — une fois la courbe d'écart par joint validée, boucler la pose DREAM dans le contrôle pour le pick-and-place.
 4. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — substitution de Gazebo par Isaac Sim + Isaac Lab pour rendu photoréaliste, piste de fond pour la suite du POC.
 
-### Validation live — dashboard DREAM (`dream_validation_dashboard.py`) — état 2026-07-23
+### Validation live — dashboard DREAM (`dream_validation_dashboard.py`) — état 2026-07-24
 
 Outil PyQt qui superpose **en temps réel** la pose estimée par DREAM (caméra seule)
 aux **angles réels des encodeurs**, avec compteur MAE/RMSE par joint et 6 courbes
 encodeur vs DREAM. C'est l'outil qui mesure l'écart angulaire de la piste #1
-ci-dessus.
+ci-dessus. Il est désormais **multi-caméras** (auto-détection Arducam + SVPRO) :
 
 ```bash
 conda deactivate && source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
-ros2 run mycobot_gateway dream_validation_dashboard   # + 4 nœuds (voir doc lancement)
+# launch unique multi-caméras (auto-détecte 1 ou 2 caméras) :
+ros2 launch mycobot_gateway dream_multicam.launch.py
+# ou le nœud seul (+ 4 nœuds, voir doc lancement) :
+ros2 run mycobot_gateway dream_validation_dashboard
 ```
+
+Avec 2 caméras calibrées, le dashboard passe en **fusion *solve-then-fuse*** :
+chaque caméra résout son propre `q`, puis fusion **par joint** pondérée par
+l'observabilité (ce qu'une vue perd, l'autre le reprend). Topologie ROS2 :
+
+![Graphe ROS2 multi-caméras — fusion Arducam + SVPRO](training/dream/rqt_dream_multicam.png)
 
 Points clés à comprendre en lisant les courbes :
 
-- **Filtrage temporel (Kalman)** — case à cocher. Un filtre 1D à vitesse constante
-  par joint lisse les estimations DREAM (jamais l'encodeur). Il est **réinitialisé**
-  quand on commande une pose (`SET Angles`/`SET Coords`/auto) pour suivre le vrai
-  mouvement sans le geler. Modèle à vitesse constante → léger dépassement sur les
-  changements brusques (réglé par `q_pos`).
+- **Filtrage temporel — 3 filtres au choix** (boutons radio ; **`aucun` par défaut,
+  Kalman n'est plus activé d'office**) : `kalman` (vitesse constante), `passe_bas`
+  (EMA) et `moyenne` (fenêtre glissante). Tous lissent les estimations DREAM (jamais
+  l'encodeur) et sont **réinitialisés** quand on commande une pose. ⚠ Un filtre ne
+  coupe que le tremblement rapide ; la dérive lente des joints faiblement observables
+  (J3-J5) n'est pas filtrable.
 - **Mode cohérence + poids solveur** (`_CONSISTENCY_REG_VEC`) — le solveur est
   amorcé sur la branche encodeur (l'image monoculaire ne peut pas lever
   l'ambiguïté de branche seule) ; les poids épinglent les joints distaux et J2.
   ⚠ Là où un keypoint distal n'est **pas détecté**, l'angle **recopie l'encodeur**
   (erreur ≈ 0) — ce n'est **pas** une mesure caméra. Les vraies mesures sont sur
   J1-J2 (bien observés) ; J5/J6 sont faiblement/non observables.
-- **Acquisition CSV** — sauvegarde les 6 joints (enc/dream/err) ; sous-dossier
-  `kalman/` quand le filtre est actif (série filtrée vs brute séparées).
+- **Acquisition CSV** — sauvegarde les 6 joints (enc/dream/err) ; sous-dossier au
+  nom du filtre actif (`kalman/`, `passe_bas/`, `moyenne/`) — série filtrée vs brute
+  séparées.
 
 Doc complète : [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md)
 · lancement des 5 nœuds : [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md).
