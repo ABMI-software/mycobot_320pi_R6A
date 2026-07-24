@@ -88,6 +88,26 @@ If revisited later: the approach (single-frame non-persisted anchor per camera, 
 
 ---
 
+## Multi-camera validation dashboard (Arducam + SVPRO) — 2026-07-24
+
+The validation dashboard is now **multi-camera aware and auto-detecting** (1 or 2 calibrated V4L2 cameras, no code edit — plug the 2nd camera and relaunch). Launch: **`ros2 launch mycobot_gateway dream_multicam.launch.py`** (auto-detects; `cameras:=arducam` forces mono). Astra stays out (no V4L2 node / no PnP intrinsic, see above).
+
+**ROS graph** — one parallel branch per detected camera, plus shared nodes. `mycobot_gateway/vision/camera_registry.py` probes `v4l2-ctl`, identifies each camera and loads/rescales its existing intrinsic (arducam=`cam_3` expo 75, SVPRO=`cam_2` 800×600→640×480, normal expo):
+
+```
+camera_publisher_arducam → /camera/image_raw       → dream_inference_arducam → /dream/keypoints       ┐
+camera_publisher_svpro   → /camera_svpro/image_raw  → dream_inference_svpro   → /dream_svpro/keypoints  ├→ dream_validation_dashboard
+joint_sync (/joint_states)  ·  bridge_tour (↔ Pi TCP 5005)                                              ┘
+```
+
+`camera_publisher` param `output_topic`, `dream_inference` param `output_prefix` — one instance per camera. Inspect live with `rqt_graph` / `ros2 topic list` (both `/dream/*` and `/dream_svpro/*` present in fusion). Full node/topic table + diagnostics: [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md).
+
+**Fusion = solve-then-fuse** (NOT a shared bundle — that branch-flipped, J1 −43°): each camera solves its own `q` (per-view consistency mode), then per-joint fusion weighted by observability (observing keypoint detected AND reproj ≤ `JOINT_CONFIDENCE_PX_THRESHOLD=15px`). Never worse than the best camera per joint; occlusion on one view is covered by the other; falls back to **MONO via {camera}** if the primary goes blind. Measured fusion MAE(J1-J5) ~1.1-1.9°. Keypoint table + "Détection globale (fusion) N/7" reflect the **union** of cameras. ⚠ Not yet validated across many poses on hardware.
+
+**Curve stability = 3 selectable temporal filters** (radio group, **`aucun` is the default — Kalman is NOT on by default**): `kalman` (constant-velocity 1D), `passe_bas` (EMA `_EMA_ALPHA=0.06`), `moyenne` (moving average `_MA_WINDOW=20`). All filter the DREAM estimate only, never the encoder; switching purges all states (`reset_kalman()`); CSV goes to a `…/<filter>/` subfolder. A filter only removes fast tremor — the residual **slow wander** on weakly-observable joints (J3/J4/J5) is the estimate genuinely drifting and is not filterable; the real lever stays camera placement / distal detection. Exposure (arducam 60 vs 75) was re-tested and **does not change detection** (stays ~4-5/7) — keep 75. Anti-flicker: secondary keypoints are display-held 0.8 s; the pose dot stays green while a view detected ≥4 kp within the last 1 s.
+
+---
+
 ## Three Python environments — never mix them
 
 This is the single most common source of breakage. **Always know which env you are in.**

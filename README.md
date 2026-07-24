@@ -5,7 +5,7 @@
 Ce projet intègre :
 - Un **bridge ROS2 TCP** pour contrôler un MyCobot 320 Pi depuis un PC distant
 - Une **simulation Gazebo Harmonic** avec gripper adaptatif, 4 caméras et domain randomization
-- Un **pipeline ML DREAM** : keypoint detection (VGG-19) → belief maps → PnP → pose 3D
+- Un **pipeline ML DREAM** : keypoint detection (VGG-19) → belief maps → PnP → pose 3D, avec un **dashboard de validation multi-caméras** (Arducam + SVPRO, auto-détection 1 ou 2 vues, fusion *solve-then-fuse* par joint) — `ros2 launch mycobot_gateway dream_multicam.launch.py`. Voir [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md) et [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md)
 - Une **téléopération par la main** (Wilor + Orbbec Astra) avec dashboard de tuning et rapport Excel — adapté du pipeline R5A / LeRobot. **Pipeline validé sur robot physique le 22/04/2026**
 - Des **datasets** synthétiques (Gazebo, 50K frames) et réels (caméras Pi, 4K images) via Git LFS
 

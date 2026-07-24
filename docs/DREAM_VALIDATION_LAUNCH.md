@@ -64,6 +64,44 @@ ros2 run mycobot_gateway dream_validation_dashboard
 Côté Pi, `bridge_pi_simple.py` doit tourner. Vérification :
 `ping -c1 10.10.0.221` puis `bash scripts/real_robot_preflight.sh`.
 
+## Raccourci — launch unique multi-caméras (2026-07-23/24)
+
+Un seul launch remplace les 5 terminaux et **auto-détecte 1 ou 2 caméras** :
+
+```bash
+ros2 launch mycobot_gateway dream_multicam.launch.py
+ros2 launch mycobot_gateway dream_multicam.launch.py cameras:=arducam   # forcer mono
+```
+
+Il sonde `v4l2-ctl` (`vision/camera_registry.py`), spawne une branche
+`camera_publisher + dream_inference` par caméra reconnue, chacune avec son
+intrinsèque (`cam_3`/`cam_2`) et son exposition (arducam 75, SVPRO normale), puis
+les nœuds partagés `joint_sync`, `bridge_tour` et le dashboard (param `cameras`).
+
+### Graphe des nœuds / topics (2 caméras)
+
+```
+camera_publisher_arducam ─ /camera/image_raw ─────→ dream_inference_arducam ─ /dream/keypoints ──────┐
+camera_publisher_svpro   ─ /camera_svpro/image_raw → dream_inference_svpro   ─ /dream_svpro/keypoints ┤
+joint_sync ─ /joint_states                                                                           ├→ dream_validation_dashboard
+bridge_tour ↔ TCP 5005 ↔ Pi ─ /from_robot, /to_robot                                                 ┘
+```
+
+Chaque `camera_publisher` prend son topic via le param `output_topic` ; chaque
+`dream_inference` publie sous le préfixe `output_prefix` (`/dream` vs
+`/dream_svpro`). Inspecter en direct : `rqt_graph`, `ros2 node list`,
+`ros2 topic list` (en fusion : `/dream/*` **et** `/dream_svpro/*` présents),
+`ros2 topic hz /dream_svpro/keypoints`.
+
+- **≥2 caméras calibrées** → le dashboard passe en **fusion *solve-then-fuse***
+  (chaque caméra résout son propre `q`, puis fusion **par joint** pondérée par
+  l'observabilité — **pas** un `q` partagé, qui basculait de branche). Badge
+  « 🔗 FUSION N vues » ; repli « MONO via {caméra} » si la primaire aveugle.
+- **1 caméra** → mode mono (comportement historique).
+
+`deactivate` le `.venv` d'abord malgré tout. Détail :
+[`DREAM_VALIDATION_DASHBOARD.md` § Multi-caméras](DREAM_VALIDATION_DASHBOARD.md).
+
 ## Diagnostic
 
 | Ce que montre le dashboard | Nœud manquant / cause | Action |
