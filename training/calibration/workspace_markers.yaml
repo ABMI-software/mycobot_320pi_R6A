@@ -1,0 +1,20 @@
+# Positions mesurées des marqueurs sol (repère monde = repère base robot).
+# Repère : X=avant, Y=gauche (REP-103), Z=haut. Origine = centre base robot,
+# Z=0 = table. Unités : mètres. Mesurées au règlet ±5 mm (banc 9 juillet 2026).
+#
+# Disposition réelle (arducam vue de dessus, avant = haut de l'image) :
+#   25 = loin-gauche    26 = loin-droite
+#   19 = proche-gauche  23 = proche-droite
+#
+# NB : X=0.52 pour les marqueurs loin est à re-vérifier (table = 0.52 m de long) ;
+#      l'overlay FK après calibration confirmera/corrigera. marker_size = 50 mm.
+#
+# Utilisé par : calibrate_arducam_markers.py. Chaque entrée = centre du marqueur.
+frame_id: base_link
+marker_size_m: 0.080
+markers:
+  # Mesurés au mètre (centre marqueur ↔ centre base), 29/07/2026. ±5 mm.
+  19: [0.14,  0.205, 0.0]   # proche-gauche
+  23: [0.14, -0.18,  0.0]   # proche-droite
+  25: [0.49,  0.205, 0.0]   # loin-gauche
+  26: [0.48, -0.18,  0.0]   # loin-droite

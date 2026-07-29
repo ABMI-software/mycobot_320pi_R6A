@@ -239,6 +239,11 @@ _L_FORE      = 120.5
 _L_FORE_Z    = 82.0
 _L_WRIST     = 84.0
 _L_EE        = 66.35
+# Gripper mounted on the flange: its fingers extend ~110 mm BELOW link6. The
+# safety FK below must include it, else poses judged "safe" drive the gripper
+# tip into the table (link6 clears 60 mm but the fingers are 110 mm lower).
+# Set to 0.0 when running WITHOUT a gripper.
+_L_GRIPPER   = 110.0
 _TABLE_Z_MIN = 60.0
 _BASE_R_MIN  = 90.0
 
@@ -251,7 +256,7 @@ def _fk_key_points(j2, j3, j4):
     r_elbow = _L_UPPER * math.sin(a2)
     z_wrist = z_elbow + _L_FORE * math.cos(a3) - _L_FORE_Z * math.sin(a3)
     r_wrist = r_elbow + _L_FORE * math.sin(a3) + _L_FORE_Z * math.cos(a3)
-    l_ee    = _L_WRIST + _L_EE
+    l_ee    = _L_WRIST + _L_EE + _L_GRIPPER
     z_ee    = z_wrist + l_ee * math.cos(a4)
     r_ee    = r_wrist + l_ee * math.sin(a4)
     return [(z_elbow, abs(r_elbow)), (z_wrist, abs(r_wrist)), (z_ee, abs(r_ee))]
