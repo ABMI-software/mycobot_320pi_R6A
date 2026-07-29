@@ -20,6 +20,54 @@ source ~/Osama_ws/install/setup.bash
 
 ---
 
+## État actuel (29 juillet 2026 — après-midi — pick-and-place vision-guidé)
+
+### Ce qui a été accompli aujourd'hui
+- **Démonstrateur pick-and-place vision-guidé** assemblé end-to-end (DREAM 7-kp +
+  détection couleur), mode **autonome** sans dashboard : détection → localisation
+  → contrôle robot.
+  - `scripts/pick_and_place_vision.py` — moitié CONTRÔLE (approche top-down →
+    descente → serrage → vérif statut pince → dépose). `--keep-ori` / `--approach-ori`.
+  - `scripts/pick_and_place_vision_live.py` — glue perception+contrôle : détecteur
+    `color`/`yolo`, `--camera-source {rosbridge,v4l2}`, `--robot-via {rosbridge,socket}`.
+  - `mycobot_gateway/mycobot_gateway/vision/multiview_localizer.py` — géométrie
+    markerless : extrinsèque DREAM live, `pixel_ray`, `triangulate` (2 vues), repli
+    plan-table mono.
+- **Extrinsèque ArUco table (levier 1 de précision)** — 4 marqueurs 80 mm sur la
+  table à positions mesurées → `calibrate_arducam_markers.py`, **RMS 0.71 px**.
+  Localisation balle au cm près (vs erreur ~1 m de l'extrapolation DREAM).
+  - `training/calibration/workspace_markers.yaml`, `arducam_extrinsic_markers.yaml`,
+    `training/calibration/calibrate_arducam_markers.py`, `aruco_markers_workspace.pdf`.
+- **Bridge** : action `set_color` (LED Atom) ajoutée à `scripts/gripper_bridge.py`.
+- **Dataset gripper 8-kp (scaffolding)** — `convert_to_ndds_gripper.py`
+  (`--gripper-absent`), `capture_real_3cam.py` (longueur gripper 110 mm dans le
+  garde-au-sol).
+
+### Décisions prises
+- **Orientation de prise = `[-91.3, 10.2, -148.9]`** (convention Euler MyCobot,
+  PAS `[180,0,0]` qui fait no-op l'IK). Lue via `get_coords` à la pose apprise `pick`.
+- **send_coords plafonné à ±350 mm** par le firmware → la balle doit être dans la
+  zone atteignable (moitié proche de la table, marqueurs 19/23).
+- **SVPRO pointée au mauvais endroit** (regarde la pièce, pas la table) →
+  triangulation 2-vues indisponible tant qu'elle n'est pas réorientée. Mono arducam
+  pour l'instant.
+
+### Prochaines actions
+1. [ROUGE] Réussir le 1er pick réel : balle en zone atteignable (X 150-300),
+   scène figée entre preview et pick, `--keep-ori`/`--approach-ori`.
+2. [JAUNE] Réorienter la SVPRO vers la table → triangulation → lève la limite de portée.
+3. [VERT] Reprendre la capture dataset gripper (248/500) puis entraîner DREAM 8-kp.
+
+### Commande rapide de reprise
+```bash
+.venv/bin/python scripts/pick_and_place_vision_live.py \
+    --pi-host 10.10.0.221 --detector color --cameras arducam --table-z 0 \
+    --camera-source v4l2 --robot-via socket \
+    --approach-ori -91.3 10.2 -148.9 --hsv-lo 22 70 70 --hsv-hi 45 255 255
+```
+
+---
+
 ## État actuel (24 juillet 2026 — soir)
 
 ### Ce qui a changé par rapport au 23/07

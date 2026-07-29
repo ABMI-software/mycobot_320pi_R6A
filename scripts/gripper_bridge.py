@@ -257,6 +257,13 @@ class BridgePiSimple:
                 return f"PRO_GRIPPER_REG[{addr}]: {v}"
             # ===================================================================
 
+            elif action == 'set_color':
+                r = int(cmd.get('r', 0))
+                g = int(cmd.get('g', 255))
+                b = int(cmd.get('b', 0))
+                self.mc.set_color(r, g, b)
+                return f"OK: LED ({r},{g},{b})"
+
             elif action == 'power_on':
                 self.mc.power_on()
                 return "OK: moteurs allumés"

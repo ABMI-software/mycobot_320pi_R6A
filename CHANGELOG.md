@@ -11,6 +11,24 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **Pick-and-place vision-guidé (démonstrateur autonome)** — localise un objet par
+  caméra puis l'exécute en cartésien sur le vrai robot, sans dashboard :
+  - `scripts/pick_and_place_vision.py` (contrôle : approche top-down → descente →
+    serrage → vérif statut → dépose ; `--keep-ori`, `--approach-ori`).
+  - `scripts/pick_and_place_vision_live.py` (perception+glue : détecteur `color`/`yolo`,
+    `--camera-source {rosbridge,v4l2}`, `--robot-via {rosbridge,socket}`).
+  - `mycobot_gateway/vision/multiview_localizer.py` — extrinsèque DREAM live,
+    `pixel_ray`, `triangulate` (2 vues), repli plan-table mono.
+  - Orientation de prise MyCobot `[-91.3, 10.2, -148.9]` (pas `[180,0,0]`) ;
+    `send_coords` plafonné à ±350 mm côté firmware.
+- **Extrinsèque ArUco table** — 4 marqueurs 80 mm à positions mesurées,
+  `training/calibration/calibrate_arducam_markers.py` (RMS 0.71 px), localisation au cm.
+  Fichiers : `workspace_markers.yaml`, `arducam_extrinsic_markers.yaml`,
+  `aruco_markers_workspace.pdf`.
+- **Bridge** — action `set_color` (LED Atom) dans `scripts/gripper_bridge.py`.
+- **Dataset gripper 8-kp (scaffolding)** — `training/dream/convert_to_ndds_gripper.py`
+  (`--gripper-absent`), `training/capture_real_3cam.py` (gripper 110 mm au garde-au-sol).
+
 - **Dashboard DREAM — multi-caméras / fusion (auto-détection)** : le dashboard
   prend maintenant 1 ou 2 caméras calibrées de façon flexible, sans édition de
   code. Nouveaux éléments :
