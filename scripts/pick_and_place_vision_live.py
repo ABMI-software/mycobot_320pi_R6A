@@ -18,6 +18,7 @@ Prérequis EN PARALLÈLE :
   - bridge Pi (send_coords / pince)
 """
 import argparse
+import subprocess
 import base64
 import sys
 import time
@@ -46,11 +47,11 @@ import pick_and_place_vision as ctrl                                   # noqa: E
 # 1-frame. None = pas d'extrinsèque figée (svpro) -> live obligatoire.
 _CAL = _REPO / 'training' / 'calibration'
 CAMERAS = {
-    'arducam': {'kp_topic': '/dream/keypoints',       'img_topic': '/camera/image_raw', 'device': 0,
-                'calib': 'cam_3',
+    'arducam': {'kp_topic': '/dream/keypoints',       'img_topic': '/camera/image_raw', 'device': 2,
+                'calib': 'cam_0',
                 'extrinsic': str(_CAL / 'arducam_extrinsic_dream_v4.yaml'),   # DREAM self-cal
                 'extrinsic_markers': str(_CAL / 'arducam_extrinsic_markers.yaml')},  # ArUco table (précis)
-    'svpro':   {'kp_topic': '/dream_svpro/keypoints', 'img_topic': '/camera_svpro/image_raw', 'device': 2,
+    'svpro':   {'kp_topic': '/dream_svpro/keypoints', 'img_topic': '/camera_svpro/image_raw', 'device': 3,
                 'calib': 'cam_2', 'extrinsic': None, 'extrinsic_markers': None},
 }
 N_KP = 7  # modèle DREAM courant (7 keypoints)
@@ -133,13 +134,16 @@ class RosbridgeRobot:
         return int(m.group()) if m else None
 
 
-def detect_color(frame, hsv_lo, hsv_hi, name=None, save=False, min_area=300):
+def detect_color(frame, hsv_lo, hsv_hi, name=None, save=False, min_area=200, border=25):
     """Détecte le plus gros blob dans la plage HSV -> (u,v du centroïde, score) ou (None,0).
 
     Bien plus robuste que YOLO pour un objet de couleur franche (balle jaune-vert).
-    score = aire normalisée (proxy de confiance).
+    score = aire normalisée (proxy de confiance). `border` : ignore les blobs dont le
+    centroïde tombe à moins de `border` px d'un bord de l'image (rejette les objets
+    jaunes parasites collés au cadre, ex. un outil au bord — la cible est au centre).
     """
     import cv2 as _cv
+    h, w = frame.shape[:2]
     hsv = _cv.cvtColor(frame, _cv.COLOR_BGR2HSV)
     mask = _cv.inRange(hsv, np.array(hsv_lo), np.array(hsv_hi))
     mask = _cv.morphologyEx(mask, _cv.MORPH_OPEN, np.ones((5, 5), np.uint8))
@@ -150,7 +154,10 @@ def detect_color(frame, hsv_lo, hsv_hi, name=None, save=False, min_area=300):
         if a > best_area and a >= min_area:
             M = _cv.moments(c)
             if M['m00'] > 0:
-                best = (M['m10'] / M['m00'], M['m01'] / M['m00'])
+                cx, cy = M['m10'] / M['m00'], M['m01'] / M['m00']
+                if cx < border or cx > w - border or cy < border or cy > h - border:
+                    continue
+                best = (cx, cy)
                 best_area = a
     if name is not None:
         print(f'    {name}: blob couleur aire={best_area:.0f}px')
@@ -253,6 +260,8 @@ def main():
     ap.add_argument('--classes', nargs='*', default=None,
                     help='classes COCO à saisir (ex: cup bottle "sports ball")')
     ap.add_argument('--table-z', type=float, default=0.0, help='plan table (m, base) pour le repli mono')
+    ap.add_argument('--max-xy', type=float, default=0.35,
+                    help='limite de sécurité absolue X/Y en mètres (défaut: 0.35)')
     ap.add_argument('--place', nargs=3, type=float, default=[0.20, 0.15, 0.05])
     ap.add_argument('--speed', type=int, default=40)
     ap.add_argument('--mode', type=int, default=1, choices=[0, 1])
@@ -274,6 +283,8 @@ def main():
     ap.add_argument('--extrinsic', choices=['markers', 'static', 'live'], default='markers',
                     help='markers = ArUco table (précis, 0.7px) ; static = DREAM self-cal ; '
                          'live = recalcul PnP chaque frame (si la caméra bouge).')
+    ap.add_argument('--marker-extrinsic', default=None,
+                    help='fichier YAML extrinsèque ArUco à utiliser (défaut: calibration standard)')
     ap.add_argument('--hsv-lo', nargs=3, type=int, default=[25, 60, 60],
                     metavar=('H', 'S', 'V'), help='seuil HSV bas (détecteur color)')
     ap.add_argument('--hsv-hi', nargs=3, type=int, default=[45, 255, 255],
@@ -281,10 +292,21 @@ def main():
     ap.add_argument('--camera-source', choices=['rosbridge', 'v4l2'], default='rosbridge',
                     help='rosbridge = images du launch multicam (défaut) ; v4l2 = caméra en '
                          'direct si le launch est arrêté.')
+    ap.add_argument('--exposure', type=int, default=75,
+                    help='exposition V4L2 manuelle (défaut validé: 75)')
+    ap.add_argument('--svpro-focus', type=int, default=90,
+                    help='focus manuel SVPro (défaut validé par capture_real_3cam: 90)')
     ap.add_argument('--robot-via', choices=['rosbridge', 'socket'], default='rosbridge',
                     help='rosbridge = commandes robot via /to_robot (bridge_tour, UNE seule '
                          'connexion Pi — pas de conflit avec le dashboard) ; socket = TCP direct.')
     args = ap.parse_args()
+
+    if args.marker_extrinsic:
+        marker_path = Path(args.marker_extrinsic).expanduser().resolve()
+        if not marker_path.is_file():
+            raise SystemExit(f'extrinsèque ArUco introuvable: {marker_path}')
+        for camera_name in args.cameras:
+            CAMERAS[camera_name]['extrinsic_markers'] = str(marker_path)
 
     # intrinsèques par caméra (640x480)
     intr = {}
@@ -312,7 +334,22 @@ def main():
         if args.extrinsic != 'markers':
             raise SystemExit('--camera-source v4l2 exige --extrinsic markers (pas de DREAM live).')
         for name in args.cameras:
+            dev = f'/dev/video{CAMERAS[name]["device"]}'
+            if name == 'arducam':
+                subprocess.run(
+                    ['v4l2-ctl', '-d', dev, '-c', 'auto_exposure=1',
+                     '-c', f'exposure_time_absolute={args.exposure},gain=0,brightness=0'],
+                    check=False,
+                )
+            else:
+                subprocess.run(
+                    ['v4l2-ctl', '-d', dev, '-c', 'focus_automatic_continuous=0',
+                     '-c', f'focus_absolute={args.svpro_focus},sharpness=0,contrast=1'],
+                    check=False,
+                )
             cap = cv2.VideoCapture(CAMERAS[name]['device'], cv2.CAP_V4L2)
+            if name == 'svpro':
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640); cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
             if not cap.isOpened():
                 raise SystemExit(f'{name}: /dev/video{CAMERAS[name]["device"]} occupé — arrête le '
@@ -375,6 +412,10 @@ def main():
     xyz, method = localize(state, intr, obj_px, args.table_z, args.cameras, args.extrinsic)
     print(f'\n  🎯 objet localisé ({method}) : base = '
           f'({xyz[0]*1000:.0f}, {xyz[1]*1000:.0f}, {xyz[2]*1000:.0f}) mm\n')
+    if not np.all(np.isfinite(xyz)) or abs(float(xyz[0])) > args.max_xy or abs(float(xyz[1])) > args.max_xy:
+        raise SystemExit(
+            f'🛑 cible hors espace sécurisé ±{args.max_xy*1000:.0f} mm : '
+            f'({xyz[0]*1000:.0f}, {xyz[1]*1000:.0f}, {xyz[2]*1000:.0f}) mm — aucun mouvement')
 
     if args.dry_run:
         bridge = None
