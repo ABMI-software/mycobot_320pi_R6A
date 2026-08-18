@@ -55,6 +55,10 @@ setup(
             # DREAM vs encoders real-time validation dashboard (PyQt)
             'dream_validation_dashboard = mycobot_gateway.dream_validation_dashboard:main',
 
+            # Asservissement visuel en boucle fermée (pick-and-place adaptatif)
+            'object_pose_node = mycobot_gateway.visual_servo.object_pose_node:main',
+            'visual_servo_controller = mycobot_gateway.visual_servo.visual_servo_node:main',
+
             # Multi-object color sorting (Gazebo)
             'color_object_detector = mycobot_gateway.color_object_detector:main',
             'sorting_orchestrator = mycobot_gateway.sorting_orchestrator:main',

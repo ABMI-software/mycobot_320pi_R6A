@@ -11,8 +11,22 @@ import time
 import cv2
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+
+# Profil capteur pour les images. Une Image 640x480 bgr8 pèse 921 ko : publiée en
+# RELIABLE profondeur 10, le middleware garantit et retransmet dix trames de ce
+# calibre, et la cadence s'effondre — mesuré le 18/08 à 3,7-4,4 Hz alors que les
+# deux caméras délivrent 14-15 fps ensemble en direct.
+#
+# BEST_EFFORT profondeur 1 est ce que demande le §11.3 (« profondeur de file
+# égale à 1 pour ne pas traiter les anciennes images », « profil QoS adapté aux
+# données capteur ») : une image perdue est sans intérêt, la suivante arrive dans
+# 33 ms. Compatible avec TOUS les consommateurs existants — dream_inference_node
+# et dream_validation_dashboard s'abonnent déjà en BEST_EFFORT.
+SENSOR_QOS = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
+                        history=HistoryPolicy.KEEP_LAST, depth=1)
 
 
 def set_manual_exposure(video_index: int, exposure: int):
@@ -97,7 +111,7 @@ class CameraPublisher(Node):
         output_topic = self.get_parameter('output_topic').value
 
         # Publisher
-        self.publisher = self.create_publisher(Image, output_topic, 10)
+        self.publisher = self.create_publisher(Image, output_topic, SENSOR_QOS)
         self.bridge = CvBridge()
 
         # Camera setup
