@@ -1,20 +1,45 @@
 # Positions mesurées des marqueurs sol (repère monde = repère base robot).
 # Repère : X=avant, Y=gauche (REP-103), Z=haut. Origine = centre base robot,
-# Z=0 = table. Unités : mètres. Mesurées au règlet ±5 mm (banc 9 juillet 2026).
+# Z=0 = table. **Unités : MILLIMÈTRES** (`units: mm`).
 #
 # Disposition réelle (arducam vue de dessus, avant = haut de l'image) :
 #   25 = loin-gauche    26 = loin-droite
 #   19 = proche-gauche  23 = proche-droite
 #
-# NB : X=0.52 pour les marqueurs loin est à re-vérifier (table = 0.52 m de long) ;
-#      l'overlay FK après calibration confirmera/corrigera. marker_size = 50 mm.
+# Mesures du 18/08/2026 (centre marqueur ↔ centre base), au mètre ruban.
+# Recoupées par un second jeu de mesures marqueur↔bord de table, avec une table
+# de 623 x 449 mm :
+#   - bord proche déduit à X = -50 mm, bord lointain à X = +575 mm
+#     -> longueur 625 mm contre 623 mesurés : écart 2 mm
+#   - bord gauche à Y = +246 mm, bord droit à Y = -212 mm
+#     -> largeur 458 mm contre 449 mesurés : écart 9 mm
+# Les deux jeux étant indépendants, cet accord borne l'erreur des positions
+# ci-dessous à environ ±5 mm. La table n'est pas centrée sur la base : son axe
+# est 17 mm à gauche, et la base est 50 mm en retrait du bord proche.
 #
-# Utilisé par : calibrate_arducam_markers.py. Chaque entrée = centre du marqueur.
+# `marker_size_mm` : côté du carré NOIR du marqueur, bordure blanche exclue.
+# Il entre directement dans les coins 3D depuis le passage aux 16 coins — une
+# erreur de 30 mm sur le côté décale chaque coin de 15 mm. La valeur ci-dessous
+# est MESURÉE sur l'image par calibrate_camera_base_extrinsic.py (la pose issue
+# des centres ne dépend pas de la taille, ce qui rend la mesure non circulaire).
+#
+# `marker_yaw_deg` : orientation dans le plan. Absent = déduit de l'image.
+#
+# Utilisé par : calibrate_camera_base_extrinsic.py, calibrate_arducam_markers.py
 frame_id: base_link
-marker_size_m: 0.080
+units: mm
+marker_size_mm: 50.0
 markers:
-  # Mesurés au mètre (centre marqueur ↔ centre base), 29/07/2026. ±5 mm.
-  19: [0.14,  0.205, 0.0]   # proche-gauche
-  23: [0.14, -0.18,  0.0]   # proche-droite
-  25: [0.49,  0.205, 0.0]   # loin-gauche
-  26: [0.48, -0.18,  0.0]   # loin-droite
+  # 19 n'est PAS une mesure au ruban : il est résolu par ajustement conjoint des
+  # deux caméras (23/25/26 tenus fixes, X/Y du 19 libres), incertitude ±0,3 mm.
+  # Le ruban donnait (108, 207) ; les deux caméras, qui le voient sous des angles
+  # très différents, convergent sur (96.8, 203.4). Trois recoupements :
+  #   - l'arducam seule donnait déjà ΔX = -11,2 mm, calcul indépendant ;
+  #   - le bord proche de la table déduit depuis 19 passe de -46 à -57 mm, contre
+  #     -54 mm déduit depuis 23 : le désaccord tombe de 8 mm à 3 mm ;
+  #   - le RMS conjoint des deux caméras passe de 1,44 px à 0,67 px.
+  # À re-mesurer au ruban à l'occasion pour confirmer.
+  19: [ 96.8,  203.4, 0.0]   # proche-gauche  (résolu 2 caméras, 18/08/2026)
+  23: [110.0, -179.0, 0.0]   # proche-droite
+  25: [535.0,  215.0, 0.0]   # loin-gauche
+  26: [530.0, -176.0, 0.0]   # loin-droite

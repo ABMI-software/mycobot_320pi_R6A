@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""Contrôleur d'asservissement visuel — fusion, suivi, commande, sûreté."""
+from mycobot_gateway.visual_servo.visual_servo_node import main
+
+if __name__ == '__main__':
+    main()
