@@ -41,6 +41,20 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | [docs/TELEOP_SIM_TESTING.md](docs/TELEOP_SIM_TESTING.md) | **Validation en simulation seule** avant le bras réel : KPIs, scénarios guidés, use cases sim-only (téléop, pick mono, sorting, RoM) |
 | [docs/REAL_ROBOT_TEST_PROCEDURE.md](docs/REAL_ROBOT_TEST_PROCEDURE.md) | Protocole de calibration sécurisé sur robot physique (validé 22/04/2026) |
 
+### 🎯 Asservissement visuel en boucle fermée (robot réel)
+| Document | Description |
+|----------|-------------|
+| [mycobot_gateway/launch/visual_servo.launch.py](mycobot_gateway/launch/visual_servo.launch.py) | Lancement de la boucle — démarre **désarmé** (`dry_run:=true`), attend un `start` explicite. Prérequis et pièges dans le docstring |
+| [mycobot_gateway/mycobot_gateway/visual_servo/state_machine.py](mycobot_gateway/mycobot_gateway/visual_servo/state_machine.py) | Machine à états SEARCH→TRACK→APPROACH→FINE_SERVO→DESCEND→GRASP→LIFT→PLACE, testable sans matériel |
+| [mycobot_gateway/mycobot_gateway/visual_servo/safety.py](mycobot_gateway/mycobot_gateway/visual_servo/safety.py) | Superviseur : 9 conditions d'arrêt, dont l'incohérence commande/mouvement mesuré |
+| [training/calibration/calibrate_camera_base_extrinsic.py](training/calibration/calibrate_camera_base_extrinsic.py) | Extrinsèque caméra→base : 16 coins, RANSAC+LM, **validation leave-one-out** |
+| [scripts/diff_ik.py](scripts/diff_ik.py) | IK différentielle sur **matrice de rotation**. Son docstring explique pourquoi `send_coords` est écarté |
+
+> ⚠ **`send_coords` est inutilisable sur cette unité.** Mesuré le 20/08 sur cible
+> identique : 247,8 mm d'erreur contre 18,2 mm via `send_angles` + IK, les deux
+> avec un `OK` du bridge — la méthode constructeur échoue en silence (blocage de
+> cardan à RY ≈ −80°). Voir le CHANGELOG § Corrigé.
+
 ### 🎯 Pick-and-place / sorting (Gazebo)
 | Document | Description |
 |----------|-------------|
@@ -91,4 +105,5 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 ---
 
 **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.7.0 (legacy DREAM)
-**Mise à jour :** 23 avril 2026 — merge `feature/teleoperation` + `feature/pick-and-place-sorting` → `main`
+**Mise à jour :** 20 août 2026 — asservissement visuel en boucle fermée, cycle
+pick-and-place complet validé sur robot réel (`feature/pick-and-place-osama`)

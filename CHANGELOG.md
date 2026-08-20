@@ -11,6 +11,55 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **Asservissement visuel en boucle fermée (`mycobot_gateway/visual_servo/`)** —
+  machine à états pick-and-place complète, testable image par image sans matériel :
+  fusion multi-caméras, suivi de Kalman avec compensation de latence, loi de
+  commande saturée, superviseur de sûreté à 9 conditions, IK différentielle sur
+  **matrice de rotation** (jamais d'angles d'Euler). Lancement :
+  `ros2 launch mycobot_gateway visual_servo.launch.py` — démarre **désarmé**
+  (`dry_run:=true`), attend un `start` explicite sur `/visual_servo/command`.
+  47 tests unitaires.
+- **Calibration extrinsèque caméra→base** (`training/calibration/calibrate_camera_base_extrinsic.py`) —
+  16 coins au lieu de 4 centres, RANSAC+LM, pooling multi-images, validation
+  **leave-one-out** (le seul chiffre qui mesure un point neuf). Résultats :
+  arducam RMS 1,01 px / LOO 3,1–3,5 mm ; svpro RMS 1,36 px / LOO 0,4–3,2 mm.
+  Stabilité vérifiée après 2 jours : **0,8 à 1,7 mm** de dérive.
+- **Cycle pick-and-place complet validé sur robot réel (20/08/2026)** — balle
+  localisée par vision, approche, descente par paliers, saisie vérifiée par
+  statut pince, transport, dépôt en bac confirmé par statut **et** par image.
+
+### Corrigé
+
+- **`send_coords` est inutilisable sur cette unité** — comparaison A/B sur cible
+  et métrique identiques (267 mm à parcourir) : méthode officielle Elephant
+  Robotics **247,8 mm d'erreur** (9 % du trajet) contre **18,2 mm** (93 %) via
+  `send_angles` + IK. Les deux reçoivent `OK` du bridge : la méthode constructeur
+  **échoue en silence**. Cause mesurée : blocage de cardan, toute la tâche se
+  déroulant entre RY = −78° et −83°.
+- **Orientation cible tournée selon l'azimut** — garder une orientation de bride
+  fixe en visant un azimut différent tord le poignet : résidu IK **20,0 mm** sur
+  33° d'écart, contre **0,19 mm** avec `Rz(Δazimut) @ R_référence`. Placement
+  final obtenu à 3,9 / 0,6 / **0,1** mm en X/Y/Z.
+- **Compensation de l'affaissement gravitaire** — le bras arrive systématiquement
+  ~13 mm plus bas que commandé à vide, ~15 mm chargé, de façon reproductible sur
+  tous les paliers. Compensé, l'erreur verticale tombe à **~2 mm**.
+- **Branche IK** — toutes les poses historiques (`observation_clear`, pick du
+  17/08) sont sur la branche *coude bas*, plaquée contre la butée J2 (**marge 0°**),
+  ce qui rendait toute boucle fermée impossible et expliquait les sauts de branche
+  de 150° sur J4. La branche *coude haut* (J3 < 0) atteint les mêmes poses avec
+  **23 à 72° de marge**. Transition validée sur matériel.
+- **Vérification de prise** — un statut de pince **inconnu** ne vaut plus
+  vérification réussie (`is not True` au lieu de `is False`) : `bridge_pi_simple.py`
+  n'implémente pas `get_pro_gripper_status`, ce qui rendait le contrôle
+  silencieusement inopérant. Utiliser **`scripts/gripper_bridge.py`** sur la Pi.
+- **Levage de contrôle** — délai d'expiration ajouté : chargé, un levage commandé
+  à +5 mm donne **−2,6 mm** réels, et l'étape bouclait indéfiniment.
+- **Perte d'objet pendant la montée** — surveillée à chaque période au lieu de la
+  seule arrivée à hauteur de transport.
+- **Passe de serrage désactivée par défaut** — sans effet mesuré : la pince cale à
+  l'angle 52 dès le premier contact et commander 12 ne la bouge pas. Le seul
+  levier réel est `set_pro_gripper_torque`.
+
 - **Pick-and-place vision-guidé (démonstrateur autonome)** — localise un objet par
   caméra puis l'exécute en cartésien sur le vrai robot, sans dashboard :
   - `scripts/pick_and_place_vision.py` (contrôle : approche top-down → descente →

@@ -409,12 +409,8 @@ def test_sequence_nominale_complete():
     directive = machine.step(base_context(now=1.0, locked_position=locked))
     assert directive.action is Action.GRIP
 
-    # Fermeture, puis passe de serrage, puis seulement LIFT.
-    directive = machine.step(base_context(now=1.1, locked_position=locked,
-                                          gripper_closed=True))
-    assert directive.action is Action.GRIP and directive.firm
-    machine.step(base_context(now=1.1 + MissionConfig().grasp_firm_settle,
-                              locked_position=locked, gripper_closed=True))
+    # Serrage désactivé par défaut (sans effet mesuré) : contact -> LIFT direct.
+    machine.step(base_context(now=1.1, locked_position=locked, gripper_closed=True))
     assert machine.state is State.LIFT
 
     # Levage en deux temps : 5 mm de contrôle, stabilisation, puis transport.
@@ -619,6 +615,30 @@ def test_levage_controle_detecte_la_perte():
     d = machine.step(base_context(now=0.5, ee_position=lifted, gripper_closed=False))
     assert machine.state is State.SAFE_STOP, 'perte de prise non détectée à 5 mm'
     assert d.action is Action.STOP
+
+
+def test_levage_controle_inatteignable_n_boucle_pas():
+    """Chargé, le bras peut ne PAS réussir les 5 mm — mesuré −2,6 mm le 20/08.
+
+    Sans délai la vérification bouclait indéfiniment sur une hauteur que le bras
+    ne peut pas atteindre. Passé le délai on juge sur le statut de la pince.
+    """
+    cfg = MissionConfig(verify_lift_height=0.005, verify_lift_settle=0.0,
+                        verify_lift_timeout=4.0, lift_height=0.12)
+    machine = PickStateMachine(cfg)
+    machine.state = State.LIFT
+    machine.entered_at = 0.0
+    bloque = np.array([0.300, 0.050, 0.012])      # ne monte jamais
+
+    d = machine.step(base_context(now=1.0, ee_position=bloque, gripper_closed=True))
+    assert d.action is Action.SERVO, 'devrait encore essayer de lever'
+
+    d = machine.step(base_context(now=5.0, ee_position=bloque, gripper_closed=True))
+    assert machine.state is State.LIFT and d.action is not Action.STOP, \
+        'objet toujours tenu : le délai ne doit pas conclure à une perte'
+
+    d = machine.step(base_context(now=5.1, ee_position=bloque, gripper_closed=False))
+    assert machine.state is State.SAFE_STOP, 'perte réelle non détectée après délai'
 
 
 def test_serrage_apres_contact_confirme():
