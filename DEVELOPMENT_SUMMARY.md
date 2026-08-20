@@ -1,15 +1,62 @@
 # 🤖 MyCobot 320 Pi - Résumé de Développement
 
-> **Date de dernière mise à jour:** 21 avril 2026
+> **Date de dernière mise à jour:** 20 août 2026
 > **Version:** 2.1.0
 > **Repository GitHub:** https://github.com/ABMI-software/mycobot_320pi_R6A
-> **Branche:** `feature/pose-training`
+> **Branche:** `feature/pick-and-place-osama`
 
 ---
 
 ## 📌 Point de Départ Rapide
 
 👉 **Pour démarrer une nouvelle session, consultez [`SESSION_RESUME.md`](SESSION_RESUME.md)**
+
+---
+
+## 🎯 Asservissement visuel en boucle fermée (20 août 2026)
+
+Cycle pick-and-place complet validé sur le robot réel : localisation par vision,
+approche, descente par paliers, saisie confirmée par statut pince, transport,
+dépôt en bac vérifié par image. Code : `mycobot_gateway/mycobot_gateway/visual_servo/`
+(47 tests unitaires), lancement `ros2 launch mycobot_gateway visual_servo.launch.py`
+— **démarre désarmé**, attend un `start` explicite.
+
+### Ce que le matériel a imposé
+
+Ces quatre points ne viennent pas d'une relecture de code mais de mesures sur le
+robot. Ils sont contre-intuitifs et coûtent cher à redécouvrir.
+
+| Constat | Mesure | Conséquence |
+|---|---|---|
+| `send_coords` inutilisable | 247,8 mm d'erreur contre 18,2 mm via `send_angles`+IK, sur cible identique | Piloter en angles, IK maison sur matrice de rotation |
+| Orientation à tourner selon l'azimut | résidu IK 20,0 mm figée → **0,19 mm** avec `Rz(Δazimut)` | Ne jamais tenir une orientation fixe sur un azimut différent |
+| Branche IK coude bas sans marge | marge J2 **0°** sur toutes les poses historiques ; coude haut : 23–72° | Basculer sur `J3 < 0` avant toute boucle fermée |
+| Affaissement gravitaire | ~13 mm à vide, ~15 mm chargé, **reproductible** | Biais compensable : erreur verticale 13 mm → ~2 mm |
+
+`send_coords` et `send_angles` reçoivent tous deux `OK` du bridge : la méthode
+officielle **échoue en silence**. La cause est un blocage de cardan — toute la
+tâche se déroule entre RY = −78° et −83°, où RX et RZ sont dégénérés. Preuve
+directe : pendant une remontée purement verticale de 43 mm, RX est passé de 1,12°
+à 38,73° alors que l'orientation physique n'avait pas changé.
+
+### Précision obtenue
+
+- Placement final : **3,9 / 0,6 / 0,1 mm** en X/Y/Z
+- Répétabilité (6 aller-retours) : **0,67 mm** en approche unidirectionnelle par
+  le haut — la spec constructeur de 1 mm est tenue
+- **Mais 5,88 mm de biais directionnel** entre approche par le haut et par le
+  côté : ne jamais mélanger les directions entre l'apprentissage d'un point et sa
+  reprise. C'est aussi ce que garantit la descente verticale à XY figé.
+- Extrinsèque arducam stable à **0,8–1,7 mm** après deux jours (RMS 1,01 px,
+  leave-one-out 3,1–3,5 mm)
+
+### Pince Pro adaptative
+
+La pince **cale sur l'objet** à un angle différent de la consigne : 52 mesuré pour
+une commande de 20. Commander ensuite 12 ne la bouge pas — viser plus bas ne serre
+donc **pas** davantage, le seul levier est `set_pro_gripper_torque`. Le statut
+`get_pro_gripper_status` est la seule confirmation de prise valable, et il n'est
+disponible que via `scripts/gripper_bridge.py` (pas `bridge_pi_simple.py`).
 
 ---
 
@@ -71,7 +118,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 ## 📁 Structure du Workspace Tour
 
 ```
-~/ros_jazzy/src/mycobot_R6A/
+~/Osama_ws/src/mycobot_R6A/
 ├── SESSION_RESUME.md               # Point de départ sessions dev
 ├── DEVELOPMENT_SUMMARY.md          # Ce fichier
 ├── CHANGELOG.md                    # Historique des versions
@@ -149,8 +196,8 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │       └── manip_configs/mycobot320.yaml
 │
 ├── datasets/                       # Données (Git LFS)
-│   ├── synthetic_dataset/          # 5000 poses × 4 vues = 20K images
-│   └── real_dataset/               # 2000 poses × 2 caméras = 4000 images
+│   ├── synthetic_dataset/          # v3 : 12.5K poses × 4 caméras = 50K images (record 99.4%)
+│   └── real_3cam/                  # 5 sessions × 500 = 2500 poses × 3 caméras = 7500 images (91.6% réel)
 │
 ├── scripts/
 │   ├── train_pipeline.sh           # Pipeline merge → NDDS → training
@@ -229,7 +276,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 # IMPORTANT: Désactiver Conda avant ROS2 (Python 3.13 vs 3.12)
 conda deactivate
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/Osama_ws/install/setup.bash
 ```
 
 ### 1. Visualisation standalone (sans robot)
@@ -252,7 +299,7 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 ```bash
 conda deactivate
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/Osama_ws/install/setup.bash
 
 # Modes de contrôle disponibles :
 ros2 launch mycobot_gateway simple_gui.launch.py        # GUI graphique
@@ -305,7 +352,7 @@ Pipeline validé sur le robot physique le 22/04/2026 — voir [`docs/REAL_ROBOT_
 
 ### 3. Meshes Gazebo non trouvés
 **Cause:** `GZ_SIM_RESOURCE_PATH` non défini
-**Solution:** Ajouter dans le launch file ou `export GZ_SIM_RESOURCE_PATH=~/ros_jazzy/install/mycobot_description/share`
+**Solution:** Ajouter dans le launch file ou `export GZ_SIM_RESOURCE_PATH=~/Osama_ws/install/mycobot_description/share`
 
 ### 4. DREAM — Belief maps effondrées (all-zeros)
 **Cause:** Fine-tuning manuel avec MSE sur grille quasi-vide
@@ -758,7 +805,7 @@ cd /tmp/DREAM && pip install -e . -r requirements.txt
 
 ```bash
 # Compiler les packages
-cd ~/ros_jazzy/src/mycobot_R6A
+cd ~/Osama_ws/src/mycobot_R6A
 colcon build --symlink-install
 
 # Compiler un seul package

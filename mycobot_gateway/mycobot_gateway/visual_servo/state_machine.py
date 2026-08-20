@@ -87,13 +87,19 @@ class MissionConfig:
     # directement de 120 mm avec une prise douteuse fait tomber l'objet de haut.
     verify_lift_height: float = 0.005    # m — levage de contrôle
     verify_lift_settle: float = 1.0      # s d'attente avant de juger la prise
-    # Fermeture en deux passes. La première s'arrête au premier contact et
-    # suffit déjà à faire répondre « objet saisi » à la pince, même quand la
-    # balle n'est que pincée par le haut — c'est exactement ce qui s'est produit
-    # le 18/08 : statut 2 obtenu, puis objet perdu au levage. La seconde passe
-    # serre sur un contact déjà établi : les doigts ne parcourent presque rien,
-    # ils appuient.
-    grasp_firm: bool = True
+    # Mesuré le 20/08 avec la balle en main : un levage commandé à +5 mm a donné
+    # −2,6 mm réels — chargé, le bras s'affaisse plus qu'il ne monte. Sans délai
+    # l'étape de vérification boucle indéfiniment sur une hauteur inatteignable.
+    # Au-delà du délai on ne conclut pas à l'échec : on juge sur le statut pince.
+    verify_lift_timeout: float = 4.0     # s
+    # Passe de serrage — DÉSACTIVÉE par défaut : mesurée sans effet le 20/08.
+    # Sur prise réelle la pince a calé à l'angle 52 (butée de couple atteinte au
+    # premier contact) ; commander ensuite 12 au lieu de 20 l'a laissée à 52,
+    # inchangée. Viser un angle plus bas ne serre donc PAS davantage — le seul
+    # levier réel est `set_pro_gripper_torque`, que gripper_bridge.py expose.
+    # L'option reste câblée pour une pince dont l'angle serait effectivement
+    # asservi, mais l'activer ici ne coûte que grasp_firm_settle secondes.
+    grasp_firm: bool = False
     grasp_firm_settle: float = 1.8       # s — la pince ignore un ordre < 1,6 s
 
 
@@ -358,7 +364,8 @@ class PickStateMachine:
         # atteinte avant même d'avoir bougé — le contrôle ne contrôlerait rien.
         verify_tol = min(self.cfg.fine_threshold, self.cfg.verify_lift_height / 2.0)
         if not self._lift_verified:
-            if ctx.ee_position[2] < verify_z - verify_tol:
+            if ctx.ee_position[2] < verify_z - verify_tol \
+                    and self.elapsed(ctx.now) < self.cfg.verify_lift_timeout:
                 target = ctx.ee_position.copy()
                 target[2] = verify_z
                 return Directive(Action.SERVO, target=target, fine=True,
@@ -387,11 +394,14 @@ class PickStateMachine:
             self._lift_verified = True
             return Directive(Action.IDLE, reason='prise confirmée sous charge')
 
+        # La perte se surveille à CHAQUE période, pas seulement une fois arrivé
+        # en haut : l'objet peut lâcher n'importe où sur la montée, et continuer
+        # à monter une pince vide ne fait que l'éloigner du sol.
+        if ctx.gripper_closed is not True:
+            self.stop_reasons = ('LIFT prise perdue pendant la montée',)
+            self._enter(State.SAFE_STOP, ctx.now)
+            return Directive(Action.STOP, reason=self.stop_reasons[0])
         if ctx.ee_position[2] >= self.cfg.lift_height - self.cfg.fine_threshold:
-            if ctx.gripper_closed is not True:
-                self.stop_reasons = ('LIFT prise perdue pendant la montée',)
-                self._enter(State.SAFE_STOP, ctx.now)
-                return Directive(Action.STOP, reason=self.stop_reasons[0])
             self._enter(State.PLACE, ctx.now)
             return Directive(Action.IDLE, reason='hauteur de transport atteinte')
         target = ctx.ee_position.copy()

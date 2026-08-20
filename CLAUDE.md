@@ -151,7 +151,7 @@ cd ~/ros_jazzy && colcon build --packages-select mycobot_gateway mycobot_descrip
 source install/setup.bash
 
 # Control a live robot (bridge must run on the Pi)
-ssh er@10.10.0.221        # Pi — start `python3 bridge_pi_simple.py`
+ssh er@10.10.0.221        # Pi — start `python3 gripper_bridge.py` (voir avertissement ci-dessous)
 ros2 launch mycobot_gateway simple_gui.launch.py
 
 # Gazebo simulation
@@ -188,12 +188,53 @@ More in [`.claude/commands/`](.claude/commands/).
 
 ---
 
+## Commande cartésienne — `send_coords` est écarté (mesuré 20/08/2026)
+
+**Ne pas piloter ce robot en `send_coords`.** Comparaison A/B sur cible et
+métrique identiques, 267 mm à parcourir : méthode officielle Elephant Robotics
+**247,8 mm d'erreur finale** (9 % du trajet) contre **18,2 mm** (93 %) via
+`send_angles` + IK différentielle. Les deux reçoivent `OK` du bridge — la méthode
+constructeur **échoue en silence**. Cause : blocage de cardan, la tâche se
+déroulant entre RY = −78° et −83°, où RX et RZ sont dégénérés.
+
+Utiliser [`scripts/diff_ik.py`](scripts/diff_ik.py) : `fk_pose` rend une **matrice
+de rotation**, `solve_pose` la tient, puis `send_angles`. Trois règles qui en
+découlent, toutes mesurées :
+
+1. **Tourner l'orientation cible selon l'azimut** — `Rz(azimut_cible −
+   azimut_référence) @ R_référence`. Sur 33° d'écart : résidu IK **0,19 mm** au
+   lieu de **20,0 mm** à orientation figée.
+2. **Travailler sur la branche IK coude haut** (`J3 < 0`, marge 23–72°). Toutes
+   les poses historiques (`observation_clear`, pick du 17/08) sont sur la branche
+   coude bas, plaquée contre la butée J2 (**marge 0°**) — d'où les sauts de branche
+   de 150° sur J4 en boucle fermée. Ne jamais basculer de branche pince en appui.
+3. **Compenser l'affaissement gravitaire** — ~13 mm à vide, ~15 mm chargé,
+   reproductible. Compensé, l'erreur verticale passe de 13 mm à ~2 mm.
+
+Allonge réelle **≈ 390 mm** (aucune solution IK au-delà). Répétabilité mesurée :
+**0,67 mm** en approche unidirectionnelle par le haut, mais **5,88 mm de biais**
+si on mélange les directions d'approche — ne jamais les mélanger entre
+l'apprentissage d'un point et sa reprise.
+
+⚠ Le bridge de la Pi doit être **`scripts/gripper_bridge.py`**, pas
+`bridge_pi_simple.py` : seul le premier répond à `get_pro_gripper_status`, sans
+quoi aucune saisie n'est confirmable. Il est **mono-client et bloquant** — un
+`bridge_tour` résiduel (que `real_robot_preflight.sh` laisse tourner) le fige :
+la connexion TCP est acceptée mais plus rien ne répond.
+
 ## Safety — real robot
 
 - Default IP is `10.10.0.221`. Always `ping` before launching anything that commands motion.
 - Run [`scripts/real_robot_preflight.sh`](scripts/real_robot_preflight.sh) before each physical session.
 - On `feature/teleoperation`: start every session with the `🐢 Safe start` preset (gains 0.6/0.6/0.6, tfs 0.3). Only go to `⚙️ Nominal` (1.2/1.2/1.6/0.25 — the validated default) once calibration is clean.
-- **Current physical robot has no gripper.** The `--no-gripper` flag on `mycobot_teleop.py` is mandatory.
+- **Le robot a désormais une pince Pro adaptative** (`gripper_id=14`, ~1,6 s entre
+  deux ordres). Saisie validée sur balle le 20/08/2026. La pince **cale sur l'objet**
+  à un angle qui n'est pas celui commandé (52 mesuré pour une consigne de 20) :
+  viser un angle plus bas ne serre **pas** davantage, le seul levier est
+  `set_pro_gripper_torque`. Le statut (`get_pro_gripper_status`) est la seule
+  confirmation de prise valable — un statut *inconnu* n'est pas une vérification.
+  Le drapeau `--no-gripper` de `mycobot_teleop.py` ne s'applique plus qu'aux
+  sessions de téléop menées sans la pince montée.
 
 See [`.claude/rules/real-robot-safety.md`](.claude/rules/real-robot-safety.md) and [`.claude/skills/real-robot-session/SKILL.md`](.claude/skills/real-robot-session/).
 
