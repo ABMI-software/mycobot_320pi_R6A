@@ -235,6 +235,24 @@ l'état de départ**, sinon il refuse aussi les *remontées* quand la pince est 
 en position basse. Ce qu'il faut interdire, c'est de **descendre** en chemin :
 `seuil = min(GARDE_MIN, garde(pose_courante) − 2 mm)`.
 
+### 5.5 Une seule tâche doit lire la caméra
+
+Le tableau de bord fait tourner les mouvements robot dans un fil séparé — ils
+durent plusieurs secondes et figeraient l'interface. Première version : ce fil
+appelait `cap.read()` pour rafraîchir sa propre image de détection, pendant que
+le minuteur graphique lisait la **même** `VideoCapture` toutes les 60 ms.
+
+Deux fils sur une capture GStreamer : elle se bloque sans jamais rendre la main.
+Le symptôme trompe — l'interface reste **vivante** (les images défilent, la
+position s'affiche en direct), seule l'étape ne se termine jamais et les boutons
+restent grisés. On soupçonne le robot ; le pont répondait en 0,02 s.
+
+Règle : **un seul fil touche `VideoCapture`**, le fil graphique. Le détecteur
+consomme un tampon horodaté que ce fil alimente, et attend au plus 3 s d'y
+trouver 3 images fraîches (< 1,2 s) et cohérentes (dispersion < 3 mm) — sinon il
+refuse la cible. Toute étape est ainsi **bornée dans le temps** : elle peut
+échouer, elle ne peut plus pendre.
+
 ### 5.3 Ne pas valider un déport d'outil sur le point qui l'a produit
 
 `scripts/tool_offset.json` a été ajusté sur **un seul point enseigné à la main**.
