@@ -60,6 +60,8 @@ ROULIS = [0, 30, -30, 60, -60, 90, -90, 120]
 
 ETAT_PINCE = {0: 'en mouvement', 1: 'rien saisi', 2: 'objet saisi', 3: 'objet lache'}
 
+SEUIL_DEPLACEMENT = 8.0   # mm — au-dela, la balle a bouge : on refait la cible
+
 POSE_OBSERVATION = np.array([-27.50, -61.61, -41.30, 89.56, 0.43, -79.62])
 
 # Le bras s'ecarte en tournant sur J1 jusqu'a ce que la camera revoie la balle.
@@ -287,7 +289,7 @@ class Contexte:
     resultats: dict = field(default_factory=dict)
     journal: list = field(default_factory=list)
     mode_auto: bool = False
-    detecteur: object = None          # callable -> (x, y) ou None
+    detecteur: object = None          # callable(patience=...) -> (x, y) ou None
 
     def note(self, texte):
         self.journal.append(texte)
@@ -447,6 +449,8 @@ TRANSITIONS = [
     ('DETECTION', 'APPROCHE', 'balle vue & portee OK', 'roulis choisi'),
     ('DETECTION', 'ATTENTE', 'hors enveloppe', 'refus'),
     ('APPROCHE', 'RECALAGE', 'arrive a 110 mm', ''),
+    ('APPROCHE', 'DETECTION', 'balle deplacee', 'cible refaite'),
+    ('RECALAGE', 'DETECTION', 'balle deplacee', 'cible refaite'),
     ('RECALAGE', 'DESCENTE', 'ecart < 1 mm', 'affaissement appris'),
     ('RECALAGE', 'APPROCHE', 'ne converge pas', 'nouvel essai'),
     ('RECALAGE', 'ECHEC', 'essais epuises', ''),
@@ -466,6 +470,34 @@ TRANSITIONS = [
 ]
 
 
+def cible_a_bouge(ctx, patience=0.5):
+    """La balle a-t-elle change de place depuis la mesure en cours ?
+
+    Ne PAS la voir ne signifie pas qu'elle a bouge — le bras l'occulte des
+    qu'il s'approche, c'est la situation normale en fin d'approche. Seule une
+    detection franche a une position differente compte ; l'absence de detection
+    laisse la cible inchangee.
+
+    Une cible qui bouge est une cible NEUVE : les compteurs d'essai et le biais
+    de descente appris sur l'ancienne position ne valent plus rien.
+    """
+    if ctx.detecteur is None or ctx.balle_xy is None:
+        return False
+    vu = ctx.detecteur(patience=patience)
+    if vu is None:
+        return False
+    xy = np.asarray(vu[:2], float)
+    ecart = float(np.linalg.norm(xy - ctx.balle_xy))
+    if ecart < SEUIL_DEPLACEMENT:
+        return False
+    ctx.note(f'la balle a bouge de {ecart:.0f} mm '
+             f'({ctx.balle_xy[0]:.0f},{ctx.balle_xy[1]:.0f}) -> ({xy[0]:.0f},{xy[1]:.0f})')
+    ctx.balle_xy = xy
+    ctx.repart_a_zero()
+    ctx.resultats['balle'] = f'({xy[0]:.1f}, {xy[1]:.1f}) mm — suivie'
+    return True
+
+
 def _degagement(ctx):
     """Ecarte le bras jusqu'a ce que la camera revoie la balle.
 
@@ -474,6 +506,9 @@ def _degagement(ctx):
     balle a moitie occultee — ou n'en trouve plus du tout et conclut a tort
     qu'il n'y en a pas.
     """
+    if ctx.detecteur is not None and ctx.detecteur(patience=0.5) is not None:
+        ctx.resultats['degagement'] = 'inutile — balle deja visible'
+        return 'DETECTION'
     ordre = list(BALAYAGE_J1)
     if ctx.balle_xy is not None:
         # Azimut connu (boucle automatique) : commencer par le plus loin de la
@@ -523,6 +558,8 @@ def _detecte(ctx):
 
 
 def _approche(ctx):
+    if cible_a_bouge(ctx):
+        return 'DETECTION'                # roulis et enveloppe a rejuger
     cible = resout_ik(np.array([ctx.balle_xy[0], ctx.balle_xy[1], Z_SURVOL]), ctx.R_balle)
     if cible is None or va_vers(ctx, cible[0], nom='approche') is None:
         return 'ECHEC'
@@ -530,6 +567,8 @@ def _approche(ctx):
 
 
 def _recalage(ctx):
+    if cible_a_bouge(ctx):
+        return 'DETECTION'
     cible = np.array([ctx.balle_xy[0], ctx.balle_xy[1], Z_SURVOL])
     q, correction, ok = converge(ctx, cible, ctx.R_balle)
     ctx.correction = correction

@@ -47,8 +47,22 @@ import camera_registry as registre                                      # noqa: 
 CALIB = RACINE / 'training' / 'calibration'
 SECOURS = {'arducam': 0, 'svpro': 2}   # si v4l2-ctl n'enumere rien
 HSV_BALLE = ((25, 90, 90), (45, 255, 255))
+# Le carton brun se separe de la planche par la TEINTE et la LUMINOSITE, pas par
+# la saturation (mesure sur image : carton H~11 S~161 V~95 ; planche H~19 S~160
+# V~200). La saturation est la meme, c'est la teinte et le fait qu'il soit deux
+# fois moins lumineux qui le trahissent.
+HSV_CARTON = ((5, 90, 45), (16, 235, 145))
 HAUTEUR_CENTRE_BALLE = 35.0
+HAUTEUR_CARTON = 60.0     # rebord du carton
 FENETRE_DETECTION = 1.2   # s — age maximal d'une detection reutilisable
+
+# Emprise du plateau, deduite des marqueurs pour ne pas dériver de leur fichier.
+# Ils sont en retrait des bords : d'où la marge.
+_XY_MARQUEURS = np.array(
+    [v[:2] for v in yaml.safe_load(
+        (CALIB / 'workspace_markers.yaml').read_text())['markers'].values()], float)
+PLATEAU = ((_XY_MARQUEURS[:, 0].min() - 40.0, _XY_MARQUEURS[:, 0].max() + 40.0),
+           (_XY_MARQUEURS[:, 1].min() - 40.0, _XY_MARQUEURS[:, 1].max() + 40.0))
 
 # Disposition du graphe, en coordonnees normalisees. La boucle principale fait le
 # tour, ECHEC est au centre : toutes les sorties d'erreur y convergent.
@@ -144,6 +158,29 @@ class Vision:
             return None                       # le bouton d'arret d'urgence est jaune aussi
         p = self.vers_base((u, v), HAUTEUR_CENTRE_BALLE)
         return p[:2], (u, v, rayon)
+
+    def carton(self, image):
+        """(x, y) base du centre du carton et son contour image, ou None.
+
+        On ne garde que la plus grande tache brune TOMBANT SUR LE PLATEAU : le
+        sol et les objets hors planche en produisent de plus grosses encore
+        (mesure : deux fausses taches a 505 et 511 mm de portee).
+        """
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        masque = cv2.inRange(hsv, *HSV_CARTON)
+        masque = cv2.morphologyEx(masque, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+        masque = cv2.morphologyEx(masque, cv2.MORPH_CLOSE, np.ones((13, 13), np.uint8))
+        contours, _ = cv2.findContours(masque, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in sorted(contours, key=cv2.contourArea, reverse=True):
+            if cv2.contourArea(c) < 1200:
+                break
+            moments = cv2.moments(c)
+            uv = (moments['m10'] / moments['m00'], moments['m01'] / moments['m00'])
+            p = self.vers_base(uv, HAUTEUR_CARTON)
+            if (PLATEAU[0][0] <= p[0] <= PLATEAU[0][1]
+                    and PLATEAU[1][0] <= p[1] <= PLATEAU[1][1]):
+                return p[:2], c
+        return None
 
 
 # --------------------------------------------------------------------------- #
@@ -366,9 +403,12 @@ class Fenetre(QMainWindow):
         boite_cible = QGroupBox('cibles')
         form_cible = QFormLayout(boite_cible)
         self.champ_carton = QLabel('non défini')
+        bouton_auto_carton = QPushButton('détecter le carton (couleur)')
+        bouton_auto_carton.clicked.connect(self._detecte_carton)
         bouton_carton = QPushButton('définir le carton = position balle')
         bouton_carton.clicked.connect(self._definit_carton)
         form_cible.addRow('carton', self.champ_carton)
+        form_cible.addRow(bouton_auto_carton)
         form_cible.addRow(bouton_carton)
         bouton_extr = QPushButton('vérifier l’extrinsèque (ArUco)')
         bouton_extr.clicked.connect(self._verifie_extrinseque)
@@ -491,6 +531,9 @@ class Fenetre(QMainWindow):
                     cv2.putText(affichee, f'{xy[0]:.0f},{xy[1]:.0f}',
                                 (int(u) - 34, int(v) - int(r) - 8),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 0, 255), 1)
+                carton = self.vision.carton(image)
+                if carton is not None:
+                    cv2.drawContours(affichee, [carton[1]], -1, (255, 150, 0), 2)
                 if self.ctx.carton_xy is not None:
                     uv = self.vision.vers_pixel([self.ctx.carton_xy[0],
                                                  self.ctx.carton_xy[1], 60.0])
@@ -649,6 +692,23 @@ class Fenetre(QMainWindow):
         self._n_journal = len(self.ctx.journal)
 
     # -- cibles ------------------------------------------------------------- #
+
+    def _detecte_carton(self):
+        image = self.images.get('arducam')
+        if image is None:
+            return
+        trouve = self.vision.carton(image)
+        if trouve is None:
+            self.statusBar().showMessage('carton non détecté sur le plateau')
+            return
+        xy, _ = trouve
+        self.ctx.carton_xy = np.asarray(xy, float)
+        portee = float(np.hypot(*xy))
+        self.champ_carton.setText(f'({xy[0]:.1f}, {xy[1]:.1f}) mm — détecté')
+        self.statusBar().showMessage(
+            f'carton détecté à {portee:.0f} mm'
+            + ('' if portee <= fsm.PORTEE_MAX
+               else f' — HORS ENVELOPPE, le largage échouera ({fsm.PORTEE_MAX:.0f} mm max)'))
 
     def _definit_carton(self):
         """Le carton se designe en y posant la balle : elle sert de mire."""
