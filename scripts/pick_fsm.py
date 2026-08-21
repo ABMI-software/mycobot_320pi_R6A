@@ -47,6 +47,9 @@ Z_SURVOL = 110.0        # au-dessus du sommet de la balle (~71 mm)
 Z_TRANSFERT = 170.0
 Z_LARGAGE = 100.0       # rebord du carton ~60 mm : la balle entre avant le lacher
 GARDE_MIN = 25.0
+PLANCHER = -20.0        # mm — aucune pose legitime sous la planche
+CHUTE_MAX = 220.0       # mm — descente verticale maximale en UN seul ordre
+ESSAIS_MAX = 3
 VITESSE = 25
 PORTEE_MAX = 335.0      # au-dela, aucun roulis ne resout a hauteur de table
 
@@ -58,6 +61,10 @@ ROULIS = [0, 30, -30, 60, -60, 90, -90, 120]
 ETAT_PINCE = {0: 'en mouvement', 1: 'rien saisi', 2: 'objet saisi', 3: 'objet lache'}
 
 POSE_OBSERVATION = np.array([-27.50, -61.61, -41.30, 89.56, 0.43, -79.62])
+
+# Le bras s'ecarte en tournant sur J1 jusqu'a ce que la camera revoie la balle.
+# La pose d'observation d'abord, puis de plus en plus loin, des deux cotes.
+BALAYAGE_J1 = [-27.5, -55.0, -85.0, 15.0, 45.0, -115.0]
 
 
 # --------------------------------------------------------------------------- #
@@ -185,8 +192,16 @@ _AMORCES_SYNTHETIQUES = [np.array(a, float) for a in (
 )]
 
 
-def resout_ik(p_cible, R, tol_mm=1.0, tol_deg=1.0, coude_haut=True):
-    """Meilleure solution parmi toutes les amorces, ou None."""
+def resout_ik(p_cible, R, tol_mm=1.0, tol_deg=1.0, coude_haut=True,
+              amorces_max=None, iterations=400):
+    """Meilleure solution parmi les amorces, ou None.
+
+    Sortie anticipee des qu'une amorce donne une solution nettement bonne :
+    balayer les 22 amorces jusqu'au bout coute 2,8 s, et `choisit_roulis` en
+    enchaine 24 — 17 s d'attente pour une seule etape. Le seuil de sortie est
+    trois fois plus severe que le seuil d'acceptation, pour ne s'arreter que
+    sur une solution qui ne demande aucun arbitrage.
+    """
     azimut = float(np.degrees(np.arctan2(p_cible[1], p_cible[0])))
     amorces = list(_AMORCES_MESUREES)
     for q in _AMORCES_MESUREES + _AMORCES_SYNTHETIQUES:
@@ -194,9 +209,9 @@ def resout_ik(p_cible, R, tol_mm=1.0, tol_deg=1.0, coude_haut=True):
         s[0] = azimut
         amorces.append(s)
     meilleure = None
-    for amorce in amorces:
+    for amorce in amorces[:amorces_max]:
         q = solve_pose(amorce, np.asarray(p_cible) - R @ TOOL, R,
-                       rot_weight=400.0, max_joint_step_deg=3.0, iterations=400)
+                       rot_weight=400.0, max_joint_step_deg=3.0, iterations=iterations)
         if coude_haut and q[2] > 0:
             continue
         if not np.all((q >= LIMITES[:, 0]) & (q <= LIMITES[:, 1])):
@@ -206,17 +221,36 @@ def resout_ik(p_cible, R, tol_mm=1.0, tol_deg=1.0, coude_haut=True):
         ecart = orientation_error_deg(q, R)
         if meilleure is None or residu + ecart < meilleure[1] + meilleure[2]:
             meilleure = (q, residu, ecart)
+        if meilleure[1] < tol_mm / 3.0 and meilleure[2] < tol_deg / 3.0:
+            break
     if meilleure is None or meilleure[1] > tol_mm or meilleure[2] > tol_deg:
         return None
     return meilleure
 
 
 def choisit_roulis(p_xy, hauteurs):
-    """Roulis le plus proche du nominal resolvant TOUTES les hauteurs voulues."""
-    for angle in ROULIS:
-        R = orientation(p_xy, angle)
-        if all(resout_ik(np.array([p_xy[0], p_xy[1], z]), R) is not None for z in hauteurs):
-            return angle, R
+    """Roulis le plus proche du nominal resolvant TOUTES les hauteurs voulues.
+
+    Scan allege d'abord : un roulis qui echoue doit epuiser toutes les amorces,
+    ce qui coute 4,9 s contre 15 ms pour un succes. Ici on ne cherche qu'a
+    SELECTIONNER — pour une sphere n'importe quel roulis qui passe convient.
+
+    Mais si le scan allege ne trouve RIEN, on refait le tour au complet avant
+    de renoncer : mesure a (320, 60), l'allege ne voyait aucun roulis la ou le
+    complet en trouvait un. Un faux negatif est sans consequence tant qu'il
+    reste un autre roulis ; quand ils tombent tous, il fait refuser une balle
+    parfaitement atteignable.
+    """
+    # Au-dela de ~310 mm le scan allege ne trouve jamais rien (mesure a 325 et
+    # 330 mm, la ou le complet trouve +30) : lui epargner un tour pour rien.
+    reglages = [{}] if float(np.hypot(*p_xy)) > 310.0 else [{'amorces_max': 8,
+                                                             'iterations': 150}, {}]
+    for reglage in reglages:
+        for angle in ROULIS:
+            R = orientation(p_xy, angle)
+            if all(resout_ik(np.array([p_xy[0], p_xy[1], z]), R, **reglage) is not None
+                   for z in hauteurs):
+                return angle, R
     return None, None
 
 
@@ -248,6 +282,8 @@ class Contexte:
     R_balle: np.ndarray = None
     R_carton: np.ndarray = None
     correction: np.ndarray = field(default_factory=lambda: np.zeros(6))
+    biais_descente: np.ndarray = field(default_factory=lambda: np.zeros(3))
+    essais: dict = field(default_factory=dict)
     resultats: dict = field(default_factory=dict)
     journal: list = field(default_factory=list)
     mode_auto: bool = False
@@ -257,22 +293,53 @@ class Contexte:
         self.journal.append(texte)
         del self.journal[:-200]
 
+    def essai(self, etat):
+        self.essais[etat] = self.essais.get(etat, 0) + 1
+        return self.essais[etat]
 
-def va_vers(ctx, q_cible, vitesse=VITESSE, nom='', patience=25):
-    """Deplacement valide : la trajectoire ne doit jamais descendre en chemin."""
+    def repart_a_zero(self):
+        """Nouvelle cible : le biais et les compteurs appris ne valent plus."""
+        self.essais.clear()
+        self.biais_descente = np.zeros(3)
+
+
+def va_vers(ctx, q_cible, vitesse=VITESSE, nom='', patience=60):
+    """Deplacement valide. Trois controles, tous nes d'un incident reel.
+
+    Un seuil de garde ABSOLU ne convient pas : la pointe doit atteindre
+    `Z_PRISE`, bien plus bas que `GARDE_MIN`, sinon aucune saisie ne passe
+    jamais. Ce qu'il faut interdire n'est pas d'etre bas, c'est de tomber :
+
+    * `PLANCHER` — sous la planche, aucune pose n'est legitime ;
+    * `CHUTE_MAX` — le plongeon de 590 mm du 20/08 venait d'une pose lue
+      perimee ; une descente utile fait ~115 mm, au-dela c'est une erreur de
+      lecture, pas une intention ;
+    * pas de creux en chemin sous le plus bas des deux bouts.
+    """
     q0 = ctx.pont.angles()
+    depart, arrivee = garde_au_sol(q0), garde_au_sol(q_cible)
+    if arrivee < PLANCHER:
+        ctx.note(f'{nom} REFUSE — cible a {arrivee:.1f} mm, sous le plancher {PLANCHER:.0f}')
+        return None
+    # La chute se mesure sur la POINTE, pas sur la garde : la garde est le point
+    # le plus bas de tout le bras, et un coude reste bas meme bras dresse — elle
+    # ne bouge quasiment pas quand la pointe plonge de 590 mm.
+    chute = float(pointe(q0)[2] - pointe(q_cible)[2])
+    if chute > CHUTE_MAX:
+        ctx.note(f'{nom} REFUSE — la pointe plongerait de {chute:.0f} mm en un seul ordre')
+        return None
+    seuil = min(GARDE_MIN, depart - 2.0, arrivee - 2.0)
     minimum = min(garde_au_sol(q0 * (1 - t) + q_cible * t) for t in np.linspace(0, 1, 61))
-    seuil = min(GARDE_MIN, garde_au_sol(q0) - 2.0)
     if minimum < seuil:
-        ctx.note(f'{nom} REFUSE — garde {minimum:.1f} mm sous le seuil {seuil:.1f}')
+        ctx.note(f'{nom} REFUSE — creux a {minimum:.1f} mm sous le seuil {seuil:.1f}')
         return None
     ctx.pont.envoie('send_angles', angles=[round(float(v), 2) for v in q_cible],
                     speed=vitesse)
     for _ in range(patience):
-        time.sleep(0.8)
+        time.sleep(0.35)
         if np.abs(ctx.pont.angles() - q_cible).max() < 1.2:
             break
-    time.sleep(1.0)
+    time.sleep(1.0)                       # l'affaissement doit s'etablir avant mesure
     return ctx.pont.angles()
 
 
@@ -308,8 +375,11 @@ def descente_verticale(ctx, p_cible, R, correction, passes=3, tol_xy=2.5):
 
     Corriger lateralement doigts en bas pousse l'objet (constate : balle
     deplacee de 33 mm). Tout recalage se fait donc en hauteur, cible decalee.
+
+    Le biais appris vit dans le contexte : un nouvel essai apres echec reprend
+    ou le precedent s'est arrete, il ne repart pas de zero.
     """
-    biais = np.zeros(3)
+    biais = ctx.biais_descente.copy()
     q_mesure, ecart_xy = None, float('inf')
     for i in range(passes):
         cible = resout_ik(p_cible + biais, R)
@@ -326,8 +396,9 @@ def descente_verticale(ctx, p_cible, R, correction, passes=3, tol_xy=2.5):
         ctx.note(f'  descente passe {i + 1} : ecart XY {ecart_xy:.2f} mm')
         if ecart_xy < tol_xy:
             return q_mesure, True
+        biais[:2] += reste[:2]            # retenu meme au dernier essai : il sert au suivant
+        ctx.biais_descente = biais.copy()
         if i < passes - 1:
-            biais[:2] += reste[:2]
             haut = resout_ik(np.array([tp[0], tp[1], Z_SURVOL]), R)
             if haut is None:
                 return q_mesure, False
@@ -365,29 +436,63 @@ def monte_par_paliers(ctx, R, hauteurs=(30.0, 80.0, 130.0, Z_TRANSFERT)):
 #  Les etats
 # --------------------------------------------------------------------------- #
 
-ETATS = ['ATTENTE', 'DETECTION', 'APPROCHE', 'RECALAGE', 'DESCENTE',
+ETATS = ['ATTENTE', 'DEGAGEMENT', 'DETECTION', 'APPROCHE', 'RECALAGE', 'DESCENTE',
          'SAISIE', 'REMONTEE', 'TRANSFERT', 'LARGAGE', 'RETRAIT', 'ECHEC']
 
 # (depart, arrivee, condition, action) — pour le graphe du tableau de bord.
 TRANSITIONS = [
-    ('ATTENTE', 'DETECTION', 'demarrer', 'pince ouverte'),
+    ('ATTENTE', 'DEGAGEMENT', 'demarrer', ''),
+    ('DEGAGEMENT', 'DETECTION', 'balle visible', ''),
+    ('DEGAGEMENT', 'ATTENTE', 'invisible partout', 'refus'),
     ('DETECTION', 'APPROCHE', 'balle vue & portee OK', 'roulis choisi'),
     ('DETECTION', 'ATTENTE', 'hors enveloppe', 'refus'),
     ('APPROCHE', 'RECALAGE', 'arrive a 110 mm', ''),
     ('RECALAGE', 'DESCENTE', 'ecart < 1 mm', 'affaissement appris'),
-    ('RECALAGE', 'ECHEC', 'ne converge pas', ''),
+    ('RECALAGE', 'APPROCHE', 'ne converge pas', 'nouvel essai'),
+    ('RECALAGE', 'ECHEC', 'essais epuises', ''),
     ('DESCENTE', 'SAISIE', 'ecart XY < 2.5 mm', ''),
-    ('DESCENTE', 'ECHEC', 'trop excentre', 'pas de fermeture'),
+    ('DESCENTE', 'RECALAGE', 'trop excentre', 'nouvel essai, biais garde'),
+    ('DESCENTE', 'ECHEC', 'essais epuises', 'pas de fermeture'),
     ('SAISIE', 'REMONTEE', 'statut == 2', ''),
-    ('SAISIE', 'RETRAIT', 'statut != 2', 'rien saisi'),
+    ('SAISIE', 'RECALAGE', 'rien saisi', 'pince rouverte, nouvel essai'),
+    ('SAISIE', 'RETRAIT', 'essais epuises', ''),
     ('REMONTEE', 'TRANSFERT', 'prise tenue', ''),
     ('REMONTEE', 'ECHEC', 'prise perdue', ''),
     ('TRANSFERT', 'LARGAGE', 'au-dessus du carton', ''),
     ('LARGAGE', 'RETRAIT', '', 'pince ouverte'),
-    ('RETRAIT', 'DETECTION', 'mode auto', 'boucle'),
+    ('RETRAIT', 'DEGAGEMENT', 'mode auto', 'boucle'),
     ('RETRAIT', 'ATTENTE', 'mode manuel', ''),
     ('ECHEC', 'ATTENTE', 'acquitte', ''),
 ]
+
+
+def _degagement(ctx):
+    """Ecarte le bras jusqu'a ce que la camera revoie la balle.
+
+    L'arducam regarde de dessus : des que le bras s'approche, il s'interpose et
+    se cache la balle a lui-meme. Un cycle qui enchaine sans degager mesure une
+    balle a moitie occultee — ou n'en trouve plus du tout et conclut a tort
+    qu'il n'y en a pas.
+    """
+    ordre = list(BALAYAGE_J1)
+    if ctx.balle_xy is not None:
+        # Azimut connu (boucle automatique) : commencer par le plus loin de la
+        # balle. Un J1 proche de son azimut place le bras juste au-dessus
+        # d'elle — c'est exactement la position qui l'occulte.
+        azimut = float(np.degrees(np.arctan2(ctx.balle_xy[1], ctx.balle_xy[0])))
+        ordre.sort(key=lambda j1: -abs(((j1 - azimut + 180.0) % 360.0) - 180.0))
+    for j1 in ordre:
+        pose = POSE_OBSERVATION.copy()
+        pose[0] = j1
+        if va_vers(ctx, pose, nom=f'degagement J1={j1:+.0f}') is None:
+            continue
+        if ctx.detecteur is None or ctx.detecteur() is not None:
+            ctx.resultats['degagement'] = f'J1 = {j1:+.0f} deg'
+            return 'DETECTION'
+        ctx.note(f'  balle invisible depuis J1={j1:+.0f}, on ecarte davantage')
+    ctx.resultats['degagement'] = 'invisible depuis toutes les poses'
+    ctx.note('balle invisible depuis toutes les poses de degagement')
+    return 'ATTENTE'
 
 
 def _detecte(ctx):
@@ -411,6 +516,7 @@ def _detecte(ctx):
         ctx.resultats['verdict'] = 'aucun roulis ne resout'
         return 'ATTENTE'
     ctx.balle_xy, ctx.roulis_balle, ctx.R_balle = xy, roulis, R
+    ctx.repart_a_zero()
     ctx.resultats['roulis balle'] = f'{roulis:+.0f} deg'
     ctx.resultats['verdict'] = 'atteignable'
     return 'APPROCHE'
@@ -428,7 +534,13 @@ def _recalage(ctx):
     q, correction, ok = converge(ctx, cible, ctx.R_balle)
     ctx.correction = correction
     ctx.resultats['recalage XY'] = f'{np.linalg.norm(pointe(q) - cible):.2f} mm'
-    return 'DESCENTE' if ok else 'ECHEC'
+    if ok:
+        return 'DESCENTE'
+    n = ctx.essai('RECALAGE')
+    if n < ESSAIS_MAX:
+        ctx.note(f'recalage insuffisant, essai {n + 1}/{ESSAIS_MAX} — on se replace')
+        return 'APPROCHE'
+    return 'ECHEC'
 
 
 def _descente(ctx):
@@ -436,7 +548,15 @@ def _descente(ctx):
     q, ok = descente_verticale(ctx, cible, ctx.R_balle, ctx.correction)
     if q is not None:
         ctx.resultats['descente'] = f'{np.linalg.norm(pointe(q)[:2] - cible[:2]):.2f} mm'
-    return 'SAISIE' if ok else 'ECHEC'
+    if ok:
+        return 'SAISIE'
+    n = ctx.essai('DESCENTE')
+    if n < ESSAIS_MAX:
+        ctx.resultats['biais appris'] = f'{ctx.biais_descente[:2].round(1)} mm'
+        ctx.note(f'descente ratee, essai {n + 1}/{ESSAIS_MAX} — reprise au recalage, '
+                 f'biais garde {ctx.biais_descente[:2].round(1)} mm')
+        return 'RECALAGE'
+    return 'ECHEC'
 
 
 def _saisie(ctx):
@@ -445,7 +565,15 @@ def _saisie(ctx):
     statut = ctx.pont.statut_pince()
     angle = ctx.pont.envoie('get_pro_gripper_angle').split(':')[-1].strip()
     ctx.resultats['pince'] = f'{ETAT_PINCE.get(statut, "?")} (angle {angle})'
-    return 'REMONTEE' if statut == 2 else 'RETRAIT'
+    if statut == 2:
+        return 'REMONTEE'
+    n = ctx.essai('SAISIE')
+    if n < ESSAIS_MAX:
+        ctx.pont.envoie('pro_gripper_open')
+        time.sleep(2.0)
+        ctx.note(f'rien saisi, essai {n + 1}/{ESSAIS_MAX} — on remonte et on recale')
+        return 'RECALAGE'
+    return 'RETRAIT'
 
 
 def _remontee(ctx):
@@ -491,11 +619,12 @@ def _retrait(ctx):
         if haut is not None:
             va_vers(ctx, haut[0], nom='remontee de retrait')
     va_vers(ctx, POSE_OBSERVATION, nom='retour observation')
-    return 'DETECTION' if ctx.mode_auto else 'ATTENTE'
+    return 'DEGAGEMENT' if ctx.mode_auto else 'ATTENTE'
 
 
 ACTIONS = {
-    'ATTENTE': lambda ctx: 'DETECTION',
+    'ATTENTE': lambda ctx: 'DEGAGEMENT',
+    'DEGAGEMENT': _degagement,
     'DETECTION': _detecte,
     'APPROCHE': _approche,
     'RECALAGE': _recalage,

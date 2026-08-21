@@ -20,6 +20,7 @@ connecte (le pont est mono-client et bloquant).
 """
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import threading
@@ -39,10 +40,12 @@ from PyQt5.QtWidgets import (QApplication, QComboBox, QFormLayout, QGroupBox,
 
 RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / 'scripts'))
+sys.path.insert(0, str(RACINE / 'mycobot_gateway' / 'mycobot_gateway' / 'vision'))
 import pick_fsm as fsm                                                  # noqa: E402
+import camera_registry as registre                                      # noqa: E402
 
 CALIB = RACINE / 'training' / 'calibration'
-CAMERAS = {'arducam': (0, 640, 480), 'svpro': (2, 800, 600)}
+SECOURS = {'arducam': 0, 'svpro': 2}   # si v4l2-ctl n'enumere rien
 HSV_BALLE = ((25, 90, 90), (45, 255, 255))
 HAUTEUR_CENTRE_BALLE = 35.0
 FENETRE_DETECTION = 1.2   # s — age maximal d'une detection reutilisable
@@ -50,11 +53,39 @@ FENETRE_DETECTION = 1.2   # s — age maximal d'une detection reutilisable
 # Disposition du graphe, en coordonnees normalisees. La boucle principale fait le
 # tour, ECHEC est au centre : toutes les sorties d'erreur y convergent.
 NOEUDS = {
-    'ATTENTE': (0.10, 0.50), 'DETECTION': (0.26, 0.16), 'APPROCHE': (0.50, 0.09),
-    'RECALAGE': (0.74, 0.16), 'DESCENTE': (0.90, 0.36), 'SAISIE': (0.90, 0.64),
-    'REMONTEE': (0.74, 0.84), 'TRANSFERT': (0.50, 0.91), 'LARGAGE': (0.26, 0.84),
-    'RETRAIT': (0.10, 0.68), 'ECHEC': (0.50, 0.50),
+    'ATTENTE': (0.06, 0.52), 'DEGAGEMENT': (0.10, 0.28), 'DETECTION': (0.30, 0.10),
+    'APPROCHE': (0.54, 0.06), 'RECALAGE': (0.78, 0.14), 'DESCENTE': (0.92, 0.36),
+    'SAISIE': (0.92, 0.64), 'REMONTEE': (0.78, 0.86), 'TRANSFERT': (0.54, 0.94),
+    'LARGAGE': (0.30, 0.90), 'RETRAIT': (0.06, 0.72), 'ECHEC': (0.50, 0.50),
 }
+def lit_controles(index):
+    """{nom: valeur} des controles d'exposition lus sur le peripherique."""
+    sortie = subprocess.run(['v4l2-ctl', '-d', f'/dev/video{index}', '--get-ctrl',
+                             'auto_exposure,exposure_time_absolute'],
+                            capture_output=True, text=True, timeout=5).stdout
+    return {m.group(1): int(m.group(2))
+            for m in (re.match(r'\s*(\w+):\s*(-?\d+)', l) for l in sortie.splitlines()) if m}
+
+
+def regle_exposition(index, exposition):
+    """Recette de `camera_publisher.set_manual_exposure`, sans dependance ROS.
+
+    Passer en manuel AVANT de poser le temps d'exposition : dans l'autre ordre
+    le driver ignore la consigne sans rien dire. `exposition < 0` = la camera
+    tourne en auto (cas SVPRO), et on force l'auto pour effacer un reglage
+    sombre reste coince dans le peripherique.
+    """
+    dev = f'/dev/video{index}'
+    reglages = ([('auto_exposure', '1'),
+                 ('exposure_time_absolute,gain,brightness', f'{exposition},0,0')]
+                if exposition >= 0 else
+                [('auto_exposure', '3'), ('gain,brightness', '100,0')])
+    for controles, valeurs in reglages:
+        ctrl = ','.join(f'{c}={v}' for c, v in zip(controles.split(','), valeurs.split(',')))
+        subprocess.run(['v4l2-ctl', '-d', dev, '--set-ctrl', ctrl],
+                       capture_output=True, timeout=5)
+
+
 BLEU = QColor(62, 110, 190)
 BLEU_CLAIR = QColor(120, 165, 225)
 GRIS = QColor(170, 175, 185)
@@ -249,6 +280,8 @@ class Fenetre(QMainWindow):
         self._n_journal = 0
         self._detections = deque(maxlen=40)
         self._verrou = threading.Lock()
+        self.derives = {}
+        self.cameras = self._detecte_cameras()
 
         self._construit()
         self._ouvre_cameras()
@@ -256,6 +289,10 @@ class Fenetre(QMainWindow):
         self.rafraichi.timeout.connect(self._tick)
         self.rafraichi.start(60)
         self._connecte()
+        # L'exposition se pose une fois le flux etabli : un controle v4l2 ecrit
+        # avant les premieres images est silencieusement annule au demarrage du
+        # flux. Le rafraichissement fait office de rodage.
+        QTimer.singleShot(2500, self._regle_expositions)
 
     # -- construction ------------------------------------------------------- #
 
@@ -265,7 +302,7 @@ class Fenetre(QMainWindow):
 
         gauche = QVBoxLayout()
         self.vues = {}
-        for nom in CAMERAS:
+        for nom in self.cameras:
             boite = QGroupBox(nom)
             interieur = QVBoxLayout(boite)
             vue = QLabel('en attente de flux…')
@@ -311,11 +348,14 @@ class Fenetre(QMainWindow):
         self.live_position = QLabel('—')
         self.live_portee = QLabel('—')
         self.live_verdict = QLabel('—')
+        self.live_expo = QLabel('réglage en cours…')
         self.live_position.setStyleSheet('font-family:monospace; font-weight:bold;')
         self.live_portee.setStyleSheet('font-family:monospace;')
+        self.live_expo.setStyleSheet('font-family:monospace; color:#888;')
         form_live.addRow('position base', self.live_position)
         form_live.addRow('portée', self.live_portee)
         form_live.addRow('verdict', self.live_verdict)
+        form_live.addRow('exposition', self.live_expo)
         droite.addWidget(boite_live)
 
         boite_mesures = QGroupBox('mesures')
@@ -352,12 +392,83 @@ class Fenetre(QMainWindow):
 
     # -- cameras ------------------------------------------------------------ #
 
-    def _ouvre_cameras(self):
-        for nom, (dev, largeur, hauteur) in CAMERAS.items():
-            cap = cv2.VideoCapture(dev)
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, largeur)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, hauteur)
-            self.captures[nom] = cap if cap.isOpened() else None
+    def _detecte_cameras(self):
+        """Memes cameras et memes reglages que le dashboard de validation DREAM.
+
+        Le registre les identifie par leur nom V4L2 et porte leur exposition
+        calibree — l'ordre des `/dev/video` n'est pas stable d'un branchement a
+        l'autre, le figer ici finirait par pointer la mauvaise camera.
+        """
+        # `probe_capture=False` : la sonde du registre ouvre la camera pour
+        # verifier qu'elle capture, et on la rouvre juste apres — l'UVC ne rend
+        # pas la bande passante assez vite, la seconde ouverture echoue sur
+        # « Failed to allocate required memory ». On ouvre une seule fois.
+        trouvees = {s.name: (s.v4l2_index, s.manual_exposure)
+                    for s in registre.detect_cameras(probe_capture=False)}
+        for nom, index in SECOURS.items():
+            trouvees.setdefault(nom, (index, registre.KNOWN_BY_NAME[nom].manual_exposure))
+        return trouvees
+
+    def _ouvre_cameras(self, essais=5):
+        """Ouvre chaque camera, en reessayant : l'ouverture est capricieuse.
+
+        Une ouverture trop proche de la precedente echoue — le peripherique
+        s'ouvre mais ne delivre aucune image. Il faut donc valider par une
+        LECTURE, pas par `isOpened()`, et laisser au bus le temps de se liberer.
+        """
+        for nom, (index, _) in self.cameras.items():
+            self.captures[nom] = None
+            for essai in range(essais):
+                cap = cv2.VideoCapture(index)
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, registre.CAPTURE_W)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, registre.CAPTURE_H)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                if cap.isOpened() and cap.read()[0]:
+                    self.captures[nom] = cap
+                    break
+                cap.release()
+                time.sleep(1.2)
+            if self.captures[nom] is None:
+                self.ctx.note(f'{nom} /dev/video{index} — muette apres {essais} essais')
+
+    def _regle_expositions(self):
+        for nom, (index, exposition) in self.cameras.items():
+            if self.captures.get(nom) is None:
+                continue
+            regle_exposition(index, exposition)
+            self.ctx.note(f'{nom} /dev/video{index} — exposition '
+                          + (f'manuelle {exposition}' if exposition >= 0 else 'auto'))
+        self.surveille = QTimer(self)
+        self.surveille.timeout.connect(self._surveille_expositions)
+        self.surveille.start(4000)
+
+    def _surveille_expositions(self):
+        """L'arducam repasse en auto toute seule — le driver relache le reglage
+        manuel (constate : `auto_exposure` revenu a 3, exposition a 157 au lieu
+        de 75). L'image scintille alors et la balle jaune disparait sous la
+        surexposition. On relit le peripherique et on repose des que ca bouge.
+        """
+        for nom, (index, exposition) in self.cameras.items():
+            if self.captures.get(nom) is None or exposition < 0:
+                continue
+            etat = lit_controles(index)
+            tenue = (etat.get('auto_exposure') == 1
+                     and etat.get('exposure_time_absolute') == exposition)
+            if nom == 'arducam':
+                self.live_expo.setText(f'manuelle {exposition}' if tenue
+                                       else f'AUTO ({etat.get("exposure_time_absolute")})')
+                self.live_expo.setStyleSheet('font-family:monospace; '
+                                             + ('color:#2e7d32;' if tenue
+                                                else 'color:#c62828; font-weight:bold;'))
+            if tenue:
+                continue
+            regle_exposition(index, exposition)
+            self.derives[nom] = self.derives.get(nom, 0) + 1
+            self.ctx.note(f'{nom} — exposition relachee par le driver '
+                          f'(auto={etat.get("auto_exposure")}, '
+                          f'temps={etat.get("exposure_time_absolute")}), remise a '
+                          f'{exposition} — {self.derives[nom]}e fois')
 
     def _tick(self):
         for nom, cap in self.captures.items():
