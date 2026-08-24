@@ -1,5 +1,57 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (24 août 2026 — journée)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Le cycle ne repart plus au ramassage avec la balle en main.** Garde unique
+  dans `MachineEtats.pas()`, deux états neufs (`RECHERCHE_CARTON`,
+  `ECHEC_PORTANT`). Seule une perte de prise relance la saisie.
+- **Détection du carton refaite** : la couleur ne le sépare pas de la planche
+  (mesuré carton H14 S171 V60, planche H15 S187 V84 — l'ancien seuil prenait la
+  planche entière). Remplacée par la recherche d'un creux sombre entouré de
+  brun, plus un suivi avec hystérésis qui stabilise le rectangle.
+- **Temps de cycle : le vrai coupable trouvé.** Chaque mouvement attendait
+  22,7 s parce que l'arrivée était jugée sur l'atteinte de la consigne, jamais
+  satisfaite à cause de l'affaissement. Détection à l'immobilité :
+  **22,7 s → 1,35 s par mouvement, à vitesse inchangée**.
+- **SVPRO recalibrée et branchée en appui** de l'arducam (hauteur de la balle
+  par triangulation, relais quand le bras masque la vue de dessus).
+- **Portée corrigée** : la limite mesurée est 350 mm, pas 335 — des balles
+  atteignables étaient refusées.
+- 25 tests neufs (`tests/test_pick_fsm_depose.py`, `tests/test_suivi_carton.py`).
+
+### Décisions prises
+
+1. **L'arducam reste la source du X/Y** ; la SVPRO ne fournit que la hauteur et
+   le relais en cas d'occultation. Refus si les rayons s'écartent de plus de 25 mm.
+2. **Pas de veto de dernière seconde avant le largage** — à cet instant le bras
+   masque le carton, la détection n'y est pas fiable. Le carton déplacé se
+   rattrape à la recherche, bras dégagé.
+3. **Viser le milieu du carton, et à défaut le point de l'ouverture le plus
+   proche du milieu** que le bras atteint.
+4. **La vitesse du bras reste à 25** : la mesure prouve que le temps ne venait
+   pas de là (22,67 s par mouvement à vitesse 25 comme à vitesse 50).
+
+### Prochaines actions
+
+1. [ROUGE] Mesurer un cycle complet réel avec le chronomètre en place et
+   attaquer les trois étapes les plus coûteuses qu'il désignera.
+2. [JAUNE] Descendre sous ~9 mouvements par cycle : fusionner approche et
+   recalage, supprimer la remontée par paliers quand le chemin direct est validé.
+3. [JAUNE] Confirmer les dimensions réelles de l'ouverture du carton pour en
+   faire un filtre dur (mesuré 101 × 135 mm, à recouper).
+4. [VERT] Utiliser la SVPRO pour vérifier que la balle tombe bien dans le carton.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+/usr/bin/python3 scripts/pick_dashboard.py     # aucun autre client TCP sur la Pi
+```
+
+---
+
 ## État actuel (20 août 2026 — après-midi)
 
 **Cycle pick-and-place complet réussi sur le robot réel**, de la localisation par
@@ -36,8 +88,11 @@ vision au dépôt en bac vérifié par image.
    le nœud d'asservissement le charge. Le refaire ou le neutraliser.
 3. [JAUNE] Porter dans le nœud la rotation d'orientation selon l'azimut et la
    compensation d'affaissement — aujourd'hui appliquées dans les scripts d'essai.
-4. [JAUNE] Remonter plus haut avant le transfert vers le bac (trajectoire actuelle
-   valide mais rasante).
+4. [FAIT] Transfert haut validé — 150 mm au lieu de 120, garde au sol pendant la
+   translation portée de ~120 à **185 mm**, statut pince vérifié à deux points du
+   transit. Contrainte : le plafond au-dessus d'une cible à 368 mm de portée est
+   de **160 mm** (à 200 mm le résidu IK monte à 12,8 mm) — choisir la hauteur de
+   transfert comme la plus haute atteignable **aux deux extrémités**.
 5. [VERT] Passer le serrage par `set_pro_gripper_torque` plutôt que par l'angle.
 
 ### Commande rapide de reprise

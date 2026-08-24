@@ -45,3 +45,7 @@ training/dream/checkpoints_dream/
 *.pkl
 *.onnx
 .claude/scheduled_tasks.lock
+
+# Position du carton retenue d une seance a l autre — etat local, pas du code
+scripts/carton_position.json
+scripts/affaissement.json
