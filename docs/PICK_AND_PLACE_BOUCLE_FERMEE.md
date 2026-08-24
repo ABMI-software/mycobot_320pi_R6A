@@ -401,6 +401,146 @@ couverture totale.
 
 ---
 
+## 6 quater. Ce qui a changé le 24 août 2026
+
+### L'objet en main interdit tout retour au ramassage
+
+Le cycle a tourné la balle en pince sans jamais déposer. La cause n'était pas la
+vision : `TRANSFERT` échouait, renvoyait vers `ECHEC`, donc `ATTENTE`, donc
+`DEGAGEMENT` — le bras repartait chercher une balle qu'il tenait déjà.
+
+La garde est **unique et dans `MachineEtats.pas()`**, pas répartie dans les
+états : toutes les sorties d'erreur passent par là, c'est le seul point où on
+puisse l'arrêter. Tant que `get_pro_gripper_status == 2`, les états de ramassage
+sont détournés vers `RECHERCHE_CARTON`.
+
+| état neuf | rôle |
+|---|---|
+| `RECHERCHE_CARTON` | cherche le carton **en hauteur, sans lâcher** (balayage J1 aux poses d'observation, pointe à 172 mm) ; à défaut, dernière position connue persistée dans `scripts/carton_position.json` |
+| `ECHEC_PORTANT` | carton introuvable ou hors d'atteinte : **garde l'objet** et s'arrête, même en automatique |
+
+Seule une perte de prise — statut 1 ou 3 — relance la saisie. Et le carton est
+jugé **avant** de saisir : `DETECTION` refuse de démarrer un cycle si le carton
+n'est ni vu ni mémorisé à portée. C'est le seul moment où le bras est dégagé.
+
+### Détecter le carton : la couleur ne suffit pas
+
+| zone | H | S | V |
+|---|---|---|---|
+| intérieur du carton | 14 | 171 | 60 |
+| planche en bois | 15 | 187 | 84 |
+
+Même teinte, même saturation. L'ancien seuil `HSV_CARTON` prenait **la planche
+entière** pour un carton — tache de 30 000 px², centroïde à 300 mm de la vraie
+boîte. Ce qui distingue le carton, c'est que son **ouverture est un creux plus
+sombre que le bois, entouré de brun sur tout son pourtour** :
+
+1. masque du plateau projeté depuis les 4 ArUco, marqueurs découpés ;
+2. `V` inférieur d'au moins 12 à la médiane locale (noyau 61 px) ;
+3. côtés réels 55–330 mm, **anneau brun ≥ 60 %** — c'est lui qui élimine les
+   marqueurs (bordure blanche) et l'ombre du bras (silhouette blanche) —
+   contraste anneau/creux ≥ 8 ;
+4. visée au centre de l'enveloppe convexe du creux ;
+5. repli couleur, en refusant toute tache couvrant plus de 35 % de la planche.
+
+`SuiviCarton` stabilise ensuite : lissage tant que la détection reste à moins de
+60 mm, **6 images concordantes** avant d'admettre un déplacement, garde de
+taille ±45 %, péremption 4 s. Le rectangle affiché est la position suivie.
+
+⚠ **Pas de contrôle de dernière seconde avant le largage.** Il a été essayé et
+retiré : à cet instant le bras est au-dessus du carton et le masque, la
+détection saute de 55 à 171 mm, et le cycle repartait en boucle sans déposer.
+Une détection de carton à moins de 120 mm sous la pointe est ignorée.
+
+### Viser le milieu, sans renoncer au carton quand il est hors d'atteinte
+
+Le milieu du carton mesuré à 363 mm est inatteignable **à toutes les hauteurs de
+largage** — 100, 120, 140 et 160 mm, aucune ne passe : la limite est
+horizontale, pas verticale. La même ouverture a son bord proche à 290 mm.
+
+Les points de largage sont donc classés **par distance au milieu**, reculés des
+parois d'autant que l'ouverture le permet (jamais plus des trois quarts du rayon
+inscrit, sinon seul le centre géométrique survit — justement le point le plus
+lointain). Mesure : largage à 2–22 mm du milieu, 31–43 mm de marge aux parois.
+
+### La portée réelle est de 350 mm, pas 335
+
+Roulis libre, outil vertical, sur les **trois** hauteurs du cycle (transfert
+170, survol 110, prise −5) :
+
+| portée | 335 | 344 | 350 | 355 | 360 |
+|---|---|---|---|---|---|
+| roulis qui résout | +30 | +30 | +60 | +60 | aucun |
+
+(360 mesuré sur prise + survol seulement — il échoue déjà là.)
+
+`PORTEE_MAX` valait 335 et refusait des balles atteignables — une à 343,6 mm.
+Porté à **355**. Incliner l'outil n'ajoute rien ici : testé de +10 à +30°,
+aucune solution (−10 et −20° passent, mais 0° passe déjà).
+
+### La SVPRO assiste l'arducam
+
+L'arducam reste la source du X/Y : elle regarde presque à la verticale. La SVPRO
+ne fournit que **la hauteur**, par triangulation des deux rayons, en
+remplacement de l'hypothèse « centre de balle à 35 mm » — hypothèse dont
+l'erreur se transforme en erreur XY, d'autant plus grande que le rayon est
+oblique, donc aux bords du plateau.
+
+Mesure du 24/08 : écartement des deux rayons **2,3 mm** (validation croisée des
+deux extrinsèques), hauteur réelle **29,9 mm**, correction XY **2,01 mm** à
+324 mm de portée. Relais complet quand le bras masque la vue de dessus — le
+journal montrait `balle vue sur 0 image(s)` à chaque recalage. Appui refusé si
+les rayons s'écartent de plus de 25 mm.
+
+⚠ La SVPRO est calibrée en **800×600** et lue en 640×480 : sa matrice
+intrinsèque doit être rescalée (`camera_registry.load_intrinsics`). Avec la
+matrice brute du `.npz`, les marqueurs se reprojettent à 200 mm de leur
+position. Son extrinsèque, dérivée à 16,5 mm, a été recalibrée sur 16 coins :
+**1,57 mm**, au niveau de l'arducam (1,24 mm).
+
+### Temps de cycle : le coupable n'était pas le robot
+
+**Chaque mouvement attendait 22,7 s.** L'arrivée était jugée sur l'atteinte de
+la consigne à 1,2° près, or l'affaissement laisse un écart permanent d'environ
+1,9° sur J2 : le test n'était jamais satisfait et l'attente allait au bout de sa
+patience. Mesuré **identique à vitesse 25 et à vitesse 50**, ce qui prouve que
+le temps ne venait pas du robot. L'arrivée se détecte désormais à
+l'**immobilité** du bras : **22,7 s → 1,35 s par mouvement**, vitesse inchangée.
+
+Trois autres postes, tous mesurés :
+
+- **le roulis.** Un roulis qui échoue épuise les 22 amorces — 5 s ; celui qui
+  marche répond en 40 ms. Le roulis retenu est réessayé en premier, rangé **par
+  bande d'allonge de 25 mm** : celui appris à 257 mm échoue à 357 mm. La pose du
+  carton est mise en cache tant qu'il n'a pas bougé de plus de 12 mm.
+  **16,7 s → 0,04 s** au retour sur une position connue.
+- **l'affaissement.** Il est reproductible : le redécouvrir coûtait deux passes
+  de convergence, donc deux mouvements (passe 1 à 10,79 mm, passe 2 à 4,15,
+  passe 3 à 0,38). La correction est retenue sur disque et réinjectée dès la
+  première passe.
+- **la seconde de stabilisation** après chaque mouvement ne sert qu'avant une
+  *mesure* : supprimée sur les transits, gardée sur la convergence et la
+  descente.
+
+Un chronomètre est en place : durée par état dans le journal, et à chaque
+retrait une ligne `CYCLE COMPLET : XX s — les trois étapes les plus coûteuses`.
+
+### Descendre depuis le bras dressé
+
+La pointe au repos est à 518 mm, la cible d'approche à 110 : le garde-fou
+anti-plongeon (220 mm en un seul ordre, né du plongeon de 590 mm du 20/08)
+refusait, et le cycle bouclait sur `APPROCHE REFUSE`. Le mouvement est découpé
+en étapes interpolées dans l'espace **articulaire**. Deux mesures qui imposent
+cette forme :
+
+- descendre par paliers **au-dessus de la cible** ne marche pas : à Z = 340 mm,
+  l'outil ne peut pas être tenu vertical, l'IK n'a aucune solution ;
+- le nombre d'étapes ne se déduit pas de la chute totale : l'interpolation
+  articulaire n'est pas monotone en hauteur, la pointe **monte d'abord à
+  562 mm** avant de plonger. Il se règle sur le profil réel.
+
+---
+
 ## 7. Autres points ouverts
 
 - **Extrinsèque SVPRO invalide** (32–149 mm de dérive, caméra déplacée). Elle ne

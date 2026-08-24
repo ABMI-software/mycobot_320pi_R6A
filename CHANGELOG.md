@@ -11,6 +11,102 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **Invariant de dépose : objet en main ⇒ jamais de retour au ramassage**
+  (`scripts/pick_fsm.py`) — garde unique et non contournable dans
+  `MachineEtats.pas()`. Deux états nouveaux : `RECHERCHE_CARTON` (cherche le
+  carton en hauteur sans lâcher, balayage J1, repli sur la dernière position
+  connue persistée) et `ECHEC_PORTANT` (garde l'objet et s'arrête, même en
+  automatique). Seule une perte de prise — statut pince 1 ou 3 — relance la
+  saisie. Le cycle tournait auparavant avec la balle en main indéfiniment :
+  `TRANSFERT` échouait → `ECHEC` → `ATTENTE` → `DEGAGEMENT`.
+- **Le carton est jugé AVANT la saisie** — `DETECTION` refuse de démarrer un
+  cycle si le carton n'est ni vu ni mémorisé à portée. C'est le seul moment où
+  le bras est dégagé et où la caméra le voit sans obstacle.
+- **Point de largage choisi dans l'ouverture, au plus près du milieu** — viser
+  le centre n'est pas obligatoire : mesuré, un centre à 363 mm inatteignable
+  (à *toutes* les hauteurs de largage, 100 à 160 mm) pour une ouverture dont le
+  bord proche est à 290 mm. Les candidats sont classés par distance au milieu,
+  reculés des parois. Mesure : largage à 2–22 mm du milieu, 31–43 mm de marge.
+- **Suivi du carton (`SuiviCarton`)** — lissage tant que la détection reste
+  proche, hystérésis de 6 images concordantes avant d'admettre un déplacement,
+  garde de taille (±45 %), péremption 4 s. Le rectangle affiché est la position
+  suivie, pas la détection brute.
+- **La SVPRO assiste l'arducam** — l'arducam reste la source du X/Y ; la SVPRO
+  ne fournit que la hauteur, par triangulation des deux rayons, remplaçant
+  l'hypothèse « centre de balle à 35 mm ». Relais complet quand le bras masque
+  la vue de dessus. Refus si les rayons s'écartent de plus de 25 mm. Mesure du
+  24/08 : écartement 2,3 mm, hauteur réelle 29,9 mm, correction XY 2,01 mm.
+- **Chronomètre de cycle** — durée par état dans le journal, secondes qui
+  défilent sur l'étape en cours, ligne `CYCLE COMPLET : XX s — les 3 étapes les
+  plus coûteuses` à chaque retrait.
+- **Tests** — `tests/test_pick_fsm_depose.py` (17 tests : invariant de dépose,
+  point de largage, descente depuis le bras dressé) et
+  `tests/test_suivi_carton.py` (8 tests).
+
+### Corrigé
+
+- **Chaque mouvement coûtait 22,7 s d'attente** (`va_vers`) — l'arrivée était
+  jugée sur l'atteinte de la consigne à 1,2° près, or l'affaissement laisse un
+  écart permanent d'environ 1,9° sur J2 : le test n'était jamais satisfait et
+  l'attente allait au bout de sa patience. Mesuré identique à vitesse 25 et 50,
+  ce qui prouve que le temps ne venait pas du robot. L'arrivée se détecte
+  désormais à l'**immobilité** du bras : **22,7 s → 1,35 s par mouvement**, à
+  vitesse inchangée.
+- **Détection du carton par la couleur** — carton H14 S171 V60 et planche
+  H15 S187 V84 : même teinte, l'ancien seuil prenait la planche entière pour un
+  carton (tache de 30 000 px², centroïde à 300 mm de la vraie boîte). Remplacé
+  par la recherche d'un **creux sombre entouré de brun** dans le plateau projeté
+  depuis les marqueurs.
+- **Matrice intrinsèque non rescalée** (`pick_dashboard.Vision`) — la SVPRO est
+  calibrée en 800×600 et lue en 640×480 ; avec la matrice brute du `.npz`, les
+  marqueurs se reprojetaient à 200 mm de leur position. Passe par
+  `camera_registry.load_intrinsics`.
+- **`PORTEE_MAX` refusait des balles atteignables** — 335 mm alors que la
+  mesure donne 330, 340 et 350 mm résolus (roulis +30, +30, +60) et 360 non.
+  Une balle à 343,6 mm était refusée. Porté à **355 mm**. Incliner l'outil
+  n'ajoute rien : testé de +10 à +30°, aucune solution.
+- **Plantage du largage sur `None @ TOOL`** — le bouton « détecter le carton »
+  remet `R_carton` à `None` ; un clic pendant la boucle faisait lever
+  `matmul: Input operand 0 does not have enough dimensions`. Le largage repasse
+  par la recherche.
+- **Approche refusée depuis le bras dressé** — la pointe au repos est à 518 mm,
+  la cible d'approche à 110 : le garde-fou anti-plongeon (220 mm par ordre)
+  refusait, et le cycle bouclait. Découpage en étapes interpolées dans l'espace
+  **articulaire** — descendre par paliers au-dessus de la balle ne marche pas,
+  à Z=340 l'outil ne peut pas être tenu vertical. Le nombre d'étapes se règle
+  sur le profil réel : l'interpolation n'est pas monotone, la pointe monte
+  d'abord à 562 mm avant de plonger.
+- **Veto de dernière seconde avant le largage — retiré** — à cet instant le bras
+  masque le carton, la détection sautait de 55 à 171 mm et le cycle repartait en
+  boucle sans jamais déposer. Une détection de carton à moins de 120 mm sous la
+  pointe est désormais ignorée : c'est le bras ou son ombre.
+- **Boucle infinie sur échec** — arrêt après 3 échecs d'affilée sans progrès,
+  compteur remis à zéro par chaque dépose réussie ; le fil du robot s'arrête dès
+  que la machine ne change plus d'état.
+- **Extrinsèque SVPRO** — dérivée à 16,5 mm d'erreur moyenne sur les 4
+  marqueurs, recalibrée sur 16 coins (RANSAC+LM, leave-one-out) : **1,57 mm**,
+  au niveau de l'arducam (1,24 mm).
+
+### Performance
+
+- **Le solveur ne cherche plus le roulis à chaque fois** — un roulis qui échoue
+  épuise les 22 amorces (5 s), celui qui marche répond en 40 ms. Le roulis
+  retenu est réessayé en premier, rangé **par bande d'allonge de 25 mm** (celui
+  appris à 257 mm échoue à 357 mm). La pose du carton est mise en cache tant
+  qu'il n'a pas bougé de plus de 12 mm. Mesure : **16,7 s → 0,04 s** au retour
+  sur une position connue ; 0,83 s après un déplacement réel de 110 mm.
+- **L'affaissement n'est plus redécouvert à chaque cycle** — la correction
+  articulaire est retenue sur disque et réinjectée dès la première passe de
+  convergence. Elle valait auparavant deux passes, donc deux mouvements
+  (mesure : passe 1 à 10,79 mm, passe 2 à 4,15, passe 3 à 0,38).
+- **Pause de stabilisation supprimée sur les transits** — la seconde d'attente
+  après un mouvement ne sert qu'avant une *mesure* ; se dégager, transférer et
+  se retirer n'en mesurent aucune.
+- **Attente de pince adaptative** — on attend un statut décidé (1/2/3) au lieu
+  de 2,2 s forfaitaires ; remontée en 3 paliers au lieu de 4.
+
+### Ajouté
+
 - **Asservissement visuel en boucle fermée (`mycobot_gateway/visual_servo/`)** —
   machine à états pick-and-place complète, testable image par image sans matériel :
   fusion multi-caméras, suivi de Kalman avec compensation de latence, loi de

@@ -1,6 +1,6 @@
 # 🤖 MyCobot 320 Pi - Résumé de Développement
 
-> **Date de dernière mise à jour:** 20 août 2026
+> **Date de dernière mise à jour:** 24 août 2026
 > **Version:** 2.1.0
 > **Repository GitHub:** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Branche:** `feature/pick-and-place-osama`
@@ -10,6 +10,38 @@
 ## 📌 Point de Départ Rapide
 
 👉 **Pour démarrer une nouvelle session, consultez [`SESSION_RESUME.md`](SESSION_RESUME.md)**
+
+---
+
+## ⏱️ Cycle autonome fiabilisé et accéléré (24 août 2026)
+
+Trois défauts trouvés par la mesure, pas par la lecture du code.
+
+**1. Le cycle repartait au ramassage avec la balle en main.** `TRANSFERT`
+échouait → `ECHEC` → `ATTENTE` → `DEGAGEMENT`. Une garde unique dans
+`MachineEtats.pas()` l'interdit tant que la pince tient ; deux états neufs,
+`RECHERCHE_CARTON` (cherche en hauteur sans lâcher) et `ECHEC_PORTANT` (garde
+l'objet et s'arrête). Le carton est jugé **avant** la saisie.
+
+**2. Chaque mouvement coûtait 22,7 s d'attente.** L'arrivée était jugée sur
+l'atteinte de la consigne à 1,2°, or l'affaissement laisse ~1,9° d'écart
+permanent sur J2 : le test n'était jamais satisfait. Mesuré identique à vitesse
+25 et 50, donc le temps ne venait pas du robot. Arrivée détectée à l'immobilité :
+**22,7 s → 1,35 s par mouvement**, vitesse inchangée. Avec le roulis appris par
+bande d'allonge (16,7 s → 0,04 s), l'affaissement retenu sur disque et les
+pauses de stabilisation supprimées sur les transits.
+
+**3. La couleur ne sépare pas le carton de la planche** (carton H14 S171 V60,
+planche H15 S187 V84) : la planche entière était prise pour un carton.
+Remplacée par la recherche d'un creux sombre entouré de brun, plus un suivi à
+hystérésis. La portée utile réelle est **350 mm**, pas 335 — des balles
+atteignables étaient refusées.
+
+La SVPRO, recalibrée (16,5 → 1,57 mm), assiste désormais l'arducam : elle
+fournit la hauteur de la balle par triangulation (écartement des rayons 2,3 mm,
+correction XY 2,01 mm) et prend le relais quand le bras masque la vue de dessus.
+
+Détail complet et chiffres : [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) § 6 quater.
 
 ---
 
