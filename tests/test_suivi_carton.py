@@ -8,6 +8,7 @@ import sys
 import unittest
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 RACINE = Path(__file__).resolve().parents[1]
@@ -245,3 +246,89 @@ class ContinuiteDesCartons(unittest.TestCase):
                in self._vision((30000.0, 35000.0)).cartons(None, connus=connus)}
         self.assertEqual(vus['grand'], (350.0, -170.0))
         self.assertEqual(vus['petit'], (368.0, 168.0))
+
+
+class MarqueurPoseAPlatSurLaTable(unittest.TestCase):
+    """Un marqueur au ras de la table nomme le carton mais ne dit pas sa hauteur.
+
+    Certains cartons n'offrent aucune surface horizontale au niveau du rebord :
+    leurs rabats se rabattent a plat sur la table. Prendre la hauteur d'un tel
+    marqueur pour celle du rebord decalerait le centre de l'ouverture de 50 mm.
+    """
+
+    def _vision(self, z_marqueur):
+        vision = tb.Vision.__new__(tb.Vision)
+        vision._creux_candidats = lambda *a, **k: [
+            (20000.0, np.array([300.0, -130.0]), None, 0.02, np.array([100.0, 100.0]))]
+        vision.vers_base = lambda uv, z: np.array([300.0, -130.0, z])
+        vision.cartons_marques = tb.Vision.cartons_marques.__get__(vision)
+        vision.pose_marqueur = lambda coins: (np.array([300.0, -130.0]), z_marqueur, 0.0)
+        return vision
+
+    def test_un_marqueur_sur_le_rebord_donne_sa_hauteur(self):
+        vus = {c: z for c, _, _, z in self._vision(84.0).cartons(None, marqueurs={10: None})}
+        self.assertEqual(vus['grand'], 84.0)
+
+    def test_un_marqueur_au_ras_de_la_table_ne_la_donne_pas(self):
+        vus = {c: z for c, _, _, z in self._vision(3.0).cartons(None, marqueurs={10: None})}
+        self.assertEqual(vus['grand'], tb.HAUTEUR_CARTON)
+
+
+class CoeurSombreDuCreux(unittest.TestCase):
+    """L'ombre de la paroi exterieure ne doit pas gonfler l'ouverture.
+
+    Le petit carton mesure 115 x 70 mm au metre ruban. Son creux, colle a
+    l'ombre de sa propre paroi, etait mesure 105 x 203 mm — et le point de
+    largage se choisit sur ce polygone, donc au-dessus de la paroi plutot que
+    dans la boite. Le coeur sombre le ramene a 67 x 115 mm.
+    """
+
+    def _vision(self):
+        vision = tb.Vision.__new__(tb.Vision)
+        vision._cotes_mm = lambda contour, z=None: tuple(
+            sorted(cv2.minAreaRect(contour)[1]))
+        return vision
+
+    def _creux(self, valeur, contour):
+        return self._vision()._coeur_sombre(contour, valeur)
+
+    def test_le_creux_se_separe_de_l_ombre_de_la_paroi(self):
+        valeur = np.full((200, 200), 200, np.uint8)
+        valeur[40:150, 40:110] = 30        # interieur de la boite
+        valeur[40:150, 110:170] = 120      # paroi a l'ombre, sombre aussi
+        contour = np.array([[[40, 40]], [[169, 40]], [[169, 149]], [[40, 149]]], np.int32)
+        coeur = self._creux(valeur, contour)
+        self.assertIsNotNone(coeur)
+        petit, grand = sorted(cv2.minAreaRect(cv2.convexHull(coeur))[1])
+        self.assertAlmostEqual(petit, 69.0, delta=6.0)
+        self.assertAlmostEqual(grand, 109.0, delta=6.0)
+
+    def test_une_ouverture_uniforme_n_est_pas_coupee_en_deux(self):
+        valeur = np.full((200, 200), 200, np.uint8)
+        valeur[40:150, 40:170] = 30
+        contour = np.array([[[40, 40]], [[169, 40]], [[169, 149]], [[40, 149]]], np.int32)
+        coeur = self._creux(valeur, contour)
+        if coeur is not None:
+            aire = cv2.contourArea(coeur) / cv2.contourArea(contour)
+            self.assertGreater(aire, 0.9)
+
+
+class RayonDeLaBase(unittest.TestCase):
+    """Rien de ce qui touche la base n'est un carton : c'est le robot.
+
+    Sans ce garde-fou, le bras au repos etait detecte comme un creux de
+    70 x 164 mm a 57 mm de la base et prenait le nom de "petit carton" — le
+    carton fantome au milieu de la table, qui ne bougeait pas quand on
+    deplacait le vrai. Le masque cinematique ne suffit pas : il exige les
+    angles, donc le pont vers la Pi, et sans lui il ne masque rien.
+    """
+
+    def test_le_seuil_est_sous_la_zone_de_largage(self):
+        self.assertLessEqual(tb.RAYON_BASE_MIN, 200.0)
+
+    def test_le_bras_au_pied_du_robot_est_hors_du_seuil(self):
+        self.assertLess(float(np.hypot(54.4, -18.4)), tb.RAYON_BASE_MIN)
+
+    def test_les_deux_cartons_mesures_sont_au_dela(self):
+        for xy in ((316.4, -144.7), (353.1, 196.3)):
+            self.assertGreater(float(np.hypot(*xy)), tb.RAYON_BASE_MIN)

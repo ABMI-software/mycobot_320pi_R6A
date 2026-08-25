@@ -73,7 +73,22 @@ ANNEAU_SOMBRE_MIN = 0.55
 # serre que l'incertitude sur le plan ou on le mesure. Sa vraie tache est
 # d'ecarter la planche entiere (450 mm) et les petits objets, pas d'arbitrer
 # au centimetre.
-COTE_CARTON_MM = (60.0, 260.0)
+# Plancher abaisse a 45 mm le 25/08 : le petit carton mesure 115 x 70 mm hors
+# tout, donc une ouverture d'une soixantaine de millimetres au petit cote — le
+# plancher precedent, 60, le rejetait tout juste.
+COTE_CARTON_MM = (45.0, 260.0)
+# Rien de ce qui est a moins de ca du centre de la base n'est un carton : c'est
+# le robot lui-meme. Sans ce garde-fou, le bras au repos etait detecte comme un
+# creux de 70 x 164 mm a 57 mm de la base et prenait le nom de "petit carton" —
+# c'est le "petit carton au milieu de la table" qui ne bougeait pas quand on
+# deplacait le vrai (constate le 25/08). Le masque cinematique ne suffit pas :
+# il exige les angles, donc le pont vers la Pi, et sans lui il ne masque rien.
+# La zone de largage commence de toute facon a 200 mm.
+RAYON_BASE_MIN = 200.0    # mm
+# Part minimale du creux que doit garder son coeur sombre pour etre cru. Sous ce
+# seuil, le seuillage a coupe dans l'ouverture elle-meme au lieu de la separer
+# de l'ombre de la paroi.
+PART_COEUR_MIN = 0.30
 # Une ouverture est un rectangle : elle remplit sa boite englobante. Une ombre
 # qui serpente, non.
 REMPLISSAGE_CARTON_MIN = 0.60
@@ -89,7 +104,12 @@ MARGE_PLATEAU = 100.0      # mm — les marqueurs sont en retrait des bords
 COTE_MARQUEUR = 90.0      # mm — carré noir + bordure blanche, à masquer
 PART_PLATEAU_MAX = 0.35   # au-delà, la tache brune EST la planche
 HAUTEUR_CENTRE_BALLE = 35.0
-HAUTEUR_CARTON = 60.0     # rebord du carton
+# Mesure du 25/08 par triangulation des deux vues sur l'ouverture du grand
+# carton : 82,9 mm, avec 11,8 mm d'ecart entre les deux rayons. La valeur
+# precedente, 60, etait supposee. L'ecart n'est pas anodin : c'est le plan sur
+# lequel se projette toute la geometrie des cartons, et entre Z=0 et Z=100 le
+# centre projete d'un carton se deplace de 50 mm.
+HAUTEUR_CARTON = 83.0     # rebord du carton, mesure
 HAUTEUR_OBJET = 12.0      # mi-hauteur d'un rouleau de scotch couche
 # Demi-epaisseur des segments du bras PLUS l'ombre qu'ils portent sur la
 # planche. C'est cette ombre qui se faisait prendre pour l'ouverture du carton :
@@ -240,6 +260,34 @@ GRIS = QColor(170, 175, 185)
 ROUGE = QColor(225, 45, 45)
 
 
+class VueCliquable(QLabel):
+    """Flux camera qui rend le pixel CLIQUE, dans le repere de l'image.
+
+    Le pixmap est mis a l'echelle en gardant les proportions : il est donc
+    centre, avec des bandes noires. Sans corriger ce centrage, le clic tombe a
+    cote.
+    """
+
+    clique = pyqtSignal(str, float, float)
+
+    def __init__(self, nom):
+        super().__init__('en attente de flux…')
+        self.nom = nom
+        self.taille_image = None
+
+    def mousePressEvent(self, evenement):
+        pixmap = self.pixmap()
+        if pixmap is None or self.taille_image is None:
+            return
+        x = evenement.x() - (self.width() - pixmap.width()) / 2.0
+        y = evenement.y() - (self.height() - pixmap.height()) / 2.0
+        if not (0 <= x < pixmap.width() and 0 <= y < pixmap.height()):
+            return
+        largeur, hauteur = self.taille_image
+        self.clique.emit(self.nom, x * largeur / pixmap.width(),
+                         y * hauteur / pixmap.height())
+
+
 # --------------------------------------------------------------------------- #
 #  Marqueurs des cartons
 # --------------------------------------------------------------------------- #
@@ -251,8 +299,15 @@ MARQUEUR_CARTON = {10: 'grand', 11: 'petit'}
 # separe, c'est qu'ils ne sont pas au meme endroit : un carton deja nomme garde
 # son nom tant qu'il reste pres de la ou on l'a vu.
 CONTINUITE_CARTON = 150.0      # mm
+DESIGNATION_CARTONS = RACINE / 'scripts' / 'cartons_designes.json'
 COTE_MARQUEUR_CARTON = 45.0    # mm — carre noir, bordure blanche exclue
 PORTE_MARQUEUR_CARTON = 220.0  # mm — distance max marqueur <-> ouverture
+# Le marqueur ne donne sa hauteur au solveur que s'il est PLAUSIBLEMENT sur le
+# rebord. Colle sur un rabat rabattu a plat sur la table — le seul endroit
+# horizontal qu'offrent certains cartons — il est a Z=0, et prendre cette
+# hauteur pour celle du rebord decalerait le centre de l'ouverture de 50 mm.
+# En deca de ce seuil, on ne retient du marqueur que le NOM.
+REBORD_MARQUEUR_MIN = 40.0     # mm
 
 
 class Marqueurs:
@@ -399,7 +454,8 @@ class Vision:
                 continue
             pose = self.pose_marqueur(coins)
             if pose is not None:
-                rendus[classe] = pose[:2]
+                xy, z = pose[:2]
+                rendus[classe] = (xy, z if z >= REBORD_MARQUEUR_MIN else None)
         return rendus
 
     def quad_plateau(self):
@@ -658,8 +714,11 @@ class Vision:
                 continue
             restants.remove(creux)
             # L'ouverture avait ete projetee a la hauteur SUPPOSEE du rebord ;
-            # le marqueur donne la vraie, on refait la projection avec.
-            rendus.append((classe, self.vers_base(creux[4], z)[:2], creux[2], z))
+            # quand le marqueur est sur le rebord il donne la vraie, et on refait
+            # la projection avec. Pose a plat sur la table, il ne dit que le nom.
+            hauteur = HAUTEUR_CARTON if z is None else z
+            rendus.append((classe, self.vers_base(creux[4], hauteur)[:2],
+                           creux[2], hauteur))
         manquantes = [c for c in ('grand', 'petit')
                       if c not in {r[0] for r in rendus}]
         for classe in list(manquantes):
@@ -705,6 +764,54 @@ class Vision:
         else:
             candidats.sort(key=lambda t: -t[0])
         return candidats[0][1], candidats[0][2]
+
+    def _coeur_sombre(self, contour, valeur):
+        """Le creux debarrasse de l'ombre de la paroi exterieure, ou None.
+
+        Une paroi de carton a l'ombre est sombre elle aussi : elle se colle a
+        l'ouverture et le contour les avale toutes les deux. Le petit carton,
+        115 x 70 mm au metre ruban, etait ainsi mesure 105 x 203 mm — et le
+        point de largage se choisit sur ce polygone, donc au-dessus de la paroi
+        plutot que dans la boite.
+
+        L'interieur de la boite est franchement plus sombre que la paroi
+        eclairee de biais : un seuil d'Otsu a l'interieur du seul creux les
+        separe. Rendu du coeur seulement s'il reste une ouverture credible,
+        sinon None — mieux vaut un contour trop large qu'un contour coupe en
+        deux.
+        """
+        plein = np.zeros(valeur.shape, np.uint8)
+        cv2.drawContours(plein, [contour], -1, 255, -1)
+        seuil, _ = cv2.threshold(valeur[plein > 0], 0, 255,
+                                 cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        # Le seuil strict colle a la mesure au metre ruban (67 x 115 mm contre
+        # 115 x 70 reels) ; le seuil large y ajoute 16 mm. Mais sur une ouverture
+        # a deux niveaux francs, Otsu tombe pile sur le niveau sombre et le seuil
+        # strict ne rend rien : on repasse alors au large plutot que de perdre
+        # le coeur.
+        garde = None
+        for comparaison in (np.less, np.less_equal):
+            coeur = (comparaison(valeur, seuil) & (plein > 0)).astype(np.uint8) * 255
+            coeur = cv2.morphologyEx(coeur, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+            contours, _ = cv2.findContours(coeur, cv2.RETR_EXTERNAL,
+                                           cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                garde = max(contours, key=cv2.contourArea)
+                break
+        if garde is None:
+            return None
+        aire = cv2.contourArea(garde)
+        if aire < PART_COEUR_MIN * max(cv2.contourArea(contour), 1.0):
+            return None
+        enveloppe = cv2.convexHull(garde)
+        petit, grand = self._cotes_mm(enveloppe)
+        rect = cv2.minAreaRect(enveloppe)
+        aire_rect = rect[1][0] * rect[1][1]
+        if not (COTE_CARTON_MM[0] <= petit and grand <= COTE_CARTON_MM[1]):
+            return None
+        if not aire_rect or cv2.contourArea(enveloppe) / aire_rect < REMPLISSAGE_CARTON_MIN:
+            return None
+        return garde
 
     def _creux_candidats(self, image, angles=None):
         """[(aire mm2, centre base, contour, part noire, centre pixel)] — tous
@@ -764,14 +871,21 @@ class Vision:
                 continue
             if part_brune >= ANNEAU_BRUN_MIN and contraste < CONTRASTE_MIN:
                 continue
+            coeur = self._coeur_sombre(c, valeur)
+            if coeur is not None:
+                c, enveloppe = coeur, cv2.convexHull(coeur)
+                petit, grand = self._cotes_mm(enveloppe)
             moments = cv2.moments(enveloppe)
             uv = (moments['m10'] / moments['m00'], moments['m01'] / moments['m00'])
+            centre_base = self.vers_base(uv, HAUTEUR_CARTON)[:2]
+            if float(np.hypot(*centre_base)) < RAYON_BASE_MIN:
+                continue
             robe = cv2.subtract(cv2.dilate(plein, np.ones((25, 25), np.uint8)),
                                 cv2.dilate(plein, np.ones((5, 5), np.uint8)))
             part_noire = (np.count_nonzero(valeur[robe > 0] < VALEUR_SOMBRE)
                           / max(1, int(np.count_nonzero(robe))))
-            candidats.append((petit * grand, self.vers_base(uv, HAUTEUR_CARTON)[:2],
-                              c, part_noire, np.asarray(uv, float)))
+            candidats.append((petit * grand, centre_base, c, part_noire,
+                              np.asarray(uv, float)))
         return candidats
 
     def _carton_par_couleur(self, image, angles=None):
@@ -1056,6 +1170,8 @@ class Fenetre(QMainWindow):
         self.suivi_cartons = {classe: SuiviCarton() for classe in ('grand', 'petit')}
         self.marqueurs = Marqueurs()
         self._cartons_marques = []
+        self._designation = self._designation_memorisee()
+        self._designation_faite = bool(self._designation)
         self._deplacements_carton = {}
         self._detections_svpro = deque(maxlen=40)
         self._carton_svpro = {}
@@ -1101,10 +1217,13 @@ class Fenetre(QMainWindow):
         for nom in self.cameras:
             boite = QGroupBox(nom)
             interieur = QVBoxLayout(boite)
-            vue = QLabel('en attente de flux…')
+            vue = VueCliquable(nom)
             vue.setMinimumSize(400, 300)
             vue.setAlignment(Qt.AlignCenter)
             vue.setStyleSheet('background:#111; color:#888;')
+            vue.setToolTip('clic sur un carton : il devient le GRAND, '
+                           "l'autre devient le petit")
+            vue.clique.connect(self._designe_grand)
             interieur.addWidget(vue)
             self.vues[nom] = vue
             gauche.addWidget(boite)
@@ -1341,8 +1460,9 @@ class Fenetre(QMainWindow):
                     self._apprend_biais_objets()
                 marqueurs = self.marqueurs.coins(image)
                 with self._verrou:
-                    connus = {c: s.centre for c, s in self.suivi_cartons.items()
-                              if s.centre is not None}
+                    connus = dict(self._designation)
+                    connus.update({c: s.centre for c, s in self.suivi_cartons.items()
+                                   if s.centre is not None})
                 vus = {classe: (xy, contour, z) for classe, xy, contour, z
                        in self.vision.cartons(image, angles=angles, objets=objets,
                                               marqueurs=marqueurs, connus=connus)}
@@ -1438,6 +1558,83 @@ class Fenetre(QMainWindow):
                     (int(uv[0]) - 44, int(uv[1]) - 16),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.42, couleur, 1)
 
+    def _designe_grand(self, camera, u, v):
+        """Un clic sur un carton le declare GRAND, l'autre devient le petit.
+
+        Aucune mesure d'image ne separe deux cartons de meme gabarit : 16 %
+        d'ecart entre les deux ouvertures, 18 % de bruit sur la meme d'une image
+        a l'autre (25/08). L'operateur, lui, sait lequel est lequel. Une fois
+        designe, c'est la CONTINUITE qui tient le nom — on peut deplacer les
+        cartons a la main sans redesigner.
+        """
+        vision = self.vision if camera == 'arducam' else self.vision_svpro
+        if vision is None:
+            return
+        vise = vision.vers_base((u, v), HAUTEUR_CARTON)[:2]
+        with self._verrou:
+            distances = sorted(
+                (float(np.linalg.norm(s.centre - vise)), classe)
+                for classe, s in self.suivi_cartons.items() if s.centre is not None)
+        if not distances or distances[0][0] > CONTINUITE_CARTON:
+            self.statusBar().showMessage(
+                f'aucun carton suivi près de ({vise[0]:.0f}, {vise[1]:.0f}) mm')
+            return
+        if distances[0][1] != 'grand':
+            with self._verrou:
+                self.suivi_cartons['grand'], self.suivi_cartons['petit'] = (
+                    self.suivi_cartons['petit'], self.suivi_cartons['grand'])
+            self.ctx.carton_resolu = None
+            self.ctx.carton_xy = None
+            self.ctx.R_carton = None
+        self._enregistre_designation(clic=True)
+        centre = self.suivi_cartons['grand'].centre
+        self.statusBar().showMessage(
+            f'GRAND carton = celui en ({centre[0]:.0f}, {centre[1]:.0f}) mm — '
+            f"l'autre est le petit")
+        self.ctx.note(f'carton grand designe a la main en '
+                      f'({centre[0]:.0f}, {centre[1]:.0f}) mm')
+
+    def _enregistre_designation(self, clic=False):
+        """Garde la designation d'une seance a l'autre.
+
+        Sans elle, chaque relance du tableau de bord repart sur un tirage a pile
+        ou face tant que les deux cartons n'ont pas ete separes par un clic.
+
+        Seul un CLIC cree la designation ; ensuite elle suit les cartons qui
+        bougent. Laisser le detecteur l'ecrire tout seul l'a remplie de
+        n'importe quoi des le premier essai : bras non connecte, donc pas
+        d'angles, donc pas de masque, et l'ombre du bras enregistree comme
+        "petit carton" a (54, -18) — au pied du robot.
+        """
+        if not (clic or self._designation_faite):
+            return
+        self._designation_faite = True
+        with self._verrou:
+            positions = {classe: s.centre.tolist()
+                         for classe, s in self.suivi_cartons.items()
+                         if s.centre is not None}
+        if len(positions) != 2:
+            return
+        # Ecrire a chaque image userait le disque pour rien ; ne pas reecrire du
+        # tout laisserait une designation perimee des que les cartons bougent.
+        bouge = any(classe not in self._designation
+                    or float(np.linalg.norm(np.asarray(xy) - self._designation[classe])) > 30.0
+                    for classe, xy in positions.items())
+        if not bouge:
+            return
+        self._designation = {c: np.asarray(xy, float) for c, xy in positions.items()}
+        DESIGNATION_CARTONS.write_text(json.dumps(positions))
+
+    def _designation_memorisee(self):
+        if not DESIGNATION_CARTONS.exists():
+            return {}
+        try:
+            memoire = json.loads(DESIGNATION_CARTONS.read_text())
+        except json.JSONDecodeError:
+            return {}
+        return {classe: np.asarray(xy, float) for classe, xy in memoire.items()
+                if classe in COULEUR_CARTON}
+
     def _maj_carton(self, suivi):
         """Le carton s'affiche et se met a jour tout seul — aucun clic requis.
 
@@ -1445,6 +1642,7 @@ class Fenetre(QMainWindow):
         machine est jetee : c'est le seul evenement qui doit la perimer, la
         position detectee tremblant de quelques mm en permanence.
         """
+        self._enregistre_designation()
         bouges = {c: s.deplacements for c, s in self.suivi_cartons.items()}
         if bouges != self._deplacements_carton:
             bougeants = [c for c, n in bouges.items()
@@ -1493,6 +1691,7 @@ class Fenetre(QMainWindow):
         h, w, _ = rgb.shape
         qimg = QImage(rgb.data, w, h, 3 * w, QImage.Format_RGB888)
         vue = self.vues[nom]
+        vue.taille_image = (w, h)
         vue.setPixmap(QPixmap.fromImage(qimg).scaled(vue.width(), vue.height(),
                                                      Qt.KeepAspectRatio,
                                                      Qt.SmoothTransformation))

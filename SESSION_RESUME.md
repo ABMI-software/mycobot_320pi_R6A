@@ -4,9 +4,9 @@
 
 ### Ce qui a été accompli aujourd'hui
 
-- **Les deux cartons sont détectés 20/20, avec une étiquette stable.** Avant :
+- **Les deux cartons sont détectés 25/25, avec une étiquette stable.** Avant :
   2/20 pour l'un, 14/20 pour l'autre, et le nom `grand`/`petit` basculait d'une
-  image à l'autre. Tremblement du centre 0,2 mm et 7,9 mm.
+  image à l'autre. Tremblement du centre ramené à 0,5 et 1,1 mm.
 - **La cause était un seuil de 10 mm.** Le carton de gauche — 4400 px, anneau
   brun 0,79, contraste 40 — était jeté parce que son grand côté mesurait 220 mm
   contre 210 autorisés. Or ces 220 mm sont mesurés au plan **supposé** du
@@ -14,14 +14,29 @@
 - **Le rebord des cartons est à 82,9 mm, pas 60** (triangulation des deux vues,
   écart des rayons 11,8 mm). C'était le plan sur lequel toute la géométrie des
   cartons se projetait : 50 mm d'écart sur le centre entre Z=0 et Z=100.
-- **Deux des trois pistes d'hier sont fermées, avec la mesure qui les ferme.**
-  La hauteur par les deux caméras : la SVPRO voit le carton lointain par la
-  tranche, triangulation à **Z = −27 mm**, sous la table. Les dimensions : les
-  deux cartons mesurent **160×214 et 144×205 mm**, 5 % d'écart, sous le bruit.
-- **La troisième est implémentée** : `scripts/aruco_service.py`, détection ArUco
+- **Le vrai coupable : le contour avalait l'ombre de la paroi extérieure.** Le
+  petit carton, **115 × 70 mm au mètre ruban**, était mesuré 105 × 203 mm. Un
+  seuil d'Otsu à l'intérieur du seul creux le ramène à **67 × 115,5 mm** — la
+  mesure réelle. Du coup les deux cartons passent de 16 % d'écart (pour 18 % de
+  bruit) à **115 ± 7 cm² contre 74 ± 1 cm²**, soit six fois le bruit : le
+  gabarit les sépare tout seul. La piste « dimensions » était bonne, c'est la
+  mesure qui était fausse.
+- **Le carton fantôme au milieu de la table, c'était le bras.** Détecté comme un
+  creux de 70 × 164 mm à 57 mm de la base, il prenait le nom de « petit
+  carton » et ne bougeait pas quand on déplaçait le vrai. `RAYON_BASE_MIN =
+  200 mm` : rien d'aussi près de la base n'est un carton. Le masque cinématique
+  ne suffisait pas — il exige les angles, donc le pont vers la Pi.
+- **Piste fermée : la hauteur par les deux caméras.** La SVPRO voit le carton
+  lointain par la tranche, triangulation à **Z = −27 mm**, sous la table.
+- **Trois filets de sécurité restent en place** pour le nom, si un jour deux
+  cartons se ressemblent vraiment. D'abord `scripts/aruco_service.py`, détection ArUco
   déportée dans le venv (`cv2.aruco` fait segfaulter l'OpenCV du système),
   **4,5 ms par image**. `id 10` = grand, `id 11` = petit. Le marqueur donne le
   nom *et* la hauteur du rebord.
+- Ensuite le **clic** : cliquer un carton dans le flux caméra le déclare GRAND. La désignation
+  est gardée sur disque et suit les cartons qui bougent. Le détecteur ne
+  l'écrit jamais seul — laissé libre il y a inscrit l'ombre du bras comme
+  « petit carton » à (54, −18), au pied du robot.
 - **Identité par continuité** (150 mm) : un carton déjà nommé garde son nom
   quand on le déplace à la main. C'est la réponse à « peu importe je bouge le
   carton ».
@@ -43,16 +58,15 @@
 
 ### Prochaines actions
 
-1. [ROUGE] **Imprimer `~/marqueurs_cartons.png` à 100 %** (carré noir de 45 mm,
-   à vérifier à la règle) et coller `id 10` à plat sur un rabat du GRAND carton,
-   `id 11` sur le PETIT. Sans ça, le premier étiquetage reste un coup de dé.
-2. [ROUGE] Vérifier sur le robot que le bras se positionne au-dessus du carton
-   **désigné** — les deux cartons déplacés au hasard, planche vide.
-3. [JAUNE] Rebrancher le tri complet des trois classes et confirmer la
+1. [ROUGE] **Vérifier sur le robot** que le bras se positionne au-dessus du
+   carton désigné, les deux cartons déplacés au hasard. Le gabarit les sépare
+   maintenant seul ; en filet, un clic sur un carton le déclare GRAND, et les
+   marqueurs ArUco (`~/marqueurs_cartons.png`) restent disponibles.
+2. [JAUNE] Rebrancher le tri complet des trois classes et confirmer la
    destination de chacune.
-4. [JAUNE] Temps de cycle sous 60 s (DESCENTE 25 s, DETECTION 14 s,
+3. [JAUNE] Temps de cycle sous 60 s (DESCENTE 25 s, DETECTION 14 s,
    DEGAGEMENT jusqu'à 20 s).
-5. [VERT] Saisie d'un scotch en régime incliné (> 355 mm) — jamais réussie.
+4. [VERT] Saisie d'un scotch en régime incliné (> 355 mm) — jamais réussie.
 
 ### Commande rapide de reprise
 
