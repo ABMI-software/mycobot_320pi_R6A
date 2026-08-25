@@ -15,6 +15,7 @@ RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / "scripts"))
 
 import pick_dashboard as tb  # noqa: E402
+import pick_fsm as fsm  # noqa: E402
 
 TAILLE = 101.0 * 135.0          # ouverture mesurée, mm²
 
@@ -248,6 +249,118 @@ class ContinuiteDesCartons(unittest.TestCase):
         self.assertEqual(vus['petit'], (368.0, 168.0))
 
 
+class AnneauRompuParLOuverture(unittest.TestCase):
+    """L'anneau du rouleau doit etre RECOLLE avant d'etre juge.
+
+    Mesure du 25/08 sur les deux rouleaux reels, arducam a 2,01 mm/px :
+
+                          aire      trou
+        masque brut    206/236 px  54/98 px
+        apres OPEN     148/132 px   0/0
+        OPEN + CLOSE   206/231 px  51/96 px
+
+    L'ouverture qui nettoie le bruit rompt aussi l'anneau, qui perd alors son
+    trou et un tiers de son aire. Sans la fermeture, le scotch ne tenait que
+    par la regle du blob compact, et un anneau casse en deux arcs passait sous
+    AIRE_OBJET_MIN — il disparaissait des qu'on le deplacait.
+    """
+
+    ECHELLE = 2.01   # mm/px, mesuree au plan de l'objet
+
+    def _vision(self):
+        vision = tb.Vision.__new__(tb.Vision)
+        vision.masque_plateau = lambda forme: np.full(forme, 255, np.uint8)
+        vision.vers_base = lambda uv, z: np.array([uv[0] * self.ECHELLE,
+                                                   uv[1] * self.ECHELLE, z])
+        vision._cotes_mm = lambda hull, z: tuple(
+            sorted(np.asarray(cv2.minAreaRect(hull)[1], float) * self.ECHELLE))
+        return vision
+
+    BOIS = (40, 90, 170)     # BGR
+
+    def _scene(self, rayon, fente=0, perce=True):
+        """Fond bois + un anneau bleu, fendu de `fente` pixels."""
+        cote = 6 * rayon
+        image = np.full((cote, cote, 3), self.BOIS, np.uint8)
+        centre = cote // 2
+        cv2.circle(image, (centre, centre), rayon, (150, 60, 30), -1)
+        if perce:
+            cv2.circle(image, (centre, centre), rayon // 2, self.BOIS, -1)
+        if fente:
+            cv2.line(image, (centre, centre - rayon), (centre, centre + rayon),
+                     self.BOIS, fente)
+        return image
+
+    def test_un_anneau_fendu_reste_un_scotch(self):
+        """Un rouleau de 36 mm, coupe en deux arcs, doit rester un objet."""
+        for fente in (0, 1, 2):
+            trouves = self._vision().objets(self._scene(9, fente))
+            self.assertEqual([c for c, _, _ in trouves], ['scotch'],
+                             f'fente de {fente} px')
+
+    def test_un_gros_rouleau_ne_tient_que_par_son_trou(self):
+        """Au-dela de COTE_SCOTCH_COMPACT, seul le trou nomme le scotch.
+
+        C'est le cas qui prouve que la fermeture n'a pas bouche l'anneau : a
+        70 mm, la regle du blob compact ne s'applique plus, et un disque plein
+        de cette taille n'est plus rien du tout.
+        """
+        rayon = 18           # 36 px de diametre, soit ~72 mm a 2,01 mm/px
+        vision = self._vision()
+        _, grand = vision._cotes_mm(
+            np.array([[[0, 0]], [[2 * rayon, 2 * rayon]]]), 0.0)
+        self.assertGreater(grand, tb.COTE_SCOTCH_COMPACT)
+
+        troue = vision.objets(self._scene(rayon, fente=2, perce=True))
+        self.assertEqual([c for c, _, _ in troue], ['scotch'])
+
+        plein = vision.objets(self._scene(rayon, fente=0, perce=False))
+        self.assertEqual([c for c, _, _ in plein], [])
+
+
+class UnMarqueurTropPetitNeDitQueSonNom(unittest.TestCase):
+    """Sous ~30 px de cote, la hauteur PnP est plus bruitee que ce qu'on mesure.
+
+    La profondeur d'une cible plane se connait a Z * bruit_coin / cote_px pres.
+    A 1 m, un coin pointe a 0,3 px, les marqueurs de 30 mm colles le 25/08 font
+    ~15 px : leur hauteur est bruitee de ~20 mm, alors que l'ecart cherche entre
+    le rebord et la table en fait 83. Le nom, lui, reste exact — c'est un
+    identifiant, aucune mesure n'entre dedans.
+    """
+
+    def _vision(self):
+        vision = tb.Vision.__new__(tb.Vision)
+        vision.K = np.array([[600.0, 0.0, 320.0], [0.0, 600.0, 240.0],
+                             [0.0, 0.0, 1.0]])
+        vision.dist = np.zeros(5)
+        vision.T = np.eye(4)
+        vision.vers_base = lambda uv, z: np.array([300.0, -130.0, z])
+        return vision
+
+    def _coins(self, distance_m):
+        demi = tb.COTE_MARQUEUR_CARTON / 2000.0
+        modele = [(-demi, demi), (demi, demi), (demi, -demi), (-demi, -demi)]
+        return np.array([[600.0 * x / distance_m + 320.0,
+                          600.0 * y / distance_m + 240.0] for x, y in modele])
+
+    def test_a_15_px_la_hauteur_est_refusee(self):
+        _, z, cote_px = self._vision().pose_marqueur(self._coins(1.0))
+        self.assertLess(cote_px, tb.COTE_MARQUEUR_PX_MIN)
+        self.assertIsNone(z)
+
+    def test_a_36_px_la_hauteur_est_rendue(self):
+        _, z, cote_px = self._vision().pose_marqueur(self._coins(0.5))
+        self.assertGreater(cote_px, tb.COTE_MARQUEUR_PX_MIN)
+        self.assertIsNotNone(z)
+
+    def test_le_nom_passe_meme_sans_hauteur(self):
+        vision = self._vision()
+        vision.pose_marqueur = lambda coins: (np.array([300.0, -130.0]), None, 15.0)
+        rendus = tb.Vision.cartons_marques(vision, None, {10: None})
+        self.assertEqual(set(rendus), {'grand'})
+        self.assertIsNone(rendus['grand'][1])
+
+
 class MarqueurPoseAPlatSurLaTable(unittest.TestCase):
     """Un marqueur au ras de la table nomme le carton mais ne dit pas sa hauteur.
 
@@ -406,3 +519,205 @@ class PriseParEpaisseur(unittest.TestCase):
     def test_le_scotch_n_est_pas_concerne(self):
         self.assertNotIn('scotch', tb.PRISE_PAR_EPAISSEUR)
         self.assertIn('robot', tb.PRISE_PAR_EPAISSEUR)
+
+
+class PlausibiliteDUnCarton(unittest.TestCase):
+    """Une designation fausse est pire qu'une designation absente.
+
+    Le 25/08 un fantome a (505,6 ; -34,2) — hors planche, 507 mm — a ete suivi
+    puis GRAVE sur le disque comme designation du grand carton. La continuite
+    l'imposait ensuite a chaque image contre la regle de taille, qui donnait
+    pourtant le bon resultat, et l'erreur survivait aux relances.
+    """
+
+    def test_le_fantome_hors_planche_est_refuse(self):
+        self.assertFalse(tb.plausible(np.array([505.6, -34.2])))
+
+    def test_le_pied_du_robot_est_refuse(self):
+        self.assertFalse(tb.plausible(np.array([54.4, -18.4])))
+
+    def test_les_deux_cartons_mesures_sont_acceptes(self):
+        for xy in ((340.2, 178.4), (316.4, -144.4), (352.6, -155.4)):
+            self.assertTrue(tb.plausible(np.array(xy)), xy)
+
+    def test_rien_n_est_plausible_sans_position(self):
+        self.assertFalse(tb.plausible(None))
+
+    def test_le_plafond_suit_la_portee_de_largage(self):
+        self.assertEqual(tb.RAYON_CARTON_MAX, fsm.PORTEE_CARTON_MAX)
+
+
+class MesuresDeReference(unittest.TestCase):
+    """Les gabarits doivent contenir ce qui a ete mesure le 25/08.
+
+    Chacun d'eux avait ete resserre au plus juste sur une scene, puis rejetait
+    un objet reel de quelques millimetres a la suivante : scotch blanc rejete
+    pour 2,8 mm, petit robot pour 6, carton de gauche pour 10.
+    """
+
+    def test_les_deux_scotchs_passent_le_gabarit(self):
+        for cote in (41.4, 36.8, 72.8):        # camera blanc, camera bleu, pied a coulisse
+            self.assertLessEqual(cote, tb.COTE_SCOTCH_MM[1], cote)
+        self.assertGreaterEqual(36.8, tb.COTE_SCOTCH_MM[0])
+
+    def test_le_robot_passe_dans_ses_deux_poses(self):
+        for petit, grand in ((71.0, 109.0), (79.0, 146.0)):
+            self.assertTrue(tb.COTE_ROBOT_MM[0] <= grand <= tb.COTE_ROBOT_MM[1],
+                            f'{petit}x{grand}')
+            self.assertLessEqual(petit, tb.LARGEUR_ROBOT_MAX)
+
+    def test_les_deux_cartons_passent_le_gabarit(self):
+        for petit, grand in ((113.0, 125.0), (67.0, 115.0)):
+            self.assertGreaterEqual(petit, tb.COTE_CARTON_MM[0], f'{petit}x{grand}')
+            self.assertLessEqual(grand, tb.COTE_CARTON_MM[1], f'{petit}x{grand}')
+
+    def test_le_rebord_mesure_est_celui_du_code(self):
+        self.assertAlmostEqual(tb.HAUTEUR_CARTON, 82.9, delta=1.0)
+
+
+class DeposeQuandLeCartonEstMasque(unittest.TestCase):
+    """Un objet reste depose meme quand sa boite n'est plus visible.
+
+    La balle deposee redevenait une cible des que le bras passait au-dessus de
+    son carton : plus de carton detecte a cet instant, donc plus d'ouverture,
+    donc plus rien pour la declarer deposee — et le cycle repartait la chercher
+    au fond de la boite (25/08). Le suivi, lui, garde le polygone.
+    """
+
+    def _carre(self, cx, cy, cote):
+        d = cote / 2.0
+        return np.array([[cx - d, cy - d], [cx + d, cy - d],
+                         [cx + d, cy + d], [cx - d, cy + d]], float)
+
+    def test_le_polygone_du_suivi_survit_a_la_peremption(self):
+        suivi = tb.SuiviCarton()
+        polygone = self._carre(320.0, 170.0, 120.0)
+        suivi.maj(np.array([320.0, 170.0]), 14400.0, polygone,
+                  maintenant=0.0, rebord=83.0)
+        # Bien apres la peremption : la position n'est plus servie...
+        self.assertIsNone(suivi.position(tb.PEREMPTION_CARTON + 10.0))
+        # ... mais le polygone reste disponible pour juger d'un depot.
+        self.assertIsNotNone(suivi.polygone)
+        fenetre = tb.Fenetre.__new__(tb.Fenetre)
+        fenetre._ouvertures = [suivi.polygone]
+        self.assertTrue(fenetre._depose(np.array([320.5, 188.0])))
+
+
+class LaContinuitePrimeSurLaTaille(unittest.TestCase):
+    """Une boite PLEINE ne se mesure plus : la position tient l'identite.
+
+    Mesure du 25/08 : le grand carton avec la balle et un scotch dedans tombe a
+    59 cm2 contre 126 vide, sous le petit reste a 71 — l'aire s'inverse. Elle ne
+    vaut donc que pour NOMMER la premiere fois, boites vides.
+
+    L'ordre inverse a ete essaye le meme jour et retire : il corrigeait bien une
+    continuite fausse, mais au prix d'inverser les deux cartons des qu'on
+    deposait quelque chose dedans, ce qui est le cas normal d'un tri.
+    """
+
+    GRAND = np.array([340.0, 178.0])
+    PETIT = np.array([337.0, -182.0])
+
+    def _vision(self, aire_grand, aire_petit):
+        vision = tb.Vision.__new__(tb.Vision)
+        vision.cartons_marques = lambda *a, **k: {}
+        vision._creux_candidats = lambda *a, **k: [
+            (aire_grand, self.GRAND, None, 0.02, np.array([130.0, 155.0])),
+            (aire_petit, self.PETIT, None, 0.02, np.array([300.0, 180.0]))]
+        return vision
+
+    def _noms(self, vision, connus=None):
+        return {c: tuple(xy) for c, xy, _, _ in vision.cartons(None, connus=connus)}
+
+    def test_la_continuite_tient_meme_quand_l_aire_dit_l_inverse(self):
+        # Cas reel : le grand carton, plein, mesure MOINS que le petit.
+        connus = {'grand': self.GRAND, 'petit': self.PETIT}
+        noms = self._noms(self._vision(5900.0, 7100.0), connus)
+        self.assertEqual(noms['grand'], tuple(self.GRAND))
+        self.assertEqual(noms['petit'], tuple(self.PETIT))
+
+    def test_sans_continuite_la_taille_nomme_les_boites_vides(self):
+        noms = self._noms(self._vision(12600.0, 7700.0))
+        self.assertEqual(noms['grand'], tuple(self.GRAND))
+        self.assertEqual(noms['petit'], tuple(self.PETIT))
+
+    def test_deux_cartons_de_meme_gabarit_laissent_faire_la_continuite(self):
+        connus = {'grand': self.PETIT, 'petit': self.GRAND}
+        noms = self._noms(self._vision(12600.0, 12000.0), connus)
+        self.assertEqual(noms['grand'], tuple(self.PETIT))
+
+    def test_l_ecart_mesure_est_bien_au_dela_du_seuil(self):
+        ecart = (12600.0 - 7700.0) / 12600.0
+        self.assertGreater(ecart, tb.ECART_TAILLE_DECISIF)
+
+
+class UnCartonVuSeulSeMesure(unittest.TestCase):
+    """Un carton vu seul doit etre MESURE, pas suppose.
+
+    Le bras masque regulierement l'un des deux. Le code se rabattait alors sur
+    "le plus grand des restants est le grand" : le PETIT carton vu seul devenait
+    le grand, et la continuite figeait l'erreur pour toute la seance. C'est le
+    mecanisme exact de l'inversion constatee le 25/08.
+    """
+
+    def _vision(self, aire, xy):
+        vision = tb.Vision.__new__(tb.Vision)
+        vision.cartons_marques = lambda *a, **k: {}
+        vision._creux_candidats = lambda *a, **k: [
+            (aire, np.asarray(xy, float), None, 0.02, np.array([130.0, 155.0]))]
+        return vision
+
+    def test_le_grand_vu_seul_est_nomme_grand(self):
+        noms = {c: tuple(xy) for c, xy, _, _
+                in self._vision(12400.0, (340.0, 178.0)).cartons(None)}
+        self.assertEqual(noms['grand'], (340.0, 178.0))
+        self.assertNotIn('petit', noms)
+
+    def test_le_petit_vu_seul_n_est_PLUS_nomme_grand(self):
+        noms = {c: tuple(xy) for c, xy, _, _
+                in self._vision(7700.0, (337.0, -182.0)).cartons(None)}
+        self.assertEqual(noms['petit'], (337.0, -182.0))
+        self.assertNotIn('grand', noms)
+
+    def test_la_frontiere_est_la_moyenne_geometrique(self):
+        frontiere = float(np.sqrt(tb.AIRE_CARTON_ATTENDUE['grand']
+                                  * tb.AIRE_CARTON_ATTENDUE['petit']))
+        self.assertEqual(tb.nom_par_aire(frontiere * 1.5), 'grand')
+        self.assertEqual(tb.nom_par_aire(frontiere / 1.5), 'petit')
+
+    def test_une_aire_entre_les_deux_ne_tranche_pas(self):
+        frontiere = float(np.sqrt(tb.AIRE_CARTON_ATTENDUE['grand']
+                                  * tb.AIRE_CARTON_ATTENDUE['petit']))
+        self.assertIsNone(tb.nom_par_aire(frontiere))
+
+    def test_les_deux_aires_mesurees_tombent_du_bon_cote(self):
+        self.assertEqual(tb.nom_par_aire(12600.0), 'grand')   # 126 cm2, mesure
+        self.assertEqual(tb.nom_par_aire(7700.0), 'petit')    # 77 cm2, mesure
+
+
+class LeFiltreEstAuPointDeChoix(unittest.TestCase):
+    """Aucune source de cible ne doit pouvoir contourner "deja depose".
+
+    Le filtre etait pose a la source, sur la liste des objets vus. Or deux
+    chemins ne passent pas par elle : `_detecte_balle`, qui interroge la camera
+    directement, et le relais SVPRO. La balle deposee redevenait donc la cible
+    cycle apres cycle (25/08). Il est desormais au point de CHOIX.
+    """
+
+    def _fenetre(self, ouvertures):
+        fenetre = tb.Fenetre.__new__(tb.Fenetre)
+        fenetre._ouvertures = ouvertures
+        return fenetre
+
+    def test_la_balle_de_la_camera_est_filtree_comme_les_autres(self):
+        carton = np.array([[329.4, 95.2], [449.4, 95.2],
+                           [449.4, 215.2], [329.4, 215.2]])
+        fenetre = self._fenetre([carton])
+        # Position reelle relevee sur le tableau de bord : balle (372, 174),
+        # carton grand (389,4 ; 155,2) — 25 mm, donc dedans.
+        self.assertTrue(fenetre._depose(np.array([372.0, 174.0])))
+
+    def test_un_objet_hors_de_toute_ouverture_reste_choisissable(self):
+        carton = np.array([[329.4, 95.2], [449.4, 95.2],
+                           [449.4, 215.2], [329.4, 215.2]])
+        self.assertFalse(self._fenetre([carton])._depose(np.array([314.0, -34.0])))
