@@ -1,9 +1,56 @@
 # Pick-and-place en boucle fermée — MyCobot 320 Pi
 
-État au 20 août 2026 — **cycle complet validé en autonome** : balle détectée,
-saisie et déposée en carton sans intervention. Document de reprise : ce qui a été
-**mesuré** sur le robot réel, ce qui marche, ce qui reste ouvert, et les pièges
-dans lesquels on est déjà tombé (deux fois pour certains).
+État au 25 août 2026 — **cycle complet validé en autonome**, trois classes
+d'objets triées vers deux cartons, les deux cartons détectés et nommés de façon
+stable où qu'on les pose. Document de reprise : ce qui a été **mesuré** sur le
+robot réel, ce qui marche, ce qui reste ouvert, et les pièges dans lesquels on
+est déjà tombé (deux fois pour certains).
+
+---
+
+## 0. Lancer une séance
+
+**1. Sur la Pi**, lancer `gripper_bridge.py` et le laisser tourner. C'est le
+seul bridge qui réponde à `get_pro_gripper_status`, donc le seul qui permette de
+confirmer une prise — `bridge_pi_simple.py` ne convient pas.
+
+**2. Sur le PC**, une seule commande :
+
+```bash
+conda deactivate                       # sinon rclpy et OpenCV se marchent dessus
+cd ~/Osama_ws/src/mycobot_R6A
+/usr/bin/python3 scripts/pick_dashboard.py
+```
+
+Le tableau de bord ouvre les deux caméras, le pont TCP et la machine à états.
+Rien d'autre à lancer : ni ROS2, ni le service ArUco, ni de calibration.
+
+Si le bras ne répond pas alors que le ping passe, c'est presque toujours un
+`bridge_tour` résiduel qui a pris le pont — il est **mono-client et bloquant** :
+
+```bash
+pgrep -af bridge_tour && pkill -f bridge_tour
+```
+
+L'adresse de la Pi est cherchée toute seule si elle a changé de bail DHCP ; pour
+la forcer : `MYCOBOT_PI=10.10.0.224 /usr/bin/python3 scripts/pick_dashboard.py`.
+
+### Dans le tableau de bord
+
+| Geste | Effet |
+|---|---|
+| rien | les deux cartons sont détectés et nommés seuls (voir § 6 sexies) |
+| **clic sur un carton** | il devient le **GRAND**, l'autre le petit — filet si le nom part de travers |
+| ⊘ **Stop** | relâche les servos — **tenir le bras avant de cliquer** |
+
+Les cartons peuvent être déplacés à la main pendant que ça tourne : la
+continuité leur garde leur nom, et le point de largage est recalculé.
+
+### Vérifier sans toucher au robot
+
+```bash
+/usr/bin/python3 -m pytest tests/ -q     # 95 tests, seul l'echec IPPE preexiste
+```
 
 ---
 
@@ -684,12 +731,54 @@ Deux rattrapages ont été essayés et écartés :
   (0,24 à 0,30) et monotone décroissante sur le lointain — aucun maximum, donc
   aucune hauteur désignée.
 
-### Piste fermée : les dimensions
+### Le contour avalait l'ombre de la paroi extérieure
 
-Les deux cartons posés côte à côte mesurent **160 × 214 et 144 × 205 mm**, soit
-5 % d'écart — sous le bruit de détection, qui fait varier l'aire relevée de
-270 à 379 cm² d'une image à l'autre sur le même carton. Aucun gabarit ne les
-sépare.
+C'était le vrai coupable, et il expliquait tout le reste.
+
+Une paroi de carton à l'ombre est sombre elle aussi. Elle jouxte l'ouverture, le
+seuillage les prend pour un seul creux, et le contour les avale toutes les deux.
+Le petit carton — **115 × 70 mm au mètre ruban** — était ainsi mesuré
+**105 × 203 mm**.
+
+Deux conséquences en chaîne :
+
+- **le point de largage se choisit sur ce polygone**, donc il pouvait tomber
+  au-dessus de la paroi plutôt que dans la boîte ;
+- **les deux cartons devenaient indiscernables** : mesurés faux, ils donnaient
+  160 × 214 et 144 × 205 mm, soit 16 % d'écart pour 18 % de bruit d'une image à
+  l'autre.
+
+L'intérieur de la boîte est franchement plus sombre que sa paroi éclairée de
+biais : un **seuil d'Otsu à l'intérieur du seul creux** les sépare
+(`Vision._coeur_sombre`). Le petit carton retombe sur **67 × 115,5 mm**, sa
+mesure réelle. Le cœur n'est retenu que s'il garde au moins 30 % du creux et
+reste une ouverture crédible — sinon on garde le contour large, un contour trop
+grand valant mieux qu'une ouverture coupée en deux.
+
+Le seuil est appliqué en comparaison **stricte** : c'est elle qui colle au mètre
+ruban, la comparaison large ajoutant 16 mm. Mais sur une ouverture à deux
+niveaux francs, Otsu tombe pile sur le niveau sombre et le strict ne rend rien —
+on repasse alors au large plutôt que de perdre le cœur.
+
+Une fois la mesure juste, la piste « dimensions » se rouvre d'elle-même :
+
+```
+grand   115 ± 7 cm2
+petit    74 ± 1 cm2      ->  six fois le bruit
+```
+
+**La piste était bonne, c'est la mesure qui était fausse.**
+
+### Le carton fantôme au milieu de la table, c'était le bras
+
+Détecté comme un creux de 70 × 164 mm à **57 mm de la base**, il prenait le nom
+de « petit carton » et ne bougeait pas quand on déplaçait le vrai — d'où
+« il a dit le petit carton au milieu, alors c'est pas vrai ».
+
+Le masque cinématique du bras ne le rattrape pas : il exige les angles, donc le
+pont vers la Pi, et sans lui il ne masque rien. Le garde-fou est géométrique et
+inconditionnel — `RAYON_BASE_MIN = 200 mm`, rien d'aussi près de la base n'est
+un carton, c'est le robot. La zone de largage commence de toute façon à 200 mm.
 
 ### Ce qui bloquait vraiment la détection
 
@@ -705,10 +794,18 @@ au plan supposé ; au vrai rebord il n'en fait que 214. **Un gabarit ne doit pas
 sa vraie tâche restant d'écarter la planche entière (450 mm) et les petits
 objets.
 
-### Trois sources de nom, de la plus sûre à la moins sûre
+### Quatre sources de nom, de la plus sûre à la moins sûre
 
 `Vision.cartons` décide dans cet ordre :
 
+0. **le clic de l'opérateur** — un clic sur un carton dans le flux caméra le
+   déclare GRAND, l'autre devient le petit. Gardé dans
+   `scripts/cartons_designes.json`, il suit ensuite les cartons qui bougent.
+   C'est le moyen retenu : il ne demande rien à imprimer, et l'opérateur est la
+   seule source qui sache vraiment lequel est lequel. Le détecteur n'écrit
+   **jamais** la désignation de lui-même — laissé libre, il y a inscrit l'ombre
+   du bras comme « petit carton » à (54, −18), au pied du robot, faute d'angles
+   pour la masquer.
 1. **le marqueur ArUco** collé sur un rabat — `id 10` grand, `id 11` petit,
    45 mm de côté. Son plan est celui du rebord : il donne le nom *et* la
    hauteur. `~/marqueurs_cartons.png` est la feuille à imprimer à 100 %.

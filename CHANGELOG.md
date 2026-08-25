@@ -11,7 +11,29 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
-- **Identification des cartons par marqueur ArUco collé**
+- **L'ouverture du carton se mesure sur son cœur sombre** (`_coeur_sombre`) —
+  une paroi de carton à l'ombre est sombre elle aussi, elle se colle à
+  l'ouverture et le contour les avale toutes les deux. Le petit carton, **115 ×
+  70 mm au mètre ruban**, était ainsi mesuré 105 × 203 mm. Un seuil d'Otsu à
+  l'intérieur du seul creux les sépare : **67 × 115,5 mm**, soit la mesure
+  réelle. Conséquences en chaîne — le point de largage se choisit sur ce
+  polygone, donc il tombait au-dessus de la paroi plutôt que dans la boîte ; et
+  les deux cartons, mesurés faux, devenaient indiscernables.
+- **Rien à moins de 200 mm de la base n'est un carton** (`RAYON_BASE_MIN`) — le
+  bras au repos était détecté comme un creux de 70 × 164 mm à 57 mm de la base
+  et prenait le nom de « petit carton ». C'est le carton fantôme au milieu de la
+  table, qui ne bougeait pas quand on déplaçait le vrai. Le masque cinématique
+  ne suffit pas : il exige les angles, donc le pont vers la Pi, et sans lui il
+  ne masque rien.
+- **Désignation du grand carton par un clic** (`VueCliquable`,
+  `_designe_grand`) — un clic sur un carton dans le flux caméra le déclare
+  GRAND, l'autre devient le petit ; gardé dans `scripts/cartons_designes.json`,
+  il suit les cartons qui bougent. Filet de sécurité : depuis que l'ouverture
+  est mesurée juste, le gabarit sépare les deux cartons de lui-même. Le
+  détecteur n'écrit jamais la désignation seul — laissé libre, il y a inscrit
+  l'ombre du bras comme « petit carton » à (54, −18).
+- **Identification des cartons par marqueur ArUco collé** *(optionnel, second
+  moyen d'arriver au même résultat)*
   (`scripts/aruco_service.py`, `Vision.cartons_marques`) — `id 10` = grand
   carton, `id 11` = petit, 45 mm de côté, collés **à plat sur un rabat**. Le
   marqueur donne le nom sans ambiguïté *et* la hauteur du rebord (son plan est
@@ -56,12 +78,16 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   triangulation rend Z = **−27 mm** — sous la table — avec 39 mm d'écart entre
   les rayons. Ni l'appariement des centroïdes ni le recouvrement des masques ne
   la rattrapent.
-- **Les deux cartons ont la même ouverture** : 160×214 et 144×205 mm, soit 5 %
-  d'écart, sous le bruit de détection. Aucun gabarit ne peut les séparer — ce
-  qui clôt définitivement la piste « dimensions extérieures ».
-- **Détection des deux cartons, 20 images consécutives, bras dégagé** :
+- **Les dimensions séparent les deux cartons, une fois l'ouverture mesurée
+  juste.** Contours gonflés par l'ombre des parois : 160×214 et 144×205 mm, 16 %
+  d'écart pour 18 % de bruit — indiscernables. Cœurs sombres : **115 ± 7 cm²
+  contre 74 ± 1 cm²**, soit six fois le bruit. La piste « dimensions » était
+  bonne, c'est la mesure qui était fausse.
+- **Détection des deux cartons, 25 images consécutives, bras dégagé** :
   avant 2/20 et 14/20 avec l'étiquette qui basculait à chaque image ; après
-  **20/20 et 20/20**, étiquette stable, tremblement du centre 0,2 mm et 7,9 mm.
+  **25/25 et 25/25**, étiquette stable, tremblement du centre 0,5 et 1,1 mm.
+- **Point de largage vérifié dans les deux cartons** : marge aux parois +32 mm
+  (petit) et +41 mm (grand), tous deux atteignables, largage à Z = 108 mm.
 - **Enveloppe de largage balayée sur tout le plateau** (IK seule, pas de
   mouvement) : X de 200 à 480 mm, Y de −240 à +240 mm par pas de 40 mm.
   **Aucun trou** — toute position en deçà de `PORTEE_CARTON_MAX` (460 mm) admet
@@ -71,12 +97,12 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Connu, non résolu
 
-- **Lequel des deux cartons est le grand ne se devine pas sans marqueur.**
-  Établi le 25/08 : les deux cartons posés côte à côte mesurent 160×214 et
-  144×205 mm, 5 % d'écart. La continuité conserve un nom déjà attribué, elle ne
-  sait pas l'attribuer la première fois. Les marqueurs ArUco ci-dessus lèvent le
-  point ; tant qu'ils ne sont pas collés, le premier étiquetage reste un coup de
-  dé. Historique de ce qui a été essayé et n'a pas tenu :
+- **Lequel des deux cartons est le grand — RÉSOLU le 25/08.** La cause n'était
+  pas le critère mais la mesure : le contour avalait l'ombre de la paroi et
+  gonflait l'ouverture. Cœurs sombres, les deux cartons sont à 115 et 74 cm²,
+  six fois le bruit. Restent en filet trois autres moyens d'y arriver — le clic,
+  le marqueur ArUco, la continuité. Historique de ce qui avait été essayé sur
+  les contours gonflés et n'avait pas tenu :
   Ni l'aire de l'ouverture (10 915 contre 9 981 mm² à une position, 138×202
   contre 62×113 mm à une autre — elle dépend trop de l'angle de vue), ni la robe
   (brun contre noir, mesurée `S174 V87` / 2 % de pixels sombres contre
