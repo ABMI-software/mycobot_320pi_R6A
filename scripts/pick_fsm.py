@@ -527,6 +527,7 @@ class Contexte:
     carton_xy: np.ndarray = None
     carton_polygone: np.ndarray = None    # ouverture en mm, repere base
     z_rebord: float = None                # hauteur mesuree du rebord, mm
+    couple_pince: int = None              # dernier couple envoye a la pince
     roulis_balle: float = 0.0
     roulis_carton: float = 0.0
     roulis_appris: dict = field(default_factory=dict)   # {'balle': deg, 'carton': deg}
@@ -1248,7 +1249,25 @@ def _descente(ctx):
     return 'ECHEC'
 
 
+# Couple de serrage par categorie (100 a 300 chez le bridge). Viser un angle
+# plus bas ne serre PAS davantage — la pince cale sur l'objet a l'angle que
+# l'objet impose : le seul levier est le couple.
+#
+# Le petit robot y a ete monte a 250 le 25/08 puis REDESCENDU au defaut : c'est
+# une piece imprimee en 3D, a maillons fins, que le serrage casserait. Son
+# lachage pendant la remontee ne vient pas d'un manque de serrage mais de
+# l'endroit ou la pince se refermait — sur un membre, et trop bas. Cela se
+# corrige par le point de prise et sa hauteur, pas par la force.
+COUPLE_PINCE = {}
+COUPLE_PINCE_DEFAUT = 150
+
+
 def _saisie(ctx):
+    couple = COUPLE_PINCE.get(ctx.classe_objet, COUPLE_PINCE_DEFAUT)
+    if couple != ctx.couple_pince:
+        ctx.pont.envoie('set_pro_gripper_torque', torque=couple)
+        ctx.couple_pince = couple
+        time.sleep(0.3)
     ctx.pont.envoie('pro_gripper_angle', angle=20)
     # On attend un statut DECIDE plutot qu'une duree forfaitaire : la pince
     # annonce 0 (« en mouvement ») tant qu'elle serre, et 1/2/3 des qu'elle a

@@ -11,6 +11,23 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **Un objet déjà dans un carton n'est plus une cible** (`Fenetre._depose`,
+  `MARGE_DEPOSE = 15 mm`) — la balle déposée était redétectée au fond de la
+  boîte, **35,4 mm à l'intérieur de l'ouverture**, et le cycle repartait la
+  chercher.
+- **Le petit robot se saisit par son point le PLUS ÉPAIS**
+  (`Vision.point_le_plus_epais`, `PRISE_PAR_EPAISSEUR`) — transformée de
+  distance, moyennée sur tout ce qui dépasse 85 % de l'épaisseur maximale. Le
+  centroïde de l'enveloppe convexe suivait les membres articulés : mesuré
+  **23,5 mm hors du ventre**, sur un ventre de 41 mm de large. C'est ce qui
+  faisait refermer la pince sur un maillon, d'où `objet saisi` puis `objet
+  lâché pendant la remontée`. Le scotch garde le centroïde — c'est le centre de
+  son anneau. Après correction : `objet saisi (angle 39)`, tenu jusqu'au
+  largage.
+- **Un décalage SVPRO par carton** au lieu d'un seul pour les deux — mesuré, la
+  SVPRO tombe à 14 mm de l'arducam sur le grand carton et à 60 mm sur le petit,
+  qu'elle voit par la tranche. Une moyenne des deux est fausse pour les deux.
+
 - **L'ouverture du carton se mesure sur son cœur sombre** (`_coeur_sombre`) —
   une paroi de carton à l'ombre est sombre elle aussi, elle se colle à
   l'ouverture et le contour les avale toutes les deux. Le petit carton, **115 ×
@@ -66,6 +83,28 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   destination, chacun rattrapé en 0,12 s quand on le déplace à la main, sans
   que la cible de l'autre bouge.
 
+### Corrigé (25/08, après-midi)
+
+- **Les objets étaient mesurés au plan du rebord des cartons (83 mm)** au lieu
+  du plan où ils reposent (`HAUTEUR_OBJET`, 12 mm) — soit **7 % trop gros**.
+- **Plafond du gabarit scotch 70 → 90 mm** : le rouleau blanc en fait 72,8 et
+  était rejeté avant même d'être classé. Un seul des deux scotchs était détecté.
+- **Plafond du gabarit robot 140 → 200 mm** : le petit robot a des membres
+  articulés et son encombrement dépend de la pose où on le trouve — 71×109 mm
+  ramassé, **79×146 pattes étalées**. À 140 il était rejeté pour 6 mm.
+- **Le couple de la pince avait été monté à 250 pour le robot, puis annulé** :
+  c'est une pièce imprimée en 3D à maillons fins, que le serrage casserait. Le
+  lâchage venait de la visée, pas de la force. La raison est écrite dans le
+  code pour qu'on ne le remonte pas.
+
+### Validé sur le robot réel (25/08)
+
+| Objet | Carton | Largage | Prise | Cycle |
+|---|---|---|---|---|
+| scotch blanc | petit | (358,7 · −156,7) Z=89,8 | confirmée, angle 30 | 64 s |
+| scotch bleu | petit | (349,8 · −167,4) Z=90,5 | confirmée, angle 25 | 96 s |
+| petit robot | grand | (311,0 · 167,4) Z=91,3 | confirmée, angle 39 | 68 s |
+
 ### Mesuré (25/08)
 
 - **Le rebord des cartons est à 82,9 mm, pas 60.** Triangulation des deux vues
@@ -96,6 +135,16 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   atteignable.
 
 ### Connu, non résolu
+
+- **Un objet déposé déforme le creux de son carton.** Le scotch blanc lâché
+  dans le petit carton l'a fait passer de 74×127 à **83×172 mm** : l'aire ne
+  sépare plus les deux boîtes et l'étiquette peut s'inverser sur une détection
+  à froid. Contourné — la désignation est gardée dans
+  `scripts/cartons_designes.json` et sert d'amorce — mais la mesure elle-même
+  reste fausse tant qu'il y a quelque chose dans la boîte.
+- **Le suivi du petit carton a sauté à (500 · −27), hors planche**, pendant le
+  cycle du robot du 25/08. Sans conséquence — le robot visait le grand — mais
+  c'est une fausse détection à traiter.
 
 - **Lequel des deux cartons est le grand — RÉSOLU le 25/08.** La cause n'était
   pas le critère mais la mesure : le contour avalait l'ombre de la paroi et

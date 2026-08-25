@@ -45,6 +45,24 @@
   460 mm de portée.
 - 87 tests (9 neufs), seul l'échec IPPE pré-existant subsiste.
 
+- **Les trois classes triées sur le robot réel, l'après-midi** : scotch blanc
+  et scotch bleu dans le **petit** carton, petit robot dans le **grand**,
+  chacun avec `objet saisi` confirmé par le statut pince. Cycles 64, 96 et 68 s.
+- **Trois plafonds de gabarit trop serrés bloquaient la détection.** Les objets
+  étaient mesurés au plan du rebord des cartons (83 mm) au lieu du plan où ils
+  reposent (12 mm), soit 7 % trop gros ; le scotch blanc (72,8 mm) passait
+  par-dessus le plafond de 70 mm ; le petit robot pattes étalées (79×146 mm)
+  par-dessus celui de 140. Portés à 90 et 200 mm.
+- **Le petit robot se saisit par son point le plus épais**, pas par le
+  centroïde de son enveloppe — mesuré **23,5 mm hors du ventre**, sur un ventre
+  de 41 mm. C'est ce qui faisait refermer la pince sur un maillon. Après
+  correction : `objet saisi (angle 39)`, tenu jusqu'au largage.
+- **Le couple de la pince ne doit PAS être monté** pour ce robot : pièce
+  imprimée à maillons fins. Essayé à 250, annulé ; la raison est dans le code.
+- **Un objet déjà dans un carton n'est plus une cible** — la balle déposée était
+  redétectée 35,4 mm à l'intérieur de l'ouverture et le cycle repartait la
+  chercher.
+
 ### Décisions prises
 
 1. **Un gabarit ne doit pas être plus serré que l'incertitude sur le plan où on
@@ -53,17 +71,23 @@
    puis robe et gabarit. Les deux derniers sont réduits au rôle d'amorce —
    mesuré, ils ne tranchent pas entre deux cartons de même ouverture.
 3. **La fusion des deux caméras sur les cartons est abandonnée.** La SVPRO reste
-   utile sur les objets ; sur les cartons elle voit des parois, pas des
-   ouvertures.
+   utile sur les objets — elle s'accorde à 18 mm de l'arducam sur les deux
+   scotchs — mais sur les cartons elle voit des parois, pas des ouvertures : 14
+   mm d'accord sur le grand, 60 mm sur le petit. Son décalage appris est
+   désormais **par carton**, un seul pour les deux étant faux pour les deux.
+4. **Quand la pince lâche, chercher la visée avant la force.** Le réflexe de
+   monter le couple a été essayé et annulé : la pièce est fragile, et le vrai
+   défaut était de viser 23,5 mm à côté du ventre.
 
 ### Prochaines actions
 
-1. [ROUGE] **Vérifier sur le robot** que le bras se positionne au-dessus du
-   carton désigné, les deux cartons déplacés au hasard. Le gabarit les sépare
-   maintenant seul ; en filet, un clic sur un carton le déclare GRAND, et les
-   marqueurs ArUco (`~/marqueurs_cartons.png`) restent disponibles.
-2. [JAUNE] Rebrancher le tri complet des trois classes et confirmer la
-   destination de chacune.
+1. [ROUGE] **Un objet déposé déforme le creux de son carton** — le scotch blanc
+   a fait passer le petit carton de 74×127 à 83×172 mm, et l'aire ne sépare
+   plus les deux boîtes. Contourné par la désignation gardée sur disque, mais
+   la mesure reste fausse dès qu'il y a quelque chose dans la boîte.
+2. [ROUGE] **Le suivi du petit carton a sauté à (500 · −27)**, hors planche,
+   pendant le cycle du robot. Sans conséquence ce jour-là, mais c'est une
+   fausse détection à traiter.
 3. [JAUNE] Temps de cycle sous 60 s (DESCENTE 25 s, DETECTION 14 s,
    DEGAGEMENT jusqu'à 20 s).
 4. [VERT] Saisie d'un scotch en régime incliné (> 355 mm) — jamais réussie.

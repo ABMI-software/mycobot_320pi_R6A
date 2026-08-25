@@ -839,6 +839,79 @@ Balayage IK de tout le plateau, sans mouvement, X de 200 à 480 mm et Y de −24
 l'outil passant de 0° au centre à −60° dans les coins. La limite est la portée,
 pas la géométrie.
 
+## 6 septies. Trier les trois classes — 25 août 2026 (après-midi)
+
+Les trois classes ont été triées sur le robot réel : scotch blanc et scotch bleu
+dans le **petit** carton, petit robot dans le **grand**, chacun avec `objet
+saisi` confirmé par le statut pince.
+
+| Objet | Carton | Largage | Prise | Cycle |
+|---|---|---|---|---|
+| scotch blanc | petit | (358,7 · −156,7) Z=89,8 | angle 30 | 64 s |
+| scotch bleu | petit | (349,8 · −167,4) Z=90,5 | angle 25 | 96 s |
+| petit robot | grand | (311,0 · 167,4) Z=91,3 | angle 39 | 68 s |
+
+### Trois plafonds de gabarit trop serrés
+
+Un seul des deux scotchs était détecté, et le robot ne l'était pas du tout selon
+la pose. Trois causes, toutes de mesure :
+
+- **les objets étaient projetés au plan du rebord des cartons** (83 mm) au lieu
+  du plan où ils reposent (`HAUTEUR_OBJET`, 12 mm) — **7 % trop gros** ;
+- **plafond scotch à 70 mm** alors que le rouleau blanc en fait 72,8 : rejeté
+  avant même d'être classé ;
+- **plafond robot à 140 mm** alors qu'il fait 79 × 146 mm pattes étalées. Ses
+  membres sont articulés : son encombrement dépend de la pose où on le trouve,
+  71 × 109 mm ramassé contre 79 × 146 étalé. Portés à 90 et 200 mm.
+
+### Saisir par le point le plus épais, pas par le centroïde
+
+Le petit robot était saisi puis **lâché pendant la remontée**. Le réflexe — monter
+le couple de la pince — a été essayé à 250 puis **annulé** : c'est une pièce
+imprimée en 3D à maillons fins, que le serrage casserait.
+
+Le vrai défaut était la visée. Le point commandé était le centroïde de
+l'enveloppe convexe, qui suit les membres qui dépassent. Mesuré sur la scène
+réelle :
+
+```
+ventre                 41 mm de large (rayon inscrit 20,3 mm)
+point le plus epais    (203,7 · -17,5)
+centroide convexe      (192,6 ·   3,2)     ->  23,5 mm d ecart
+```
+
+Sur un ventre de 41 mm, 23,5 mm d'écart suffisent à refermer la pince sur un
+maillon. `Vision.point_le_plus_epais` prend le maximum de la **transformée de
+distance** — le point le plus éloigné du bord, donc par construction le plus
+épais — moyenné sur tout ce qui dépasse 85 % de ce maximum, pour ne pas tenir à
+un pixel. Le scotch garde le centroïde : c'est le centre de son anneau, et c'est
+là que la pince doit se refermer.
+
+Après correction : `objet saisi (angle 39)` — la pince cale sur les 41 mm du
+ventre — et l'objet est **tenu jusqu'au largage**.
+
+**Règle qui en sort : quand la pince lâche, chercher la visée avant la force.**
+
+### Un objet déposé n'est plus une cible
+
+La balle déposée était redétectée au fond de la boîte — **35,4 mm à l'intérieur**
+de l'ouverture du grand carton — et le cycle repartait la chercher. Tout objet
+dont le centre tombe dans une ouverture (à `MARGE_DEPOSE = 15 mm` près, négatif
+pour accepter un objet appuyé contre la paroi) est **déposé**, point.
+
+### Ce que ça casse en retour, non résolu
+
+Un objet dans une boîte **déforme le creux de cette boîte** : le scotch blanc a
+fait passer le petit carton de 74 × 127 à **83 × 172 mm**. L'aire ne sépare plus
+les deux boîtes et l'étiquette peut s'inverser sur une détection à froid.
+Contourné par la désignation gardée dans `scripts/cartons_designes.json`, qui
+sert d'amorce au lieu d'un tirage — mais la mesure elle-même reste fausse tant
+qu'il y a quelque chose dans la boîte.
+
+Autre point ouvert : le suivi du petit carton a sauté à **(500 · −27), hors
+planche**, pendant le cycle du robot. Sans conséquence — le robot visait le
+grand — mais c'est une fausse détection à traiter.
+
 ## 7. Autres points ouverts
 
 - **Extrinsèque SVPRO invalide** (32–149 mm de dérive, caméra déplacée). Elle ne

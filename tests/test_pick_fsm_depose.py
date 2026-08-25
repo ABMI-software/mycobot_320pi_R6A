@@ -436,3 +436,26 @@ class HauteurDeLargage(unittest.TestCase):
     def test_un_rebord_haut_releve_le_lacher(self):
         ctx = types.SimpleNamespace(z_rebord=110.0)
         self.assertEqual(fsm.z_largage(ctx), 110.0 + fsm.GARDE_LARGAGE)
+
+
+class CoupleDeLaPince(unittest.TestCase):
+    """On ne serre PAS plus fort le petit robot : c'est une piece imprimee.
+
+    Le couple avait ete monte a 250 pour lui le 25/08, puis redescendu — a
+    maillons fins, il casserait. Son lachage pendant la remontee vient de
+    l'endroit ou la pince se refermait, pas d'un manque de force.
+    """
+
+    def test_le_robot_n_est_pas_serre_plus_fort(self):
+        self.assertEqual(fsm.COUPLE_PINCE.get('robot', fsm.COUPLE_PINCE_DEFAUT),
+                         fsm.COUPLE_PINCE_DEFAUT)
+
+    def test_le_couple_reste_dans_ce_qu_accepte_le_pont(self):
+        for couple in list(fsm.COUPLE_PINCE.values()) + [fsm.COUPLE_PINCE_DEFAUT]:
+            self.assertGreaterEqual(couple, 100)
+            self.assertLessEqual(couple, 300)
+
+    def test_les_autres_categories_gardent_le_defaut(self):
+        for classe in ('scotch', 'balle'):
+            self.assertEqual(fsm.COUPLE_PINCE.get(classe, fsm.COUPLE_PINCE_DEFAUT),
+                             fsm.COUPLE_PINCE_DEFAUT)

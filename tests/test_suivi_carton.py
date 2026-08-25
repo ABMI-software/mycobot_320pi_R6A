@@ -332,3 +332,77 @@ class RayonDeLaBase(unittest.TestCase):
     def test_les_deux_cartons_mesures_sont_au_dela(self):
         for xy in ((316.4, -144.7), (353.1, 196.3)):
             self.assertGreater(float(np.hypot(*xy)), tb.RAYON_BASE_MIN)
+
+
+class ObjetDejaDepose(unittest.TestCase):
+    """Un objet dans un carton n'est plus une cible.
+
+    La balle deposee etait redetectee au fond de la boite — mesure du 25/08 :
+    35,4 mm a l'interieur de l'ouverture du grand carton, et toujours annoncee
+    comme cible. Le cycle repartait la chercher indefiniment.
+    """
+
+    def _fenetre(self, ouvertures):
+        fenetre = tb.Fenetre.__new__(tb.Fenetre)
+        fenetre._ouvertures = ouvertures
+        return fenetre
+
+    def _carre(self, cx, cy, cote):
+        d = cote / 2.0
+        return np.array([[cx - d, cy - d], [cx + d, cy - d],
+                         [cx + d, cy + d], [cx - d, cy + d]], float)
+
+    def test_la_balle_au_fond_du_carton_ne_compte_plus(self):
+        fenetre = self._fenetre([self._carre(320.0, 170.0, 120.0)])
+        self.assertTrue(fenetre._depose(np.array([320.5, 188.0])))
+
+    def test_un_objet_sur_la_planche_reste_une_cible(self):
+        fenetre = self._fenetre([self._carre(320.0, 170.0, 120.0)])
+        self.assertFalse(fenetre._depose(np.array([220.0, -90.0])))
+
+    def test_un_objet_appuye_contre_la_paroi_compte_comme_depose(self):
+        fenetre = self._fenetre([self._carre(320.0, 170.0, 120.0)])
+        bord = 320.0 + 60.0
+        self.assertTrue(fenetre._depose(np.array([bord + tb.MARGE_DEPOSE - 1.0, 170.0])))
+        self.assertFalse(fenetre._depose(np.array([bord + tb.MARGE_DEPOSE + 5.0, 170.0])))
+
+    def test_sans_carton_vu_rien_n_est_depose(self):
+        self.assertFalse(self._fenetre([])._depose(np.array([320.0, 170.0])))
+
+
+class PriseParEpaisseur(unittest.TestCase):
+    """Le petit robot se prend par le torse, pas par un bras.
+
+    Le centroide de l'enveloppe convexe suit les membres qui depassent : sur une
+    silhouette a bras asymetriques il glisse hors du torse, et la pince se
+    refermait sur un bras (constate le 25/08). Le point le plus eloigne du bord
+    est par construction le plus epais.
+    """
+
+    def _silhouette(self):
+        """Torse epais a gauche, long bras fin qui part a droite."""
+        masque = np.zeros((200, 300), np.uint8)
+        masque[70:130, 40:100] = 255      # torse 60 x 60
+        masque[95:105, 100:260] = 255     # bras 160 x 10
+        return masque
+
+    def test_le_point_epais_tombe_dans_le_torse(self):
+        vision = tb.Vision.__new__(tb.Vision)
+        u, v = vision.point_le_plus_epais(self._silhouette())
+        self.assertTrue(40 <= u <= 100, f'u={u} hors du torse')
+        self.assertTrue(70 <= v <= 130, f'v={v} hors du torse')
+
+    def test_le_centroide_convexe_lui_sort_du_torse(self):
+        contours, _ = cv2.findContours(self._silhouette(), cv2.RETR_EXTERNAL,
+                                       cv2.CHAIN_APPROX_SIMPLE)
+        moments = cv2.moments(cv2.convexHull(contours[0]))
+        u = moments['m10'] / moments['m00']
+        self.assertGreater(u, 100.0)
+
+    def test_une_tache_vide_ne_rend_rien(self):
+        vision = tb.Vision.__new__(tb.Vision)
+        self.assertIsNone(vision.point_le_plus_epais(np.zeros((50, 50), np.uint8)))
+
+    def test_le_scotch_n_est_pas_concerne(self):
+        self.assertNotIn('scotch', tb.PRISE_PAR_EPAISSEUR)
+        self.assertIn('robot', tb.PRISE_PAR_EPAISSEUR)

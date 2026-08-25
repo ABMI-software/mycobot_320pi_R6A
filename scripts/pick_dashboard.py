@@ -85,6 +85,10 @@ COTE_CARTON_MM = (45.0, 260.0)
 # il exige les angles, donc le pont vers la Pi, et sans lui il ne masque rien.
 # La zone de largage commence de toute facon a 200 mm.
 RAYON_BASE_MIN = 200.0    # mm
+# Un objet a moins de ca du bord INTERIEUR de l'ouverture est considere depose.
+# Negatif = on accepte un peu au-dela du bord : un objet appuye contre la paroi
+# est dans la boite, meme si son centre projete tombe un cheveu dehors.
+MARGE_DEPOSE = 15.0       # mm
 # Part minimale du creux que doit garder son coeur sombre pour etre cru. Sous ce
 # seuil, le seuillage a coupe dans l'ouverture elle-meme au lieu de la separer
 # de l'ombre de la paroi.
@@ -123,13 +127,21 @@ RAYON_BRAS = 80.0
 # l'exposition 75 le scotch bleu se lit V=48, presque noir (mesure du 24/08) —
 # la geometrie, si. Le robot imprime est sombre et allonge ; la balle est un
 # disque jaune plein.
-COTE_SCOTCH_MM = (28.0, 70.0)     # diametre exterieur de l'anneau
+# Diametre exterieur de l'anneau. Plafond porte de 70 a 90 mm le 25/08 : le
+# rouleau blanc mesure 72,8 mm au pied a coulisse, donc il etait rejete par le
+# gabarit avant meme d'etre classe — un seul des deux scotchs etait detecte.
+COTE_SCOTCH_MM = (28.0, 90.0)
 AIRE_TROU_MIN = 18                # px — le plus petit trou mesure fait 28 px
 # Plus grand cote. Le plancher a 60 mm separe le robot des SCOTCHS : mesure du
 # 24/08, le robot fait 82x134 mm et les rouleaux 33x39 et 38x43. Un rouleau dont
 # le trou n'est pas vu (il est sombre, V=48) tombait sinon dans la categorie
 # robot — et partait vers le mauvais carton.
-COTE_ROBOT_MM = (60.0, 140.0)
+# Plafond porte de 140 a 200 mm le 25/08 : le petit robot a des membres
+# articules, et son encombrement depend de la pose ou on le trouve — 71x109 mm
+# ramasse, 79x146 pattes etalees. A 140 il etait rejete pour 6 mm. Ce qui le
+# separe d'une OUVERTURE de carton reste sa largeur (LARGEUR_ROBOT_MAX), et
+# desormais aussi le fait qu'un objet trouve DANS un carton est classe depose.
+COTE_ROBOT_MM = (60.0, 200.0)
 # Plus petit cote : c'est lui qui separe le robot d'une OUVERTURE de carton, qui
 # est sombre elle aussi. Mesure du 24/08 : robot 82x134 mm, grand carton
 # 127x140 mm. Sans cette borne, le carton se faisait ramasser comme un objet.
@@ -169,6 +181,11 @@ AIRE_OBJET_MIN = 90               # px
 # Destination de chaque categorie. Le petit carton est noir a l'exterieur, le
 # grand est brun — c'est l'anneau autour de l'ouverture qui les separe.
 DESTINATION = {'scotch': 'petit', 'balle': 'grand', 'robot': 'grand'}
+# Categories qu'on saisit par leur endroit le plus EPAIS et non par le centroide
+# de leur enveloppe. Le centroide suit les membres qui depassent : sur le petit
+# robot la pince se refermait sur un bras. Le scotch, lui, garde le centroide —
+# c'est le centre de son anneau.
+PRISE_PAR_EPAISSEUR = {'robot'}
 COULEUR_CARTON = {'grand': (255, 150, 0), 'petit': (0, 165, 255)}
 COULEUR_OBJET = {'scotch': (0, 255, 0), 'robot': (255, 0, 255), 'balle': (0, 0, 255)}
 FENETRE_DETECTION = 1.2   # s — age maximal d'une detection reutilisable
@@ -542,6 +559,26 @@ class Vision:
         bras = self.masque_bras(forme, angles)
         return cv2.bitwise_and(plateau, cv2.bitwise_not(bras)), bras
 
+    def point_le_plus_epais(self, plein):
+        """Pixel le plus ENFONCE dans la tache : (u, v).
+
+        Le centroide de l'enveloppe convexe suit les membres qui depassent : sur
+        le petit robot, la pince se refermait sur un bras au lieu du torse
+        (constate le 25/08). Le point le plus eloigne du bord, lui, est par
+        construction l'endroit le plus epais — le torse — donc celui ou la pince
+        a le plus de matiere a serrer.
+
+        On ne prend pas l'argmax brut, qui tient a un pixel : on moyenne tout ce
+        qui est a plus de 85 % de l'epaisseur maximale, ce qui recentre le point
+        dans la zone epaisse au lieu de le coller a son sommet.
+        """
+        distance = cv2.distanceTransform(plein, cv2.DIST_L2, 5)
+        sommet = float(distance.max())
+        if sommet <= 0.0:
+            return None
+        v, u = np.nonzero(distance >= 0.85 * sommet)
+        return float(u.mean()), float(v.mean())
+
     def objets(self, image, angles=None):
         """Objets a trier poses sur la planche : [(classe, xy_base, contour)].
 
@@ -600,7 +637,10 @@ class Vision:
             enfant = hierarchie[0][i][2]
             troue = any(cv2.contourArea(contours[j]) >= AIRE_TROU_MIN
                         for j in self._fratrie(hierarchie, enfant))
-            petit, grand = self._cotes_mm(cv2.convexHull(contour))
+            # A HAUTEUR_OBJET, pas au plan du rebord : un objet pose sur la
+            # planche mesure a 83 mm se lit 7 % trop grand, et le rouleau blanc
+            # passait ainsi par-dessus le plafond du gabarit scotch.
+            petit, grand = self._cotes_mm(cv2.convexHull(contour), HAUTEUR_OBJET)
             sombre = (int(np.median(valeur[plein > 0])) < VALEUR_SOMBRE
                       and int(np.median(saturation[plein > 0])) < SATURATION_NOIRE_MAX)
             if troue and COTE_SCOTCH_MM[0] <= petit and grand <= COTE_SCOTCH_MM[1]:
@@ -612,6 +652,12 @@ class Vision:
                 continue
             moments = cv2.moments(cv2.convexHull(contour))
             uv = (moments['m10'] / moments['m00'], moments['m01'] / moments['m00'])
+            if classe in PRISE_PAR_EPAISSEUR:
+                # Le scotch garde le centroide : c'est le centre de son anneau,
+                # et la pince doit se refermer dessus, pas sur la bande.
+                epais = self.point_le_plus_epais(plein)
+                if epais is not None:
+                    uv = epais
             trouves.append((classe, self.vers_base(uv, HAUTEUR_OBJET)[:2], contour))
         return trouves
 
@@ -1170,6 +1216,7 @@ class Fenetre(QMainWindow):
         self.suivi_cartons = {classe: SuiviCarton() for classe in ('grand', 'petit')}
         self.marqueurs = Marqueurs()
         self._cartons_marques = []
+        self._ouvertures = []
         self._designation = self._designation_memorisee()
         self._designation_faite = bool(self._designation)
         self._deplacements_carton = {}
@@ -1186,7 +1233,7 @@ class Fenetre(QMainWindow):
         # oblique suppose la hauteur du rebord et se trompe dessus. Sans ce
         # recalage, chaque relais SVPRO passait pour un DEPLACEMENT du carton et
         # jetait la pose deja resolue — 1,8 s de solveur a chaque fois.
-        self._decalage_svpro = None
+        self._decalage_svpro = {}
         self._source_balle = '—'
         self._camera_balle = ''
         self._decalage_balle = None
@@ -1453,11 +1500,6 @@ class Fenetre(QMainWindow):
                                 (int(u) - 34, int(v) - int(r) - 8),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 0, 255), 1)
                 objets = self.vision.objets(image, angles=angles)
-                with self._verrou:
-                    self._objets_vus = [(classe, xy) for classe, xy, _ in objets]
-                    if trouve is not None:
-                        self._objets_vus.append(('balle', np.asarray(trouve[0], float)))
-                    self._apprend_biais_objets()
                 marqueurs = self.marqueurs.coins(image)
                 with self._verrou:
                     connus = dict(self._designation)
@@ -1466,6 +1508,16 @@ class Fenetre(QMainWindow):
                 vus = {classe: (xy, contour, z) for classe, xy, contour, z
                        in self.vision.cartons(image, angles=angles, objets=objets,
                                               marqueurs=marqueurs, connus=connus)}
+                self._ouvertures = [self.vision.polygone_base(contour, z)
+                                    for _, contour, z in vus.values()]
+                objets = [o for o in objets if not self._depose(o[1])]
+                if trouve is not None and self._depose(trouve[0]):
+                    trouve = None
+                with self._verrou:
+                    self._objets_vus = [(classe, xy) for classe, xy, _ in objets]
+                    if trouve is not None:
+                        self._objets_vus.append(('balle', np.asarray(trouve[0], float)))
+                    self._apprend_biais_objets()
                 with self._verrou:
                     self._cartons_marques = sorted(
                         c for c, i in ((v, k) for k, v in MARQUEUR_CARTON.items())
@@ -1480,20 +1532,25 @@ class Fenetre(QMainWindow):
                                   petit * grand, z)
                         appui = self._carton_svpro.get(classe)
                         if appui is not None:
+                            # Un decalage PAR CARTON, pas un seul pour les deux.
+                            # Mesure du 25/08 : la SVPRO tombe a 14 mm de
+                            # l'arducam sur le grand carton et a 60 mm sur le
+                            # petit, qu'elle voit par la tranche. Une moyenne
+                            # des deux est fausse pour les deux.
                             ecart = releve[0] - appui[0]
-                            self._decalage_svpro = (
-                                ecart if self._decalage_svpro is None
-                                else 0.9 * self._decalage_svpro + 0.1 * ecart)
+                            ancien = self._decalage_svpro.get(classe)
+                            self._decalage_svpro[classe] = (
+                                ecart if ancien is None else 0.9 * ancien + 0.1 * ecart)
                     elif (self._carton_svpro.get(classe) is not None
-                          and self._decalage_svpro is not None):
+                          and self._decalage_svpro.get(classe) is not None):
                         # L'arducam est aveugle sur ce carton : la SVPRO prend le
                         # relais, remise dans le repere de l'arducam. Sans
                         # decalage appris on ne prend rien — une position
                         # decalee de 29 mm vaut moins que la derniere bonne, que
                         # le suivi tient 4 s.
                         appui = self._carton_svpro[classe]
-                        releve = (appui[0] + self._decalage_svpro,
-                                  appui[1] + self._decalage_svpro, appui[2])
+                        decalage = self._decalage_svpro[classe]
+                        releve = (appui[0] + decalage, appui[1] + decalage, appui[2])
                     with self._verrou:
                         if releve is not None:
                             suivi.maj(releve[0], releve[2], releve[1],
@@ -1557,6 +1614,18 @@ class Fenetre(QMainWindow):
         cv2.putText(image, f'{etiquette} {point[0]:.0f},{point[1]:.0f}',
                     (int(uv[0]) - 44, int(uv[1]) - 16),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.42, couleur, 1)
+
+    def _depose(self, xy):
+        """L'objet est-il DEJA dans un carton ? Alors il n'est plus une cible.
+
+        Sans ca la balle deposee etait redetectee au fond de la boite et le
+        cycle repartait la chercher — mesure du 25/08 : 35,4 mm a l'interieur de
+        l'ouverture du grand carton, et toujours annoncee comme cible.
+        """
+        point = (float(xy[0]), float(xy[1]))
+        return any(cv2.pointPolygonTest(
+            np.asarray(ouverture, np.float32).reshape(-1, 1, 2), point, True) > -MARGE_DEPOSE
+            for ouverture in self._ouvertures)
 
     def _designe_grand(self, camera, u, v):
         """Un clic sur un carton le declare GRAND, l'autre devient le petit.
