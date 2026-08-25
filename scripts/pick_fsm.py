@@ -18,6 +18,7 @@ Voir `docs/PICK_AND_PLACE_BOUCLE_FERMEE.md` pour le pourquoi de chaque constante
 from __future__ import annotations
 
 import json
+import os
 import socket
 import sys
 import time
@@ -35,7 +36,53 @@ from diff_ik import solve_pose, orientation_error_deg                   # noqa: 
 from diff_ik import PRACTICAL_JOINT_LIMITS_DEG as LIMITES               # noqa: E402
 from mycobot_fk import forward_kinematics                               # noqa: E402
 
-PI = ('10.10.0.221', 5005)
+PORT_PI = 5005
+# L'adresse de la Pi est distribuee en DHCP : elle a change de .221 a .224 entre
+# deux journees (25/08). La figer dans le code obligeait a editer un fichier
+# source a chaque bail. On la prend donc dans l'environnement, et a defaut on la
+# CHERCHE sur le sous-reseau — voir `trouve_la_pi`.
+PI = (os.environ.get('MYCOBOT_PI', '10.10.0.224'), PORT_PI)
+
+
+def _repond(hote, port=PORT_PI, delai=0.6):
+    """Ce pont-la parle-t-il vraiment ?
+
+    Accepter la connexion ne suffit pas : le pont est mono-client et bloquant,
+    et un client residuel le fige dans un etat ou le port reste OUVERT alors que
+    plus aucune reponse n'arrive (constate le 25/08). Le seul test valable est
+    donc une question a laquelle il doit repondre.
+    """
+    try:
+        with socket.create_connection((hote, port), timeout=delai) as sock:
+            sock.settimeout(delai)
+            sock.sendall(b'{"action": "get_angles"}\n')
+            return b'ANGLES' in sock.recv(4096).upper()
+    except OSError:
+        return False
+
+
+def trouve_la_pi(delai=0.6):
+    """Cherche un pont qui REPOND sur le sous-reseau local, ou None."""
+    import ipaddress
+    import subprocess
+    from concurrent.futures import ThreadPoolExecutor
+
+    sortie = subprocess.run(['ip', '-4', '-brief', 'addr'],
+                            capture_output=True, text=True).stdout
+    reseaux = []
+    for ligne in sortie.splitlines():
+        for mot in ligne.split()[2:]:
+            if '/' in mot and not mot.startswith('127.'):
+                reseaux.append(ipaddress.ip_interface(mot).network)
+    for reseau in reseaux:
+        if reseau.num_addresses > 512:
+            continue
+        hotes = [str(h) for h in reseau.hosts()]
+        with ThreadPoolExecutor(max_workers=64) as pool:
+            for hote, ok in zip(hotes, pool.map(lambda h: _repond(h, delai=delai), hotes)):
+                if ok:
+                    return hote
+    return None
 TOOL = np.array(json.loads((RACINE / 'scripts' / 'tool_offset.json').read_text())
                 ['tool_offset_mm'], float)
 
@@ -45,9 +92,33 @@ Q_REFERENCE = np.array([45.43, -86.57, -96.76, 135.52, 1.84, -43.33])
 AZIMUT_REFERENCE = 7.2
 
 Z_PRISE = -5.0
+# Hauteur de POINTE a la prise, par categorie. La balle fait 66 mm : elle tient
+# les doigts ecartes, la pointe peut viser sous le plan de la table. Un rouleau
+# de scotch couche ne fait que ~22 mm et le robot imprime ~20 : viser -5 ferait
+# taper les doigts sur la planche AVANT qu'ils se referment — la pince se ferme
+# alors a vide. On vise donc leur mi-hauteur.
+# Hauteur de pointe a la prise, par categorie et par REGIME (outil vertical,
+# outil couche). Mesure du 24/08 sur le vrai robot : recalage a 0,50 mm,
+# descente a 1,30 mm, et pourtant « rien saisi » a chaque fois. La position
+# etait juste — c'est la hauteur qui ne l'etait pas, et pour deux raisons
+# distinctes :
+#   * verticalement, viser -5 mm comme la balle fait taper les doigts sur la
+#     planche avant qu'ils se referment : la balle fait 66 mm et les tient
+#     ecartes, un rouleau couche 22 mm et le robot imprime ~20 ;
+#   * couche (au-dela de 355 mm), l'outil visait Z=25 — la mi-hauteur de la
+#     BALLE. Sur un objet plat de 22 mm, la pince se refermait entierement
+#     au-dessus de lui, dans le vide. C'est ce cas qui a fait echouer les
+#     saisies du scotch a 377 mm.
+# On vise donc la mi-hauteur de CHAQUE objet, dans les deux regimes.
+Z_PRISE_PAR_CLASSE = {'balle': (-5.0, 25.0), 'scotch': (2.0, 11.0),
+                      'robot': (2.0, 10.0)}
+# Et si ca rate quand meme, on ne refait PAS le meme geste : chaque nouvel essai
+# descend d'un cran. Trois tentatives identiques donnent trois echecs identiques.
+PAS_DESCENTE_ESSAI = 4.0
 Z_SURVOL = 110.0        # au-dessus du sommet de la balle (~71 mm)
 Z_TRANSFERT = 170.0
-Z_LARGAGE = 100.0       # rebord du carton ~60 mm : la balle entre avant le lacher
+Z_LARGAGE = 100.0       # plancher, quand la hauteur du rebord n'est pas mesuree
+GARDE_LARGAGE = 25.0    # mm au-dessus du rebord MESURE, quand on le connait
 GARDE_MIN = 25.0
 PLANCHER = -20.0        # mm — aucune pose legitime sous la planche
 CHUTE_MAX = 220.0       # mm — descente verticale maximale en UN seul ordre
@@ -59,11 +130,51 @@ VITESSE = 25
 # La valeur precedente, 335, refusait des balles parfaitement atteignables — une
 # a 343,6 mm a ete refusee alors qu'elle se resout avec un roulis de +30.
 # Incliner l'outil n'ajoute rien ici : teste de +10 a +30 deg, aucune solution.
-PORTEE_MAX = 355.0
-# Le largage se fait plus haut que la prise, donc un peu plus loin : mesure a
-# l'azimut du carton, 355 mm passe (roulis +60), 365 mm ne passe plus. Ce
-# pre-filtre evite les 40 s que coute un `choisit_roulis` qui echoue.
-PORTEE_CARTON_MAX = 360.0
+PORTEE_MAX = 430.0
+# L'outil TENU VERTICAL plafonne la : au-dela on le couche, et le scan vertical
+# n'a plus lieu d'etre tente (huit roulis qui echouent coutent 40 s).
+#
+# Piste essayee et FERMEE le 24/08 : cette limite avait ete mesuree en exigeant
+# aussi Z_TRANSFERT=170 au-dessus du point de prise, contrainte qui n'a pas lieu
+# d'etre sur un objet pose a plat. En ne demandant que le survol et la prise, la
+# limite ne bouge pas d'un millimetre — 350 mm passe, 360 non, dans les deux cas.
+# C'est bien une limite mecanique. Ne pas re-tenter.
+PORTEE_VERTICALE_MAX = 355.0
+# L'outil fait 110 mm : couche, la bride n'a plus besoin d'aller aussi loin que
+# la pointe. Mesure du 24/08, survol 110 ET prise resolus par la meme
+# orientation : 360 mm a -15 deg, 380 et 400 a -30, 420 a -30, 440 a -45.
+INCLINAISONS = [0.0, -15.0, -30.0, -45.0]
+# Inclinaison minimale exigee par l'allonge — mesuree, survol ET prise resolus.
+INCLINAISONS_PAR_PORTEE = ((355.0, 0.0), (370.0, -15.0), (425.0, -30.0),
+                           (1e9, -45.0))
+# Incline, la pointe vise le CENTRE de la balle et non le ras de la table : les
+# doigts l'abordent de biais, descendre au ras la pousserait.
+Z_PRISE_INCLINE = 25.0
+# Le largage est PLUS exigeant que la prise : la pointe doit etre loin ET haut
+# (transfert a 170 puis lacher a 100), alors que la prise se fait au ras de la
+# table. Outil tenu vertical il plafonne a 355 mm — c'est ce qui bloquait TOUT
+# le cycle le 24/08 : carton mesure a 449 mm, quatre points de largage refuses,
+# balle jamais saisie faute de savoir ou la deposer.
+#
+# Mesure du 24/08 a l'azimut du carton, transfert ET largage resolus par la
+# meme orientation (roulis retenu entre parentheses) :
+#
+#   portee |   0     -15    -30    -45    -60
+#      360 |   .    (+60)  (+0)   (+0)   (+0)
+#      380 |   .     .     (+0)   (+0)   (+0)
+#      400 |   .     .     (+0)   (+0)   (+0)
+#      420 |   .     .      .     (+0)   (+0)
+#      440 |   .     .      .     (+0)   (+0)
+#      460 |   .     .      .      .     (+0)
+#
+# Coucher l'outil porte donc la depose de 355 a 460 mm. Abaisser en plus le
+# transfert a 130 mm a ete mesure : ca ne gagne qu'une bande (420 passe a -30
+# au lieu de -45) et ca rapproche la trajectoire du rebord — ecarte.
+PORTEE_CARTON_MAX = 460.0
+INCLINAISONS_CARTON = [0.0, -15.0, -30.0, -45.0, -60.0, -75.0]
+# (allonge maximale, inclinaison minimale exigee)
+INCLINAISONS_CARTON_PAR_PORTEE = ((355.0, 0.0), (365.0, -15.0), (410.0, -30.0),
+                                  (450.0, -45.0), (1e9, -60.0))
 ESSAIS_CARTON = 2       # tours de balayage avant de renoncer, objet en main
 MARGE_LARGAGE = 38.0    # mm — recul des parois : la balle fait 33 mm de rayon
 MARGE_LARGAGE_MIN = 15.0  # plancher quand l'ouverture ne peut pas offrir mieux
@@ -73,7 +184,14 @@ MEMOIRE_AFFAISSEMENT = RACINE / 'scripts' / 'affaissement.json'
 AFFAISSEMENT_MAX = 6.0  # deg — borne de l'ecart articulaire reinjecte au depart
 # Le carton ne bouge pas entre le debut d'un cycle et la depose : re-resoudre sa
 # pose a chaque etat coutait 4 a 15 s pour un resultat identique.
-TOLERANCE_CARTON_RESOLU = 12.0
+# La pose resolue n'est perimee que par un VRAI deplacement du carton, signale
+# par le suivi (six images concordantes). Le centre detecte, lui, tremble de
+# quelques mm en permanence : le re-resoudre la-dessus coutait 4 a 25 s par
+# cycle pour un resultat identique.
+TOLERANCE_CARTON_RESOLU = 30.0
+# Un point de largage doit rester DANS l'ouverture qu'il visait : au-dela d'un
+# carton d'ecart avec la position suivie, il designe autre chose.
+DERIVE_CARTON_MAX = 150.0
 
 # Pour une sphere, l'orientation des doigts dans le plan horizontal est sans
 # importance : ce roulis est un degre de liberte gratuit qui porte la portee
@@ -83,10 +201,12 @@ ROULIS = [0, 30, -30, 60, -60, 90, -90, 120]
 ETAT_PINCE = {0: 'en mouvement', 1: 'rien saisi', 2: 'objet saisi', 3: 'objet lache'}
 
 SEUIL_DEPLACEMENT = 8.0   # mm — au-dela, la balle a bouge : on refait la cible
-# Le bras masque ce qu'il survole : une detection de carton dont le centre tombe
-# sous la pointe est celle de l'ombre ou du bras lui-meme. Mesure du 24/08 :
-# elle sautait de 55, 76 puis 171 mm d'un pas a l'autre, carton immobile.
-RAYON_MASQUAGE = 120.0
+# Le bras masque ce qu'il survole : une detection de carton proche du bras est
+# celle de l'ombre ou du bras lui-meme. Mesure du 24/08 : elle sautait de 55, 76
+# puis 171 mm d'un pas a l'autre, carton immobile. La distance se mesure au bras
+# ENTIER (voir `distance_au_bras`) : ce sont ses segments qui portent l'ombre,
+# pas seulement sa pointe.
+RAYON_MASQUAGE = 150.0
 
 POSE_OBSERVATION = np.array([-27.50, -61.61, -41.30, 89.56, 0.43, -79.62])
 
@@ -103,10 +223,20 @@ class Pont:
     """Client du `gripper_bridge.py` de la Pi. Protocole texte, une ligne."""
 
     def __init__(self, timeout=8.0):
+        global PI
         self.timeout = timeout
+        if not _repond(*PI):
+            trouvee = trouve_la_pi()
+            if trouvee is not None and trouvee != PI[0]:
+                print(f'pont introuvable en {PI[0]} — trouve en {trouvee}')
+                PI = (trouvee, PORT_PI)
         self.sock = socket.create_connection(PI, timeout=timeout)
         self.sock.settimeout(timeout)
         self.buf = b''
+        # La detection du carton doit masquer le bras. Elle ne peut pas
+        # interroger le pont elle-meme : il est mono-client et bloquant, et la
+        # machine a etats s'en sert deja. On lui laisse donc la derniere pose lue.
+        self.derniers_angles = None
 
     def _vide(self):
         """Jette le tampon avant d'emettre.
@@ -151,6 +281,7 @@ class Pont:
                 time.sleep(0.3)
                 continue
             if q.size == 6 and np.all(np.isfinite(q)) and np.all(np.abs(q) <= 200.0):
+                self.derniers_angles = q
                 return q
             time.sleep(0.3)
         raise RuntimeError(f'get_angles illisible : {derniere!r}')
@@ -171,6 +302,26 @@ class Pont:
 def pose_bride(q_deg):
     positions, transformations = forward_kinematics(np.radians(np.asarray(q_deg, float)))
     return np.asarray(positions['mycobot320_link6']) * 1000.0, transformations[6][:3, :3]
+
+
+def distance_au_bras(xy, q_deg):
+    """Distance en XY entre un point du plan et le bras tout entier (mm).
+
+    La pointe seule ne suffit pas : ce sont les SEGMENTS du bras qui portent
+    l'ombre prise pour une ouverture de carton, et ils couvrent beaucoup plus
+    que leur extremite.
+    """
+    positions, _ = forward_kinematics(np.radians(np.asarray(q_deg, float)))
+    chaine = [np.asarray(v, float)[:2] * 1000.0 for v in positions.values()]
+    chaine.append(pointe(q_deg)[:2])
+    xy = np.asarray(xy, float)
+    proche = float('inf')
+    for a, b in zip(chaine, chaine[1:]):
+        ab = b - a
+        longueur = float(ab @ ab)
+        t = 0.0 if longueur == 0 else float(np.clip((xy - a) @ ab / longueur, 0.0, 1.0))
+        proche = min(proche, float(np.linalg.norm(xy - (a + t * ab))))
+    return proche
 
 
 def pointe(q_deg):
@@ -256,6 +407,49 @@ def resout_ik(p_cible, R, tol_mm=1.0, tol_deg=1.0, coude_haut=True,
     return meilleure
 
 
+def incline(R, azimut_deg, theta_deg):
+    """Couche l'outil de theta autour de l'axe tangentiel a l'allonge."""
+    if abs(theta_deg) < 1e-6:
+        return R
+    a = np.radians(azimut_deg)
+    u = np.array([-np.sin(a), np.cos(a), 0.0])
+    M, _ = cv2.Rodrigues(u * np.radians(theta_deg))
+    return M @ R
+
+
+def choisit_pose_prise(ctx, xy):
+    """(roulis, inclinaison, R, hauteur de prise) pour saisir en xy, ou None.
+
+    L'outil vertical est essaye d'abord : c'est le regime valide, la pince
+    enveloppe la balle par le dessus. Il plafonne a PORTEE_VERTICALE_MAX. Au-dela
+    on le couche progressivement, ce qui porte l'atteignabilite de 355 a 440 mm.
+    La combinaison qui a marche pour cette bande d'allonge est reessayee en
+    premier — un couple qui echoue coute 5 s, celui qui marche 40 ms.
+    """
+    azimut = float(np.degrees(np.arctan2(xy[1], xy[0])))
+    portee = float(np.hypot(*xy))
+    # On part de l'inclinaison MINIMALE que l'allonge exige, au lieu de balayer
+    # depuis la verticale : a 384 mm, essayer 0 puis -15 avant -30 coutait 41 s
+    # pour un resultat connu d'avance.
+    depart = next(t for limite, t in INCLINAISONS_PAR_PORTEE if portee <= limite)
+    ordre_theta = [t for t in INCLINAISONS if t <= depart] or [INCLINAISONS[-1]]
+    couples = [(t, r) for t in ordre_theta for r in ROULIS]
+    memo = ctx.prise_apprise.get(cle_roulis('balle', xy))
+    if memo in couples:
+        couples.insert(0, couples.pop(couples.index(memo)))
+    debout, couche = Z_PRISE_PAR_CLASSE.get(ctx.classe_objet,
+                                            (Z_PRISE, Z_PRISE_INCLINE))
+    for theta, roulis in couples:
+        z_prise = debout if theta == 0.0 else couche
+        hauteurs = ([Z_TRANSFERT, Z_SURVOL, z_prise] if theta == 0.0
+                    else [Z_SURVOL, z_prise])
+        R = incline(orientation(xy, roulis), azimut, theta)
+        if all(resout_ik(np.array([xy[0], xy[1], z]), R) is not None for z in hauteurs):
+            ctx.prise_apprise[cle_roulis('balle', xy)] = (theta, roulis)
+            return roulis, theta, R, z_prise
+    return None
+
+
 def cle_roulis(nom, xy):
     """Le bon roulis depend surtout de l'ALLONGE, pas de l'azimut.
 
@@ -332,10 +526,14 @@ class Contexte:
     balle_xy: np.ndarray = None
     carton_xy: np.ndarray = None
     carton_polygone: np.ndarray = None    # ouverture en mm, repere base
+    z_rebord: float = None                # hauteur mesuree du rebord, mm
     roulis_balle: float = 0.0
     roulis_carton: float = 0.0
     roulis_appris: dict = field(default_factory=dict)   # {'balle': deg, 'carton': deg}
     carton_resolu: tuple = None       # (centre resolu, point de largage, roulis, R)
+    prise_apprise: dict = field(default_factory=dict)  # bande d'allonge -> (inclinaison, roulis)
+    inclinaison_balle: float = 0.0
+    z_prise: float = Z_PRISE
     R_balle: np.ndarray = None
     R_carton: np.ndarray = None
     correction: np.ndarray = field(default_factory=lambda: np.zeros(6))
@@ -348,6 +546,10 @@ class Contexte:
     chrono: dict = field(default_factory=dict)   # secondes passees par etat, cycle courant
     debut_cycle: float = 0.0
     detecteur: object = None          # callable(patience=...) -> (x, y) ou None
+    source_balle: str = ''            # camera qui a fourni la derniere detection
+    source_cible: str = ''            # celle qui a fourni la cible en cours
+    classe_objet: str = ''            # 'balle', 'scotch' ou 'robot' — objet en cours
+    carton_vise: str = 'grand'        # destination de cet objet
     detecteur_carton: object = None   # idem, pour le carton
 
     def note(self, texte):
@@ -461,7 +663,59 @@ def points_de_largage(xy, polygone, pas=6.0):
             choisis.append(p)
         if len(choisis) == LARGAGES_TESTES:
             break
+    # Dernier recours : le point de l'ouverture le PLUS PROCHE du robot. Les
+    # candidats ci-dessus partent du milieu ; quand le carton est pose loin ils
+    # sont tous hors d'atteinte alors que son bord proche, lui, se resout. Un
+    # largage excentre depose quand meme la balle dedans — c'est le but.
+    bord = min(dedans, key=lambda p: float(np.hypot(*p)))
+    if all(np.linalg.norm(bord - q) > 20.0 for q in choisis):
+        choisis.append(bord)
     return choisis
+
+
+def choisit_pose_largage(ctx, xy):
+    """(roulis, inclinaison, R) pour larguer en xy, ou (None, None, None).
+
+    Meme methode que la prise, appliquee au depot : l'outil tenu vertical
+    plafonne, couche il porte beaucoup plus loin. Sans ca un carton pose a
+    449 mm bloquait TOUT le cycle — le bras refusait meme de saisir la balle,
+    faute de savoir ou la deposer (journal du 24/08 : quatre points de largage
+    a 425-473 mm, tous refuses, `carton ni vu ni memorise a portee`).
+    """
+    xy = np.asarray(xy, float)
+    portee = float(np.hypot(*xy))
+    azimut = float(np.degrees(np.arctan2(xy[1], xy[0])))
+    hauteurs = [Z_TRANSFERT, z_largage(ctx)]
+    depart = next(t for limite, t in INCLINAISONS_CARTON_PAR_PORTEE if portee <= limite)
+    if depart == 0.0:
+        roulis, R = choisit_roulis(xy, hauteurs,
+                                   prefere=roulis_retenu(ctx, 'carton', xy))
+        if R is not None:
+            return roulis, 0.0, R
+    memo = ctx.prise_apprise.get(cle_roulis('carton', xy))
+    for theta in [t for t in INCLINAISONS_CARTON if t <= depart and t != 0.0]:
+        ordre = ROULIS
+        if memo is not None and memo[0] == theta:
+            ordre = [memo[1]] + [r for r in ROULIS if r != memo[1]]
+        for roulis in ordre:
+            R = incline(orientation(xy, roulis), azimut, theta)
+            if all(resout_ik(np.array([xy[0], xy[1], z]), R) is not None
+                   for z in hauteurs):
+                ctx.prise_apprise[cle_roulis('carton', xy)] = (theta, roulis)
+                return roulis, theta, R
+    return None, None, None
+
+
+def z_largage(ctx):
+    """Hauteur de lacher : au-dessus du rebord REEL, pas d'un rebord suppose.
+
+    Le rebord du grand carton a ete mesure a 82,9 mm par triangulation des deux
+    vues le 25/08, contre 60 mm supposes — soit 17 mm de garde au lieu de 40,
+    et rien du tout pour un carton plus haut. La hauteur vient desormais du
+    marqueur colle sur le rabat, quand il est vu.
+    """
+    rebord = getattr(ctx, 'z_rebord', None)
+    return Z_LARGAGE if rebord is None else max(Z_LARGAGE, rebord + GARDE_LARGAGE)
 
 
 def carton_atteignable(ctx, xy, polygone=None):
@@ -480,10 +734,11 @@ def carton_atteignable(ctx, xy, polygone=None):
             ctx.note(f'point de largage a {portee:.0f} mm — au-dela de '
                      f'{PORTEE_CARTON_MAX:.0f} mm aucun roulis ne resout')
             continue
-        roulis, R = choisit_roulis(cible, [Z_TRANSFERT, Z_LARGAGE],
-                                   prefere=roulis_retenu(ctx, 'carton', cible))
+        roulis, theta, R = choisit_pose_largage(ctx, cible)
         if R is not None:
             ctx.roulis_appris[cle_roulis('carton', cible)] = roulis
+            ctx.resultats['inclinaison largage'] = (
+                'verticale' if theta == 0.0 else f'{theta:+.0f} deg')
             ecart = float(np.linalg.norm(cible - np.asarray(xy, float)))
             if ecart > 1.0:
                 ctx.note(f'milieu du carton a {np.hypot(*xy):.0f} mm inatteignable — '
@@ -506,10 +761,11 @@ def detecte_carton(ctx, patience=1.5):
     if vu is None:
         return 'invisible'
     xy, polygone = np.asarray(vu[0], float), vu[1]
-    pointe_xy = pointe(ctx.pont.angles())[:2]
-    if float(np.linalg.norm(xy - pointe_xy)) < RAYON_MASQUAGE:
-        ctx.note(f'carton "vu" a {np.linalg.norm(xy - pointe_xy):.0f} mm sous la '
-                 f'pointe — le bras ou son ombre, detection ignoree')
+    ctx.z_rebord = vu[2] if len(vu) > 2 else None
+    ecart_bras = distance_au_bras(xy, ctx.pont.angles())
+    if ecart_bras < RAYON_MASQUAGE:
+        ctx.note(f'carton "vu" a {ecart_bras:.0f} mm du bras — le bras ou son '
+                 f'ombre, detection ignoree')
         return 'invisible'
     cible, roulis, R = carton_atteignable(ctx, xy, polygone)
     if R is None:
@@ -536,6 +792,7 @@ def carton_pret(ctx):
     memoire = carton_memorise(ctx)
     if memoire is None:
         return False
+    ctx.z_rebord = None                   # la memoire ne retient pas la hauteur
     cible, roulis, R = carton_atteignable(ctx, memoire)
     if R is None:
         return False
@@ -583,14 +840,19 @@ def va_vers(ctx, q_cible, vitesse=VITESSE, nom='', patience=60, stabilise=True):
     # et l'attente allait au bout de sa patience a CHAQUE mouvement — 22,7 s
     # mesurees le 24/08, identiques a vitesse 25 et a vitesse 50, ce qui prouve
     # que le temps ne venait pas du robot.
-    if float(np.abs(q_cible - q0).max()) > 0.5:
-        precedent, parti = q0, False
+    if float(np.abs(q_cible - q0).max()) > 0.05:
+        debut, precedent = time.time(), q0
         for _ in range(patience):
             time.sleep(0.15)
             q = ctx.pont.angles()
-            parti = parti or float(np.abs(q - q0).max()) > 0.5
+            # Immobile ET assez attendu pour que le mouvement ait pu demarrer.
+            # Exiger d'abord d'avoir VU le bras partir bloquait les corrections
+            # fines : une passe de convergence deplace le bras de moins d'un
+            # degre, le depart n'etait jamais constate et l'attente allait au
+            # bout de sa patience — RECALAGE a 37 s pour quatre passes.
             immobile = float(np.abs(q - precedent).max()) < 0.2
-            if float(np.abs(q - q_cible).max()) < 1.2 or (parti and immobile):
+            if (float(np.abs(q - q_cible).max()) < 1.2
+                    or (immobile and time.time() - debut > 0.75)):
                 break
             precedent = q
     if stabilise:
@@ -601,11 +863,15 @@ def va_vers(ctx, q_cible, vitesse=VITESSE, nom='', patience=60, stabilise=True):
     return ctx.pont.angles()
 
 
-def converge(ctx, p_cible, R, passes=4, tol=1.0):
+def converge(ctx, p_cible, R, passes=4, tol=2.5):
     """Compense l'affaissement en reinjectant l'ecart articulaire mesure.
 
     `send_angles` n'atteint pas la consigne : ~+1.9 deg sur J2, ce qui deplace la
     pointe ET fait pivoter l'outil. Rend (q, correction, converge).
+
+    `tol` vaut le seuil qui compte reellement en aval (3 mm) et non 1 mm : sur
+    une balle de 66 mm, la 3e passe gagnait 1,7 mm pour 3 s (journal du 24/08,
+    11,62 -> 2,09 -> 0,34 mm). La convergence reste declaree a `< 3.0`.
     """
     q_mesure = ctx.pont.angles()
     # Depart CHAUD : on repart de l'affaissement deja mesure au lieu de le
@@ -812,26 +1078,67 @@ def cible_a_bouge(ctx, patience=0.5):
     ecart = float(np.linalg.norm(xy - ctx.balle_xy))
     if ecart < SEUIL_DEPLACEMENT:
         return False
+    # Deux cameras ne s'accordent pas au millimetre. Quand le bras masque la vue
+    # de dessus, la cible passe a la SVPRO et l'ecart de reperage — 10 mm mesures
+    # le 24/08 — se lisait comme un deplacement de la balle : retour a DETECTION,
+    # 11 s perdues, balle parfaitement immobile. On adopte la nouvelle position
+    # sans relancer le cycle : ce n'est pas la balle qui a bouge, c'est l'oeil.
+    if ctx.source_balle != ctx.source_cible:
+        ctx.note(f'ecart de {ecart:.0f} mm au changement de camera, pas un '
+                 f'deplacement — cible ajustee')
+        ctx.balle_xy, ctx.source_cible = xy, ctx.source_balle
+        return False
     ctx.note(f'la balle a bouge de {ecart:.0f} mm '
              f'({ctx.balle_xy[0]:.0f},{ctx.balle_xy[1]:.0f}) -> ({xy[0]:.0f},{xy[1]:.0f})')
-    ctx.balle_xy = xy
+    ctx.balle_xy, ctx.source_cible = xy, ctx.source_balle
     ctx.repart_a_zero()
     ctx.resultats['balle'] = f'({xy[0]:.1f}, {xy[1]:.1f}) mm — suivie'
     return True
 
 
+def dessus(ctx, **kw):
+    """Detection par la vue de dessus, ou None si seule la SVPRO voit la balle.
+
+    `exige_dessus` n'existe que sur le detecteur du tableau de bord ; un
+    detecteur d'essai ne le connait pas et repond comme d'habitude.
+    """
+    try:
+        return ctx.detecteur(exige_dessus=True, **kw)
+    except TypeError:
+        return ctx.detecteur(**kw)
+
+
 def _degagement(ctx):
-    """Ecarte le bras jusqu'a ce que la camera revoie la balle.
+    """Ecarte le bras jusqu'a ce que la VUE DE DESSUS revoie la balle.
 
     L'arducam regarde de dessus : des que le bras s'approche, il s'interpose et
     se cache la balle a lui-meme. Un cycle qui enchaine sans degager mesure une
     balle a moitie occultee — ou n'en trouve plus du tout et conclut a tort
     qu'il n'y en a pas.
+
+    Se contenter de la SVPRO ici enferme le cycle : le bras reste plante devant
+    l'arducam, le degagement se croit inutile, et la mesure de biais de la vue
+    laterale fait sortir la balle de l'enveloppe. Journal du 24/08 : sept tours
+    ATTENTE -> DEGAGEMENT -> DETECTION a « balle a 430 mm — hors enveloppe »,
+    balle immobile et parfaitement atteignable. Le degagement EXIGE donc la vue
+    de dessus, et lui seul.
     """
-    if ctx.detecteur is not None and ctx.detecteur(patience=0.5) is not None:
-        ctx.resultats['degagement'] = 'inutile — balle deja visible'
+    # L'objet en cours peut avoir disparu (deja depose, ou pousse) : sans cet
+    # oubli, le bras balaye indefiniment a la recherche d'une balle qui est deja
+    # dans le carton, alors que deux scotchs et un robot attendent.
+    ctx.classe_objet = ''
+    if ctx.detecteur is not None and dessus(ctx, patience=0.5) is not None:
+        ctx.resultats['degagement'] = 'inutile — objet deja visible de dessus'
         return 'DETECTION'
     ordre = list(BALAYAGE_J1)
+    # Au tout premier cycle, aucune cible n'est encore posee : on demande une
+    # position, ne serait-ce que par la camera d'appui, plutot que de balayer
+    # dans l'ordre du fichier. Mesure du 24/08 : sans ca le bras a essaye cinq
+    # poses avant la bonne — 20 s sur un cycle de 99.
+    if ctx.balle_xy is None and ctx.detecteur is not None:
+        vu = ctx.detecteur(patience=0.5)
+        if vu is not None:
+            ctx.balle_xy = np.asarray(vu[:2], float)
     if ctx.balle_xy is not None:
         # Azimut connu (boucle automatique) : commencer par le plus loin de la
         # balle. Un J1 proche de son azimut place le bras juste au-dessus
@@ -844,10 +1151,10 @@ def _degagement(ctx):
         if va_vers_par_etapes(ctx, pose, nom=f'degagement J1={j1:+.0f}',
                               stabilise=False) is None:
             continue
-        if ctx.detecteur is None or ctx.detecteur() is not None:
+        if ctx.detecteur is None or dessus(ctx) is not None:
             ctx.resultats['degagement'] = f'J1 = {j1:+.0f} deg'
             return 'DETECTION'
-        ctx.note(f'  balle invisible depuis J1={j1:+.0f}, on ecarte davantage')
+        ctx.note(f'  balle invisible de dessus depuis J1={j1:+.0f}, on ecarte davantage')
     ctx.resultats['degagement'] = 'invisible depuis toutes les poses'
     ctx.note('balle invisible depuis toutes les poses de degagement')
     return 'ATTENTE'
@@ -856,12 +1163,15 @@ def _degagement(ctx):
 def _detecte(ctx):
     ctx.pont.envoie('pro_gripper_open')
     time.sleep(2.0)
-    # Le bras vient de se degager : c'est le seul moment du cycle ou la camera
-    # voit le carton sans obstacle. On le localise MAINTENANT, avant de saisir.
+    # Le bras vient de se degager : c'est le meilleur moment pour localiser le
+    # carton, sans occlusion. Mais on n'en fait PAS une condition de depart :
+    # attendre de le voir bloquait tout le cycle (journal du 24/08, la balle
+    # n'etait jamais saisie). On saisit d'abord, on cherche le carton ensuite —
+    # l'invariant qui compte est ailleurs : une fois l'objet en main, on ne
+    # recommence jamais la saisie, on va a RECHERCHE_CARTON.
     if not carton_pret(ctx):
-        ctx.resultats['verdict'] = 'carton inconnu ou hors d atteinte — cycle non demarre'
-        ctx.note('carton ni vu ni memorise a portee — on ne saisit pas la balle')
-        return 'ATTENTE'
+        ctx.note('carton pas encore localise — on saisit quand meme, '
+                 'la recherche se fera objet en main')
     vu = ctx.detecteur() if ctx.detecteur else None
     if vu is None:
         ctx.resultats['balle'] = 'non detectee'
@@ -875,15 +1185,19 @@ def _detecte(ctx):
         ctx.resultats['verdict'] = f'HORS ENVELOPPE (> {PORTEE_MAX:.0f} mm)'
         ctx.note(f'balle a {portee:.0f} mm — hors enveloppe, cible refusee')
         return 'ATTENTE'
-    roulis, R = choisit_roulis(xy, [Z_TRANSFERT, Z_SURVOL, Z_PRISE],
-                               prefere=roulis_retenu(ctx, 'balle', xy))
-    if R is None:
-        ctx.resultats['verdict'] = 'aucun roulis ne resout'
+    pose = choisit_pose_prise(ctx, xy)
+    if pose is None:
+        ctx.resultats['verdict'] = 'aucune orientation ne resout'
         return 'ATTENTE'
-    ctx.roulis_appris[cle_roulis('balle', xy)] = roulis
+    roulis, inclinaison, R, z_prise = pose
     ctx.balle_xy, ctx.roulis_balle, ctx.R_balle = xy, roulis, R
+    ctx.inclinaison_balle, ctx.z_prise = inclinaison, z_prise
+    ctx.source_cible = ctx.source_balle
     ctx.repart_a_zero()
     ctx.resultats['roulis balle'] = f'{roulis:+.0f} deg'
+    ctx.resultats['inclinaison outil'] = (
+        'verticale' if inclinaison == 0.0
+        else f'{inclinaison:+.0f} deg — prise a Z={z_prise:.0f}')
     ctx.resultats['verdict'] = 'atteignable'
     return 'APPROCHE'
 
@@ -915,7 +1229,11 @@ def _recalage(ctx):
 
 
 def _descente(ctx):
-    cible = np.array([ctx.balle_xy[0], ctx.balle_xy[1], Z_PRISE])
+    baisse = PAS_DESCENTE_ESSAI * ctx.essais.get('SAISIE', 0)
+    if baisse:
+        ctx.note(f'essai precedent a vide — on descend {baisse:.0f} mm plus bas')
+    cible = np.array([ctx.balle_xy[0], ctx.balle_xy[1],
+                      max(Z_PRISE, ctx.z_prise - baisse)])
     q, ok = descente_verticale(ctx, cible, ctx.R_balle, ctx.correction)
     if q is not None:
         ctx.resultats['descente'] = f'{np.linalg.norm(pointe(q)[:2] - cible[:2]):.2f} mm'
@@ -1063,6 +1381,27 @@ def _transfert(ctx):
         if R is None:
             return 'ECHEC_PORTANT'
         ctx.carton_xy, ctx.roulis_carton, ctx.R_carton = cible, roulis, R
+    # Dernier controle possible SANS masquer le carton : le bras est encore haut
+    # et loin. Le 24/08 la machine a lache la balle a (209, -1), au milieu de la
+    # table, sur un carton fantome, pendant que le suivi affichait le vrai a
+    # (364, 161). Un point de largage qui a derive de plus d'un carton n'est plus
+    # le bon : on refait la recherche plutot que de lacher dans le vide.
+    if ctx.detecteur_carton is not None:
+        vu = ctx.detecteur_carton(patience=0.6)
+        if vu is not None:
+            derive = float(np.linalg.norm(np.asarray(vu[0], float) - ctx.carton_xy))
+            if derive > DERIVE_CARTON_MAX:
+                # On NE REPART PAS en recherche : une fois au-dessus du carton on
+                # depose, point. On se recale sur la position suivie et on
+                # continue — un tour de boucle de plus coute plus cher qu'un
+                # largage decale de quelques centimetres dans l'ouverture.
+                ctx.note(f'point de largage a {derive:.0f} mm du carton suivi — '
+                         f'recale sur le carton, sans refaire de tour')
+                cible, roulis, R = carton_atteignable(
+                    ctx, np.asarray(vu[0], float), vu[1] if len(vu) > 1 else None)
+                if R is None:
+                    return 'ECHEC_PORTANT'
+                ctx.carton_xy, ctx.roulis_carton, ctx.R_carton = cible, roulis, R
     ctx.resultats['roulis carton'] = f'{ctx.roulis_carton:+.0f} deg'
     cible = resout_ik(np.array([ctx.carton_xy[0], ctx.carton_xy[1], Z_TRANSFERT]),
                       ctx.R_carton)
@@ -1084,7 +1423,7 @@ def _largage(ctx):
     """
     if ctx.R_carton is None:              # l'operateur a redefini la cible en route
         return 'RECHERCHE_CARTON'
-    cible = resout_ik(np.array([ctx.carton_xy[0], ctx.carton_xy[1], Z_LARGAGE]),
+    cible = resout_ik(np.array([ctx.carton_xy[0], ctx.carton_xy[1], z_largage(ctx)]),
                       ctx.R_carton)
     if cible is None or va_vers(ctx, cible[0], nom='largage', stabilise=False) is None:
         ctx.note('descente de largage refusee — objet garde en main')
