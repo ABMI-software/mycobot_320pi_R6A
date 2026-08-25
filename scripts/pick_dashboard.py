@@ -85,6 +85,13 @@ COTE_CARTON_MM = (45.0, 260.0)
 # il exige les angles, donc le pont vers la Pi, et sans lui il ne masque rien.
 # La zone de largage commence de toute facon a 200 mm.
 RAYON_BASE_MIN = 200.0    # mm
+# Et rien AU-DELA de la portee de largage n'est un carton utilisable : on ne
+# saurait de toute facon pas y deposer. C'est ce qui manquait le 25/08 quand un
+# fantome a (505,6 ; -34,2) — hors planche, 507 mm — est passe tous les filtres,
+# a ete SUIVI, puis ECRIT sur le disque comme designation du grand carton. La
+# continuite imposait ensuite ce faux point contre la regle de taille, qui elle
+# donnait le bon resultat. Doit rester egal a fsm.PORTEE_CARTON_MAX.
+RAYON_CARTON_MAX = 460.0  # mm
 # Un objet a moins de ca du bord INTERIEUR de l'ouverture est considere depose.
 # Negatif = on accepte un peu au-dela du bord : un objet appuye contre la paroi
 # est dans la boite, meme si son centre projete tombe un cheveu dehors.
@@ -127,11 +134,68 @@ RAYON_BRAS = 80.0
 # l'exposition 75 le scotch bleu se lit V=48, presque noir (mesure du 24/08) —
 # la geometrie, si. Le robot imprime est sombre et allonge ; la balle est un
 # disque jaune plein.
+# --------------------------------------------------------------------------- #
+#  Mesures de reference — scene du 25/08/2026
+# --------------------------------------------------------------------------- #
+# Tout ce qui suit a ete MESURE sur le robot reel, et c'est ce qui justifie
+# chacun des gabarits ci-dessous. Sans cette table, chaque seuil redevient un
+# nombre magique et se refait resserrer par le premier qui passe.
+#
+# Objets, vus de dessus par l'arducam, projetes a HAUTEUR_OBJET :
+#
+#   scotch blanc   39,7 x 41,4 mm   trou 105 px   V142 S 68   -> petit carton
+#   scotch bleu    35,1 x 36,8 mm   trou  43 px   V 65 S101   -> petit carton
+#   petit robot    71 x 109 mm ramasse, 79 x 146 pattes etalees, V 39 S 58
+#                  ventre 41 mm de large (rayon inscrit 20,3 mm)  -> grand
+#   balle          disque jaune, detecteur dedie
+#
+#   Au pied a coulisse l'operateur donne 72,8 mm pour le blanc et 55 pour le
+#   bleu, soit pres du double de ce que voit la camera. L'ecart n'est pas
+#   explique ; les deux jeux tiennent dans le gabarit, qui est dimensionne sur
+#   le plus grand des deux.
+#
+# Cartons, ouverture mesuree sur le COEUR SOMBRE du creux, a HAUTEUR_CARTON :
+#
+#   grand   113 x 125 mm  ~115 cm2  (+-7 sur 25 images)
+#   petit    67 x 115 mm  ~ 74 cm2  (+-1 sur 25 images)
+#
+#   Soit 41 cm2 d'ecart pour +-7 de bruit : SIX FOIS le bruit, le gabarit les
+#   separe donc tout seul. Ce n'etait pas le cas avant la correction du coeur
+#   sombre — contours gonfles par l'ombre des parois, ils donnaient 160x214 et
+#   144x205 mm, 16 % d'ecart pour 18 % de bruit, indiscernables.
+#
+#   Le rebord des deux est a 82,9 mm (triangulation des deux vues, 11,8 mm
+#   d'ecart entre les rayons), et non 60 comme suppose jusqu'au 25/08.
+#
+# ATTENTION : un objet DEPOSE deforme le creux de sa boite — le scotch blanc a
+# fait passer le petit carton de 74x127 a 83x172 mm. La separation ci-dessus ne
+# vaut que boites vides ; c'est pourquoi l'identite est aussi tenue par la
+# continuite et par la designation.
+
 # Diametre exterieur de l'anneau. Plafond porte de 70 a 90 mm le 25/08 : le
 # rouleau blanc mesure 72,8 mm au pied a coulisse, donc il etait rejete par le
 # gabarit avant meme d'etre classe — un seul des deux scotchs etait detecte.
 COTE_SCOTCH_MM = (28.0, 90.0)
-AIRE_TROU_MIN = 18                # px — le plus petit trou mesure fait 28 px
+# Un blob COMPACT sous cette taille ne peut etre qu'un scotch : le robot fait au
+# moins 60 mm, une ouverture de carton au moins 45, la balle a son detecteur.
+# C'est le repli quand le trou de l'anneau ne se forme pas — le rouleau bleu
+# fait 32 x 38 mm, soit 16 x 19 px, et son trou passe de 43 px a rien du tout
+# selon l'eclairage (mesure du 25/08). Compact, donc PETIT COTE compris lui
+# aussi dans la fourchette : un morceau de cable fait 34 x 271 mm et sort.
+COTE_SCOTCH_COMPACT = 60.0
+AIRE_TROU_MIN = 18
+MARGE_MASQUE_MARQUEUR = 1.6
+# Ecart de luminosite au bois au-dela duquel un pixel est etranger. Le rouleau
+# BLANC n'a que 39 unites d'ecart (V148 contre V109 pour le bois) : a 55, seul
+# le coeur de son anneau passait, le bord fondait dans la planche et le rouleau
+# se cassait en fragments de 16 x 33 mm — sous le gabarit, donc invisible une
+# image sur cinq. Balayage du 25/08, 10 images, les deux rouleaux :
+#
+#   seuil 55 -> blanc  8/10     seuil 45 -> 10/10     seuil 35 -> bleu 4/10
+#
+# A 35 le veinage du bois entre dans le masque et fabrique de faux objets. 45
+# laisse dix unites de marge de chaque cote.
+ECART_VALEUR_BOIS = 45                # px — le plus petit trou mesure fait 28 px
 # Plus grand cote. Le plancher a 60 mm separe le robot des SCOTCHS : mesure du
 # 24/08, le robot fait 82x134 mm et les rouleaux 33x39 et 38x43. Un rouleau dont
 # le trou n'est pas vu (il est sombre, V=48) tombait sinon dans la categorie
@@ -176,7 +240,14 @@ VALEUR_SOMBRE = 60                # V median en-deca duquel un objet est "noir"
 # se faisaient prendre pour le robot — quatre faux positifs sur une planche vide,
 # mesure du 24/08. Ce qui separe vraiment, c'est la SATURATION : le robot imprime
 # est noir desature (S=44), le bois reste brun sature meme dans l'ombre (S=170).
-SATURATION_NOIRE_MAX = 90
+# Descendu de 90 a 70 le 25/08. A 90, l'INTERIEUR du petit carton — sombre et
+# peu sature, S=89, un point sous le seuil — etait classe "robot" : 72,6 x 115,6
+# mm, pile son ouverture. L'ouverture disparaissait alors de la liste des
+# cartons (un creux colle a un objet n'est pas retenu), le bras descendait dans
+# la boite et se refermait sur du vide. Les valeurs mesurees sur le vrai robot
+# sont S=33, 44 et 58 selon l'eclairage : 70 les garde toutes et ecarte le
+# carton.
+SATURATION_NOIRE_MAX = 70
 AIRE_OBJET_MIN = 90               # px
 # Destination de chaque categorie. Le petit carton est noir a l'exterieur, le
 # grand est brun — c'est l'anneau autour de l'ouverture qui les separe.
@@ -277,6 +348,42 @@ GRIS = QColor(170, 175, 185)
 ROUGE = QColor(225, 45, 45)
 
 
+def nom_par_aire(aire):
+    """Nom d'un carton d'apres sa SEULE aire d'ouverture, ou None si c'est trop
+    juste pour trancher.
+
+    C'est le cas qui faisait tout basculer : un seul carton visible, l'autre
+    masque par le bras. Le code se rabattait alors sur "le plus grand des
+    restants est le grand", donc le PETIT carton vu seul devenait le grand — et
+    la continuite figeait l'erreur pour toute la seance.
+
+    La frontiere est la moyenne GEOMETRIQUE des deux aires attendues, pas leur
+    moyenne arithmetique : l'erreur de mesure d'une aire est relative, pas
+    absolue, et la moyenne geometrique est le point equidistant des deux au sens
+    du rapport.
+    """
+    frontiere = float(np.sqrt(AIRE_CARTON_ATTENDUE['grand']
+                              * AIRE_CARTON_ATTENDUE['petit']))
+    if abs(aire - frontiere) < BANDE_MORTE_AIRE * frontiere:
+        return None
+    return 'grand' if aire > frontiere else 'petit'
+
+
+def plausible(xy):
+    """Cette position peut-elle etre celle d'un carton ?
+
+    Un garde-fou a l'ECRITURE, pas seulement a la detection. Le 25/08 un
+    fantome a (505,6 ; -34,2) a ete suivi puis grave sur le disque comme
+    designation du grand carton : la continuite l'a ensuite impose a chaque
+    image contre la regle de taille, qui donnait le bon resultat. Une
+    designation fausse est pire qu'une designation absente — elle survit aux
+    relances.
+    """
+    if xy is None:
+        return False
+    return RAYON_BASE_MIN <= float(np.hypot(*np.asarray(xy, float))) <= RAYON_CARTON_MAX
+
+
 class VueCliquable(QLabel):
     """Flux camera qui rend le pixel CLIQUE, dans le repere de l'image.
 
@@ -316,9 +423,46 @@ MARQUEUR_CARTON = {10: 'grand', 11: 'petit'}
 # separe, c'est qu'ils ne sont pas au meme endroit : un carton deja nomme garde
 # son nom tant qu'il reste pres de la ou on l'a vu.
 CONTINUITE_CARTON = 150.0      # mm
+# Ecart relatif d'aire au-dela duquel les deux ouvertures se separent d'elles-
+# memes, sans avoir besoin ni de la continuite ni d'une designation. Mesure du
+# 25/08, les deux cartons vides et le bras degage : 126 +-3 cm2 contre 77 +-1,
+# soit 39 % d'ecart pour 3 % de bruit. A 25 % on est encore loin du bruit et
+# largement sous l'ecart reel.
+ECART_TAILLE_DECISIF = 0.25
+# Aire d'ouverture ATTENDUE de chaque carton, en mm2 — mesuree le 25/08, bras
+# degage, boites vides, sur 15 images : 126 +-3 cm2 et 77 +-1 cm2.
+#
+# Elle sert au cas qui faisait tout basculer : UN SEUL carton visible, l'autre
+# masque par le bras. Sans elle, le code se rabattait sur "le plus grand des
+# restants est le grand" — donc le PETIT carton vu seul devenait le grand, et la
+# continuite figeait ensuite l'erreur pour toute la seance. Un carton seul doit
+# etre MESURE, pas suppose.
+#
+# Si les boites changent, ces deux valeurs sont a re-mesurer : le banc
+# scratchpad/stabilite_cartons.py les sort en une commande.
+AIRE_CARTON_ATTENDUE = {'grand': 12600.0, 'petit': 7700.0}
+# Bande morte autour de la moyenne geometrique des deux, en deca de laquelle un
+# carton seul n'est pas assez tranche pour se nommer par sa seule aire.
+BANDE_MORTE_AIRE = 0.15
 DESIGNATION_CARTONS = RACINE / 'scripts' / 'cartons_designes.json'
-COTE_MARQUEUR_CARTON = 45.0    # mm — carre noir, bordure blanche exclue
+COTE_MARQUEUR_CARTON = 30.0    # mm — carre noir, bordure blanche exclue
 PORTE_MARQUEUR_CARTON = 220.0  # mm — distance max marqueur <-> ouverture
+# Un carre plan ne rend sa PROFONDEUR qu'a Z * bruit_coin / cote_px pres. La
+# camera est a ~1 m, un coin se pointe a ~0,3 px : il faut donc ~30 px de cote
+# pour connaitre la hauteur a 10 mm. Les marqueurs colles le 25/08 font 30 mm,
+# soit ~15 px a 2,01 mm/px — leur profondeur est bruitee de ~20 mm, plus que
+# l'ecart qu'on cherche a mesurer. On ne leur demande donc que le NOM, et la
+# hauteur reste HAUTEUR_CARTON. Reimprimes plus grands, ils repassent ce seuil
+# et redonnent la hauteur sans qu'on touche a quoi que ce soit.
+COTE_MARQUEUR_PX_MIN = 30.0
+# Un marqueur colle sur un rabat EST une tache etrangere sombre et compacte de
+# 30 mm : le detecteur d'objets a classe id 11 comme un rouleau de scotch a
+# (381, -195) le 25/08, et le bras serait alle pincer l'autocollant. Les
+# marqueurs de la planche sont deja retires par `masque_plateau` — leurs places
+# sont fixes — mais ceux des cartons bougent avec les boites, donc on les
+# retire image par image, a partir du quadrilatere detecte. Facteur mesure sur
+# la scene du 25/08 : l'autocollant entier (papier blanc compris) s'etend a
+# 1,30-1,33 fois le rayon du carre noir ; 1,6 laisse la marge.
 # Le marqueur ne donne sa hauteur au solveur que s'il est PLAUSIBLEMENT sur le
 # rebord. Colle sur un rabat rabattu a plat sur la table — le seul endroit
 # horizontal qu'offrent certains cartons — il est a Z=0, et prendre cette
@@ -450,11 +594,16 @@ class Vision:
         monde = (R.T @ (tvec.reshape(3) - t)) * 1000.0
         z = float(np.clip(monde[2], 0.0, 200.0))
         # Le CENTRE vient du rayon, pas de la translation PnP : la profondeur
-        # d'une cible plane de 45 mm est bruitee de ~15 mm, sa direction ne
-        # l'est pas. On garde donc de PnP la seule hauteur, et on redescend le
-        # rayon sur ce plan-la.
-        centre = np.asarray(coins, float).mean(axis=0)
-        return self.vers_base(centre, z)[:2], z, float(np.linalg.norm(monde))
+        # d'une cible plane est bruitee, sa direction ne l'est pas. On garde
+        # donc de PnP la seule hauteur, et on redescend le rayon sur ce plan-la.
+        # Trop petit, le marqueur ne dit meme plus sa hauteur (cf.
+        # COTE_MARQUEUR_PX_MIN) : il ne reste que le nom, qui lui est exact.
+        quad = np.asarray(coins, float).reshape(4, 2)
+        cote_px = float(np.mean([np.linalg.norm(quad[i] - quad[(i + 1) % 4])
+                                 for i in range(4)]))
+        centre = quad.mean(axis=0)
+        return (self.vers_base(centre, z)[:2],
+                z if cote_px >= COTE_MARQUEUR_PX_MIN else None, cote_px)
 
     def cartons_marques(self, image, marqueurs):
         """{classe: (xy du marqueur, z du rebord)} vu par les marqueurs colles.
@@ -472,7 +621,8 @@ class Vision:
             pose = self.pose_marqueur(coins)
             if pose is not None:
                 xy, z = pose[:2]
-                rendus[classe] = (xy, z if z >= REBORD_MARQUEUR_MIN else None)
+                rendus[classe] = (xy, z if z is not None and z >= REBORD_MARQUEUR_MIN
+                                  else None)
         return rendus
 
     def quad_plateau(self):
@@ -579,20 +729,37 @@ class Vision:
         v, u = np.nonzero(distance >= 0.85 * sommet)
         return float(u.mean()), float(v.mean())
 
-    def objets(self, image, angles=None):
+    @staticmethod
+    def sans_marqueurs(masque, marqueurs):
+        """Le meme masque, les autocollants des cartons effaces."""
+        if not marqueurs:
+            return masque
+        net = masque.copy()
+        for coins in marqueurs.values():
+            quad = np.asarray(coins, float).reshape(4, 2)
+            centre = quad.mean(axis=0)
+            elargi = centre + (quad - centre) * MARGE_MASQUE_MARQUEUR
+            cv2.fillConvexPoly(net, elargi.astype(np.int32), 0)
+        return net
+
+    def objets(self, image, angles=None, marqueurs=None):
         """Objets a trier poses sur la planche : [(classe, xy_base, contour)].
 
         Trois signatures, mesurees le 24/08 sur la scene reelle :
 
-        * `scotch` — ANNEAU. Un contour qui enferme un trou. C'est le seul
-          discriminant fiable : a l'exposition 75, le rouleau bleu se lit
-          H=15 S=90 V=48, indistinguable du bois sombre. Sa forme, elle, ne
-          depend pas de l'eclairage.
+        * `scotch` — ANNEAU, ou a defaut BLOB COMPACT de moins de
+          `COTE_SCOTCH_COMPACT`. Le trou reste le meilleur indice, mais il ne se
+          forme pas toujours : le rouleau bleu fait 16 x 19 px a l'image et son
+          trou passe de 43 px a rien selon l'eclairage. A cette taille-la,
+          aucune autre categorie n'est possible — le robot fait au moins 60 mm,
+          une ouverture de carton au moins 45, la balle a son propre detecteur.
         * `robot` — tache SOMBRE et allongee (V median < 60), 25 a 140 mm.
         * `balle` — disque jaune plein, rendu par `balle()` qui la connait deja.
 
         Le bras est retire de l'image avant tout, sinon sa silhouette et son
-        ombre fournissent des taches sombres de la bonne taille.
+        ombre fournissent des taches sombres de la bonne taille. Les marqueurs
+        des cartons le sont aussi : un carre noir de 30 mm sur son papier blanc
+        a exactement la signature d'un rouleau de scotch.
         """
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         teinte, saturation, valeur = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
@@ -604,16 +771,34 @@ class Vision:
                 int(np.median(valeur[plateau > 0])))
         ecart_teinte = np.minimum(np.abs(teinte.astype(int) - bois[0]),
                                   180 - np.abs(teinte.astype(int) - bois[0]))
-        etranger = ((ecart_teinte > 12)
-                    | (np.abs(saturation.astype(int) - bois[1]) > 55)
-                    | (np.abs(valeur.astype(int) - bois[2]) > 55)) & (plateau > 0)
-        etranger = cv2.morphologyEx(etranger.astype(np.uint8) * 255,
-                                    cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
-        # AUCUNE fermeture morphologique. Elle boucherait le trou du rouleau,
-        # qui est toute la signature du scotch : mesure du 24/08, le trou de
-        # l'anneau bleu fait 28 px et disparait des la fermeture 3x3 — le
-        # rouleau tombait alors dans la categorie robot et partait vers le
-        # mauvais carton. L'ouverture 3x3 suffit a nettoyer le bruit.
+        brut = (((ecart_teinte > 12)
+                 | (np.abs(saturation.astype(int) - bois[1]) > 55)
+                 | (np.abs(valeur.astype(int) - bois[2]) > ECART_VALEUR_BOIS))
+                & (plateau > 0)).astype(np.uint8) * 255
+        etranger = cv2.morphologyEx(brut, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+        # Puis on RECOLLE l'anneau. C'est l'ouverture qui le casse, pas la
+        # fermeture qui le bouche — mesure du 25/08 sur les deux rouleaux :
+        #
+        #                        aire      trou
+        #   masque brut       206/236 px  54/98 px
+        #   apres OPEN 3x3    148/132 px   0/0     <- l'anneau est rompu
+        #   OPEN puis CLOSE   206/231 px  51/96 px
+        #
+        # Rompu, l'anneau perd son trou ET un tiers de son aire : il ne tenait
+        # plus que par la regle du blob compact, et deux arcs separes seraient
+        # passes chacun sous AIRE_OBJET_MIN. Referme, il retrouve sa signature
+        # entiere avec deux fois la marge.
+        #
+        # Le noyau vaut 5 et pas 3 : un 3x3 ne recolle qu'une cassure d'UN
+        # pixel, et l'anneau se rompt plus large des qu'il s'eloigne du centre
+        # de l'image. Il n'a plus a menager le trou, qui se mesure desormais sur
+        # `brut` (cf. `creux_enferme`) — la fermeture ne sert qu'a recoller. On
+        # garde malgre tout le plus petit noyau qui suffise : a 5 elle ne relie
+        # que ce qui est distant de 8 mm, a 7 de 12 mm, et deux objets poses
+        # cote a cote finiraient par n'en faire qu'un.
+        etranger = cv2.morphologyEx(etranger, cv2.MORPH_CLOSE,
+                                    np.ones((5, 5), np.uint8))
+        etranger = self.sans_marqueurs(etranger, marqueurs)
 
         contours, hierarchie = cv2.findContours(etranger, cv2.RETR_CCOMP,
                                                 cv2.CHAIN_APPROX_SIMPLE)
@@ -634,9 +819,7 @@ class Vision:
                 dedans = np.count_nonzero(cv2.bitwise_and(plein, silhouette))
                 if dedans > 0.4 * np.count_nonzero(plein):
                     continue
-            enfant = hierarchie[0][i][2]
-            troue = any(cv2.contourArea(contours[j]) >= AIRE_TROU_MIN
-                        for j in self._fratrie(hierarchie, enfant))
+            troue = self.creux_enferme(plein, brut) >= AIRE_TROU_MIN
             # A HAUTEUR_OBJET, pas au plan du rebord : un objet pose sur la
             # planche mesure a 83 mm se lit 7 % trop grand, et le rouleau blanc
             # passait ainsi par-dessus le plafond du gabarit scotch.
@@ -644,6 +827,8 @@ class Vision:
             sombre = (int(np.median(valeur[plein > 0])) < VALEUR_SOMBRE
                       and int(np.median(saturation[plein > 0])) < SATURATION_NOIRE_MAX)
             if troue and COTE_SCOTCH_MM[0] <= petit and grand <= COTE_SCOTCH_MM[1]:
+                classe = 'scotch'
+            elif COTE_SCOTCH_MM[0] <= petit and grand <= COTE_SCOTCH_COMPACT:
                 classe = 'scotch'
             elif (sombre and COTE_ROBOT_MM[0] <= grand <= COTE_ROBOT_MM[1]
                   and petit <= LARGEUR_ROBOT_MAX):
@@ -662,11 +847,20 @@ class Vision:
         return trouves
 
     @staticmethod
-    def _fratrie(hierarchie, premier):
-        """Indices d'un contour et de tous ses freres."""
-        while premier != -1:
-            yield premier
-            premier = hierarchie[0][premier][0]
+    def creux_enferme(plein, brut):
+        """Plus grande poche de fond enfermee dans un contour, en pixels.
+
+        Mesuree sur le masque AVANT les morphologies, pas sur les contours-fils
+        d'apres : la fermeture qui recolle l'anneau retrecit son trou, et la
+        signature du scotch ne doit pas dependre du reglage qui le repare. Le
+        contour rempli est erode d'un pixel pour que son propre liseré ne
+        compte pas comme du fond.
+        """
+        dedans = cv2.erode(plein, np.ones((3, 3), np.uint8))
+        creux = cv2.bitwise_and(dedans, cv2.bitwise_not(brut))
+        nombre, _, stats, _ = cv2.connectedComponentsWithStats(creux, 8)
+        return max((stats[j, cv2.CC_STAT_AREA] for j in range(1, nombre)),
+                   default=0)
 
     def polygone_base(self, contour, z=None):
         """Ouverture du carton en mm dans le repere base, a hauteur de rebord.
@@ -709,7 +903,7 @@ class Vision:
         trouve = self._carton_par_creux(image, dernier, angles)
         return trouve if trouve is not None else self._carton_par_couleur(image, angles)
 
-    def points_interessants(self, image, angles=None):
+    def points_interessants(self, image, angles=None, marqueurs=None):
         """Tout ce qui n'est pas le fond, SANS le classer : [(xy base, contour)].
 
         C'est ce que la camera d'appui doit rendre. Lui faire classifier seule
@@ -718,7 +912,8 @@ class Vision:
         24/08). Elle ne nomme donc plus rien : elle fournit des positions, et
         c'est l'arducam qui dit ce que chacune est.
         """
-        points = [(xy, contour) for _, xy, contour in self.objets(image, angles)]
+        points = [(xy, contour) for _, xy, contour
+                  in self.objets(image, angles, marqueurs)]
         points += [(xy, contour) for _, xy, contour, _, _
                    in self._creux_candidats(image, angles)]
         return points
@@ -733,13 +928,21 @@ class Vision:
            la hauteur du rebord avec ;
         2. la CONTINUITE — un carton deja nomme garde son nom tant qu'il reste
            pres de la ou on l'a vu ;
-        3. la ROBE puis le GABARIT — brun pour le grand, noir pour le petit,
-           puis a defaut le plus grand des deux.
+        3. la TAILLE RELATIVE, quand les deux ouvertures sont vues et different
+           d'au moins `ECART_TAILLE_DECISIF` — 126 +-3 cm2 contre 77 +-1 sur
+           boites VIDES, six fois le bruit ;
+        4. l'AIRE ABSOLUE, pour un carton vu SEUL, comparee aux deux aires
+           mesurees (`AIRE_CARTON_ATTENDUE`). Sans elle, un carton seul se
+           voyait attribuer "grand" par defaut : le PETIT vu seul devenait le
+           grand ;
+        5. la ROBE puis le plus grand des restants, en dernier recours.
 
-        La 3 seule ne suffit pas : mesures du 25/08, les deux cartons poses
-        cote a cote donnent 160x214 et 144x205 mm, 5 % d'ecart, et l'etiquette
-        bascule d'une image a l'autre. Elle ne reste que comme amorce, pour le
-        cas ou rien d'autre n'est encore connu.
+        Pourquoi la continuite passe AVANT la taille : une boite PLEINE ne se
+        mesure plus. Mesure du 25/08, le grand carton avec la balle et un scotch
+        dedans tombe a 59 cm2 contre 126 vide, sous le petit reste a 71 —
+        l'aire s'inverse. Elle ne vaut donc que pour NOMMER la premiere fois,
+        boites vides ; ensuite c'est la position qui tient l'identite. Un
+        marqueur colle affranchit de tout cela.
 
         Les objets a trier sont ecartes : le robot imprime est une tache sombre
         de 82x134 mm cerclee de bois brun, donc un candidat parfait. Passe en
@@ -767,6 +970,12 @@ class Vision:
                            creux[2], hauteur))
         manquantes = [c for c in ('grand', 'petit')
                       if c not in {r[0] for r in rendus}]
+        # LA CONTINUITE D'ABORD, des lors qu'il y a un nom a conserver. Ce n'est
+        # pas un choix de confort : une boite PLEINE ne se mesure plus. Mesure du
+        # 25/08, le grand carton avec la balle et un scotch dedans tombe a
+        # 59 cm2 contre 126 vide, sous le petit reste a 71 — l'aire s'inverse.
+        # Elle n'est fiable que sur une boite vide, donc au moment ou on nomme
+        # pour la premiere fois. Apres, c'est la position qui tient l'identite.
         for classe in list(manquantes):
             connu = (connus or {}).get(classe)
             if connu is None or not restants:
@@ -778,6 +987,31 @@ class Vision:
             restants.remove(creux)
             manquantes.remove(classe)
             rendus.append((classe,) + creux[1:3] + (HAUTEUR_CARTON,))
+        if len(manquantes) == 2 and len(restants) >= 2:
+            # LA TAILLE D'ABORD, quand elle tranche franchement. La continuite
+            # etait passee avant, et c'etait une faute : une premiere image ratee
+            # — un seul carton visible, l'autre masque par le bras — verrouillait
+            # une etiquette fausse que plus rien ne corrigeait, et le scotch
+            # partait dans le grand carton (constate le 25/08).
+            restants.sort(key=lambda v: -v[0])
+            gros, maigre = restants[0], restants[1]
+            if (gros[0] - maigre[0]) / max(gros[0], 1.0) >= ECART_TAILLE_DECISIF:
+                restants.remove(gros)
+                restants.remove(maigre)
+                manquantes.clear()
+                rendus += [('grand',) + gros[1:3] + (HAUTEUR_CARTON,),
+                           ('petit',) + maigre[1:3] + (HAUTEUR_CARTON,)]
+        if len(restants) == 1 and manquantes:
+            # Un carton vu SEUL — le bras masque regulierement l'autre. Son aire
+            # absolue le nomme. Restreint a ce cas : des que deux ouvertures sont
+            # visibles, c'est leur ecart RELATIF qui tranche (plus haut), et si
+            # cet ecart est trop faible c'est a la continuite de decider, pas a
+            # une frontiere absolue qui les mettrait toutes deux du meme cote.
+            classe = nom_par_aire(restants[0][0])
+            if classe in manquantes:
+                creux = restants.pop()
+                manquantes.remove(classe)
+                rendus.append((classe,) + creux[1:3] + (HAUTEUR_CARTON,))
         if manquantes and restants:
             sombres = [v for v in restants if v[3] >= NOIR_EXTERIEUR_MIN]
             bruns = [v for v in restants if v[3] < NOIR_EXTERIEUR_MIN]
@@ -924,7 +1158,7 @@ class Vision:
             moments = cv2.moments(enveloppe)
             uv = (moments['m10'] / moments['m00'], moments['m01'] / moments['m00'])
             centre_base = self.vers_base(uv, HAUTEUR_CARTON)[:2]
-            if float(np.hypot(*centre_base)) < RAYON_BASE_MIN:
+            if not (RAYON_BASE_MIN <= float(np.hypot(*centre_base)) <= RAYON_CARTON_MAX):
                 continue
             robe = cv2.subtract(cv2.dilate(plein, np.ones((25, 25), np.uint8)),
                                 cv2.dilate(plein, np.ones((5, 5), np.uint8)))
@@ -1467,7 +1701,8 @@ class Fenetre(QMainWindow):
                 # vue de dessus, elle le voit encore. Elle ASSISTE l'arducam,
                 # elle ne la remplace pas — la projection obliques est plus
                 # sensible a l'erreur de hauteur de rebord.
-                points = self.vision_svpro.points_interessants(image, angles=angles)
+                points = self.vision_svpro.points_interessants(
+                    image, angles=angles, marqueurs=self.marqueurs.coins(image))
                 # La SVPRO ne nomme rien : chaque tache qu'elle voit est
                 # rapprochee de ce que l'ARDUCAM a deja identifie, et n'herite
                 # d'un nom que par cette proximite. Les deux vues affichent
@@ -1499,8 +1734,9 @@ class Fenetre(QMainWindow):
                     cv2.putText(affichee, f'{xy[0]:.0f},{xy[1]:.0f}',
                                 (int(u) - 34, int(v) - int(r) - 8),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 0, 255), 1)
-                objets = self.vision.objets(image, angles=angles)
                 marqueurs = self.marqueurs.coins(image)
+                objets = self.vision.objets(image, angles=angles,
+                                            marqueurs=marqueurs)
                 with self._verrou:
                     connus = dict(self._designation)
                     connus.update({c: s.centre for c, s in self.suivi_cartons.items()
@@ -1508,8 +1744,18 @@ class Fenetre(QMainWindow):
                 vus = {classe: (xy, contour, z) for classe, xy, contour, z
                        in self.vision.cartons(image, angles=angles, objets=objets,
                                               marqueurs=marqueurs, connus=connus)}
+                # L'UNION de ce qu'on voit a l'instant et de ce que le suivi
+                # tient encore. Se limiter a l'image courante laissait la balle
+                # deja deposee redevenir une cible des que le bras passait
+                # au-dessus de sa boite : plus de carton vu, donc plus
+                # d'ouverture, donc plus rien pour la declarer deposee, et le
+                # cycle repartait la chercher au fond du carton (25/08).
                 self._ouvertures = [self.vision.polygone_base(contour, z)
                                     for _, contour, z in vus.values()]
+                with self._verrou:
+                    self._ouvertures += [suivi.polygone
+                                         for suivi in self.suivi_cartons.values()
+                                         if suivi.polygone is not None]
                 objets = [o for o in objets if not self._depose(o[1])]
                 if trouve is not None and self._depose(trouve[0]):
                     trouve = None
@@ -1681,7 +1927,7 @@ class Fenetre(QMainWindow):
         with self._verrou:
             positions = {classe: s.centre.tolist()
                          for classe, s in self.suivi_cartons.items()
-                         if s.centre is not None}
+                         if s.centre is not None and plausible(s.centre)}
         if len(positions) != 2:
             return
         # Ecrire a chaque image userait le disque pour rien ; ne pas reecrire du
@@ -1702,7 +1948,7 @@ class Fenetre(QMainWindow):
         except json.JSONDecodeError:
             return {}
         return {classe: np.asarray(xy, float) for classe, xy in memoire.items()
-                if classe in COULEUR_CARTON}
+                if classe in COULEUR_CARTON and plausible(xy)}
 
     def _maj_carton(self, suivi):
         """Le carton s'affiche et se met a jour tout seul — aucun clic requis.
@@ -1813,6 +2059,15 @@ class Fenetre(QMainWindow):
         balle = self._detecte_balle(echantillons, patience, exige_dessus)
         if balle is not None:
             candidats.append((float(np.hypot(*balle)), 'balle', balle))
+        # Le filtre "deja depose" se pose ICI, au point de CHOIX, et pas a la
+        # source : `_detecte_balle` interroge la camera directement et le relais
+        # SVPRO aussi, tous deux court-circuitant la liste filtree. C'est par la
+        # que la balle deposee redevenait la cible, cycle apres cycle (25/08).
+        deposes = [c for c in candidats if self._depose(c[2])]
+        candidats = [c for c in candidats if not self._depose(c[2])]
+        if deposes:
+            self.ctx.note(f'{len(deposes)} objet(s) deja dans un carton, ignores : '
+                          + ', '.join(sorted({c[1] for c in deposes})))
         atteignables = [c for c in candidats if c[0] <= fsm.PORTEE_MAX]
         if not atteignables:
             if candidats:
