@@ -4,6 +4,7 @@ Le cycle a tourné la balle en main parce qu'un carton introuvable renvoyait
 vers ECHEC, donc vers ATTENTE, donc vers un nouveau DEGAGEMENT. Ces tests
 tiennent la garde qui l'interdit, et le fait qu'un carton déplacé soit suivi.
 """
+import types
 import sys
 import unittest
 from pathlib import Path
@@ -122,11 +123,18 @@ class AvantDeSaisir(unittest.TestCase):
             fichier.unlink()
         self.dossier.rmdir()
 
-    def test_pas_de_carton_pas_de_cycle(self):
+    def test_carton_inconnu_la_saisie_se_fait_quand_meme(self):
+        """Regle inversee le 24/08 : ne pas voir le carton ne bloque plus rien.
+
+        Attendre de le voir avant de saisir immobilisait tout le cycle. Ce qui
+        protege le robot n'est pas ce prealable mais l'invariant d'apres la
+        prise — teste par `PriseEnMain` : objet en main, on ne recommence
+        jamais la saisie.
+        """
         machine = fsm.MachineEtats(contexte(statut=1, dossier=self.dossier))
         machine.etat = "DETECTION"
         machine.pas()
-        self.assertEqual(machine.etat, "ATTENTE")
+        self.assertEqual(machine.etat, "APPROCHE")
 
     def test_la_memoire_suffit_a_demarrer(self):
         machine = fsm.MachineEtats(contexte(statut=1, memoire=(280.0, -130.0),
@@ -259,3 +267,172 @@ class ApprocheDepuisBrasDresse(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ChangementDeCamera(unittest.TestCase):
+    """Un ecart entre les deux cameras n'est pas un deplacement de la balle.
+
+    Mesure du 24/08 : le bras masque la vue de dessus, la cible passe a la
+    SVPRO, les 10 mm d'ecart de reperage relancent DETECTION. Onze secondes
+    perdues, balle immobile.
+    """
+
+    def setUp(self):
+        self.dossier = Path(__file__).resolve().parent / "__memoire3__"
+        self.dossier.mkdir(exist_ok=True)
+
+    def tearDown(self):
+        for fichier in self.dossier.glob("*"):
+            fichier.unlink()
+        self.dossier.rmdir()
+
+    def _ctx(self, source_vue):
+        ctx = contexte(statut=1, dossier=self.dossier)
+        ctx.balle_xy = np.array([382.0, 177.0])
+        ctx.source_cible = "arducam"
+        ctx.source_balle = source_vue
+        ctx.detecteur = lambda patience=1.0: np.array([392.0, 177.0])
+        return ctx
+
+    def test_le_relais_svpro_ne_relance_pas_le_cycle(self):
+        ctx = self._ctx("svpro")
+        self.assertFalse(fsm.cible_a_bouge(ctx))
+        np.testing.assert_allclose(ctx.balle_xy, [392.0, 177.0])
+
+    def test_la_meme_camera_signale_un_vrai_deplacement(self):
+        ctx = self._ctx("arducam")
+        self.assertTrue(fsm.cible_a_bouge(ctx))
+
+
+class DegagementExigeLaVueDeDessus(unittest.TestCase):
+    """Sept tours a vide le 24/08 : le bras restait plante devant l'arducam
+    parce que la SVPRO, elle, voyait la balle."""
+
+    def setUp(self):
+        self.dossier = Path(__file__).resolve().parent / "__memoire4__"
+        self.dossier.mkdir(exist_ok=True)
+
+    def tearDown(self):
+        for fichier in self.dossier.glob("*"):
+            fichier.unlink()
+        self.dossier.rmdir()
+
+    def test_seule_la_svpro_voit_donc_on_ecarte(self):
+        appels = []
+
+        def detecteur(patience=1.0, exige_dessus=False):
+            appels.append(exige_dessus)
+            return None if exige_dessus else np.array([250.0, -60.0])
+
+        ctx = contexte(statut=1, dossier=self.dossier)
+        ctx.detecteur = detecteur
+        self.assertIsNone(fsm.dessus(ctx, patience=0.5))
+        self.assertTrue(appels[0])
+
+    def test_un_detecteur_qui_ignore_l_option_repond_quand_meme(self):
+        ctx = contexte(statut=1, dossier=self.dossier)
+        ctx.detecteur = lambda patience=1.0: np.array([250.0, -60.0])
+        np.testing.assert_allclose(fsm.dessus(ctx), [250.0, -60.0])
+
+
+class HauteurDePriseParCategorie(unittest.TestCase):
+    """Un rouleau couche ne se saisit pas a la hauteur d'une balle.
+
+    La balle fait 66 mm et tient les doigts ecartes : viser sous le plan de la
+    table est sans danger. Un scotch fait ~22 mm — les doigts taperaient la
+    planche avant de se refermer, et la pince se fermerait a vide.
+    """
+
+    def test_la_balle_garde_ses_hauteurs_historiques(self):
+        self.assertEqual(fsm.Z_PRISE_PAR_CLASSE["balle"],
+                         (fsm.Z_PRISE, fsm.Z_PRISE_INCLINE))
+
+    def test_les_objets_plats_se_prennent_au_dessus_de_la_planche(self):
+        for classe in ("scotch", "robot"):
+            self.assertGreater(fsm.Z_PRISE_PAR_CLASSE[classe][0], 0.0)
+
+    def test_couche_l_outil_vise_la_mi_hauteur_de_l_objet_pas_celle_de_la_balle(self):
+        """Le defaut du 24/08 : Z=25 (mi-hauteur de la balle) sur un rouleau de
+        22 mm — la pince se refermait entierement au-dessus de lui."""
+        for classe in ("scotch", "robot"):
+            self.assertLess(fsm.Z_PRISE_PAR_CLASSE[classe][1],
+                            fsm.Z_PRISE_PAR_CLASSE["balle"][1])
+
+    def test_une_categorie_inconnue_retombe_sur_les_hauteurs_par_defaut(self):
+        self.assertEqual(
+            fsm.Z_PRISE_PAR_CLASSE.get("inconnu", (fsm.Z_PRISE, fsm.Z_PRISE_INCLINE)),
+            (fsm.Z_PRISE, fsm.Z_PRISE_INCLINE))
+
+
+class OmbreDuBras(unittest.TestCase):
+    """Le fantome au milieu de la table est venu de la : une ombre portee par le
+    bras se confirme aussi bien qu'un vrai deplacement, puisqu'elle le suit
+    image apres image."""
+
+    def test_la_distance_se_mesure_au_bras_entier_pas_a_sa_pointe(self):
+        q = np.array([0.0, -60.0, -40.0, 90.0, 0.0, -80.0])
+        milieu_du_bras = fsm.forward_kinematics(np.radians(q))[0]
+        coude = np.asarray(milieu_du_bras["mycobot320_link3"], float)[:2] * 1000.0
+        pointe = fsm.pointe(q)[:2]
+        self.assertGreater(float(np.linalg.norm(coude - pointe)), 100.0)
+        self.assertLess(fsm.distance_au_bras(coude, q), 1.0)
+
+    def test_un_point_lointain_reste_lointain(self):
+        q = np.array([0.0, -60.0, -40.0, 90.0, 0.0, -80.0])
+        self.assertGreater(fsm.distance_au_bras(np.array([-400.0, 400.0]), q), 300.0)
+
+
+class DescenteQuiInsiste(unittest.TestCase):
+    """Trois tentatives identiques donnent trois echecs identiques.
+
+    Mesure du 24/08 : recalage a 0,59 mm, descente a 1,42 mm, et pourtant
+    « rien saisi » trois fois. La position etait juste, la hauteur non.
+    """
+
+    def test_chaque_essai_rate_descend_d_un_cran(self):
+        self.assertGreater(fsm.PAS_DESCENTE_ESSAI, 0.0)
+
+    def test_on_ne_descend_jamais_sous_la_hauteur_de_la_balle(self):
+        """Le plancher reste la hauteur validee sur la balle : plus bas, les
+        doigts tapent la planche."""
+        z = fsm.Z_PRISE_PAR_CLASSE["scotch"][0]
+        for essais in range(6):
+            self.assertGreaterEqual(
+                max(fsm.Z_PRISE, z - fsm.PAS_DESCENTE_ESSAI * essais), fsm.Z_PRISE)
+
+
+class OrdreDuBalayage(unittest.TestCase):
+    """Le degagement commence par la pose la PLUS ELOIGNEE de l'objet.
+
+    Mesure du 24/08 : au premier cycle aucune cible n'etait posee, le bras
+    balayait dans l'ordre du fichier et essayait cinq poses avant la bonne —
+    20 s sur un cycle de 99.
+    """
+
+    def test_la_pose_la_plus_eloignee_vient_en_premier(self):
+        azimut = 4.0
+        ordre = sorted(fsm.BALAYAGE_J1,
+                       key=lambda j1: -abs(((j1 - azimut + 180.0) % 360.0) - 180.0))
+        self.assertEqual(ordre[0], min(fsm.BALAYAGE_J1,
+                                       key=lambda j1: -abs(j1 - azimut)))
+
+
+class HauteurDeLargage(unittest.TestCase):
+    """Le lacher se cale sur le rebord MESURE, pas sur un rebord suppose.
+
+    Le rebord du grand carton mesure 82,9 mm (triangulation des deux vues,
+    25/08) alors que la constante en supposait 60 : la garde reelle etait de
+    17 mm, et negative pour un carton plus haut.
+    """
+
+    def test_sans_mesure_on_garde_le_plancher(self):
+        ctx = types.SimpleNamespace(z_rebord=None)
+        self.assertEqual(fsm.z_largage(ctx), fsm.Z_LARGAGE)
+
+    def test_un_rebord_bas_ne_fait_pas_descendre_le_lacher(self):
+        ctx = types.SimpleNamespace(z_rebord=40.0)
+        self.assertEqual(fsm.z_largage(ctx), fsm.Z_LARGAGE)
+
+    def test_un_rebord_haut_releve_le_lacher(self):
+        ctx = types.SimpleNamespace(z_rebord=110.0)
+        self.assertEqual(fsm.z_largage(ctx), 110.0 + fsm.GARDE_LARGAGE)

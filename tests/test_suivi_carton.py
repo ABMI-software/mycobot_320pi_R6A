@@ -29,14 +29,14 @@ class SuiviCartonTests(unittest.TestCase):
 
     def test_la_premiere_detection_est_adoptee(self):
         self._voit((320.0, -140.0))
-        centre, _ = self.suivi.position(self.t)
+        centre, _, _ = self.suivi.position(self.t)
         np.testing.assert_allclose(centre, [320.0, -140.0])
 
     def test_le_tremblement_est_lisse(self):
         self._voit((320.0, -140.0))
         for dx, dy in ((6, -5), (-7, 4), (5, 6), (-4, -6), (7, 3), (-6, 5)):
             self._voit((320.0 + dx, -140.0 + dy))
-        centre, _ = self.suivi.position(self.t)
+        centre, _, _ = self.suivi.position(self.t)
         self.assertLess(float(np.linalg.norm(centre - np.array([320.0, -140.0]))), 4.0)
 
     def test_un_saut_isole_est_ignore(self):
@@ -44,14 +44,14 @@ class SuiviCartonTests(unittest.TestCase):
         la cible."""
         self._voit((320.0, -140.0))
         self._voit((180.0, 60.0))
-        centre, _ = self.suivi.position(self.t)
+        centre, _, _ = self.suivi.position(self.t)
         self.assertLess(float(np.linalg.norm(centre - np.array([320.0, -140.0]))), 5.0)
 
     def test_un_deplacement_reel_est_suivi(self):
         self._voit((320.0, -140.0))
         for _ in range(tb.CONFIRMATIONS_CARTON):
             self._voit((180.0, 60.0))
-        centre, _ = self.suivi.position(self.t)
+        centre, _, _ = self.suivi.position(self.t)
         np.testing.assert_allclose(centre, [180.0, 60.0], atol=1.0)
 
     def test_des_aberrations_dispersees_ne_confirment_rien(self):
@@ -60,14 +60,14 @@ class SuiviCartonTests(unittest.TestCase):
         for xy in ((180.0, 60.0), (500.0, -200.0), (100.0, 200.0),
                    (450.0, 100.0), (150.0, -250.0), (520.0, 180.0)):
             self._voit(xy)
-        centre, _ = self.suivi.position(self.t)
+        centre, _, _ = self.suivi.position(self.t)
         self.assertLess(float(np.linalg.norm(centre - np.array([320.0, -140.0]))), 5.0)
 
     def test_un_changement_de_taille_n_est_pas_le_carton(self):
         """Une ombre qui grandit n'est pas l'ouverture : pas de lissage dessus."""
         self._voit((320.0, -140.0))
         self._voit((330.0, -145.0), taille=TAILLE * 3.0)
-        centre, _ = self.suivi.position(self.t)
+        centre, _, _ = self.suivi.position(self.t)
         np.testing.assert_allclose(centre, [320.0, -140.0], atol=0.5)
 
     def test_la_position_se_perime(self):
@@ -78,9 +78,170 @@ class SuiviCartonTests(unittest.TestCase):
         self._voit((320.0, -140.0))
         self.t += tb.PEREMPTION_CARTON + 1.0
         self._voit((180.0, 60.0))
-        centre, _ = self.suivi.position(self.t)
+        centre, _, _ = self.suivi.position(self.t)
         np.testing.assert_allclose(centre, [180.0, 60.0])
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReactionImmediate(unittest.TestCase):
+    """Deplacer le carton a la main doit se voir tout de suite, pas dans 1 s."""
+
+    def test_le_carton_deplace_est_adopte_en_moins_de_trois_dixiemes(self):
+        suivi = tb.SuiviCarton()
+        t = 1000.0
+        suivi.maj(np.array([430.0, -80.0]), TAILLE, None, t)
+        depart = t
+        for _ in range(10):
+            t += 0.06
+            suivi.maj(np.array([250.0, 120.0]), TAILLE, None, t)
+            centre, _, _ = suivi.position(t)
+            if float(np.linalg.norm(centre - np.array([250.0, 120.0]))) < 1.0:
+                break
+        self.assertLess(t - depart, 0.3)
+        self.assertEqual(suivi.deplacements, 1)
+
+
+class TriParCategorie(unittest.TestCase):
+    """Chaque categorie a UNE destination, et elle ne change pas en route."""
+
+    def test_les_scotchs_vont_dans_le_petit_carton(self):
+        self.assertEqual(tb.DESTINATION["scotch"], "petit")
+
+    def test_la_balle_et_le_robot_vont_dans_le_grand(self):
+        self.assertEqual(tb.DESTINATION["balle"], "grand")
+        self.assertEqual(tb.DESTINATION["robot"], "grand")
+
+    def test_chaque_categorie_a_une_couleur_de_trace(self):
+        self.assertEqual(set(tb.DESTINATION), set(tb.COULEUR_OBJET))
+
+    def test_les_deux_cartons_sont_suivis_separement(self):
+        """Deplacer un carton ne doit pas bouger la cible de l'autre."""
+        suivis = {c: tb.SuiviCarton() for c in ("grand", "petit")}
+        t = 1000.0
+        suivis["grand"].maj(np.array([400.0, 175.0]), TAILLE, None, t)
+        suivis["petit"].maj(np.array([373.0, -151.0]), TAILLE, None, t)
+        for _ in range(tb.CONFIRMATIONS_CARTON + 1):
+            t += 0.06
+            suivis["petit"].maj(np.array([200.0, -250.0]), TAILLE, None, t)
+            suivis["grand"].maj(np.array([400.0, 175.0]), TAILLE, None, t)
+        np.testing.assert_allclose(suivis["grand"].position(t)[0], [400.0, 175.0], atol=1.0)
+        np.testing.assert_allclose(suivis["petit"].position(t)[0], [200.0, -250.0], atol=1.0)
+
+
+class RobeDesCartons(unittest.TestCase):
+    """Le sens de la regle a ete inverse une fois : il est verrouille ici.
+
+    Le GRAND carton est brun, le PETIT est noir a l'exterieur. Trois mesures du
+    24/08 concordent : la consigne d'origine, les ouvertures (138x202 mm pour le
+    brun contre 62x113 pour le noir) et l'essai reel, ou le robot dirige vers
+    'grand' a atterri dans le petit carton.
+    """
+
+    def _cartons(self, part_noire_a, part_noire_b):
+        vision = tb.Vision.__new__(tb.Vision)
+        candidats = [(20000.0, np.array([300.0, -130.0]), None, part_noire_a,
+                      np.array([100.0, 100.0])),
+                     (7000.0, np.array([390.0, 210.0]), None, part_noire_b,
+                      np.array([200.0, 200.0]))]
+        vision._creux_candidats = lambda *a, **k: candidats
+        vision.cartons_marques = lambda *a, **k: {}
+        return dict((classe, tuple(xy))
+                    for classe, xy, _, _ in vision.cartons(None))
+
+    def test_le_carton_brun_est_le_grand(self):
+        vus = self._cartons(0.02, 0.59)
+        self.assertEqual(vus["grand"], (300.0, -130.0))
+
+    def test_le_carton_noir_est_le_petit(self):
+        vus = self._cartons(0.02, 0.59)
+        self.assertEqual(vus["petit"], (390.0, 210.0))
+
+
+class MarqueursDesCartons(unittest.TestCase):
+    """Un marqueur colle sur le carton prime sur toute heuristique.
+
+    La robe et le gabarit ont bascule des que les deux cartons changeaient de
+    place : l'ouverture du carton lointain se mesure a la hauteur SUPPOSEE du
+    rebord, et cette hauteur etait fausse de 23 mm (rebord mesure a 82,9 mm par
+    triangulation le 25/08, constante a 60). Le marqueur donne les deux d'un
+    coup — le nom et la hauteur.
+    """
+
+    def _vision(self, part_noire_a=0.02, part_noire_b=0.59):
+        vision = tb.Vision.__new__(tb.Vision)
+        vision._creux_candidats = lambda *a, **k: [
+            (20000.0, np.array([300.0, -130.0]), None, part_noire_a,
+             np.array([100.0, 100.0])),
+            (7000.0, np.array([390.0, 210.0]), None, part_noire_b,
+             np.array([200.0, 200.0]))]
+        vision.vers_base = lambda uv, z: np.array(
+            [300.0, -130.0, z] if uv[0] < 150 else [390.0, 210.0, z])
+        return vision
+
+    def test_le_marqueur_renomme_contre_la_robe(self):
+        vision = self._vision()
+        vision.cartons_marques = lambda *a, **k: {
+            'petit': (np.array([300.0, -130.0]), 83.0),
+            'grand': (np.array([390.0, 210.0]), 71.0)}
+        vus = {c: (tuple(xy), z) for c, xy, _, z in vision.cartons(None)}
+        self.assertEqual(vus['petit'], ((300.0, -130.0), 83.0))
+        self.assertEqual(vus['grand'], ((390.0, 210.0), 71.0))
+
+    def test_un_seul_marqueur_laisse_l_autre_a_la_geometrie(self):
+        vision = self._vision()
+        vision.cartons_marques = lambda *a, **k: {
+            'petit': (np.array([300.0, -130.0]), 83.0)}
+        vus = {c: (tuple(xy), z) for c, xy, _, z in vision.cartons(None)}
+        self.assertEqual(vus['petit'], ((300.0, -130.0), 83.0))
+        self.assertEqual(vus['grand'], ((390.0, 210.0), tb.HAUTEUR_CARTON))
+
+    def test_marqueur_trop_loin_de_toute_ouverture_ignore(self):
+        vision = self._vision()
+        vision.cartons_marques = lambda *a, **k: {
+            'petit': (np.array([300.0 + tb.PORTE_MARQUEUR_CARTON + 50.0, -130.0]),
+                      83.0)}
+        vus = {c: tuple(xy) for c, xy, _, _ in vision.cartons(None)}
+        self.assertEqual(vus['grand'], (300.0, -130.0))
+        self.assertEqual(vus['petit'], (390.0, 210.0))
+
+
+class ContinuiteDesCartons(unittest.TestCase):
+    """Deux cartons de meme ouverture ne se separent que par ou ils sont.
+
+    Mesure du 25/08 : poses cote a cote, les deux cartons donnent 160x214 et
+    144x205 mm — 5 % d'ecart, sous le bruit. Classes par l'aire, l'etiquette
+    basculait d'une image a l'autre ; le tri envoyait l'objet dans le mauvais
+    carton une fois sur deux.
+    """
+
+    def _vision(self, aires):
+        vision = tb.Vision.__new__(tb.Vision)
+        vision.cartons_marques = lambda *a, **k: {}
+        vision._creux_candidats = lambda *a, **k: [
+            (aires[0], np.array([350.0, -170.0]), None, 0.02, np.array([100.0, 100.0])),
+            (aires[1], np.array([368.0, 168.0]), None, 0.02, np.array([200.0, 200.0]))]
+        return vision
+
+    def test_sans_rien_de_connu_le_plus_grand_est_le_grand(self):
+        vus = {c: tuple(xy) for c, xy, _, _ in self._vision((30000.0, 35000.0)).cartons(None)}
+        self.assertEqual(vus['grand'], (368.0, 168.0))
+
+    def test_le_nom_survit_a_une_inversion_des_aires(self):
+        connus = {'grand': np.array([350.0, -170.0]), 'petit': np.array([368.0, 168.0])}
+        # L'aire s'inverse d'une image a l'autre — c'est le bruit mesure.
+        for aires in ((30000.0, 35000.0), (35000.0, 30000.0)):
+            vus = {c: tuple(xy) for c, xy, _, _
+                   in self._vision(aires).cartons(None, connus=connus)}
+            self.assertEqual(vus['grand'], (350.0, -170.0))
+            self.assertEqual(vus['petit'], (368.0, 168.0))
+
+    def test_un_carton_vraiment_deplace_ne_vole_pas_le_nom_de_l_autre(self):
+        connus = {'grand': np.array([350.0, -170.0]),
+                  'petit': np.array([368.0 + 3 * tb.CONTINUITE_CARTON, 168.0])}
+        vus = {c: tuple(xy) for c, xy, _, _
+               in self._vision((30000.0, 35000.0)).cartons(None, connus=connus)}
+        self.assertEqual(vus['grand'], (350.0, -170.0))
+        self.assertEqual(vus['petit'], (368.0, 168.0))

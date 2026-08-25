@@ -1,5 +1,143 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (25 août 2026 — matin)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Les deux cartons sont détectés 20/20, avec une étiquette stable.** Avant :
+  2/20 pour l'un, 14/20 pour l'autre, et le nom `grand`/`petit` basculait d'une
+  image à l'autre. Tremblement du centre 0,2 mm et 7,9 mm.
+- **La cause était un seuil de 10 mm.** Le carton de gauche — 4400 px, anneau
+  brun 0,79, contraste 40 — était jeté parce que son grand côté mesurait 220 mm
+  contre 210 autorisés. Or ces 220 mm sont mesurés au plan **supposé** du
+  rebord ; au vrai rebord il n'en fait que 214. Gabarit porté à 260 mm.
+- **Le rebord des cartons est à 82,9 mm, pas 60** (triangulation des deux vues,
+  écart des rayons 11,8 mm). C'était le plan sur lequel toute la géométrie des
+  cartons se projetait : 50 mm d'écart sur le centre entre Z=0 et Z=100.
+- **Deux des trois pistes d'hier sont fermées, avec la mesure qui les ferme.**
+  La hauteur par les deux caméras : la SVPRO voit le carton lointain par la
+  tranche, triangulation à **Z = −27 mm**, sous la table. Les dimensions : les
+  deux cartons mesurent **160×214 et 144×205 mm**, 5 % d'écart, sous le bruit.
+- **La troisième est implémentée** : `scripts/aruco_service.py`, détection ArUco
+  déportée dans le venv (`cv2.aruco` fait segfaulter l'OpenCV du système),
+  **4,5 ms par image**. `id 10` = grand, `id 11` = petit. Le marqueur donne le
+  nom *et* la hauteur du rebord.
+- **Identité par continuité** (150 mm) : un carton déjà nommé garde son nom
+  quand on le déplace à la main. C'est la réponse à « peu importe je bouge le
+  carton ».
+- **Un carton posé n'importe où reste atteignable.** Balayage IK de tout le
+  plateau (X 200→480, Y −240→+240, pas de 40 mm) : aucun trou en deçà de
+  460 mm de portée.
+- 87 tests (9 neufs), seul l'échec IPPE pré-existant subsiste.
+
+### Décisions prises
+
+1. **Un gabarit ne doit pas être plus serré que l'incertitude sur le plan où on
+   le mesure.** C'est ce qui a coûté un carton entier pour 10 mm.
+2. **Le nom d'un carton se décide dans cet ordre** : marqueur, puis continuité,
+   puis robe et gabarit. Les deux derniers sont réduits au rôle d'amorce —
+   mesuré, ils ne tranchent pas entre deux cartons de même ouverture.
+3. **La fusion des deux caméras sur les cartons est abandonnée.** La SVPRO reste
+   utile sur les objets ; sur les cartons elle voit des parois, pas des
+   ouvertures.
+
+### Prochaines actions
+
+1. [ROUGE] **Imprimer `~/marqueurs_cartons.png` à 100 %** (carré noir de 45 mm,
+   à vérifier à la règle) et coller `id 10` à plat sur un rabat du GRAND carton,
+   `id 11` sur le PETIT. Sans ça, le premier étiquetage reste un coup de dé.
+2. [ROUGE] Vérifier sur le robot que le bras se positionne au-dessus du carton
+   **désigné** — les deux cartons déplacés au hasard, planche vide.
+3. [JAUNE] Rebrancher le tri complet des trois classes et confirmer la
+   destination de chacune.
+4. [JAUNE] Temps de cycle sous 60 s (DESCENTE 25 s, DETECTION 14 s,
+   DEGAGEMENT jusqu'à 20 s).
+5. [VERT] Saisie d'un scotch en régime incliné (> 355 mm) — jamais réussie.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/Osama_ws/src/mycobot_R6A
+/usr/bin/python3 scripts/pick_dashboard.py
+```
+
+---
+
+## État actuel (24 août 2026 — soir)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Le CYCLE de tri est validé sur le robot réel** — trois classes prises,
+  transportées et larguées dans un carton, saisie confirmée par le statut
+  pince. Cycles mesurés : 58 s (robot), 61 s (balle), 99 s (scotch).
+  ⚠ **La DESTINATION ne l'est pas** : le scotch bleu, dirigé vers `petit`, a
+  fini dans le grand carton. Voir « Le point qui bloque » ci-dessous.
+- **Reconnaissance sans dépendance à l'éclairage.** Le scotch est un **anneau**
+  (son bleu se lit H15 S90 V48 à l'exposition 75, indistinguable du bois) ; le
+  robot est **noir désaturé** (S=44 contre 170 pour le bois même à l'ombre) et
+  long d'au moins 60 mm.
+- **Le carton fantôme est mort.** Trois largages au milieu de la table venaient
+  de l'ombre du bras — elle le suit image après image, donc elle se confirme
+  aussi bien qu'un vrai déplacement. Filtre à 200 mm du bras **entier**, et la
+  mémoire sur disque, qui contenait le fantôme, est repartie propre et scindée
+  par carton.
+- **Hauteur de prise par catégorie et par régime.** Couché, l'outil visait Z=25,
+  la mi-hauteur de la *balle* — sur un rouleau de 22 mm la pince se refermait
+  au-dessus de lui. C'est ce qui faisait échouer toutes les saisies de scotch
+  malgré 0,5 mm de précision latérale.
+- **Enveloppe de dépose 360 → 460 mm**, l'outil se couche aussi pour larguer.
+- 18 tests neufs (78 au total, seul l'échec IPPE pré-existant subsiste).
+
+### Décisions prises
+
+1. **L'arducam nomme, la SVPRO positionne.** Mesuré : depuis sa vue oblique la
+   SVPRO prend une paroi de carton pour le robot et ne voit aucun anneau. Elle
+   ne classe donc plus rien ; ses taches héritent du nom que l'arducam a donné
+   au même endroit. Les deux vues affichent enfin la même chose.
+2. **Grand carton = brun, petit = noir.** Le sens a été inversé une fois puis
+   remis d'aplomb par trois mesures concordantes (consigne d'origine, ouvertures
+   de 138×202 contre 62×113 mm, et l'essai réel). Verrouillé par deux tests.
+3. **Aucune fermeture morphologique sur la détection d'objets** — elle bouchait
+   le trou du rouleau, qui est toute sa signature.
+
+### Le point qui bloque
+
+**Distinguer le grand du petit carton n'est pas résolu.** Deux critères ont été
+essayés et ont échoué :
+
+* **l'aire de l'ouverture** — 10 915 contre 9 981 mm² à une position, 138×202
+  contre 62×113 mm à une autre. Elle dépend trop de l'angle de vue et du
+  débordement hors du plateau ; le classement bascule d'une image à l'autre ;
+* **la robe** — brun (`S174 V87`, 2 % de pixels sous V=60) contre noir
+  (`S148 V52`, 59 %). Le sens a dû être inversé deux fois, et le 24/08 au soir
+  le scotch bleu dirigé vers `petit` a atterri dans le grand carton.
+
+Le transport et le largage sont justes ; c'est **l'identité de la boîte** qui ne
+l'est pas.
+
+### Prochaines actions
+
+1. [ROUGE] **Identifier les deux cartons de façon fiable, planche vide.** Les
+   déplacer au hasard tous les deux, sans aucun objet autour, et trouver le
+   critère qui tient : dimensions extérieures plutôt que l'ouverture, hauteur
+   des parois par les deux caméras, ou un marqueur ArUco collé sur chacun — ce
+   dernier étant mesuré faisable à 3,8 ms dans le Python du tableau de bord.
+2. [ROUGE] **Le bras se positionne au-dessus du carton désigné** et le confirme
+   visuellement, avant de rebrancher le tri complet.
+3. [JAUNE] Ramener le temps de cycle sous 60 s : `DESCENTE` coûte 25 s en deux
+   passes, `DETECTION` 14 s, `DEGAGEMENT` jusqu'à 20 s.
+4. [VERT] Valider la saisie d'un scotch en régime **couché** (au-delà de
+   355 mm) — jamais réussie ; à 331 mm en vertical elle passe du premier coup.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/Osama_ws/src/mycobot_R6A
+/usr/bin/python3 scripts/pick_dashboard.py
+```
+
 ## État actuel (24 août 2026 — journée)
 
 ### Ce qui a été accompli aujourd'hui

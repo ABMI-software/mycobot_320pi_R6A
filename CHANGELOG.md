@@ -11,6 +11,126 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **Identification des cartons par marqueur ArUco collé**
+  (`scripts/aruco_service.py`, `Vision.cartons_marques`) — `id 10` = grand
+  carton, `id 11` = petit, 45 mm de côté, collés **à plat sur un rabat**. Le
+  marqueur donne le nom sans ambiguïté *et* la hauteur du rebord (son plan est
+  celui du rebord). `cv2.aruco` fait segfaulter l'OpenCV 4.6 du système où
+  tourne le tableau de bord : la détection est déportée dans un processus du
+  venv qui reste ouvert et reçoit les images par un tube — **4,5 ms par image**,
+  contre ~1 s si on relançait un interpréteur à chaque fois. Service absent, la
+  géométrie reprend la main sans bruit. Feuille à imprimer à 100 % :
+  `~/marqueurs_cartons.png`.
+- **Identité des cartons par continuité** (`CONTINUITE_CARTON = 150 mm`) — un
+  carton déjà nommé garde son nom tant qu'il reste près de là où on l'a vu.
+  C'est ce qui permet de le déplacer à la main sans qu'il échange son nom avec
+  l'autre. L'ordre de décision est désormais : marqueur, puis continuité, puis
+  robe et gabarit (ce dernier réduit au rôle d'amorce).
+- **Hauteur de largage calée sur le rebord mesuré** (`fsm.z_largage`,
+  `GARDE_LARGAGE = 25 mm`) — au lieu d'un rebord supposé à 60 mm. La garde
+  réelle était de 17 mm, et négative pour un carton plus haut.
+- **Tri par catégorie : trois classes d'objets, deux cartons de destination**
+  (`scripts/pick_dashboard.py`, `scripts/pick_fsm.py`) — `scotch` → petit
+  carton, `balle` et `robot` → grand carton. Le **cycle** est validé sur le
+  robot réel le 24/08 pour les trois classes (prise, transport, largage dans un
+  carton). L'**étiquetage grand/petit ne l'est pas** : voir « Connu, non
+  résolu » plus bas. Chaque classe est reconnue par une signature qui ne
+  dépend pas de l'éclairage : le **scotch est un anneau** (un trou dans le
+  contour — à l'exposition 75 son bleu se lit H15 S90 V48, indistinguable du
+  bois sombre), le **robot est noir désaturé** (S=44 contre S=170 pour le bois
+  même à l'ombre) et long d'au moins 60 mm, la **balle** garde son détecteur
+  jaune. Cycle mesuré : 58 à 99 s, saisie confirmée par le statut pince.
+- **Deux cartons détectés et suivis séparément** — un `SuiviCarton` par
+  destination, chacun rattrapé en 0,12 s quand on le déplace à la main, sans
+  que la cible de l'autre bouge.
+
+### Mesuré (25/08)
+
+- **Le rebord des cartons est à 82,9 mm, pas 60.** Triangulation des deux vues
+  sur l'ouverture, écart des rayons 12 mm. Or 60 mm était le plan sur lequel
+  toute la géométrie des cartons se projetait : entre Z=0 et Z=100 le centre
+  d'un carton se déplace de **50 mm**.
+- **La piste « hauteur des parois par les deux caméras » est fermée.** Elle
+  tient sur le carton proche (Z = 82,9 mm, écart 12 mm) et pas sur le lointain :
+  la SVPRO en voit la **paroi du fond par la tranche**, pas l'ouverture, et la
+  triangulation rend Z = **−27 mm** — sous la table — avec 39 mm d'écart entre
+  les rayons. Ni l'appariement des centroïdes ni le recouvrement des masques ne
+  la rattrapent.
+- **Les deux cartons ont la même ouverture** : 160×214 et 144×205 mm, soit 5 %
+  d'écart, sous le bruit de détection. Aucun gabarit ne peut les séparer — ce
+  qui clôt définitivement la piste « dimensions extérieures ».
+- **Détection des deux cartons, 20 images consécutives, bras dégagé** :
+  avant 2/20 et 14/20 avec l'étiquette qui basculait à chaque image ; après
+  **20/20 et 20/20**, étiquette stable, tremblement du centre 0,2 mm et 7,9 mm.
+- **Enveloppe de largage balayée sur tout le plateau** (IK seule, pas de
+  mouvement) : X de 200 à 480 mm, Y de −240 à +240 mm par pas de 40 mm.
+  **Aucun trou** — toute position en deçà de `PORTEE_CARTON_MAX` (460 mm) admet
+  une solution de largage, l'inclinaison de l'outil passant de 0° au centre à
+  −60° aux angles. Un carton déplacé n'importe où sur la planche est donc
+  atteignable.
+
+### Connu, non résolu
+
+- **Lequel des deux cartons est le grand ne se devine pas sans marqueur.**
+  Établi le 25/08 : les deux cartons posés côte à côte mesurent 160×214 et
+  144×205 mm, 5 % d'écart. La continuité conserve un nom déjà attribué, elle ne
+  sait pas l'attribuer la première fois. Les marqueurs ArUco ci-dessus lèvent le
+  point ; tant qu'ils ne sont pas collés, le premier étiquetage reste un coup de
+  dé. Historique de ce qui a été essayé et n'a pas tenu :
+  Ni l'aire de l'ouverture (10 915 contre 9 981 mm² à une position, 138×202
+  contre 62×113 mm à une autre — elle dépend trop de l'angle de vue), ni la robe
+  (brun contre noir, mesurée `S174 V87` / 2 % de pixels sombres contre
+  `S148 V52` / 59 %) n'ont tenu : le sens a dû être inversé deux fois et le
+  24/08 au soir le scotch bleu, dirigé vers `petit`, a atterri dans le grand
+  carton. Le transport et le largage sont justes ; c'est l'identité de la boîte
+  qui ne l'était pas.
+- **Masque du bras déduit de la cinématique** (`Vision.masque_bras`) — la
+  silhouette du bras est projetée et retirée de l'image avant toute détection.
+  Son ombre était un creux sombre cerclé de brun, donc une ouverture de carton
+  parfaite.
+- **Hauteur de prise par catégorie ET par régime** (`Z_PRISE_PAR_CLASSE`) —
+  balle (−5 / 25 mm), scotch (2 / 11), robot (2 / 10). Chaque essai de saisie
+  raté descend ensuite de 4 mm plutôt que de refaire le même geste.
+- **Enveloppe de dépose portée de 360 à 460 mm** — l'outil se couche aussi pour
+  larguer, comme il le fait déjà pour saisir.
+
+### Corrigé
+
+- **Le carton fantôme au milieu de la table** — trois fois de suite la machine a
+  visé une ouverture inexistante (211, 1), (205, −16), (212, 6) et y a lâché
+  l'objet. C'était l'ombre du bras : elle le suit image après image, donc elle
+  se confirme aussi bien qu'un vrai déplacement, et aucun filtre de forme ou de
+  taille ne l'arrête. Un carton ne peut plus être localisé à moins de 200 mm du
+  bras, distance mesurée au bras **entier** et non à sa pointe. La mémoire sur
+  disque contenait aussi ce fantôme et le ressortait à chaque redémarrage ; elle
+  est désormais **une par carton** et n'est écrite que sur une détection propre.
+- **La cible sautait d'un objet à l'autre en cours de descente** — le bras
+  masquait le scotch visé, le détecteur trouvait l'autre rouleau 311 mm plus
+  loin et la machine repartait à zéro. Porte de suivi à 80 mm.
+- **Un changement de caméra n'est plus lu comme un déplacement de l'objet** —
+  les 10 mm d'écart de repérage entre l'arducam et la SVPRO relançaient un
+  `DETECTION` complet (11 s perdues, objet immobile).
+- **Le dégagement exigeait la balle spécifiquement** et pouvait boucler sept
+  fois à vide pendant que d'autres objets attendaient ; il exige maintenant la
+  **vue de dessus** de n'importe quel objet, et ordonne son balayage par
+  l'azimut de la cible dès le premier cycle.
+- **Le scotch passait pour le robot** quand son trou n'était pas vu : la
+  fermeture morphologique le bouchait (28 px pour l'anneau bleu). Fermeture
+  supprimée, et le robot exige désormais 60 mm de longueur minimale.
+
+### Mesuré
+
+- **La limite verticale de 355 mm est mécanique.** Elle avait été mesurée en
+  exigeant aussi `Z_TRANSFERT` au-dessus du point de prise ; en ne demandant que
+  le survol et la prise, elle ne bouge pas d'un millimètre (350 mm passe,
+  360 non). Piste fermée, ne pas re-tenter.
+- **La SVPRO ne peut pas classifier comme l'arducam** — vue oblique, elle prend
+  une paroi de carton pour le robot et ne voit pas les anneaux du tout. Elle
+  fournit des positions ; c'est l'arducam qui nomme. Les deux vues affichent
+  alors les mêmes étiquettes.
+
+### Ajouté
+
 - **Invariant de dépose : objet en main ⇒ jamais de retour au ramassage**
   (`scripts/pick_fsm.py`) — garde unique et non contournable dans
   `MachineEtats.pas()`. Deux états nouveaux : `RECHERCHE_CARTON` (cherche le

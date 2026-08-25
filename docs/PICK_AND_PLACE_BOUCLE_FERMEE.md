@@ -22,7 +22,7 @@ XYZ dans base_link → IK différentielle → send_angles`.
 
 | Élément | Valeur |
 |---|---|
-| Pi | `10.10.0.221:5005` |
+| Pi | `10.10.0.224:5005` |
 | Bridge sur la Pi | **`scripts/gripper_bridge.py`** — obligatoire, `bridge_pi_simple.py` n'implémente pas `get_pro_gripper_status` |
 | Pince | Pro adaptative, `gripper_id=14`, ~1,6 s entre deux ordres |
 | Caméra de travail | arducam, intrinsèque `training/calibration/cam_3.npz`, **calibrée en 640×480** — capturer dans ce mode |
@@ -540,6 +540,207 @@ cette forme :
   562 mm** avant de plonger. Il se règle sur le profil réel.
 
 ---
+
+## 6 quinquies. Tri par catégorie — 24 août 2026 (soir)
+
+La tâche est passée de « une balle dans un carton » à **trois classes d'objets
+et deux cartons de destination** : `scotch` → petit carton, `balle` et `robot`
+→ grand carton. Les trois ont été prises et déposées sur le robot réel.
+
+### Reconnaître sans dépendre de l'éclairage
+
+La couleur ne sépare pas ces objets. À l'exposition 75 de l'arducam, le rouleau
+de scotch **bleu** se lit `H15 S90 V48` — indistinguable du bois sombre. Trois
+signatures géométriques ou structurelles ont donc été retenues, chacune mesurée :
+
+| Classe | Signature | Mesure du 24/08 |
+|--------|-----------|-----------------|
+| `scotch` | **anneau** : un trou dans le contour | trous de 28 et 65 px ; aucun autre objet de la planche n'en a |
+| `robot` | **noir désaturé**, ≥ 60 mm de long | S=44 contre S=170 pour le bois même à l'ombre ; 82×134 mm contre 33×39 et 38×43 pour les rouleaux |
+| `balle` | disque jaune plein | détecteur historique, inchangé |
+
+Deux pièges, tous deux corrigés :
+
+* **la fermeture morphologique bouchait le trou du rouleau.** Le trou de
+  l'anneau bleu ne fait que 28 px et disparaît dès un `CLOSE 3×3`. Le rouleau
+  tombait alors dans la catégorie `robot` et repartait vers le mauvais carton.
+  Il n'y a plus aucune fermeture sur la détection d'objets ;
+* **« sombre » ne suffit pas pour le robot.** Le veinage du bois descend sous
+  V=60 et fournissait quatre faux positifs sur une planche vide. C'est la
+  saturation qui tranche.
+
+### Deux cartons, classés par leur robe
+
+Les deux ouvertures ont des aires trop proches — et surtout dépendantes de
+l'angle de vue — pour servir de critère : le classement basculait d'une image à
+l'autre. C'est la **robe** qui les sépare, mesurée sur un anneau de 25 px autour
+de l'ouverture : le **grand** est brun (`S174 V87`, 2 % de pixels sous V=60), le
+**petit** est noir (`S148 V52`, 59 %).
+
+Le sens de cette règle a été inversé une fois puis remis d'aplomb par trois
+mesures concordantes : la consigne d'origine de l'opérateur, les ouvertures
+(138×202 mm pour le brun contre 62×113 mm pour le noir) et l'essai réel — le
+robot dirigé vers `grand` avait atterri dans le petit carton. Deux tests
+verrouillent désormais le sens.
+
+Chaque carton a son propre `SuiviCarton` : déplacer l'un est rattrapé en 0,12 s
+sans que la cible de l'autre bouge.
+
+### Le carton fantôme au milieu de la table
+
+Trois fois de suite, la machine a visé une ouverture inexistante — (211, 1),
+(205, −16), puis (212, 6) prise sur le fait à 141 mm du bras, 18 410 mm² — et y
+a lâché l'objet, pendant que le suivi affichait le vrai carton à (364, 161).
+
+C'était **l'ombre du bras**. Elle est sombre, rectangulaire, cerclée de bois
+brun : elle passe tous les filtres de forme et de taille. Et surtout elle suit le
+bras image après image, donc elle **se confirme aussi bien qu'un vrai
+déplacement** — l'abaissement du seuil de confirmation à 2 images, qui rend le
+suivi réactif, la rend aussi crédible.
+
+Deux corrections, la seconde étant la vraie raison de la persistance du défaut :
+
+1. **un carton ne peut plus être localisé à moins de 200 mm du bras**, distance
+   mesurée au bras **entier** (`fsm.distance_au_bras`) et non à sa pointe : ce
+   sont les segments qui portent l'ombre, bien plus loin que leur bout ;
+2. **la mémoire sur disque contenait le fantôme.** `scripts/carton_position.json`
+   gardait (207, 14) comme dernière position connue, et `RECHERCHE_CARTON` y
+   retombait même sans détection live — ce qui survivait aux redémarrages. Le
+   fichier est désormais **scindé par carton** et n'est écrit que sur une
+   détection propre.
+
+### Hauteur de prise : par catégorie ET par régime
+
+La saisie du scotch échouait systématiquement alors que le recalage donnait
+**0,50 mm** et la descente **1,30 mm**. La position était juste ; la hauteur ne
+l'était pas, et pour deux raisons distinctes :
+
+* **outil vertical**, viser −5 mm comme la balle fait taper les doigts sur la
+  planche avant qu'ils se referment. La balle fait 66 mm et les tient écartés,
+  un rouleau couché 22 mm ;
+* **outil couché** (au-delà de 355 mm), la pointe visait `Z = 25` — la
+  mi-hauteur de la **balle**. Sur un objet plat de 22 mm, la pince se refermait
+  entièrement au-dessus de lui.
+
+D'où `Z_PRISE_PAR_CLASSE`, qui donne les deux hauteurs de chaque classe :
+balle (−5 / 25), scotch (2 / 11), robot (2 / 10). Et un essai raté descend
+ensuite de 4 mm au lieu de refaire le même geste — trois tentatives identiques
+donnaient trois échecs identiques.
+
+### La SVPRO nomme plus rien
+
+Laissée libre de classifier depuis sa vue oblique, elle contredisait l'arducam :
+paroi de carton prise pour le robot, plateau étiqueté « petit carton », anneaux
+jamais vus. Ce n'est pas un réglage — c'est la géométrie : projeter sur un seul
+plan horizontal n'est juste que vue de dessus, et un anneau de 48 mm vu en
+rasant perd son trou.
+
+Elle rend donc des **taches sans nom**, et chacune hérite du nom que l'arducam a
+donné au même endroit (appariement à 90 mm). Une tache sans équivalent côté
+arducam n'est pas utilisée : la caméra d'appui ne peut plus inventer un objet ni
+un carton. Les deux vues affichent enfin les mêmes étiquettes.
+
+### Piste fermée : allonger la portée verticale
+
+`PORTEE_VERTICALE_MAX = 355` avait été mesurée en exigeant aussi `Z_TRANSFERT`
+au-dessus du point de prise, contrainte sans objet sur une pièce posée à plat.
+En ne demandant que le survol et la prise, **la limite ne bouge pas d'un
+millimètre** : 350 mm passe, 360 non, dans les deux cas. C'est mécanique. Ne pas
+re-tenter.
+
+---
+
+## 6 sexies. Identifier les deux cartons — 25 août 2026
+
+Le tri était juste sur tout sauf sur un point : **lequel des deux cartons est le
+grand**. Le 24 au soir le scotch bleu, dirigé vers `petit`, a atterri dans le
+grand. Trois pistes avaient été retenues — dimensions extérieures, hauteur des
+parois par les deux caméras, marqueur ArUco. Voici ce que chacune a donné.
+
+### Le rebord est à 83 mm, pas 60
+
+Triangulation de l'ouverture du grand carton entre l'arducam et la SVPRO :
+**Z = 82,9 mm**, écart entre les deux rayons **11,8 mm** — la mesure est bonne.
+Or `HAUTEUR_CARTON = 60` était le plan sur lequel toute la géométrie des cartons
+se projetait. L'erreur n'est pas anodine : entre Z = 0 et Z = 100, le centre
+projeté d'un carton se déplace de **50 mm**, et son grand côté passe de 233 à
+206 mm.
+
+### Piste fermée : la hauteur par les deux caméras
+
+Elle tient sur le carton proche et **pas** sur le lointain. La SVPRO, très
+oblique, n'en voit pas l'ouverture mais la **paroi du fond par la tranche** : son
+contour est une bande de 42 × 122 px, et son centroïde est à 40 mm de celui de
+l'arducam. La triangulation rend alors **Z = −27 mm** — sous la table — avec
+38,7 mm d'écart entre les rayons.
+
+Deux rattrapages ont été essayés et écartés :
+
+- **apparier par la distance entre rayons** plutôt que par les positions : sans
+  gabarit métrique il n'y a plus rien pour écarter les mauvaises paires, et les
+  centroïdes ne portent de toute façon pas sur le même point physique ;
+- **maximiser le recouvrement** du contour arducam reprojeté dans la SVPRO, en
+  balayant la hauteur de 0 à 140 mm : la courbe est plate sur le carton proche
+  (0,24 à 0,30) et monotone décroissante sur le lointain — aucun maximum, donc
+  aucune hauteur désignée.
+
+### Piste fermée : les dimensions
+
+Les deux cartons posés côte à côte mesurent **160 × 214 et 144 × 205 mm**, soit
+5 % d'écart — sous le bruit de détection, qui fait varier l'aire relevée de
+270 à 379 cm² d'une image à l'autre sur le même carton. Aucun gabarit ne les
+sépare.
+
+### Ce qui bloquait vraiment la détection
+
+Avant même la question du nom, un carton sur deux n'était pas vu. Sur
+20 images consécutives, bras dégagé : **2/20 pour l'un, 14/20 pour l'autre**, et
+l'étiquette basculait d'une image à l'autre.
+
+La cause est un seul seuil. Le carton de gauche — 4400 px, anneau brun à 0,79,
+contraste 40, remplissage 0,74, un carton parfait — était rejeté pour **10 mm de
+trop** : 220 mm contre `COTE_CARTON_MM[1] = 210`. Et ces 220 mm étaient mesurés
+au plan supposé ; au vrai rebord il n'en fait que 214. **Un gabarit ne doit pas
+être plus serré que l'incertitude sur le plan où on le mesure.** Porté à 260 mm,
+sa vraie tâche restant d'écarter la planche entière (450 mm) et les petits
+objets.
+
+### Trois sources de nom, de la plus sûre à la moins sûre
+
+`Vision.cartons` décide dans cet ordre :
+
+1. **le marqueur ArUco** collé sur un rabat — `id 10` grand, `id 11` petit,
+   45 mm de côté. Son plan est celui du rebord : il donne le nom *et* la
+   hauteur. `~/marqueurs_cartons.png` est la feuille à imprimer à 100 %.
+2. **la continuité** (`CONTINUITE_CARTON = 150 mm`) — un carton déjà nommé garde
+   son nom tant qu'il reste près de là où on l'a vu. C'est ce qui permet de le
+   déplacer à la main sans qu'il échange son nom avec l'autre.
+3. **la robe puis le gabarit** — réduits au rôle d'amorce, puisqu'on vient de
+   voir qu'ils ne tranchent pas.
+
+`cv2.aruco` fait **segfaulter** l'OpenCV 4.6 du système, où tourne le tableau de
+bord. La détection est donc déportée dans un processus du venv qui reste ouvert
+et reçoit les images brutes par un tube ([`scripts/aruco_service.py`](../scripts/aruco_service.py)) :
+**4,5 ms par image** aller-retour compris, contre ~1 s si on relançait un
+interpréteur à chaque fois. Service absent, la géométrie reprend la main sans
+bruit — c'est un supplément d'information, pas une dépendance.
+
+Résultat sur 20 images consécutives : **20/20 et 20/20**, étiquette stable,
+tremblement du centre 0,2 mm et 7,9 mm.
+
+### Le lâcher se cale sur le rebord mesuré
+
+`fsm.z_largage` rend `max(Z_LARGAGE, rebord + GARDE_LARGAGE)` au lieu de la
+constante. Avec un rebord réel à 83 mm et `Z_LARGAGE = 100`, la garde n'était que
+de 17 mm — et négative pour un carton plus haut.
+
+### Un carton déplacé n'importe où reste atteignable
+
+Balayage IK de tout le plateau, sans mouvement, X de 200 à 480 mm et Y de −240 à
++240 mm par pas de 40 mm : **aucun trou**. Toute position en deçà de
+`PORTEE_CARTON_MAX = 460 mm` admet une solution de largage, l'inclinaison de
+l'outil passant de 0° au centre à −60° dans les coins. La limite est la portée,
+pas la géométrie.
 
 ## 7. Autres points ouverts
 
