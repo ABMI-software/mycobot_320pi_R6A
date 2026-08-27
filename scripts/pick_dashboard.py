@@ -20,6 +20,7 @@ connecte (le pont est mono-client et bloquant).
 """
 from __future__ import annotations
 
+import itertools
 import json
 import re
 import subprocess
@@ -95,7 +96,11 @@ RAYON_CARTON_MAX = 460.0  # mm
 # Un objet a moins de ca du bord INTERIEUR de l'ouverture est considere depose.
 # Negatif = on accepte un peu au-dela du bord : un objet appuye contre la paroi
 # est dans la boite, meme si son centre projete tombe un cheveu dehors.
-MARGE_DEPOSE = 15.0       # mm
+MARGE_DEPOSE = 15.0
+# Rayon d'identite d'un objet depose : deux detections a moins de ca l'une de
+# l'autre sont le MEME objet. Un objet au fond d'une boite ne bouge pas ; s'il
+# reapparait a plus de ca, c'est qu'on l'a ressorti et repose sur la table.
+RAYON_DEPOSE = 40.0       # mm
 # Part minimale du creux que doit garder son coeur sombre pour etre cru. Sous ce
 # seuil, le seuillage a coupe dans l'ouverture elle-meme au lieu de la separer
 # de l'ombre de la paroi.
@@ -111,10 +116,23 @@ AIRE_CREUX_MIN = 250      # px
 # Les cartons sont poses au bord de la planche et debordent : a 35 mm de marge
 # leur ouverture etait coupee par le masque et devenait informe. A 100 mm les
 # deux sont vus entiers, sans laisser entrer le clavier ni la souris.
-MARGE_PLATEAU = 100.0      # mm — les marqueurs sont en retrait des bords
+# mm — les marqueurs sont en retrait des bords. Mesure du 26/08, en marchant
+# vers l'exterieur depuis douze points des quatre bords jusqu'a ce que le bois
+# s'arrete : 0 a 65 mm selon l'endroit, une seule sonde a 160 mm sur un bord
+# prolonge par un carton. A 100 mm le masque mordait donc sur le bureau, et les
+# cables et objets poses la ressortaient comme objets a trier — a 580-590 mm de
+# portee, hors d'atteinte, mais affiches avec une destination comme s'ils
+# allaient etre ramasses.
+MARGE_PLATEAU = 50.0
 COTE_MARQUEUR = 90.0      # mm — carré noir + bordure blanche, à masquer
 PART_PLATEAU_MAX = 0.35   # au-delà, la tache brune EST la planche
-HAUTEUR_CENTRE_BALLE = 35.0
+# Mesure au pied a coulisse le 26/08 : 64,14 mm. La norme ITF va de 65,41 a
+# 68,58 mm — cette balle est donc sous la norme (usee ou d'entrainement), et
+# c'est precisement pourquoi la mesure prime sur la table. Le centre d'une
+# sphere posee est a son rayon : la valeur de 35 mm utilisee jusqu'ici etait
+# supposee. C'est le plan sur lequel la position image de la balle est projetee.
+DIAMETRE_BALLE = 64.14
+HAUTEUR_CENTRE_BALLE = DIAMETRE_BALLE / 2.0
 # Mesure du 25/08 par triangulation des deux vues sur l'ouverture du grand
 # carton : 82,9 mm, avec 11,8 mm d'ecart entre les deux rayons. La valeur
 # precedente, 60, etait supposee. L'ecart n'est pas anodin : c'est le plan sur
@@ -126,6 +144,19 @@ HAUTEUR_OBJET = 12.0      # mi-hauteur d'un rouleau de scotch couche
 # planche. C'est cette ombre qui se faisait prendre pour l'ouverture du carton :
 # creux sombre, entoure de brun, elle passait tous les tests (mesure du 24/08,
 # carton annonce a 166 mm alors qu'il est a 449).
+# Demi-largeur de la silhouette du bras, en mm. Mesure du 25/08 en comparant
+# la piece blanche reelle a la chaine articulaire projetee : a 80 mm, 11,5 % de
+# la surface du bras tombait HORS du masque, et ces fragments — compacts,
+# sombres ou pales — etaient classes "scotch". La machine partait alors saisir
+# son propre bras : trois faux objets a 195, 201 et 252 mm le 25/08, tous
+# rattrapes a vide. Rayon necessaire par maillon, 99e centile : link3 136 mm,
+# link4 145, link5 103, pointe 97. On monte a 110 plutot qu'a 145 : le masque
+# sert aussi a rejeter les objets, et l'elargir de trop fait disparaitre ceux
+# qui sont poses A COTE du bras (le robot imprime a 30 mm avait deja ete perdu
+# ainsi le 24/08). ESSAI DU 25/08 A 110 : le rouleau blanc pose a 200 mm du
+# bras DISPARAISSAIT — les maillons hauts se projettent loin de leur aplomb et
+# le masque balaie une large bande. Perdre un objet reel coute plus cher qu'un
+# fantome occasionnel, donc on reste a 80 et le fantome se traite autrement.
 RAYON_BRAS = 80.0
 
 # --- tri par categorie (24/08) ------------------------------------------------
@@ -193,9 +224,40 @@ MARGE_MASQUE_MARQUEUR = 1.6
 #
 #   seuil 55 -> blanc  8/10     seuil 45 -> 10/10     seuil 35 -> bleu 4/10
 #
-# A 35 le veinage du bois entre dans le masque et fabrique de faux objets. 45
-# laisse dix unites de marge de chaque cote.
-ECART_VALEUR_BOIS = 45                # px — le plus petit trou mesure fait 28 px
+# A 35 le veinage du bois entre dans le masque et fabrique de faux objets.
+#
+# REVENU A 55 le 25/08 au soir : a 45, le PETIT ROBOT devient introuvable. La
+# planche est BICOLORE — moitie jaune clair, moitie brun fonce — et comparee a
+# une mediane unique, la moitie sombre passe elle-meme pour un objet des qu'on
+# baisse le seuil. Mesure sur 4 images, aire du plus gros amas et robot retrouve :
+#
+#   seuil 45 -> 27 312 px, robot 0/4      seuil 55 -> 17 642 px, robot 4/4
+#
+# A 45 le robot est colle a un amas de 557 x 583 mm, soit presque la planche
+# entiere. Perdre un objet entier coute plus cher que les 2 images sur 10 ou le
+# rouleau blanc decroche.
+#
+# LE VRAI REMEDE n'est aucun de ces deux seuils : c'est de comparer chaque pixel
+# a son VOISINAGE plutot qu'a la planche entiere. Mesure du 25/08, fond median
+# local sur 41 px : plus gros amas 2 034 px au lieu de 27 312, et le robot
+# retrouve 4/4 a tous les seuils essayes. A implementer avec les deux rouleaux
+# sur la table pour valider les deux cas d'un coup.
+ECART_VALEUR_BOIS = 40
+# Taille du voisinage servant de FOND, en pixels. Chaque pixel est compare a la
+# mediane de son entourage et non a la planche entiere : la planche est
+# bicolore — moitie jaune clair, moitie brun fonce — et une mediane unique fait
+# passer l'une des deux moities pour un objet des que la lumiere tourne. Mesure
+# du 25/08, aire du plus gros amas parasite et petit robot retrouve :
+#
+#   mediane globale, seuil 45 -> 27 312 px, robot 0/4
+#   mediane globale, seuil 55 -> 17 642 px, robot 4/4 le matin, 0/4 le soir
+#   fond local 41 px, seuil 40 ->  2 034 px, robot 4/4 a TOUS les seuils
+#
+# 41 px valent ~80 mm au plan des objets : bien plus large que le plus gros
+# objet (46 px pour le robot etale), donc un objet disparait dans sa propre
+# mediane locale et ne se soustrait pas a lui-meme. Bien plus etroit que les
+# plages de couleur de la planche, donc le degrade est suivi.
+NOYAU_FOND = 41                # px — le plus petit trou mesure fait 28 px
 # Plus grand cote. Le plancher a 60 mm separe le robot des SCOTCHS : mesure du
 # 24/08, le robot fait 82x134 mm et les rouleaux 33x39 et 38x43. Un rouleau dont
 # le trou n'est pas vu (il est sombre, V=48) tombait sinon dans la categorie
@@ -209,7 +271,30 @@ COTE_ROBOT_MM = (60.0, 200.0)
 # Plus petit cote : c'est lui qui separe le robot d'une OUVERTURE de carton, qui
 # est sombre elle aussi. Mesure du 24/08 : robot 82x134 mm, grand carton
 # 127x140 mm. Sans cette borne, le carton se faisait ramasser comme un objet.
-LARGEUR_ROBOT_MAX = 105.0
+#
+# Porte de 105 a 115 le 25/08 au soir. Le robot pattes ecartees mesure 106,6 mm
+# de large : il etait rejete pour 1,6 mm, et c'est la SEULE raison pour laquelle
+# il est reste introuvable toute la seance — son amas etait pourtant net, 1142
+# px a V33 S32, la bonne longueur, au bon endroit.
+#
+# La borne a change de camp entre-temps : depuis que `_coeur_sombre` mesure
+# l'ouverture reelle et non l'ombre de la paroi, les cartons font 67 a 95 mm de
+# large (mesures du 25/08) et non plus 127. Ils sont donc desormais PLUS ETROITS
+# que le robot, et 115 les laisse tous deux du bon cote — avec 11 mm de marge
+# sous le robot et 20 mm au-dessus du plus large carton. Ce qui protege vraiment
+# du carton n'est plus cette borne mais la saturation (SATURATION_NOIRE_MAX) et
+# le fait qu'un objet trouve DANS une ouverture est classe depose.
+LARGEUR_ROBOT_MAX = 115.0
+# ELANCEMENT, en plus des deux cotes. Le cable noir qui traverse la planche
+# fusionne avec le petit robot, noir lui aussi, et l'amas reste dans le gabarit
+# — c'est sa FORME qui change. Rapport grand/petit mesure : 94x111 = 1,18 ;
+# 71x109 = 1,54 ; 82x134 = 1,63 ; 79x146 = 1,85 (robot seul, membres plus ou
+# moins etales) contre 67x184 = 2,75 fusionne au cable. Ce qui s'est joue
+# derriere ce chiffre le 26/08 : le centroide de l'amas fusionne a ete tire
+# jusqu'a 151 mm de la base, une pose que le bras ne tient pas, la boucle de
+# recalage s'y est emballee et le pont de la Pi a fini par tomber. 2,2 separe
+# les deux familles avec 0,35 de marge sous le robot etale.
+ELANCEMENT_ROBOT_MAX = 2.2
 RAYON_OBJET_CARTON = 60.0         # mm — un creux si proche d'un objet EST cet objet
 # Distance au-dela de laquelle une tache vue par la camera d'appui ne peut plus
 # etre la meme chose que ce que l'arducam a identifie. Large : les deux vues se
@@ -248,10 +333,72 @@ VALEUR_SOMBRE = 60                # V median en-deca duquel un objet est "noir"
 # sont S=33, 44 et 58 selon l'eclairage : 70 les garde toutes et ecarte le
 # carton.
 SATURATION_NOIRE_MAX = 70
+# V < 60 est un seuil ABSOLU, et l'eclairage de la piece ne l'est pas. Le 26/08
+# la planche est surexposee (fond V=251) et le robot imprime s'y lit V=90 : noir
+# a l'oeil, mais au-dessus du seuil, et invisible 12 images sur 12 alors que son
+# amas etait parfaitement isole (1 320 px, 82 x 135 mm, 0 % bras). Ce qui ne
+# bouge pas avec la lumiere, c'est l'ECART au fond local. Mesure sur 5 images,
+# tous amas de la scene :
+#
+#   amas                     V    S   fond V   ecart
+#   robot imprime           90   48     251     161   <- la cible
+#   cable noir du bureau    72   23     226     154   (hors planche, 619 mm)
+#   carton des rouleaux    172   80     219      46
+#   carton de la balle     225  120     233       8
+#   papier blanc           255    0     255       0
+#
+# Le seuil est mis a 80 : il laisse passer les deux taches vraiment noires et
+# ecarte le bois et les cartons avec un facteur 3 de marge. On GARDE le test
+# absolu en plus — sous faible eclairage le fond descend et l'ecart avec lui,
+# c'est alors V < 60 qui rattrape. Le cable, lui, n'est pas ecarte ici mais par
+# la portee : 619 mm, tres au-dela de l'allonge de 390 mm du bras.
+CONTRASTE_SOMBRE = 80
+# Ecart minimal, en teinte ou en saturation, entre le trou d'un objet et la
+# matiere qui l'entoure. Un vrai trou montre le bois ; un creux fictif a la
+# couleur de l'objet, donc un ecart quasi nul.
+CONTRASTE_TROU = 25
 AIRE_OBJET_MIN = 90               # px
+# La balle a son propre detecteur, mais rien ne l'empechait d'etre AUSSI comptee
+# parmi les objets : un disque jaune de 39 x 46 mm entre pile dans le gabarit du
+# rouleau compact, et partait donc au petit carton au lieu du grand. Mesure du
+# 26/08 sur la scene complete — part des pixels de l'amas dans `HSV_BALLE` :
+# balle 57,7 %, robot 0,0 %, rouleau blanc 0,0 %, rouleau bleu 0,0 %. La
+# frontiere est franche, le seuil est place au quart.
+PART_BALLE_MIN = 0.25
+# Une trame MJPG arrive parfois DECHIREE de l'USB : l'image est recollee a
+# partir de deux captures, la scene y est coupee et decalee. Mesure du 26/08 sur
+# l'arducam — environ une image sur trois, et c'est la seule cause du
+# « clignotement » de la detection (les quatre objets ne sortaient que 7 fois sur
+# 10). Les marqueurs du plateau sont fixes dans l'image, donc leur position
+# attendue est connue : elle s'ecarte de 1,7 px sur une image saine et de 246 px
+# sur une image dechiree. Aucun reglage d'exposition ne corrige ca — seul le
+# rejet de la trame le fait.
+#
+# Le seuil doit valoir pour LES DEUX cameras, et elles ne sont pas calibrees
+# aussi finement. Mesure sur 16 images chacune :
+#
+#   arducam  2,7 px sur image saine (12/16), 246,7 px sur image dechiree (4/16)
+#   svpro   21,4 px sur TOUTES ses images, aucune dechirure
+#
+# Les 21,4 px de la SVPRO ne sont pas une dechirure mais un biais de son
+# extrinseque (calibree en 800x600, relue en 640x480) — le meme qui lui fait
+# placer les rouleaux une trentaine de mm a cote de l'arducam. A 60 px on est
+# 22 fois au-dessus du bruit de l'arducam, 3 fois au-dessus de ce biais, et
+# 4 fois sous une vraie dechirure.
+ECART_MARQUEUR_MAX = 60.0
 # Destination de chaque categorie. Le petit carton est noir a l'exterieur, le
 # grand est brun — c'est l'anneau autour de l'ouverture qui les separe.
 DESTINATION = {'scotch': 'petit', 'balle': 'grand', 'robot': 'grand'}
+# Inventaire de la scene : combien d'exemplaires de chaque categorie sont a
+# trier. Des qu'une categorie est complete, on cesse de la chercher, meme si la
+# camera croit encore la voir — c'est la boite qui la voit, pas la table.
+#
+# Sans ce compte, la balle deposee redevenait une cible : le bras qui revient
+# masque le carton, l'ouverture disparait de l'image, le test « deja depose »
+# n'a plus de polygone a interroger, et le cycle repartait la chercher au fond
+# de la boite (constate le 25/08). Le test geometrique reste utile — il attrape
+# un objet pose dans un carton par l'operateur — mais il ne suffit pas.
+INVENTAIRE = {'scotch': 2, 'balle': 1, 'robot': 1}
 # Categories qu'on saisit par leur endroit le plus EPAIS et non par le centroide
 # de leur enveloppe. Le centroide suit les membres qui depassent : sur le petit
 # robot la pince se refermait sur un bras. Le scotch, lui, garde le centroide —
@@ -417,6 +564,15 @@ class VueCliquable(QLabel):
 # --------------------------------------------------------------------------- #
 
 MARQUEUR_CARTON = {10: 'grand', 11: 'petit'}
+# Les seules lignes qui restent SOUS LES YEUX pendant un cycle : ce qu'il reste
+# a trier, ou en est le temps, ce qu'on vise et ou ca doit aller, et si la pince
+# tient. Tout le reste — roulis, inclinaisons, biais, ecarts de recalage — est
+# une mesure de reglage qu'on relit apres coup : elle part au journal. Le
+# panneau prenait sinon une vingtaine de lignes et poussait les boutons de
+# conduite hors de la fenetre.
+MESURES_AFFICHEES = ('inventaire', 'cycle en cours', 'objet', 'cible',
+                     'portee cible', 'verdict', 'pince', 'carton', 'largage',
+                     'cycle')
 # Deux cartons peuvent avoir la MEME ouverture — mesure du 25/08 : 160x214 et
 # 144x205 mm, soit 5 % d'ecart, sous le bruit de la detection. Aucun gabarit ne
 # les separe alors, et l'etiquette bascule d'une image a l'autre. Ce qui les
@@ -543,6 +699,7 @@ class Vision:
         self.K, self.dist = registre.load_intrinsics(d['intrinsics_stem'])
         self.source = fichier.name
         self._plateau = None
+        self._planche = None
 
     def vers_base(self, uv, z_mm):
         """Pixel -> point du plan horizontal Z=z_mm dans le repere base (mm)."""
@@ -559,19 +716,53 @@ class Vision:
                                   rvec, self.T[:3, 3], self.K, self.dist)
         return uv.reshape(2)
 
+    def image_intacte(self, marqueurs):
+        """La trame est-elle entiere ? (cf. ECART_MARQUEUR_MAX)
+
+        Sans marqueur du plateau visible on ne peut rien affirmer : on accepte,
+        plutot que de rejeter une image qu'on n'a pas su juger.
+        """
+        for ident, coins in (marqueurs or {}).items():
+            if ident not in _MARQUEURS:
+                continue
+            attendu = self.vers_pixel(np.asarray(_MARQUEURS[ident], float))
+            mesure = np.asarray(coins, float).reshape(4, 2).mean(axis=0)
+            if float(np.linalg.norm(mesure - attendu)) > ECART_MARQUEUR_MAX:
+                return False
+        return True
+
     def balle(self, image):
-        """(x, y) base en mm, plus la tache image, ou None si douteux."""
+        """(x, y) base en mm, plus la tache image, ou None si douteux.
+
+        Deux choses valent d'etre dites, toutes deux payees d'une balle perdue.
+
+        La recherche est bornee a la planche — marqueurs COMPRIS, cf.
+        `masque_planche`. Sans ce masque elle balayait toute
+        l'image, ou le carton beige pose a cote forme une tache de 704 px contre
+        934 pour la balle — assez proche pour lui passer devant des que
+        l'eclairage monte. Mesure du 26/08 : a l'exposition 75 la balle sortait
+        3 fois sur 12, et plus jamais au-dela.
+
+        Et on ne juge plus le SEUL plus gros contour : on prend le plus gros
+        PARMI CEUX QUI PASSENT. Retenir le plus gros puis le rejeter parce qu'il
+        n'est pas rond, c'est jeter la balle a cause d'une tache qui n'a jamais
+        ete candidate.
+        """
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         masque = cv2.morphologyEx(cv2.inRange(hsv, *HSV_BALLE), cv2.MORPH_CLOSE,
                                   np.ones((5, 5), np.uint8))
+        masque = cv2.bitwise_and(masque, self.masque_planche(masque.shape))
         contours, _ = cv2.findContours(masque, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if not contours:
+        ronds = []
+        for c in contours:
+            aire = cv2.contourArea(c)
+            (u, v), rayon = cv2.minEnclosingCircle(c)
+            # le bouton d'arret d'urgence est jaune aussi, mais il n'est pas rond
+            if aire >= 150 and aire / (np.pi * rayon ** 2) >= 0.6:
+                ronds.append((aire, u, v, rayon))
+        if not ronds:
             return None
-        c = max(contours, key=cv2.contourArea)
-        aire = cv2.contourArea(c)
-        (u, v), rayon = cv2.minEnclosingCircle(c)
-        if aire < 150 or aire / (np.pi * rayon ** 2) < 0.6:
-            return None                       # le bouton d'arret d'urgence est jaune aussi
+        _, u, v, rayon = max(ronds)
         p = self.vers_base((u, v), HAUTEUR_CENTRE_BALLE)
         return p[:2], (u, v, rayon)
 
@@ -633,14 +824,29 @@ class Vision:
         elargi = centre + (xy - centre) * (1.0 + MARGE_PLATEAU / rayons)
         return np.array([self.vers_pixel([q[0], q[1], 0.0]) for q in elargi], np.int32)
 
+    def masque_planche(self, forme):
+        """La planche seule, marqueurs COMPRIS.
+
+        `masque_plateau` en retire les marqueurs, parce qu'un carre noir sur son
+        papier blanc a exactement la signature d'un rouleau de scotch. Cette
+        exclusion n'a aucun sens pour une cible reconnue a sa COULEUR : un
+        marqueur est noir et blanc, il ne peut pas etre jaune. Elle a coute une
+        balle le 26/08 — posee contre un marqueur, son disque passait de 1034 a
+        744 px et sa rondeur de 0,75 a 0,54, sous le seuil de 0,60.
+        """
+        if self._planche is not None and self._planche.shape == forme:
+            return self._planche
+        self._planche = np.zeros(forme, np.uint8)
+        cv2.fillConvexPoly(self._planche, self.quad_plateau(), 255)
+        return self._planche
+
     def masque_plateau(self, forme):
         """Planche seule, marqueurs exclus. Camera et extrinseque fixes : une
         seule fois. Sans ce masque, le clavier, la moquette et le pied de
         lampe fournissent des taches sombres plus grandes que le carton."""
         if self._plateau is not None and self._plateau.shape == forme:
             return self._plateau
-        masque = np.zeros(forme, np.uint8)
-        cv2.fillConvexPoly(masque, self.quad_plateau(), 255)
+        masque = self.masque_planche(forme)
         marqueurs = np.zeros(forme, np.uint8)
         demi = COTE_MARQUEUR / 2.0
         for q in _MARQUEURS.values():
@@ -763,17 +969,19 @@ class Vision:
         """
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         teinte, saturation, valeur = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+        jaune = cv2.inRange(hsv, *HSV_BALLE)
         plateau = self.masque_plateau(valeur.shape)
         silhouette = (self.masque_bras(valeur.shape, angles)
                       if angles is not None else None)
-        bois = (int(np.median(teinte[plateau > 0])),
-                int(np.median(saturation[plateau > 0])),
-                int(np.median(valeur[plateau > 0])))
-        ecart_teinte = np.minimum(np.abs(teinte.astype(int) - bois[0]),
-                                  180 - np.abs(teinte.astype(int) - bois[0]))
+        fond_t = cv2.medianBlur(teinte, NOYAU_FOND)
+        fond_s = cv2.medianBlur(saturation, NOYAU_FOND)
+        fond_v = cv2.medianBlur(valeur, NOYAU_FOND)
+        ecart_teinte = np.minimum(
+            np.abs(teinte.astype(int) - fond_t.astype(int)),
+            180 - np.abs(teinte.astype(int) - fond_t.astype(int)))
         brut = (((ecart_teinte > 12)
-                 | (np.abs(saturation.astype(int) - bois[1]) > 55)
-                 | (np.abs(valeur.astype(int) - bois[2]) > ECART_VALEUR_BOIS))
+                 | (np.abs(saturation.astype(int) - fond_s.astype(int)) > 55)
+                 | (np.abs(valeur.astype(int) - fond_v.astype(int)) > ECART_VALEUR_BOIS))
                 & (plateau > 0)).astype(np.uint8) * 255
         etranger = cv2.morphologyEx(brut, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         # Puis on RECOLLE l'anneau. C'est l'ouverture qui le casse, pas la
@@ -819,19 +1027,27 @@ class Vision:
                 dedans = np.count_nonzero(cv2.bitwise_and(plein, silhouette))
                 if dedans > 0.4 * np.count_nonzero(plein):
                     continue
-            troue = self.creux_enferme(plein, brut) >= AIRE_TROU_MIN
+            if (np.count_nonzero(cv2.bitwise_and(plein, jaune))
+                    > PART_BALLE_MIN * np.count_nonzero(plein)):
+                continue                             # c'est la balle, elle a son detecteur
+            troue = (self.creux_enferme(plein, brut, teinte, saturation)
+                     >= AIRE_TROU_MIN)
             # A HAUTEUR_OBJET, pas au plan du rebord : un objet pose sur la
             # planche mesure a 83 mm se lit 7 % trop grand, et le rouleau blanc
             # passait ainsi par-dessus le plafond du gabarit scotch.
             petit, grand = self._cotes_mm(cv2.convexHull(contour), HAUTEUR_OBJET)
-            sombre = (int(np.median(valeur[plein > 0])) < VALEUR_SOMBRE
+            mediane_v = int(np.median(valeur[plein > 0]))
+            sombre = ((mediane_v < VALEUR_SOMBRE
+                       or int(np.median(fond_v[plein > 0])) - mediane_v
+                       >= CONTRASTE_SOMBRE)
                       and int(np.median(saturation[plein > 0])) < SATURATION_NOIRE_MAX)
             if troue and COTE_SCOTCH_MM[0] <= petit and grand <= COTE_SCOTCH_MM[1]:
                 classe = 'scotch'
             elif COTE_SCOTCH_MM[0] <= petit and grand <= COTE_SCOTCH_COMPACT:
                 classe = 'scotch'
             elif (sombre and COTE_ROBOT_MM[0] <= grand <= COTE_ROBOT_MM[1]
-                  and petit <= LARGEUR_ROBOT_MAX):
+                  and petit <= LARGEUR_ROBOT_MAX
+                  and grand <= ELANCEMENT_ROBOT_MAX * max(petit, 1.0)):
                 classe = 'robot'
             else:
                 continue
@@ -847,7 +1063,7 @@ class Vision:
         return trouves
 
     @staticmethod
-    def creux_enferme(plein, brut):
+    def creux_enferme(plein, brut, teinte=None, saturation=None):
         """Plus grande poche de fond enfermee dans un contour, en pixels.
 
         Mesuree sur le masque AVANT les morphologies, pas sur les contours-fils
@@ -855,12 +1071,34 @@ class Vision:
         signature du scotch ne doit pas dependre du reglage qui le repare. Le
         contour rempli est erode d'un pixel pour que son propre liseré ne
         compte pas comme du fond.
+
+        Un TROU montre la planche au travers. C'est ce qui le separe du creux
+        FICTIF que le fond local se creuse au centre d'un objet plein : la
+        fenetre de mediane, prise au milieu d'un disque plus large qu'elle,
+        ne voit que le disque, qui devient ainsi son propre fond et cesse
+        d'etre marque etranger. Le creux qui en resulte a la couleur de
+        l'OBJET, pas celle du bois. On exige donc que la poche differe
+        franchement de la couronne qui l'entoure — ce qu'un vrai trou fait par
+        construction, puisqu'il montre autre chose que l'objet.
         """
         dedans = cv2.erode(plein, np.ones((3, 3), np.uint8))
         creux = cv2.bitwise_and(dedans, cv2.bitwise_not(brut))
-        nombre, _, stats, _ = cv2.connectedComponentsWithStats(creux, 8)
-        return max((stats[j, cv2.CC_STAT_AREA] for j in range(1, nombre)),
-                   default=0)
+        nombre, etiquettes, stats, _ = cv2.connectedComponentsWithStats(creux, 8)
+        if nombre <= 1:
+            return 0
+        j = max(range(1, nombre), key=lambda k: stats[k, cv2.CC_STAT_AREA])
+        aire = stats[j, cv2.CC_STAT_AREA]
+        if teinte is None or saturation is None:
+            return aire
+        poche = etiquettes == j
+        couronne = (plein > 0) & ~poche
+        if not couronne.any():
+            return aire
+        ecart_t = abs(int(np.median(teinte[poche])) - int(np.median(teinte[couronne])))
+        ecart_t = min(ecart_t, 180 - ecart_t)
+        ecart_s = abs(int(np.median(saturation[poche]))
+                      - int(np.median(saturation[couronne])))
+        return aire if max(ecart_t, ecart_s) >= CONTRASTE_TROU else 0
 
     def polygone_base(self, contour, z=None):
         """Ouverture du carton en mm dans le repere base, a hauteur de rebord.
@@ -950,26 +1188,64 @@ class Vision:
         24/08). Un objet deja identifie n'est pas un carton, point.
         """
         centres = [np.asarray(xy, float) for _, xy, _ in objets]
+        marques = self.cartons_marques(image, marqueurs)
+        # ... SAUF si un marqueur de carton est pose dessus. L'exclusion par les
+        # objets se retournait contre le petit carton : son ouverture sombre est
+        # aussi une signature de rouleau, l'objet fantome detecte a 36 mm faisait
+        # jeter la vraie ouverture, et le nom "petit" allait ensuite au premier
+        # creux restant — a 334 mm de son marqueur, contre le tas de la balle
+        # (mesure du 26/08). Un marqueur ne se trompe pas de carton : ce qu'il
+        # designe n'est pas un objet a trier.
+        def porte_un_marqueur(xy):
+            return any(np.linalg.norm(xy - m[0]) <= PORTE_MARQUEUR_CARTON
+                       for m in marques.values())
         vus = [v for v in self._creux_candidats(image, angles)
-               if all(np.linalg.norm(v[1] - centre) > RAYON_OBJET_CARTON
-                      for centre in centres)
+               if (porte_un_marqueur(v[1])
+                   or all(np.linalg.norm(v[1] - centre) > RAYON_OBJET_CARTON
+                          for centre in centres))
                and not sous_le_bras(v[1], angles)]
         rendus, restants = [], list(vus)
-        for classe, (xy_marqueur, z) in self.cartons_marques(image, marqueurs).items():
-            if not restants:
-                break
-            creux = min(restants, key=lambda v: float(np.linalg.norm(v[1] - xy_marqueur)))
-            if float(np.linalg.norm(creux[1] - xy_marqueur)) > PORTE_MARQUEUR_CARTON:
-                continue
-            restants.remove(creux)
+        # Affectation GLOBALE des marqueurs aux ouvertures, pas au premier
+        # arrive. Servi dans l'ordre, le marqueur traite en premier prenait
+        # l'ouverture la plus proche de LUI, quitte a voler celle de l'autre —
+        # et les deux boites sont posees cote a cote, tres en deca des 220 mm de
+        # portee d'un marqueur. Le petit se retrouvait nomme grand, et la balle
+        # partait dans le petit (constate le 26/08). On choisit desormais le
+        # couplage qui minimise la somme des distances, ce qui ne peut pas
+        # intervertir deux boites voisines.
+        noms = list(marques)
+        k = min(len(noms), len(restants))
+        paires, cout_min = [], None
+        for combi in itertools.combinations(range(len(noms)), k):
+            for choix in itertools.permutations(range(len(restants)), k):
+                ecarts = [float(np.linalg.norm(restants[j][1] - marques[noms[i]][0]))
+                          for i, j in zip(combi, choix)]
+                if any(e > PORTE_MARQUEUR_CARTON for e in ecarts):
+                    continue
+                if cout_min is None or sum(ecarts) < cout_min:
+                    paires, cout_min = list(zip(combi, choix)), sum(ecarts)
+        for i, j in paires:
+            classe, creux, z = noms[i], restants[j], marques[noms[i]][1]
             # L'ouverture avait ete projetee a la hauteur SUPPOSEE du rebord ;
             # quand le marqueur est sur le rebord il donne la vraie, et on refait
             # la projection avec. Pose a plat sur la table, il ne dit que le nom.
             hauteur = HAUTEUR_CARTON if z is None else z
             rendus.append((classe, self.vers_base(creux[4], hauteur)[:2],
                            creux[2], hauteur))
+        for j in sorted((j for _, j in paires), reverse=True):
+            del restants[j]
         manquantes = [c for c in ('grand', 'petit')
                       if c not in {r[0] for r in rendus}]
+        # UN CARTON DONT LE MARQUEUR EST VU NE SE NOMME PAS AUTREMENT. Si son
+        # ouverture n'a pas ete appariee sur cette image, on ne rend rien pour
+        # lui plutot que de laisser les heuristiques — continuite, aire, robe —
+        # coller son nom sur la premiere tache restante. C'est exactement comme
+        # ca que « petit » s'est retrouve a 334 mm de son marqueur, sur le tas
+        # de la balle, et que la balle est partie dans le petit carton (26/08).
+        # Perdre une boite le temps d'une image ne coute rien : `SuiviCarton`
+        # tient sa derniere position pendant `PEREMPTION_CARTON`. La nommer
+        # faux coute un objet dans le mauvais carton.
+        manquantes = [c for c in manquantes if c not in marques]
         # LA CONTINUITE D'ABORD, des lors qu'il y a un nom a conserver. Ce n'est
         # pas un choix de confort : une boite PLEINE ne se mesure plus. Mesure du
         # 25/08, le grand carton avec la balle et un scotch dedans tombe a
@@ -1007,6 +1283,7 @@ class Vision:
             # visibles, c'est leur ecart RELATIF qui tranche (plus haut), et si
             # cet ecart est trop faible c'est a la continuite de decider, pas a
             # une frontiere absolue qui les mettrait toutes deux du meme cote.
+
             classe = nom_par_aire(restants[0][0])
             if classe in manquantes:
                 creux = restants.pop()
@@ -1229,12 +1506,24 @@ class SuiviCarton:
         self.vu_le = maintenant
         self._candidat, self._confirmations = None, 0
 
-    def maj(self, centre, taille, polygone, maintenant=None, rebord=None):
+    def maj(self, centre, taille, polygone, maintenant=None, rebord=None,
+            marque=False):
         maintenant = time.time() if maintenant is None else maintenant
         if centre is None:
             return
         perime = maintenant - self.vu_le > PEREMPTION_CARTON
         if self.centre is None or perime:
+            self._adopte(centre, taille, polygone, maintenant, rebord)
+            return
+        # UN MARQUEUR NE SE CONFIRME PAS : il prouve l'identite de la boite, donc
+        # un ecart franc n'est pas un doute a lever, c'est un DEPLACEMENT a
+        # suivre. Le lissage et les deux confirmations sont faits pour une ombre
+        # qui tremble ou pour le bras qui passe au-dessus — deux cas ou personne
+        # ne dit ou est la boite. Quand le marqueur, lui, le dit, attendre n'est
+        # plus de la prudence : le 26/08 les deux cartons ont ete intervertis et
+        # les deux etiquettes sont restees l'une sur l'autre a leur ancienne
+        # place, le suivi refusant le saut a chaque image.
+        if marque:
             self._adopte(centre, taille, polygone, maintenant, rebord)
             return
         change_de_taille = (self.taille is not None and taille is not None
@@ -1438,6 +1727,7 @@ class Fenetre(QMainWindow):
                              if (CALIB / 'svpro_extrinsic_servo.yaml').exists() else None)
         self.images = {}
         self.captures = {}
+        self.dechirees = {}
         self.ctx = fsm.Contexte()
         self.ctx.detecteur = self._detecte_objet
         self.ctx.detecteur_carton = self._detecte_carton_live
@@ -1451,6 +1741,10 @@ class Fenetre(QMainWindow):
         self.marqueurs = Marqueurs()
         self._cartons_marques = []
         self._ouvertures = []
+        # Positions vues au moins une fois DANS une ouverture. Le test
+        # geometrique ne peut repondre que carton visible ; celui-ci s'en
+        # souvient.
+        self._deposes_vus = []
         self._designation = self._designation_memorisee()
         self._designation_faite = bool(self._designation)
         self._deplacements_carton = {}
@@ -1560,6 +1854,7 @@ class Fenetre(QMainWindow):
         boite_mesures = QGroupBox('mesures')
         self.mesures = QFormLayout(boite_mesures)
         self.champs = {}
+        self._dernier_detail = ''
         droite.addWidget(boite_mesures)
 
         boite_cible = QGroupBox('cibles')
@@ -1680,12 +1975,28 @@ class Fenetre(QMainWindow):
         # Position du bras pour masquer sa silhouette : la DERNIERE lue par la
         # machine a etats, jamais une lecture a nous — le pont est mono-client
         # et bloquant, l'interroger d'ici couperait le dialogue en cours.
-        angles = None if self.ctx.pont is None else self.ctx.pont.derniers_angles
+        # Sans angles, `masque_bras` ne masque RIEN et le bras devient un objet :
+        # le 25/08 la pince blanche a ete classee "scotch" a (165, -117), soit
+        # exactement la pointe de l'outil, et la machine est partie la saisir.
+        # Au tout premier tour `derniers_angles` est encore vide — on le remplit.
+        angles = None
+        if self.ctx.pont is not None:
+            angles = self.ctx.pont.derniers_angles
+            if angles is None and self.ouvrier is None:
+                try:
+                    angles = self.ctx.pont.angles()
+                except (OSError, RuntimeError, ConnectionError):
+                    angles = None
         for nom, cap in self.captures.items():
             if cap is None:
                 continue
             ok, image = cap.read()
             if not ok:
+                continue
+            vision = self.vision if nom == 'arducam' else self.vision_svpro
+            marqueurs = self.marqueurs.coins(image)
+            if vision is not None and not vision.image_intacte(marqueurs):
+                self.dechirees[nom] = self.dechirees.get(nom, 0) + 1
                 continue
             self.images[nom] = image
             affichee = image.copy()
@@ -1702,7 +2013,7 @@ class Fenetre(QMainWindow):
                 # elle ne la remplace pas — la projection obliques est plus
                 # sensible a l'erreur de hauteur de rebord.
                 points = self.vision_svpro.points_interessants(
-                    image, angles=angles, marqueurs=self.marqueurs.coins(image))
+                    image, angles=angles, marqueurs=marqueurs)
                 # La SVPRO ne nomme rien : chaque tache qu'elle voit est
                 # rapprochee de ce que l'ARDUCAM a deja identifie, et n'herite
                 # d'un nom que par cette proximite. Les deux vues affichent
@@ -1711,10 +2022,23 @@ class Fenetre(QMainWindow):
                 nommes = self._nomme_par_arducam(points)
                 self._objets_svpro = [(classe, xy) for classe, xy, _ in nommes
                                       if classe in DESTINATION]
-                self._carton_svpro = {
-                    classe: (xy, self.vision_svpro.polygone_base(contour),
-                             float(np.prod(self.vision_svpro._cotes_mm(contour))))
-                    for classe, xy, contour in nommes if classe in COULEUR_CARTON}
+                points_nommes = [(classe, xy, contour) for classe, xy, contour
+                                 in nommes if classe in DESTINATION]
+                # Les OBJETS heritent leur nom de l'arducam, les CARTONS non :
+                # la SVPRO les identifie elle-meme, par les marqueurs colles
+                # dessus. Herites, un carton que la vue de dessus a perdu — parce
+                # qu'on l'a deplace, ou parce que le bras le survole — n'etait
+                # plus nommable par PERSONNE, et le relais de secours n'avait
+                # justement plus rien a relayer au moment ou il servait.
+                cartons_svpro = {}
+                for classe, xy, contour, z in self.vision_svpro.cartons(
+                        image, angles=angles, objets=points_nommes,
+                        marqueurs=marqueurs):
+                    petit, grand = self.vision_svpro._cotes_mm(contour, z)
+                    cartons_svpro[classe] = (np.asarray(xy, float),
+                                             self.vision_svpro.polygone_base(contour, z),
+                                             petit * grand)
+                self._carton_svpro = cartons_svpro
                 for classe, xy, contour in nommes:
                     couleur = COULEUR_OBJET.get(classe) or COULEUR_CARTON[classe]
                     cv2.polylines(affichee, [cv2.convexHull(contour)], True, couleur, 2)
@@ -1734,7 +2058,6 @@ class Fenetre(QMainWindow):
                     cv2.putText(affichee, f'{xy[0]:.0f},{xy[1]:.0f}',
                                 (int(u) - 34, int(v) - int(r) - 8),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 0, 255), 1)
-                marqueurs = self.marqueurs.coins(image)
                 objets = self.vision.objets(image, angles=angles,
                                             marqueurs=marqueurs)
                 with self._verrou:
@@ -1764,10 +2087,14 @@ class Fenetre(QMainWindow):
                     if trouve is not None:
                         self._objets_vus.append(('balle', np.asarray(trouve[0], float)))
                     self._apprend_biais_objets()
+                self.ctx.resultats['inventaire'] = self._inventaire()
                 with self._verrou:
                     self._cartons_marques = sorted(
                         c for c, i in ((v, k) for k, v in MARQUEUR_CARTON.items())
                         if i in marqueurs)
+                    # La machine s'en sert pour savoir si une detection proche du
+                    # bras est fiable : avec marqueur, oui.
+                    self.ctx.cartons_marques = set(self._cartons_marques)
                 for classe, suivi in self.suivi_cartons.items():
                     releve = None
                     if classe in vus:
@@ -1800,7 +2127,8 @@ class Fenetre(QMainWindow):
                     with self._verrou:
                         if releve is not None:
                             suivi.maj(releve[0], releve[2], releve[1],
-                                      rebord=releve[3] if len(releve) > 3 else None)
+                                      rebord=releve[3] if len(releve) > 3 else None,
+                                      marque=classe in self._cartons_marques)
                 self._dessine_objets(affichee, objets)
                 self._dessine_cartons(affichee)
                 self._maj_carton(self._suivi_vise())
@@ -1814,12 +2142,21 @@ class Fenetre(QMainWindow):
         return self.suivi_cartons[self.ctx.carton_vise].position()
 
     def _dessine_objets(self, image, objets):
+        """Ce qui est HORS D'ATTEINTE est trace en gris et sans destination.
+
+        Annoncer « scotch -> petit » sur une tache a 590 mm, c'est promettre un
+        ramassage qui n'aura jamais lieu : le choix de cible ecarte tout ce qui
+        depasse PORTEE_MAX. L'image disait donc le contraire du comportement.
+        """
         for classe, xy, contour in objets:
-            cv2.polylines(image, [cv2.convexHull(contour)], True, COULEUR_OBJET[classe], 2)
+            atteignable = (fsm.PORTEE_MIN <= float(np.hypot(*xy)) <= fsm.PORTEE_MAX)
+            couleur = COULEUR_OBJET[classe] if atteignable else (150, 150, 150)
+            cv2.polylines(image, [cv2.convexHull(contour)], True, couleur, 2)
             rect = cv2.boundingRect(contour)
-            cv2.putText(image, f'{classe} -> {DESTINATION[classe]}',
-                        (rect[0], rect[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
-                        COULEUR_OBJET[classe], 1)
+            texte = (f'{classe} -> {DESTINATION[classe]}' if atteignable
+                     else f'{classe} hors portee')
+            cv2.putText(image, texte, (rect[0], rect[1] - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, couleur, 1)
 
     def _dessine_cartons(self, image):
         for classe, suivi in self.suivi_cartons.items():
@@ -1867,11 +2204,41 @@ class Fenetre(QMainWindow):
         Sans ca la balle deposee etait redetectee au fond de la boite et le
         cycle repartait la chercher — mesure du 25/08 : 35,4 mm a l'interieur de
         l'ouverture du grand carton, et toujours annoncee comme cible.
+
+        La reponse est MEMORISEE, parce que la question ne peut pas toujours
+        etre posee : il faut un polygone d'ouverture pour y repondre, et le
+        carton n'est pas toujours vu. Constate le 25/08, capture a l'appui — la
+        balle etait au fond du carton de gauche, ce carton-la n'etait pas
+        reconnu a cet instant, donc aucune ouverture a interroger, donc la balle
+        redevenait une cible et le bras repartait la chercher a vide.
+
+        Un objet ressorti du carton et repose sur la table n'est PAS gene : il
+        est ailleurs, donc il ne correspond a aucune position memorisee.
+
+        Les endroits ou l'on a LACHE quelque chose sont verses dans cette meme
+        memoire par `_detecte_objet` : ils sont connus exactement, ne demandent
+        ni carton visible ni ouverture, et valent pour tous les noms qu'on
+        pourrait donner a ce qu'on y voit.
         """
         point = (float(xy[0]), float(xy[1]))
-        return any(cv2.pointPolygonTest(
-            np.asarray(ouverture, np.float32).reshape(-1, 1, 2), point, True) > -MARGE_DEPOSE
-            for ouverture in self._ouvertures)
+        distances = [cv2.pointPolygonTest(
+            np.asarray(ouverture, np.float32).reshape(-1, 1, 2), point, True)
+            for ouverture in self._ouvertures]
+        # On ne MEMORISE que ce qui est franchement dedans. Un objet seulement
+        # appuye contre la paroi compte comme depose sur l'instant, mais il est
+        # trop pres du bord pour qu'on parie dessus quand le carton ne sera plus
+        # visible — c'est aussi bien un objet pose juste a cote de la boite.
+        if any(d > 0.0 for d in distances):
+            deja = any(float(np.linalg.norm(np.asarray(xy, float) - p)) < RAYON_DEPOSE
+                       for p in self._deposes_vus)
+            if not deja:
+                self._deposes_vus.append(np.asarray(xy, float))
+                del self._deposes_vus[:-12]
+            return True
+        if any(d > -MARGE_DEPOSE for d in distances):
+            return True
+        return any(float(np.linalg.norm(np.asarray(xy, float) - p)) < RAYON_DEPOSE
+                   for p in self._deposes_vus)
 
     def _designe_grand(self, camera, u, v):
         """Un clic sur un carton le declare GRAND, l'autre devient le petit.
@@ -2046,7 +2413,19 @@ class Fenetre(QMainWindow):
         if self.ctx.classe_objet == 'balle':
             return self._detecte_balle(echantillons, patience, exige_dessus)
         if self.ctx.classe_objet in DESTINATION:
-            return self._position_objet(self.ctx.classe_objet, self.ctx.balle_xy)
+            # Le SUIVI d'une cible court-circuitait tous les filtres poses plus
+            # bas — deja depose, mis de cote, categorie complete. Il pouvait
+            # donc rendre la position d'un objet qui est maintenant au fond d'un
+            # carton, ou pire la derniere position connue d'un exemplaire
+            # ENLEVE. Le suivi ne vaut que pour un objet encore la.
+            classe = self.ctx.classe_objet
+            fini = (self.ctx.deposes.get(classe, 0) >= INVENTAIRE.get(classe, 0))
+            suivie = None if fini else self._position_objet(classe, self.ctx.balle_xy)
+            if (suivie is not None and not self._depose(suivie)
+                    and not self.ctx.est_oublie(suivie)):
+                return suivie
+            self.ctx.note(f'{classe} suivi n a plus lieu d etre — nouveau choix')
+            self.ctx.classe_objet = ''
 
         candidats = []
         with self._verrou:
@@ -2063,18 +2442,58 @@ class Fenetre(QMainWindow):
         # source : `_detecte_balle` interroge la camera directement et le relais
         # SVPRO aussi, tous deux court-circuitant la liste filtree. C'est par la
         # que la balle deposee redevenait la cible, cycle apres cycle (25/08).
+        # Ce qu'on a LACHE est verse dans la memoire des deposes avant de
+        # filtrer. Le comptage par categorie ne suffit pas quand le meme objet
+        # a ete vu sous deux noms : le 26/08 la balle sortait a la fois de son
+        # detecteur et de la liste des objets, a 21 mm d'ecart. Le cycle
+        # cochait l'un des deux, l'autre restait « a faire », et le bras
+        # repartait le chercher AU FOND DU CARTON pour s'y refermer sur du vide.
+        with self._verrou:
+            for lache in self.ctx.largages:
+                if not any(float(np.linalg.norm(lache - vu)) < RAYON_DEPOSE
+                           for vu in self._deposes_vus):
+                    self._deposes_vus.append(np.asarray(lache, float))
+            del self._deposes_vus[:-12]
+        tous = list(candidats)
         deposes = [c for c in candidats if self._depose(c[2])]
         candidats = [c for c in candidats if not self._depose(c[2])]
-        if deposes:
-            self.ctx.note(f'{len(deposes)} objet(s) deja dans un carton, ignores : '
-                          + ', '.join(sorted({c[1] for c in deposes})))
-        atteignables = [c for c in candidats if c[0] <= fsm.PORTEE_MAX]
+        # Et ceux dont les essais de saisie sont epuises : sans ce filtre, le
+        # cycle suivant reprend le plus proche — le meme — et la machine tourne
+        # a vide pendant que les autres objets attendent.
+        abandonnes = [c for c in candidats if self.ctx.est_oublie(c[2])]
+        candidats = [c for c in candidats if not self.ctx.est_oublie(c[2])]
+        # Et les categories DEJA COMPLETES : un largage reussi est un fait
+        # acquis, il ne depend pas de ce que la camera voit ensuite.
+        finis = {c for c in DESTINATION
+                 if self.ctx.deposes.get(c, 0) >= INVENTAIRE.get(c, 0)}
+        boucles = [c for c in candidats if c[1] in finis]
+        candidats = [c for c in candidats if c[1] not in finis]
+        atteignables = [c for c in candidats
+                        if fsm.PORTEE_MIN <= c[0] <= fsm.PORTEE_MAX]
+        retenu = min(atteignables) if atteignables else None
+        # UNE ligne pour tout le choix. Elle remplace les trois notes par lot
+        # qu'il y avait avant, et dit ce qu'elles ne disaient pas : le gagnant.
+        if tous:
+            motifs = {'depose': deposes, 'de cote': abandonnes, 'fini': boucles}
+            ecartes = []
+            for c in sorted(tous, key=lambda c: c[0]):
+                if c is retenu:
+                    continue
+                raison = next((m for m, lot in motifs.items()
+                               if any(c is x for x in lot)),
+                              'loin' if c[0] > fsm.PORTEE_MAX else
+                              'trop pres' if c[0] < fsm.PORTEE_MIN else f'{c[0]:.0f}mm')
+                ecartes.append(f'{c[1]} {raison}')
+            pris = (f'{retenu[1]} ({retenu[2][0]:.0f},{retenu[2][1]:.0f}) '
+                    f'{retenu[0]:.0f}mm' if retenu is not None else 'rien')
+            self.ctx.note(f'choix : {pris}'
+                          + (f'  [ecartes : {", ".join(ecartes)}]' if ecartes else ''))
         if not atteignables:
             if candidats:
                 self.ctx.note(f'{len(candidats)} objet(s) vus, tous hors enveloppe '
                               f'(le plus proche a {min(candidats)[0]:.0f} mm)')
             return None
-        _, classe, xy = min(atteignables)
+        _, classe, xy = retenu
         self.ctx.classe_objet = classe
         self.ctx.carton_vise = DESTINATION[classe]
         self.ctx.resultats['objet'] = (f'{classe} a ({xy[0]:.0f}, {xy[1]:.0f}) '
@@ -2082,6 +2501,27 @@ class Fenetre(QMainWindow):
         self.ctx.note(f'objet retenu : {classe} a {np.hypot(*xy):.0f} mm '
                       f'-> carton {DESTINATION[classe]}')
         return xy
+
+    def _inventaire(self):
+        """Une pastille par objet a trier : `balle ✔ · robot ○ · scotch ✔ ◉`.
+
+        Ce que la camera voit ne dit pas ce qui reste a faire — un objet au fond
+        d'un carton se voit encore. Ces pastilles ne reculent donc jamais sur ce
+        que la camera croit voir : `◉` des que la PINCE confirme la prise, `✔`
+        des que l'objet est effectivement largue dans son carton. Une prise
+        perdue en route redescend a `○`, parce que la pince l'a dit.
+        """
+        return '   ·   '.join(f'{classe} {self._pastilles(classe)[0]}'
+                              for classe in sorted(INVENTAIRE))
+
+    def _pastilles(self, classe):
+        """(pastilles, etat) pour une categorie : `('✔ ◉', 'en main')`."""
+        total = INVENTAIRE[classe]
+        fait = min(self.ctx.deposes.get(classe, 0), total)
+        en_main = 1 if self.ctx.en_main == classe and fait < total else 0
+        etat = 'fini' if fait >= total else 'en main' if en_main else 'a faire'
+        return (' '.join(['✔'] * fait + ['◉'] * en_main
+                         + ['○'] * (total - fait - en_main)), etat)
 
     def _nomme_par_arducam(self, points):
         """[(classe, xy, contour)] — les taches de la SVPRO nommees par l'arducam.
@@ -2137,7 +2577,8 @@ class Fenetre(QMainWindow):
         """Position fraiche de l'objet de cette classe, le plus proche du dernier
         point connu quand il y en a plusieurs (deux scotchs sur la planche)."""
         with self._verrou:
-            memes = [np.asarray(xy, float) for c, xy in self._objets_vus if c == classe]
+            memes = [np.asarray(xy, float) for c, xy in self._objets_vus
+                     if c == classe and not self._depose(np.asarray(xy, float))]
             if not memes:
                 memes = self._relais_svpro(classe)
                 if memes:
@@ -2336,11 +2777,36 @@ class Fenetre(QMainWindow):
         self._marche(f'prêt — {self.machine.etat}', occupe=False)
 
     def _montre_mesures(self, _):
-        for cle, valeur in self.ctx.resultats.items():
+        """Le panneau des mesures : l'essentiel seulement, le reste au journal.
+
+        Le panneau accueillait TOUTE ligne posee dans `ctx.resultats` — une
+        vingtaine — et poussait les boutons de conduite hors de la fenetre. Les
+        mesures de reglage (roulis, inclinaisons, biais, ecarts de recalage) ne
+        se lisent pas en continu : on les consulte apres coup. Elles vont donc
+        au journal, en UNE ligne condensee et seulement quand elles CHANGENT,
+        sans quoi elles le noieraient a chaque rafraichissement.
+        """
+        # Minuteur VIVANT : `pas()` ne rafraichit qu'entre deux etats, or c'est
+        # pendant un etat long qu'on veut voir le temps courir.
+        encours = (f'{time.time() - self.ctx.debut_cycle:.0f} s en cours'
+                   if self.ctx.debut_cycle else 'à l’arrêt')
+        dernier = (f' · dernier {self.ctx.dernier_cycle:.0f} s'
+                   if self.ctx.dernier_cycle else '')
+        self.ctx.resultats['cycle en cours'] = encours + dernier
+        for cle in MESURES_AFFICHEES:
+            valeur = self.ctx.resultats.get(cle)
+            if valeur is None:
+                continue
             if cle not in self.champs:
                 self.champs[cle] = QLabel()
                 self.mesures.addRow(cle, self.champs[cle])
             self.champs[cle].setText(str(valeur))
+        detail = ' · '.join(f'{cle} {valeur}' for cle, valeur
+                            in self.ctx.resultats.items()
+                            if cle not in MESURES_AFFICHEES)
+        if detail and detail != self._dernier_detail:
+            self._dernier_detail = detail
+            self.ctx.note(detail)
 
     def _vide_journal(self):
         if len(self.ctx.journal) == self._n_journal:
@@ -2362,7 +2828,8 @@ class Fenetre(QMainWindow):
         self.ctx.carton_resolu = None
         portee = float(np.hypot(*xy))
         self.champ_carton.setText(f'({xy[0]:.1f}, {xy[1]:.1f}) mm — détecté')
-        fsm.memorise_carton(self.ctx.carton_xy, self.ctx.roulis_appris)
+        fsm.memorise_carton(self.ctx.carton_vise, self.ctx.carton_xy,
+                            self.ctx.roulis_appris)
         self.statusBar().showMessage(
             f'carton détecté à {portee:.0f} mm'
             + ('' if portee <= fsm.PORTEE_CARTON_MAX
@@ -2378,7 +2845,8 @@ class Fenetre(QMainWindow):
         self.ctx.carton_xy = np.asarray(vu, float)
         self.ctx.R_carton = None
         self.ctx.carton_resolu = None
-        fsm.memorise_carton(self.ctx.carton_xy, self.ctx.roulis_appris)
+        fsm.memorise_carton(self.ctx.carton_vise, self.ctx.carton_xy,
+                            self.ctx.roulis_appris)
         self.champ_carton.setText(f'({vu[0]:.1f}, {vu[1]:.1f}) mm')
 
     def _verifie_extrinseque(self):

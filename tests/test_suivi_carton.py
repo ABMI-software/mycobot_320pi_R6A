@@ -200,14 +200,27 @@ class MarqueursDesCartons(unittest.TestCase):
         self.assertEqual(vus['petit'], ((300.0, -130.0), 83.0))
         self.assertEqual(vus['grand'], ((390.0, 210.0), tb.HAUTEUR_CARTON))
 
-    def test_marqueur_trop_loin_de_toute_ouverture_ignore(self):
+    def test_marqueur_vu_sans_ouverture_appariee_ne_nomme_rien(self):
+        """Le marqueur est la SEULE autorite sur le nom d une boite.
+
+        Son marqueur est vu mais aucune ouverture ne lui correspond : on ne
+        rend rien pour ce carton, plutot que de laisser la geometrie coller son
+        nom sur la tache qui reste. C est exactement ainsi que « petit » s est
+        retrouve a 334 mm de son marqueur, sur le tas de la balle, et que la
+        balle est partie dans le petit carton (26/08). Perdre la boite le temps
+        d une image ne coute rien — `SuiviCarton` tient sa derniere position ;
+        la nommer faux coute un objet dans le mauvais carton.
+
+        L autre carton, lui, n a pas de marqueur visible : la geometrie garde
+        tous ses droits sur celui-la.
+        """
         vision = self._vision()
         vision.cartons_marques = lambda *a, **k: {
             'petit': (np.array([300.0 + tb.PORTE_MARQUEUR_CARTON + 50.0, -130.0]),
                       83.0)}
         vus = {c: tuple(xy) for c, xy, _, _ in vision.cartons(None)}
         self.assertEqual(vus['grand'], (300.0, -130.0))
-        self.assertEqual(vus['petit'], (390.0, 210.0))
+        self.assertNotIn('petit', vus)
 
 
 class ContinuiteDesCartons(unittest.TestCase):
@@ -458,6 +471,7 @@ class ObjetDejaDepose(unittest.TestCase):
     def _fenetre(self, ouvertures):
         fenetre = tb.Fenetre.__new__(tb.Fenetre)
         fenetre._ouvertures = ouvertures
+        fenetre._deposes_vus = []
         return fenetre
 
     def _carre(self, cx, cy, cote):
@@ -600,6 +614,7 @@ class DeposeQuandLeCartonEstMasque(unittest.TestCase):
         self.assertIsNotNone(suivi.polygone)
         fenetre = tb.Fenetre.__new__(tb.Fenetre)
         fenetre._ouvertures = [suivi.polygone]
+        fenetre._deposes_vus = []
         self.assertTrue(fenetre._depose(np.array([320.5, 188.0])))
 
 
@@ -707,6 +722,7 @@ class LeFiltreEstAuPointDeChoix(unittest.TestCase):
     def _fenetre(self, ouvertures):
         fenetre = tb.Fenetre.__new__(tb.Fenetre)
         fenetre._ouvertures = ouvertures
+        fenetre._deposes_vus = []
         return fenetre
 
     def test_la_balle_de_la_camera_est_filtree_comme_les_autres(self):
@@ -721,3 +737,79 @@ class LeFiltreEstAuPointDeChoix(unittest.TestCase):
         carton = np.array([[329.4, 95.2], [449.4, 95.2],
                            [449.4, 215.2], [329.4, 215.2]])
         self.assertFalse(self._fenetre([carton])._depose(np.array([314.0, -34.0])))
+
+
+class ApresUnLargageOnPasseAuSuivant(unittest.TestCase):
+    """Le lacher fait, on va au SUIVANT — jamais rechercher ce qu'on vient de poser.
+
+    Le compteur par categorie ne suffit pas : le 26/08 la balle sortait sous
+    DEUX noms, son propre detecteur (159,8 ; 138,7) et la liste des objets, qui
+    la prenait pour un rouleau (167,5 ; 119,5) — 21 mm d'ecart. Le cycle cochait
+    « balle », « scotch » restait a faire, et le bras repartait au fond du
+    carton se refermer sur du vide. L'ENDROIT du lacher, lui, ne depend d'aucun
+    nom.
+    """
+
+    def _fenetre(self, largages):
+        fenetre = tb.Fenetre.__new__(tb.Fenetre)
+        fenetre._ouvertures = []          # le carton n'est plus vu : bras au-dessus
+        fenetre._deposes_vus = [np.asarray(p, float) for p in largages]
+        return fenetre
+
+    def test_le_point_de_lacher_n_est_plus_une_cible(self):
+        fenetre = self._fenetre([(372.0, 174.0)])
+        self.assertTrue(fenetre._depose(np.array([372.0, 174.0])))
+
+    def test_le_meme_objet_sous_un_autre_nom_est_filtre_aussi(self):
+        # Les deux detections de la balle, a 21 mm l'une de l'autre.
+        fenetre = self._fenetre([(159.8, 138.7)])
+        self.assertTrue(fenetre._depose(np.array([167.5, 119.5])))
+
+    def test_un_objet_ailleurs_reste_choisissable(self):
+        fenetre = self._fenetre([(372.0, 174.0)])
+        self.assertFalse(fenetre._depose(np.array([317.0, -78.0])))
+
+    def test_le_largage_est_memorise_par_la_machine(self):
+        ctx = fsm.Contexte()
+        ctx.classe_objet = 'balle'
+        self.assertEqual(ctx.largages, [])
+        ctx.largages.append(np.array([372.0, 174.0]))
+        self.assertEqual(len(ctx.largages), 1)
+
+
+class UnCartonMarqueSuitSonMarqueurSansDELAI(unittest.TestCase):
+    """Le 26/08 les deux cartons ont été intervertis et les deux étiquettes
+    sont restées l'une sur l'autre à leur ancienne place.
+
+    Le lissage et les deux confirmations existent pour une ombre qui tremble ou
+    pour le bras qui passe au-dessus — deux cas où personne ne dit où est la
+    boîte. Un marqueur, lui, PROUVE l'identité : un écart franc n'est plus un
+    doute à lever, c'est un déplacement à suivre.
+    """
+
+    def _suivi(self):
+        s = tb.SuiviCarton()
+        s.maj(np.array([300.0, -130.0]), 12000.0, None, maintenant=0.0)
+        return s
+
+    def test_sans_marqueur_le_saut_doit_se_confirmer(self):
+        s = self._suivi()
+        loin = np.array([300.0 + 4 * tb.SAUT_CARTON, 130.0])
+        s.maj(loin, 12000.0, None, maintenant=0.1)
+        self.assertLess(float(np.linalg.norm(s.centre - loin)), 1e9)
+        self.assertGreater(float(np.linalg.norm(s.centre - loin)), tb.SAUT_CARTON,
+                           "un saut non marqué ne doit pas être adopté d'emblée")
+
+    def test_avec_marqueur_le_saut_est_adopte_des_la_premiere_image(self):
+        s = self._suivi()
+        loin = np.array([300.0 + 4 * tb.SAUT_CARTON, 130.0])
+        s.maj(loin, 12000.0, None, maintenant=0.1, marque=True)
+        self.assertTrue(np.allclose(s.centre, loin))
+
+    def test_deux_cartons_intervertis_se_croisent_sans_se_confondre(self):
+        grand, petit = self._suivi(), tb.SuiviCarton()
+        petit.maj(np.array([300.0, 130.0]), 7700.0, None, maintenant=0.0)
+        grand.maj(np.array([300.0, 130.0]), 12000.0, None, maintenant=0.1, marque=True)
+        petit.maj(np.array([300.0, -130.0]), 7700.0, None, maintenant=0.1, marque=True)
+        self.assertTrue(np.allclose(grand.centre, [300.0, 130.0]))
+        self.assertTrue(np.allclose(petit.centre, [300.0, -130.0]))

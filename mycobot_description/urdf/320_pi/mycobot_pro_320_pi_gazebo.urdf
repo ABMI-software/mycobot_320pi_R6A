@@ -181,6 +181,7 @@
         <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left1.dae"/>
       </geometry>
       <origin xyz="0.048 -0.035 -0.003" rpy="1.5708 0 1.5708"/>
+      <material name="gripper_left1_black"><color rgba="0.05 0.05 0.05 1.0"/></material>
     </visual>
     <collision>
       <geometry>
@@ -201,6 +202,7 @@
         <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left2.dae"/>
       </geometry>
       <origin xyz="0.026 0.022 -0.018" rpy="1.5708 0 1.5708"/>
+      <material name="gripper_left2_black"><color rgba="0.05 0.05 0.05 1.0"/></material>
     </visual>
     <collision>
       <geometry>
@@ -221,6 +223,7 @@
         <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left3.dae"/>
       </geometry>
       <origin xyz="0.0 0.0 -0.018" rpy="1.5708 0 1.5708"/>
+      <material name="gripper_left3_black"><color rgba="0.05 0.05 0.05 1.0"/></material>
     </visual>
     <collision>
       <geometry>
@@ -241,6 +244,7 @@
         <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right1.dae"/>
       </geometry>
       <origin xyz="-0.086 -0.036 -0.003" rpy="1.5708 0 1.5708"/>
+      <material name="gripper_right1_black"><color rgba="0.05 0.05 0.05 1.0"/></material>
     </visual>
     <collision>
       <geometry>
@@ -261,6 +265,7 @@
         <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right2.dae"/>
       </geometry>
       <origin xyz="-0.062 0.0224 -0.018" rpy="1.5708 0 1.5708"/>
+      <material name="gripper_right2_black"><color rgba="0.05 0.05 0.05 1.0"/></material>
     </visual>
     <collision>
       <geometry>
@@ -281,6 +286,7 @@
         <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right3.dae"/>
       </geometry>
       <origin xyz="-0.034 0.0 -0.018" rpy="1.5708 0 1.5708"/>
+      <material name="gripper_right3_black"><color rgba="0.05 0.05 0.05 1.0"/></material>
     </visual>
     <collision>
       <geometry>
@@ -368,7 +374,7 @@
     <child link="gripper_left3"/>
     <origin xyz="-0.018 0.015 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit effort="10.0" lower="-0.7" upper="0.0" velocity="3.14"/>
+    <limit effort="10.0" lower="-1.10" upper="0.0" velocity="3.14"/>
     <dynamics damping="0.3" friction="0.1"/>
   </joint>
 
@@ -383,7 +389,7 @@
     <child link="gripper_left1"/>
     <origin xyz="-0.05 0.035 -0.015" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit effort="2.0" lower="-0.7" upper="0.7" velocity="3.14"/>
+    <limit effort="2.0" lower="-1.10" upper="1.10" velocity="3.14"/>
     <dynamics damping="0.2" friction="0.05"/>
   </joint>
 
@@ -392,7 +398,7 @@
     <child link="gripper_right3"/>
     <origin xyz="0.016 0.014 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit effort="10.0" lower="0.0" upper="0.7" velocity="3.14"/>
+    <limit effort="10.0" lower="0.0" upper="1.10" velocity="3.14"/>
     <dynamics damping="0.3" friction="0.1"/>
   </joint>
 
@@ -407,7 +413,7 @@
     <child link="gripper_right1"/>
     <origin xyz="0.052 0.035 -0.015" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit effort="2.0" lower="-0.7" upper="0.7" velocity="3.14"/>
+    <limit effort="2.0" lower="-1.10" upper="1.10" velocity="3.14"/>
     <dynamics damping="0.2" friction="0.05"/>
   </joint>
 
@@ -467,7 +473,7 @@
     <parent link="world"/>
     <child link="camera_link"/>
     <!-- x=0.8 forward, z=0.4 height, pitched down toward robot -->
-    <origin xyz="0.8 0.0 0.4" rpy="0 0.3 3.1416"/>
+    <origin xyz="1.1 0.0 0.4" rpy="0 0.3 3.1416"/>
   </joint>
 
   <gazebo reference="camera_link">
@@ -476,7 +482,7 @@
       <update_rate>10</update_rate>
       <visualize>true</visualize>
       <camera>
-        <horizontal_fov>1.047</horizontal_fov>
+        <horizontal_fov>1.15</horizontal_fov>
         <image>
           <width>640</width>
           <height>480</height>
@@ -518,7 +524,7 @@
   <joint name="world_to_camera_right" type="fixed">
     <parent link="world"/>
     <child link="camera_link_right"/>
-    <origin xyz="0.0 0.8 0.4" rpy="0 0.3 -1.5708"/>
+    <origin xyz="0.0 1.1 0.4" rpy="0 0.3 -1.5708"/>
   </joint>
 
   <gazebo reference="camera_link_right">
@@ -527,7 +533,7 @@
       <update_rate>10</update_rate>
       <visualize>false</visualize>
       <camera>
-        <horizontal_fov>1.047</horizontal_fov>
+        <horizontal_fov>1.15</horizontal_fov>
         <image><width>640</width><height>480</height><format>R8G8B8</format></image>
         <clip><near>0.05</near><far>10.0</far></clip>
       </camera>
@@ -562,7 +568,7 @@
   <joint name="world_to_camera_left" type="fixed">
     <parent link="world"/>
     <child link="camera_link_left"/>
-    <origin xyz="0.0 -0.8 0.4" rpy="0 0.3 1.5708"/>
+    <origin xyz="0.0 -1.1 0.4" rpy="0 0.3 1.5708"/>
   </joint>
 
   <gazebo reference="camera_link_left">
@@ -571,7 +577,7 @@
       <update_rate>10</update_rate>
       <visualize>false</visualize>
       <camera>
-        <horizontal_fov>1.047</horizontal_fov>
+        <horizontal_fov>1.15</horizontal_fov>
         <image><width>640</width><height>480</height><format>R8G8B8</format></image>
         <clip><near>0.05</near><far>10.0</far></clip>
       </camera>
@@ -606,7 +612,7 @@
   <joint name="world_to_camera_top" type="fixed">
     <parent link="world"/>
     <child link="camera_link_top"/>
-    <origin xyz="0.0 0.0 1.2" rpy="0 1.5708 0"/>
+    <origin xyz="0.0 0.0 1.0" rpy="0 1.5708 0"/>
   </joint>
 
   <gazebo reference="camera_link_top">
@@ -615,7 +621,7 @@
       <update_rate>10</update_rate>
       <visualize>false</visualize>
       <camera>
-        <horizontal_fov>1.047</horizontal_fov>
+        <horizontal_fov>1.15</horizontal_fov>
         <image><width>640</width><height>480</height><format>R8G8B8</format></image>
         <clip><near>0.05</near><far>10.0</far></clip>
       </camera>
@@ -685,7 +691,7 @@
          -->
     <joint name="gripper_controller">
       <command_interface name="position">
-        <param name="min">-0.7</param>
+        <param name="min">-1.10</param>
         <param name="max">0.0</param>
       </command_interface>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
@@ -695,7 +701,7 @@
     <joint name="gripper_base_to_gripper_right3">
       <command_interface name="position">
         <param name="min">0.0</param>
-        <param name="max">0.7</param>
+        <param name="max">1.10</param>
       </command_interface>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
@@ -703,8 +709,8 @@
 
     <joint name="gripper_left3_to_gripper_left1">
       <command_interface name="position">
-        <param name="min">-0.7</param>
-        <param name="max">0.7</param>
+        <param name="min">-1.10</param>
+        <param name="max">1.10</param>
       </command_interface>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
@@ -712,13 +718,36 @@
 
     <joint name="gripper_right3_to_gripper_right1">
       <command_interface name="position">
-        <param name="min">-0.7</param>
-        <param name="max">0.7</param>
+        <param name="min">-1.10</param>
+        <param name="max">1.10</param>
       </command_interface>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
     </joint>
   </ros2_control>
+
+  <!-- Frottement des DOIGTS. Sans ces blocs ils n'ont aucun `mu` declare
+       alors que les cubes du monde de tri sont a mu=1.0 : le contact glisse et
+       rien ne se saisit. `kp`/`kd` raidissent le contact pour que les doigts
+       n'entrent pas dans le cube avant de le pousser. -->
+  <gazebo reference="gripper_left1">
+    <mu1>1.6</mu1><mu2>1.6</mu2>
+    <kp>1000000.0</kp><kd>100.0</kd>
+    <minDepth>0.0005</minDepth>
+    <maxVel>0.0</maxVel>
+  </gazebo>
+  <gazebo reference="gripper_right1">
+    <mu1>1.6</mu1><mu2>1.6</mu2>
+    <kp>1000000.0</kp><kd>100.0</kd>
+    <minDepth>0.0005</minDepth>
+    <maxVel>0.0</maxVel>
+  </gazebo>
+  <gazebo reference="gripper_left3">
+    <mu1>1.6</mu1><mu2>1.6</mu2>
+  </gazebo>
+  <gazebo reference="gripper_right3">
+    <mu1>1.6</mu1><mu2>1.6</mu2>
+  </gazebo>
 
   <!-- Gazebo ↔ ros2_control bridge plugin -->
   <gazebo>
@@ -749,6 +778,26 @@
     <plugin filename="gz-sim-sensors-system"
             name="gz::sim::systems::Sensors">
       <render_engine>ogre2</render_engine>
+    </plugin>
+  </gazebo>
+
+  <!-- Commande des articulations cote GAZEBO. C'est ce plugin qui ecoute les
+       topics /model/mycobot_320/joint/<j>/cmd_pos utilises par
+       `pick_and_place_node` et `sorting_orchestrator`. Il avait disparu de
+       cette copie du depot : sans lui ces topics n'ont AUCUN abonne, le bras
+       reste fige a zero, et la demo de tri va quand meme jusqu'a « Sorting
+       complete » parce qu'elle est en boucle ouverte et TELEPORTE les objets.
+       Constate le 28/08 ; le plugin est repris tel quel de ~/ros_jazzy, ou la
+       demo fonctionnait. -->
+  <gazebo>
+    <plugin filename="gz-sim-joint-position-controller-system"
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>joint2_to_joint1</joint_name>
+      <joint_name>joint3_to_joint2</joint_name>
+      <joint_name>joint4_to_joint3</joint_name>
+      <joint_name>joint5_to_joint4</joint_name>
+      <joint_name>joint6_to_joint5</joint_name>
+      <joint_name>joint6output_to_joint6</joint_name>
     </plugin>
   </gazebo>
 

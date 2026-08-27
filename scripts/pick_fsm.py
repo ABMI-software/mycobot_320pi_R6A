@@ -110,27 +110,176 @@ Z_PRISE = -5.0
 #     au-dessus de lui, dans le vide. C'est ce cas qui a fait echouer les
 #     saisies du scotch a 377 mm.
 # On vise donc la mi-hauteur de CHAQUE objet, dans les deux regimes.
-Z_PRISE_PAR_CLASSE = {'balle': (-5.0, 25.0), 'scotch': (2.0, 11.0),
+# La balle entre a +15, ce qui commande +5 une fois `BIAIS_Z_PRISE` applique.
+# Les -5 historiques avaient ete regles AVANT que ce biais soit mesure : ils
+# l'embarquaient deja en douce, et le garder tel quel revenait a l'appliquer
+# deux fois. Balayage du 26/08 sur la balle, meme boucle fermee, l'angle auquel
+# la pince CALE etant le vrai juge — a hauteur egale il ne bouge pas, et il
+# saute des que les doigts butent sur autre chose que la balle :
+#
+#   z commande   modele atteint   resultat   angle de calage
+#      +10,0         +11,3         saisi           53
+#       +5,0          +6,3         saisi           53
+#        0,0          +0,7         saisi           53
+#       -5,0          -4,2         saisi           52
+#      -10,0          -8,4         saisi           56
+#      -15,0         -12,7         saisi           74   <- la PLANCHE, pas la balle
+#
+# Toutes « reussissent », mais a -15 la pince cale a 74 au lieu de 53 : les
+# doigts sont arretes par la planche. On se place a +5, au milieu du palier a
+# angle constant, 20 mm au-dessus de la hauteur qui degrade. Les deux objets
+# plats (rouleau, robot), eux, restent a leur mi-hauteur geometrique.
+# Second terme (outil couche) du rouleau : balayage du 26/08 a 347-357 mm, meme
+# boucle fermee, l'angle de calage de la pince faisant juge — commande +3, +9 et
+# +15 saisissent toutes les trois, calage 29-30 a chaque fois. On se pose au
+# milieu de ce palier, soit z_prise 19 une fois BIAIS_Z_PRISE applique.
+# Premier terme du rouleau (outil vertical) : -4 et non +2. Balayage du 26/08 a
+# 271-280 mm, meme boucle fermee, l'angle de calage de la pince faisant juge —
+# il ne bouge pas de toute la plage, donc les doigts serrent le ROULEAU et
+# jamais la planche :
+#
+#   z commande   modele atteint   resultat   angle de calage
+#       -8,0         -6,8          saisi           25
+#      -12,0        -11,6          saisi           24
+#      -16,0        -14,4          saisi           25
+#      -20,0        -18,3          saisi           25
+#
+# Ce palier a ete lu comme une invitation a descendre au milieu (-14 commande)
+# et c'etait FAUX : essaye le 26/08 sur un rouleau a 312 mm, les trois hauteurs
+# -14, -18 et -20 se referment sur du VIDE, angle 20, et les doigts finissent
+# par toucher la planche. Le palier ci-dessus a ete mesure a 271-280 mm et ne
+# transfere pas a 312 : le biais du modele croit avec l'allonge (5,9 mm a 206,
+# 11,9 a 327, 17,9 a 370), donc a allonge plus grande la meme consigne descend
+# reellement plus bas. On revient a +2, la valeur qui a saisi tout au long de la
+# journee sur toute la bande d'allonge, et on laisse les reprises de `_saisie`
+# chercher 4 mm plus bas quand c'est necessaire.
+Z_PRISE_PAR_CLASSE = {'balle': (15.0, 25.0), 'scotch': (2.0, 19.0),
                       'robot': (2.0, 10.0)}
 # Et si ca rate quand meme, on ne refait PAS le meme geste : chaque nouvel essai
 # descend d'un cran. Trois tentatives identiques donnent trois echecs identiques.
 PAS_DESCENTE_ESSAI = 4.0
+# Le modele place la pointe plus BAS qu'elle n'est reellement : viser la
+# mi-hauteur d'un objet fait refermer les doigts au-dessus de lui. Balayage du
+# 26/08 sur un rouleau (mi-hauteur Z=2), boucle fermee, meme objet, XY converge
+# a chaque fois :
+#
+#   z commande   modele atteint   resultat        angle de calage
+#      +2,0          +4,1         rien saisi           20
+#      -4,0          -0,7         SAISI                24
+#     -10,0          -7,9         SAISI                25
+#     -16,0         -14,4         SAISI                25
+#
+# L'essai qui ECHOUE est celui dont le XY est le meilleur (1,89 mm contre 1,92
+# et 2,19 pour deux reussites) : c'est la hauteur, seule. L'angle de calage a
+# 24-25 sur les trois reussites confirme que les doigts serrent le rouleau.
+#
+# Ce biais n'est pas une propriete de l'objet mais du modele du bras, et c'est
+# pourquoi la balle se saisissait quand meme : une sphere se laisse prendre par
+# en dessous, un rouleau plat non. On vise donc 10 mm sous la mi-hauteur — le
+# milieu de la plage mesuree, 6 mm de marge de chaque cote.
+#
+# Verifie ensuite par le chemin complet de la machine, 7 saisies sur 7 :
+# rouleau 3/3 a 271-303 mm, petit robot 2/2 a 187-221 mm, balle 2/2. Une seule
+# constante suffit donc sur toute cette bande, alors que le biais de saisie
+# croit avec l'allonge (5,9 mm a 206, 11,9 a 327, 17,9 a 370 — signature d'une
+# flexion) : au-dela de 303 mm elle reste a confirmer.
+#
+# Et elle n'est mesuree qu'en regime OUTIL VERTICAL. Au-dela de 355 mm la
+# machine couche l'outil ; une erreur verticale ne s'y projette plus de la meme
+# facon, et le second terme de `Z_PRISE_PAR_CLASSE` n'a pas ete rejuge.
+BIAIS_Z_PRISE = -10.0
+# Plancher de la descente. Il valait -18 mm, soit 18 mm DANS la table : une
+# reserve creusee a l'epoque ou les reprises approfondissaient la descente. Elle
+# n'a plus de raison d'etre, et deux mesures le disent :
+#
+#   * approfondir NE SERT PAS — le 26/08 a 312 mm d'allonge, -14, -18 et -20 se
+#     referment tous sur du VIDE (angle 20) et les doigts touchent la planche ;
+#   * le bras arrive de toute facon 6 a 25 mm SOUS sa consigne selon l'allonge
+#     (affaissement mesure le 27/08), donc une consigne deja negative racle.
+#
+# Le plancher vaut donc exactement la consigne NOMINALE, -8 : c'est elle qui
+# saisit le rouleau par sa moitie, elle ne change pas d'un millimetre, et plus
+# aucune reprise ne peut descendre en dessous. Monter ce plancher au-dessus de
+# -8 remonterait la prise elle-meme et ferait lacher le rouleau.
+Z_PRISE_MIN = -8.0
+# Saut articulaire maximal tolere entre deux paliers de descente.
+#
+# 25 deg etait trop serre et refusait des descentes parfaitement saines : le
+# rouleau blanc a 312 mm exigeait 39 deg sur son DERNIER palier, refuse trois
+# fois d'affilee. Mesure du 26/08 sur cette cible exacte, en faisant varier la
+# taille du palier — le saut est toujours sur la derniere marche, et le residu
+# de pose y vaut 0,02 mm, donc la pose est bel et bien atteignable : c'est le
+# poignet qui se reconfigure progressivement pres du sol, pas une branche qui
+# change.
+#
+#   pas 35 mm (4 marches) : 34,6 deg      pas 15 mm ( 8 marches) : 24,0 deg
+#   pas 25 mm (5 marches) : 30,9 deg      pas 10 mm (12 marches) : 18,9 deg
+#   pas 20 mm (6 marches) : 28,0 deg
+#
+# Un vrai changement de branche, lui, coute 180 a 320 deg (balayage des colonnes
+# du 26/08). Les deux familles sont a un ordre de grandeur l'une de l'autre : 60
+# passe entre elles, avec 1,7x de marge au-dessus du plus gros saut legitime.
+SAUT_PALIER_MAX = 60.0
+# Hauteur d'un palier de descente. Plus long, l'interpolation articulaire
+# s'ecarte trop de la verticale entre les deux bouts.
+# 15 mm et non 35 : plus la marche est courte, moins le poignet a a se
+# reconfigurer d'un palier au suivant (34,6 deg a 35 mm, 24,0 a 15 — mesure
+# ci-dessous), et plus la pointe suit la verticale. Les paliers sont enchaines,
+# ils ne coutent donc pas de temps.
+PAS_PALIER_DESCENTE = 15.0
+# Borne de la correction laterale accumulee pendant une descente. Au-dela, ce
+# n'est plus l'affaissement du bras qu'on rattrape mais une cible fausse, et
+# reinjecter plus fort ne fait que pousser les servos dans la butee (incident du
+# 26/08). La derive mesuree utile vaut quelques millimetres.
+DERIVE_DESCENTE_MAX = 25.0
+# La descente se fait plus lentement que les transits : c'est le seul moment ou
+# la pince arrive au contact, et une approche lente laisse le temps de couper.
+VITESSE_DESCENTE = 15
 Z_SURVOL = 110.0        # au-dessus du sommet de la balle (~71 mm)
 Z_TRANSFERT = 170.0
 Z_LARGAGE = 100.0       # plancher, quand la hauteur du rebord n'est pas mesuree
 GARDE_LARGAGE = 25.0    # mm au-dessus du rebord MESURE, quand on le connait
+# Affaissement de la pointe en pose de largage, mesure le 27/08 (voir
+# `affaissement_largage`). Sans compensation la garde ci-dessus est mangee des
+# 410 mm de portee et nulle a 470.
+PENTE_AFFAISSEMENT_LARGAGE = 0.0943
+ORIGINE_AFFAISSEMENT_LARGAGE = -20.43
 GARDE_MIN = 25.0
 PLANCHER = -20.0        # mm — aucune pose legitime sous la planche
 CHUTE_MAX = 220.0       # mm — descente verticale maximale en UN seul ordre
 ETAPES_MAX = 12         # decoupage maximal d'un grand deplacement
 ESSAIS_MAX = 3
+# Un objet dont les essais de saisie sont EPUISES est mis de cote, sinon le
+# cycle suivant reprend le plus proche — c'est-a-dire le meme — et la machine
+# tourne a vide indefiniment. Constate le 25/08 : un faux scotch a 252 mm, puis
+# un vrai rouleau hors de portee de la pince, tous deux repris cycle apres
+# cycle pendant que deux autres objets attendaient.
+RAYON_OUBLI = 45.0        # mm — un objet a moins de ca d'un oubli EST cet oubli
+DUREE_OUBLI = 180.0       # s — au-dela, on retente : la scene a pu changer
 VITESSE = 25
+# Delai d'engagement d'un ordre, mesure a 0,27-0,30 s sur huit mouvements.
+DEMARRAGE_MAX = 0.6
+LECTURES_CALMES = 6      # lectures d'affilee sous 0,05 deg — 0,18 s de silence
+REPOS_MESURE = 0.3       # s — derive residuelle nulle au-dela, mesuree
 # Mesure du 24/08, roulis libre, outil vertical, cible a hauteur de table ET
 # survol a 110 : 330, 340 et 350 mm se resolvent (roulis +30, +30, +60), 360 non.
 # La valeur precedente, 335, refusait des balles parfaitement atteignables — une
 # a 343,6 mm a ete refusee alors qu'elle se resout avec un roulis de +30.
 # Incliner l'outil n'ajoute rien ici : teste de +10 a +30 deg, aucune solution.
 PORTEE_MAX = 430.0
+# Et un PLANCHER d'allonge. Le 26/08 la pince est venue buter contre le J3 sur
+# une cible a 151 mm : l'IK donnait une solution, le bras ne pouvait pas la
+# tenir, l'ecart de recalage est reste bloque a 33-36 mm en CROISSANT, et la
+# boucle a reinjecte l'ecart jusqu'a faire tomber le pont de la Pi.
+#
+# Cette borne est EMPIRIQUE, pas un modele de collision : `forward_kinematics`
+# rend les centres d'articulation, sans l'encombrement des liens ni la largeur
+# de la pince, et cette pose-la s'y lit a 152 mm de marge — le modele ne voit
+# donc pas la collision. Ce qu'on a, ce sont les allonges reellement executees :
+# 152 bloque, 178 et 189 saisissent proprement. On se place entre les deux.
+# Le vrai garde-fou reste l'arret de reinjection dans `converge`, qui protege
+# quelle que soit la cause — collision, butee ou obstacle.
+PORTEE_MIN = 170.0
 # L'outil TENU VERTICAL plafonne la : au-dela on le couche, et le scan vertical
 # n'a plus lieu d'etre tente (huit roulis qui echouent coutent 40 s).
 #
@@ -145,7 +294,41 @@ PORTEE_VERTICALE_MAX = 355.0
 # orientation : 360 mm a -15 deg, 380 et 400 a -30, 420 a -30, 440 a -45.
 INCLINAISONS = [0.0, -15.0, -30.0, -45.0]
 # Inclinaison minimale exigee par l'allonge — mesuree, survol ET prise resolus.
-INCLINAISONS_PAR_PORTEE = ((355.0, 0.0), (370.0, -15.0), (425.0, -30.0),
+#
+# La premiere borne n'est PAS PORTEE_VERTICALE_MAX (355). Atteindre la prise et
+# atteindre le survol ne dit rien de ce qu'il y a ENTRE les deux, et c'est la
+# que ca se joue. Balayage du 26/08, colonne verticale complete de Z=110 au ras
+# de la table, par pas de 15 mm, pour chaque roulis (saut articulaire maximal
+# d'un pas au suivant) :
+#
+#   portee | roulis qui descendent droit | ce que font les autres
+#      240 | +0 +30 +60 +90 +120         | -30 : trou, saut 197 deg
+#      270 | +0 +30 +60                  | +90 : 243 deg, +120 : 319 deg
+#      300 | +0 +30 +90                  | +60 : 235 deg
+#      320 | +30 +60                     | +90 : 246 deg
+#      335 | AUCUN                       | +30 : 199 deg, +60 : 194 deg
+#      350 | AUCUN                       | +60 : 208 deg
+#      355 | AUCUN                       | +60 : 203 deg
+#
+# A partir de 335 mm la colonne verticale est trouee pour TOUS les roulis : le
+# bras ne peut rejoindre la prise qu'en changeant de branche, ~200 deg de
+# poignet a quelques centimetres de la planche. C'est ce balayage qui raclait la
+# table. Couche, la meme cible descend droit des -15 deg. On arrete donc le
+# vertical a 325, entre le dernier propre (320) et le premier troue (335).
+# La bascule vertical -> couche est passee de 325 a 320 le 27/08. 325 avait ete
+# pose « entre le dernier propre (320) et le premier troue (335) » — un milieu
+# raisonne, pas mesure. Le rouleau blanc a 324 mm l'a mis en defaut : la machine
+# choisissait l'outil vertical et la descente etait refusee, « palier Z=-8 exige
+# 190 deg — changement de branche refuse ». Balayage geometrique du meme jour,
+# descente jusqu'a Z=-8 :
+#
+#   portee |  300  310  315  320  324  326  330  335  340
+#   droit  |  ok   ok   ok   ok   NON  NON  NON  NON  NON
+#   -15    |  ok   ok   ok   ok   ok   ok   ok   ok   ok
+#
+# 320 est donc la derniere valeur VERIFIEE, et l'outil couche resout tout le
+# reste avec le roulis nominal.
+INCLINAISONS_PAR_PORTEE = ((320.0, 0.0), (370.0, -15.0), (425.0, -30.0),
                            (1e9, -45.0))
 # Incline, la pointe vise le CENTRE de la balle et non le ras de la table : les
 # doigts l'abordent de biais, descendre au ras la pousserait.
@@ -176,9 +359,13 @@ INCLINAISONS_CARTON = [0.0, -15.0, -30.0, -45.0, -60.0, -75.0]
 INCLINAISONS_CARTON_PAR_PORTEE = ((355.0, 0.0), (365.0, -15.0), (410.0, -30.0),
                                   (450.0, -45.0), (1e9, -60.0))
 ESSAIS_CARTON = 2       # tours de balayage avant de renoncer, objet en main
-MARGE_LARGAGE = 38.0    # mm — recul des parois : la balle fait 33 mm de rayon
+MARGE_LARGAGE = 38.0    # mm — recul des parois : la balle a 32,1 mm de rayon (mesure)
 MARGE_LARGAGE_MIN = 15.0  # plancher quand l'ouverture ne peut pas offrir mieux
 LARGAGES_TESTES = 3     # points d'ouverture essayes avant de renoncer
+# Au-dela, le MILIEU d'une ouverture n'est plus un point de largage raisonnable
+# meme quand l'IK le resout : c'est la zone ou le bras n'arrive plus. On y vise
+# le bord proche de la meme ouverture, qui depose tout aussi bien dedans.
+PORTEE_LARGAGE_CONFORT = 400.0
 MEMOIRE_CARTON = RACINE / 'scripts' / 'carton_position.json'
 MEMOIRE_AFFAISSEMENT = RACINE / 'scripts' / 'affaissement.json'
 AFFAISSEMENT_MAX = 6.0  # deg — borne de l'ecart articulaire reinjecte au depart
@@ -192,6 +379,16 @@ TOLERANCE_CARTON_RESOLU = 30.0
 # Un point de largage doit rester DANS l'ouverture qu'il visait : au-dela d'un
 # carton d'ecart avec la position suivie, il designe autre chose.
 DERIVE_CARTON_MAX = 150.0
+# Ecart tolere entre le point de largage COMMANDE et la pointe REELLE au moment
+# d'ouvrir la pince. Le 26/08 la machine a commande (401, 204) a 450 mm, le bras
+# s'est immobilise a (373, -52) — 256 mm plus loin, entre les deux boites — et la
+# pince s'est ouverte quand meme : le petit robot est tombe a cote du petit
+# carton. Rien ne verifiait l'ARRIVEE, seulement que l'ordre avait ete accepte.
+# 45 mm laisse passer le biais de modele (18 mm mesure a 370 mm de portee) et
+# arrete tout le reste. Une ouverture de carton fait 88 mm de cote (petit) a
+# 112 mm (grand) : un objet lache a 45 mm du point vise, choisi avec 15 a 38 mm
+# de recul des parois, tombe encore dedans.
+ECART_LARGAGE_MAX = 45.0
 
 # Pour une sphere, l'orientation des doigts dans le plan horizontal est sans
 # importance : ce roulis est un degre de liberte gratuit qui porte la portee
@@ -291,6 +488,11 @@ class Pont:
         chiffres = ''.join(c for c in rep if c.isdigit())
         return int(chiffres[0]) if chiffres else -1
 
+    def angle_pince(self):
+        rep = self.envoie('get_pro_gripper_angle')
+        chiffres = ''.join(c for c in rep if c.isdigit() or c == '-')
+        return int(chiffres) if chiffres.lstrip('-').isdigit() else -1
+
     def ferme(self):
         self.sock.close()
 
@@ -327,6 +529,86 @@ def distance_au_bras(xy, q_deg):
 def pointe(q_deg):
     p, R = pose_bride(q_deg)
     return p + R @ TOOL
+
+
+# --------------------------------------------------------------------------- #
+#  Anticollision par capsules
+# --------------------------------------------------------------------------- #
+# Chaque lien est un SEGMENT entoure d'un rayon ; deux liens se touchent quand
+# la distance entre leurs segments passe sous la somme des rayons plus une
+# marge. Les rayons ne sont pas repris d'un schema de robot generique : ils
+# sortent des maillages de CE bras (`mycobot_description/urdf/320_pi/*.dae`,
+# unites mm), demi-section la plus large de chaque lien.
+RAYONS_CAPSULE = {'colonne': 58.0, 'bras': 48.0, 'avant_bras': 43.0,
+                  'poignet': 44.0, 'bride': 29.0, 'pince': 45.0}
+MARGE_CAPSULE = 5.0
+# Paires qu'on NE TESTE PAS, et pourquoi. Mesure du 27/08, 4000 poses tirees
+# dans les butees :
+#
+#   * poignet/pince — marge de -27,7 a -27,6 mm, soit 0,1 mm d'amplitude. Elle
+#     ne depend d'AUCUNE articulation : la bride ne fait que 19 mm d'epaisseur,
+#     poignet et pince sont un seul bloc mecanique. C'est une constante
+#     geometrique, pas une collision.
+#   * avant_bras/bride et avant_bras/pince — une capsule de 45 mm autour de la
+#     pince couvre une fourche qui est surtout du vide. Resultat : -8,0 mm sur
+#     POSE_OBSERVATION et -6,7 mm sur une prise a 300 mm, deux poses que ce
+#     robot tient tous les jours. Tant que le volume reel de la pince n'est pas
+#     mesure, ces paires refuseraient le travail au lieu de le proteger.
+#
+# Restent sept paires, toutes verifiees positives sur l'enveloppe de travail.
+PAIRES_CAPSULE_EXCLUES = {('poignet', 'pince'), ('avant_bras', 'bride'),
+                          ('avant_bras', 'pince')}
+
+
+def capsules(q_deg):
+    """[(nom, extremite, extremite)] — le bras en six segments, pince comprise."""
+    p, R = pose_bride(q_deg)
+    origines, _ = forward_kinematics(np.radians(np.asarray(q_deg, float)))
+    o = lambda k: np.asarray(origines[f'mycobot320_{k}'], float) * 1000.0
+    return [('colonne', o('base'), o('link1')),
+            ('bras', o('link1'), o('link3')),
+            ('avant_bras', o('link3'), o('link4')),
+            ('poignet', o('link4'), o('link5')),
+            ('bride', o('link5'), o('link6')),
+            ('pince', o('link6'), p + R @ TOOL)]
+
+
+def _distance_segments(a0, a1, b0, b1):
+    u, v, w = a1 - a0, b1 - b0, a0 - b0
+    a, b, c, d, e = u @ u, u @ v, v @ v, u @ w, v @ w
+    den = a * c - b * b
+    t = (e / c if c > 1e-9 else 0.0) if den < 1e-9 else 0.0
+    s = 0.0 if den < 1e-9 else np.clip((b * e - c * d) / den, 0.0, 1.0)
+    if den >= 1e-9:
+        s = np.clip((b * e - c * d) / den, 0.0, 1.0)
+        t = np.clip((a * e - b * d) / den, 0.0, 1.0)
+    if a > 1e-9:
+        s = float(np.clip((b * t - d) / a, 0.0, 1.0))
+    if c > 1e-9:
+        t = float(np.clip((b * s + e) / c, 0.0, 1.0))
+    return float(np.linalg.norm(w + s * u - t * v))
+
+
+def marge_collision(q_deg):
+    """(marge la plus faible en mm, paire concernee). Negative = contact.
+
+    La paire `colonne/avant_bras` est celle qui compte : elle passe sous zero a
+    ~143 mm d'allonge, ce qui retrouve tout seul l'incident du 26/08 — pince
+    coincee contre J3, cible a 151 mm — et le plancher `PORTEE_MIN` pose
+    empiriquement apres coup.
+    """
+    seg = capsules(q_deg)
+    pire, ou = float('inf'), ''
+    for i in range(len(seg)):
+        for j in range(i + 2, len(seg)):        # deux liens VOISINS se touchent
+            if (seg[i][0], seg[j][0]) in PAIRES_CAPSULE_EXCLUES:
+                continue
+            marge = (_distance_segments(seg[i][1], seg[i][2], seg[j][1], seg[j][2])
+                     - RAYONS_CAPSULE[seg[i][0]] - RAYONS_CAPSULE[seg[j][0]]
+                     - MARGE_CAPSULE)
+            if marge < pire:
+                pire, ou = marge, f'{seg[i][0]}/{seg[j][0]}'
+    return pire, ou
 
 
 def garde_au_sol(q_deg):
@@ -372,21 +654,39 @@ _AMORCES_SYNTHETIQUES = [np.array(a, float) for a in (
 
 
 def resout_ik(p_cible, R, tol_mm=1.0, tol_deg=1.0, coude_haut=True,
-              amorces_max=None, iterations=400):
+              amorces_max=None, iterations=150):
     """Meilleure solution parmi les amorces, ou None.
 
     Sortie anticipee des qu'une amorce donne une solution nettement bonne :
-    balayer les 22 amorces jusqu'au bout coute 2,8 s, et `choisit_roulis` en
-    enchaine 24 — 17 s d'attente pour une seule etape. Le seuil de sortie est
-    trois fois plus severe que le seuil d'acceptation, pour ne s'arreter que
-    sur une solution qui ne demande aucun arbitrage.
+    balayer les 22 amorces jusqu'au bout coute des secondes, et les etats de
+    largage en enchainent plusieurs. Le seuil de sortie est trois fois plus
+    severe que le seuil d'acceptation, pour ne s'arreter que sur une solution
+    qui ne demande aucun arbitrage.
+
+    L'ORDRE des amorces compte autant que leur nombre. Mesure du 26/08 sur une
+    cible de largage (362, 152), amorce par amorce :
+
+        amorces 0-3 (poses mesurees telles quelles)  216 ms chacune, residu ~100 mm
+        amorce  4   (la meme, J1 recale sur l'azimut)  45 ms, residu 0,000 mm
+
+    Une amorce dont le J1 pointe ailleurs que la cible ne converge pas, et paie
+    le budget d'iterations en entier : 865 des 910 ms d'un appel partaient la,
+    sans jamais changer la solution retenue. Les amorces recalees passent donc
+    devant, les brutes restent en dernier recours.
+
+    Le budget est descendu de 400 a 150 iterations : mesure sur la meme cible,
+    150 donne exactement le meme resultat que 400 (meme premiere amorce bonne,
+    15 amorces valides sur 22) et divise par 2,7 le cout d'une cible SANS
+    solution, ou le balayage va forcement jusqu'au bout. A 60 la qualite tombe
+    (12 amorces valides), donc la marge est gardee.
     """
     azimut = float(np.degrees(np.arctan2(p_cible[1], p_cible[0])))
-    amorces = list(_AMORCES_MESUREES)
+    amorces = []
     for q in _AMORCES_MESUREES + _AMORCES_SYNTHETIQUES:
         s = q.copy()
         s[0] = azimut
         amorces.append(s)
+    amorces += list(_AMORCES_MESUREES)
     meilleure = None
     for amorce in amorces[:amorces_max]:
         q = solve_pose(amorce, np.asarray(p_cible) - R @ TOOL, R,
@@ -417,6 +717,38 @@ def incline(R, azimut_deg, theta_deg):
     return M @ R
 
 
+def colonne_continue(xy, R, z_bas, z_haut=None):
+    """La descente tient-elle sur UNE SEULE branche IK, de bout en bout ?
+
+    Verifier que le survol et la prise se resolvent ne suffit pas : entre les
+    deux, l'orientation retenue peut n'avoir aucune solution. Le bras rejoint
+    alors la prise en changeant de branche — ~200 deg de poignet a quelques
+    centimetres de la planche — et c'est ce balayage qui raclait la table.
+    """
+    z_haut = Z_SURVOL if z_haut is None else z_haut
+    depart = resout_ik(np.array([xy[0], xy[1], z_haut]), R)
+    if depart is None:
+        return False
+    q = depart[0]
+    # EXACTEMENT la discretisation de `descend_par_paliers`, bord bas compris.
+    # Par pas fixe depuis le haut, le dernier cran tombait avant l'arrivee : la
+    # colonne etait declaree bonne jusqu'a -10 pendant que la descente visait
+    # -14, et c'est dans ces 4 mm-la que le rouleau a 312 mm demandait 196 deg
+    # de saut de branche (26/08). On ne valide plus autre chose que ce qui sera
+    # execute.
+    marches = max(1, int(np.ceil((z_haut - z_bas) / PAS_PALIER_DESCENTE)))
+    for i in range(1, marches + 1):
+        z = z_haut + (z_bas - z_haut) * i / marches
+        cible = np.array([xy[0], xy[1], float(z)])
+        q_z = solve_pose(q, cible - R @ TOOL, R, rot_weight=400.0,
+                         max_joint_step_deg=3.0, iterations=150)
+        if (float(np.linalg.norm(pointe(q_z) - cible)) > 2.0
+                or float(np.abs(q_z - q).max()) > SAUT_PALIER_MAX):
+            return False
+        q = q_z
+    return True
+
+
 def choisit_pose_prise(ctx, xy):
     """(roulis, inclinaison, R, hauteur de prise) pour saisir en xy, ou None.
 
@@ -434,8 +766,14 @@ def choisit_pose_prise(ctx, xy):
     depart = next(t for limite, t in INCLINAISONS_PAR_PORTEE if portee <= limite)
     ordre_theta = [t for t in INCLINAISONS if t <= depart] or [INCLINAISONS[-1]]
     couples = [(t, r) for t in ordre_theta for r in ROULIS]
-    memo = ctx.prise_apprise.get(cle_roulis('balle', xy))
-    if memo in couples:
+    cle = cle_roulis('balle', xy)
+    # Un couple qui a referme la pince a vide passe en DERNIER, il n'est pas
+    # supprime : quand ils ont tous echoue il faut bien en reproposer un.
+    rates = ctx.prises_ratees.get(cle, [])
+    couples = ([c for c in couples if c not in rates]
+               + [c for c in couples if c in rates])
+    memo = ctx.prise_apprise.get(cle)
+    if memo in couples and memo not in rates:
         couples.insert(0, couples.pop(couples.index(memo)))
     debout, couche = Z_PRISE_PAR_CLASSE.get(ctx.classe_objet,
                                             (Z_PRISE, Z_PRISE_INCLINE))
@@ -444,8 +782,24 @@ def choisit_pose_prise(ctx, xy):
         hauteurs = ([Z_TRANSFERT, Z_SURVOL, z_prise] if theta == 0.0
                     else [Z_SURVOL, z_prise])
         R = incline(orientation(xy, roulis), azimut, theta)
-        if all(resout_ik(np.array([xy[0], xy[1], z]), R) is not None for z in hauteurs):
-            ctx.prise_apprise[cle_roulis('balle', xy)] = (theta, roulis)
+        # La colonne se verifie jusqu'a la hauteur REELLEMENT commandee, pas
+        # jusqu'a `z_prise` : `_descente` vise `z_prise + BIAIS_Z_PRISE`, soit
+        # 10 mm plus bas. Ces 10 mm-la n'etaient pas controles, et c'est
+        # exactement dans ce dernier palier que le rouleau a 319 mm demandait
+        # 200 deg de saut de branche (26/08) — refuse a l'execution, donc trois
+        # essais perdus, alors qu'une autre orientation descendait droit.
+        z_bas = max(Z_PRISE_MIN, z_prise + BIAIS_Z_PRISE)
+        if (all(resout_ik(np.array([xy[0], xy[1], z]), R) is not None for z in hauteurs)
+                and colonne_continue(xy, R, z_bas)):
+            ctx.prise_apprise[cle] = (theta, roulis)
+            # La profondeur VALIDEE voyage avec la pose : les reprises de
+            # `_saisie` descendent d'un cran a chaque essai a vide, et sans
+            # cette borne elles sortaient de la colonne verifiee — troisieme
+            # essai refuse pour 194 deg de saut de branche, les deux premiers
+            # etant passes (26/08). Valider plus bas d'emblee n'est pas la
+            # reponse : a 312 mm cela ecarte le roulis +30, qui saisit, au
+            # profit du +60, qui attrape le rouleau par le bord.
+            ctx.z_valide = z_bas
             return roulis, theta, R, z_prise
     return None
 
@@ -533,18 +887,39 @@ class Contexte:
     roulis_appris: dict = field(default_factory=dict)   # {'balle': deg, 'carton': deg}
     carton_resolu: tuple = None       # (centre resolu, point de largage, roulis, R)
     prise_apprise: dict = field(default_factory=dict)  # bande d'allonge -> (inclinaison, roulis)
+    # Couples (inclinaison, roulis) qui ont referme la pince A VIDE a cette
+    # bande d'allonge. Mesure du 27/08 sur le rouleau bleu a 389 mm : le
+    # roulis 0 le POUSSE de 6 mm au lieu de le saisir, le roulis +30 le tient
+    # (statut 2, angle 26, garde jusqu'a Z=170). Les deux sont geometriquement
+    # valides — seule la prise reelle les separe, et sans cette memoire les
+    # trois essais rejouaient le meme roulis rate.
+    prises_ratees: dict = field(default_factory=dict)
     inclinaison_balle: float = 0.0
     z_prise: float = Z_PRISE
     R_balle: np.ndarray = None
     R_carton: np.ndarray = None
     correction: np.ndarray = field(default_factory=lambda: np.zeros(6))
     biais_descente: np.ndarray = field(default_factory=lambda: np.zeros(3))
+    # Le meme biais, mais garde d'un OBJET A L'AUTRE. La derive laterale de la
+    # descente est une propriete du BRAS (l'affaissement sous la gravite), pas de
+    # l'objet vise : la remettre a zero a chaque cible faisait repayer a chacune
+    # la passe de mesure — descendre, remonter, redescendre, quatre fois par tri.
+    biais_appris: np.ndarray = field(default_factory=lambda: np.zeros(3))
     essais: dict = field(default_factory=dict)
     resultats: dict = field(default_factory=dict)
     journal: list = field(default_factory=list)
     mode_auto: bool = False
     echecs: int = 0                   # echecs d'affilee, remis a zero par une depose
     chrono: dict = field(default_factory=dict)   # secondes passees par etat, cycle courant
+    derniere_consigne: object = None  # angles du dernier ordre, bras peut-etre encore en route
+    en_main: str = ''                 # classe de l'objet tenu, '' si la pince est vide
+    pince_fermee: bool = False        # une fermeture a ete commandee et pas encore annulee
+    z_valide: float = None            # profondeur jusqu'a laquelle la colonne est verifiee
+    garde_cible: bool = False         # un degagement de reprise : la cible ne change pas
+    largages: list = field(default_factory=list)   # xy des lachers effectues
+    largages_rates: list = field(default_factory=list)  # xy commandes jamais atteints
+    cartons_marques: set = field(default_factory=set)  # classes identifiees par leur marqueur
+    dernier_cycle: float = 0.0        # duree du dernier cycle complet, en secondes
     debut_cycle: float = 0.0
     detecteur: object = None          # callable(patience=...) -> (x, y) ou None
     source_balle: str = ''            # camera qui a fourni la derniere detection
@@ -552,36 +927,138 @@ class Contexte:
     classe_objet: str = ''            # 'balle', 'scotch' ou 'robot' — objet en cours
     carton_vise: str = 'grand'        # destination de cet objet
     detecteur_carton: object = None   # idem, pour le carton
+    oublies: list = field(default_factory=list)   # [(xy, instant)] — saisies epuisees
+    deposes: dict = field(default_factory=dict)  # {classe: nombre reellement largue}
 
     def note(self, texte):
         self.journal.append(texte)
         del self.journal[:-200]
+        # ... et sur la sortie standard. Le journal ne vivait que dans la
+        # fenetre Qt : apres un cycle rate, la seule trace disponible etait une
+        # capture d'ecran tronquee. Redirige vers un fichier, il devient
+        # relisible en entier, ce qui coute une ligne et fait gagner un cycle
+        # d'essais a chaque diagnostic.
+        print(texte, flush=True)
 
     def essai(self, etat):
         self.essais[etat] = self.essais.get(etat, 0) + 1
         return self.essais[etat]
 
+    def oublie(self, xy):
+        """Mettre de cote une position ou la saisie a echoue pour de bon."""
+        if xy is None:
+            return
+        self.oublies.append((np.asarray(xy, float), time.time()))
+        del self.oublies[:-8]
+
+    def est_oublie(self, xy):
+        """Cette position est-elle celle d'un objet deja abandonne ?"""
+        maintenant = time.time()
+        self.oublies = [(p, t) for p, t in self.oublies
+                        if maintenant - t < DUREE_OUBLI]
+        return any(float(np.linalg.norm(np.asarray(xy, float) - p)) < RAYON_OUBLI
+                   for p, _ in self.oublies)
+
     def repart_a_zero(self):
-        """Nouvelle cible : le biais et les compteurs appris ne valent plus."""
+        """Nouvelle cible : les compteurs d'essais ne valent plus.
+
+        Le BIAIS, lui, repart de ce qui a deja converge. Il decrit la derive du
+        bras, pas la cible : le remettre a zero faisait recommencer a chaque
+        objet la passe « descendre, mesurer, remonter, redescendre ». S'il se
+        trouve faux a la nouvelle position, la passe suivante le corrige comme
+        avant — on ne perd rien, on part seulement d'un point deja mesure.
+        """
         self.essais.clear()
-        self.biais_descente = np.zeros(3)
+        self.biais_descente = self.biais_appris.copy()
+
+
+PINCE_OUVERTE_MIN = 90        # angle lu au-dela duquel la pince est deja ouverte
+ANGLE_PINCE_FERMEE = 20       # consigne de fermeture envoyee a la saisie
+# A VIDE la pince atteint exactement la consigne — mesure du 26/08, 20 tout
+# rond, et 100 ouverte. Sur un objet elle CALE plus haut : 24-25 sur un rouleau
+# de pres, 29-30 de loin, 52-53 sur la balle, 74 quand les doigts butent sur la
+# planche. Trois degres suffisent donc a separer le vide du tenu.
+MARGE_ANGLE_TENUE = 3
+# La pince repond parfois n'IMPORTE QUOI pendant que le bras bouge. Mesure du
+# 27/08, remontee en trois paliers, 12 lectures : deux statuts « 6 » (aucun sens
+# pour cette pince, qui ne rend que 0-3) et un angle « 65535 » — le -1 du
+# registre lu en 16 bits non signes. Une seule de ces reponses suffisait a
+# declarer l'objet lache : c'est ainsi que le rouleau blanc est parti en vol,
+# `monte_par_paliers` ayant rendu « perdu » sur un rouleau parfaitement tenu,
+# apres quoi la pince s'est ouverte en l'air.
+STATUTS_PINCE = (0, 1, 2, 3)
+ANGLE_PINCE_MAX = 100         # pince grande ouverte ; au-dela la lecture est du bruit
+LECTURES_PINCE_MAX = 3
+
+
+def _temoins_pince(ctx):
+    """(statut, angle) de la pince, ou None pour un temoin illisible."""
+    statut = ctx.pont.statut_pince()
+    angle = ctx.pont.angle_pince()
+    return (statut if statut in STATUTS_PINCE else None,
+            angle if 0 <= angle <= ANGLE_PINCE_MAX else None)
 
 
 def porte_objet(ctx):
-    """La pince tient-elle l'objet ? Le statut 2 en est le seul juge.
+    """La pince tient-elle l'objet ? Statut 2, ou l'ANGLE s'il dit le contraire.
 
     Tant que c'est vrai, aucun retour au ramassage n'est permis. Le cycle a
     tourne des heures la balle en main parce qu'un carton introuvable renvoyait
     vers ECHEC, donc vers ATTENTE, donc vers un nouveau DEGAGEMENT : le bras
     repartait chercher une balle qu'il tenait deja.
+
+    Le statut seul ne suffit pas : le 26/08 il a annonce « objet lache » a la
+    remontee alors que le petit robot etait bel et bien dans les doigts. La
+    machine est repartie chercher un rouleau EN LE TENANT, et l'a depose dans le
+    petit carton sous le nom « scotch ». L'angle est un temoin independant et il
+    ne s'est pas trompe. On le lit dans une BANDE, pas au-dessus d'un seuil :
+    ouverte la pince lit 100, ce qui passerait tout aussi bien un simple seuil.
+
+    Une reponse ILLISIBLE n'est pas une reponse : on relit. Et si les deux
+    temoins restent illisibles au bout de trois tours, on repond « tenu ». Des
+    deux erreurs possibles celle-la est la moins chere : croire tenir ce qu'on
+    ne tient pas fait perdre un cycle, croire avoir lache ce qu'on tient fait
+    ouvrir la pince en plein vol.
     """
-    return ctx.pont is not None and ctx.pont.statut_pince() == 2
+    if ctx.pont is None:
+        return False
+    for _ in range(LECTURES_PINCE_MAX):
+        statut, angle = _temoins_pince(ctx)
+        if statut == 2:
+            return True
+        # L'angle ne temoigne que si l'on a REELLEMENT commande une fermeture.
+        # Au reveil apres l'incident du 26/08 la pince lisait 73 avec le statut
+        # « rien saisi » : un etat residuel, ni ouvert ni referme sur quoi que
+        # ce soit, que la seule lecture de l'angle aurait pris pour une prise.
+        if not ctx.pince_fermee:
+            return False
+        if angle is not None:
+            return ANGLE_PINCE_FERMEE + MARGE_ANGLE_TENUE <= angle < PINCE_OUVERTE_MIN
+    ctx.note('  pince illisible trois fois — on considere l objet TENU')
+    return True
 
 
-def memorise_carton(xy, roulis_appris=None):
+def memorise_carton(classe, xy, roulis_appris=None):
+    """Retient le ROULIS appris — jamais la position des cartons.
+
+    Les positions ne sont volontairement PLUS persistees. Les boites se
+    deplacent entre deux seances, et une position ecrite sur disque survit a ce
+    deplacement : le 26/08 « grand » valait encore (428, -97), du cote du petit
+    et a 320 mm du vrai grand, et la balle est allee s'y poser — sur la planche,
+    entre les deux boites. Une position fausse et durable coute plus cher que
+    tout ce qu'elle fait gagner.
+
+    Pendant une seance les boites ne bougent pas, et le suivi camera
+    (`SuiviCarton`) tient leur position en memoire vive : c'est la bonne portee
+    pour cette information. Le roulis appris, lui, est une propriete du BRAS et
+    non de la scene — il reste persiste, et fait gagner 10 s au premier cycle.
+    """
+    try:
+        d = json.loads(MEMOIRE_CARTON.read_text())
+    except (OSError, json.JSONDecodeError):
+        d = {}
     MEMOIRE_CARTON.write_text(json.dumps(
-        {'carton_xy_mm': [float(xy[0]), float(xy[1])],
-         'roulis_appris': roulis_appris or {}}))
+        {'roulis_appris': roulis_appris or d.get('roulis_appris') or {}}))
 
 
 def memorise_affaissement(correction):
@@ -606,23 +1083,30 @@ def affaissement_memorise():
     return np.clip(v, -AFFAISSEMENT_MAX, AFFAISSEMENT_MAX) if v.size == 6 else np.zeros(6)
 
 
-def carton_memorise(ctx=None):
-    """Derniere position vue, d'une seance a l'autre. Le carton bouge peu.
+def carton_memorise(ctx=None, classe=None):
+    """Recharge le ROULIS appris. Ne rend JAMAIS de position de carton.
 
-    Recharge aussi le roulis qui marchait : sans lui, le premier cycle d'une
-    seance repaie le choix complet (mesure : 14,5 s contre 4,1 s ensuite).
+    Les positions ne sont plus persistees (voir `memorise_carton`) : les boites
+    se deplacent entre deux seances et une position ecrite sur disque survit a
+    ce deplacement. Le 26/08 « grand » valait encore (428, -97), du cote du
+    petit, a 320 mm du vrai grand — la balle est allee s'y poser. Pendant une
+    seance les boites ne bougent pas et le suivi camera tient leur position en
+    memoire vive : c'est la bonne portee pour cette information.
+
+    Le roulis appris, lui, est une propriete du BRAS et non de la scene. Sans
+    lui, le premier cycle d'une seance repaie le choix complet (14,5 s contre
+    4,1 s ensuite).
     """
     if not MEMOIRE_CARTON.exists():
         return None
     try:
         d = json.loads(MEMOIRE_CARTON.read_text())
-        xy = np.asarray(d['carton_xy_mm'], float)
-    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+    except (OSError, json.JSONDecodeError):
         return None
     if ctx is not None:
         for cible, angle in (d.get('roulis_appris') or {}).items():
             ctx.roulis_appris.setdefault(cible, angle)
-    return xy
+    return None
 
 
 def points_de_largage(xy, polygone, pas=6.0):
@@ -656,7 +1140,17 @@ def points_de_largage(xy, polygone, pas=6.0):
     dedans = [p for marge, p in marges if marge >= exigee]
     if not dedans:
         return [max(marges, key=lambda t: t[0])[1]]
-    dedans.sort(key=lambda p: float(np.linalg.norm(p - xy)))
+    # VISER LE CENTRE tant qu'il est confortable, LE BORD PROCHE au-dela. Au
+    # centre l'objet tombe au milieu de l'ouverture, c'est le meilleur point —
+    # mais seulement si le bras y va. Le 26/08 le grand carton etait a 450 mm :
+    # l'IK resolvait son centre, le bras s'immobilisait 256 mm avant, et la pince
+    # s'ouvrait au-dessus de la planche. Les candidats gardent tous `exigee` de
+    # recul des parois, donc le bord proche depose DEDANS lui aussi : quand la
+    # boite est loin, le prendre d'emblee epargne un aller-retour d'echec.
+    if float(np.hypot(*xy)) > PORTEE_LARGAGE_CONFORT:
+        dedans.sort(key=lambda p: float(np.hypot(*p)))
+    else:
+        dedans.sort(key=lambda p: float(np.linalg.norm(p - xy)))
     # Deux candidats voisins echouent ou reussissent ensemble : les espacer.
     choisis = []
     for p in dedans:
@@ -686,7 +1180,7 @@ def choisit_pose_largage(ctx, xy):
     xy = np.asarray(xy, float)
     portee = float(np.hypot(*xy))
     azimut = float(np.degrees(np.arctan2(xy[1], xy[0])))
-    hauteurs = [Z_TRANSFERT, z_largage(ctx)]
+    hauteurs = [Z_TRANSFERT, z_largage_commande(ctx, xy)]
     depart = next(t for limite, t in INCLINAISONS_CARTON_PAR_PORTEE if portee <= limite)
     if depart == 0.0:
         roulis, R = choisit_roulis(xy, hauteurs,
@@ -694,7 +1188,15 @@ def choisit_pose_largage(ctx, xy):
         if R is not None:
             return roulis, 0.0, R
     memo = ctx.prise_apprise.get(cle_roulis('carton', xy))
-    for theta in [t for t in INCLINAISONS_CARTON if t <= depart and t != 0.0]:
+    inclinaisons = [t for t in INCLINAISONS_CARTON if t <= depart and t != 0.0]
+    # La memoire reordonnait les roulis mais pas les inclinaisons : on repartait
+    # donc du haut de la liste et on re-parcourait tout ce qui avait deja echoue.
+    # Mesure du 26/08 : resoudre un carton neuf coute 1,81 s, soit 64 a 96 appels
+    # d'IK a 13 ms. Remettre l'inclinaison retenue en tete ramene une resolution
+    # deja connue a deux appels.
+    if memo is not None and memo[0] in inclinaisons:
+        inclinaisons = [memo[0]] + [t for t in inclinaisons if t != memo[0]]
+    for theta in inclinaisons:
         ordre = ROULIS
         if memo is not None and memo[0] == theta:
             ordre = [memo[1]] + [r for r in ROULIS if r != memo[1]]
@@ -708,15 +1210,48 @@ def choisit_pose_largage(ctx, xy):
 
 
 def z_largage(ctx):
-    """Hauteur de lacher : au-dessus du rebord REEL, pas d'un rebord suppose.
+    """Hauteur de lacher VOULUE : au-dessus du rebord REEL, pas d'un suppose.
 
     Le rebord du grand carton a ete mesure a 82,9 mm par triangulation des deux
     vues le 25/08, contre 60 mm supposes — soit 17 mm de garde au lieu de 40,
     et rien du tout pour un carton plus haut. La hauteur vient desormais du
     marqueur colle sur le rabat, quand il est vu.
+
+    C'est la hauteur VOULUE, pas celle a commander : voir `z_largage_commande`.
     """
     rebord = getattr(ctx, 'z_rebord', None)
     return Z_LARGAGE if rebord is None else max(Z_LARGAGE, rebord + GARDE_LARGAGE)
+
+
+def affaissement_largage(portee):
+    """De combien la pointe arrive SOUS la consigne, en pose de largage (mm).
+
+    Mesure du 27/08 sur le vrai bras, azimut +27, consigne Z=108 :
+
+        portee (mm) | 340   380   410   430   450   470
+        manque (mm) | 11,9  14,8  19,7  19,1  20,4  25,3
+
+    Droite de regression, residus <= 1,6 mm. Ce n'est pas une erreur de modele :
+    `send_angles` n'atteint pas sa consigne sous le couple de gravite, et la
+    cinematique directe des angles LUS le dit fidelement. Le meme phenomene vaut
+    `BIAIS_Z_PRISE` a la prise, ou `converge` le rattrape passe par passe — au
+    largage il n'y a pas de convergence, la vitesse compte.
+
+    Enjeu : a 470 mm la pointe arrivait a 82,7 mm pour un rebord mesure a
+    82,9 — la garde de 25 mm entierement mangee, l'objet lache AU RAS du bord.
+    """
+    return max(0.0, PENTE_AFFAISSEMENT_LARGAGE * float(portee)
+               + ORIGINE_AFFAISSEMENT_LARGAGE)
+
+
+def z_largage_commande(ctx, xy):
+    """Hauteur a COMMANDER pour que la pointe arrive a `z_largage`.
+
+    Verifie le 27/08 a l'azimut -18, c'est-a-dire hors des points ayant servi a
+    la regression : consignes 119,6 / 125,3 / 130,0 mm a 340 / 400 / 450 mm de
+    portee, pointe atteinte a 108,0 / 107,1 / 109,0 pour 108 voulus.
+    """
+    return z_largage(ctx) + affaissement_largage(np.hypot(*np.asarray(xy, float)))
 
 
 def carton_atteignable(ctx, xy, polygone=None):
@@ -731,6 +1266,14 @@ def carton_atteignable(ctx, xy, polygone=None):
             return cible, roulis, R
     for cible in points_de_largage(xy, polygone):
         portee = float(np.hypot(*cible))
+        # Un point que le bras n'a PAS SU ATTEINDRE ne se represente pas : l'IK
+        # le resout (c'est bien pour ca qu'il avait ete retenu), seul le robot
+        # sait qu'il n'y va pas. Sans cette memoire, ECHEC_PORTANT reproposait
+        # le meme point indefiniment. Ecarte, il laisse la place au candidat
+        # suivant — le bord PROCHE de la meme ouverture, qui lui se rejoint.
+        if any(float(np.linalg.norm(cible - rate)) < 20.0
+               for rate in ctx.largages_rates):
+            continue
         if portee > PORTEE_CARTON_MAX:
             ctx.note(f'point de largage a {portee:.0f} mm — au-dela de '
                      f'{PORTEE_CARTON_MAX:.0f} mm aucun roulis ne resout')
@@ -763,10 +1306,17 @@ def detecte_carton(ctx, patience=1.5):
         return 'invisible'
     xy, polygone = np.asarray(vu[0], float), vu[1]
     ctx.z_rebord = vu[2] if len(vu) > 2 else None
+    # Un carton identifie par son MARQUEUR echappe a ce garde-fou : une ombre
+    # n'a pas de code ArUco. La regle a ete ecrite quand les cartons etaient
+    # reconnus a la couleur, ou l'ombre du bras passait effectivement pour une
+    # ouverture. Depuis, elle jetait la bonne detection des que le bras — qui
+    # vient justement de saisir au-dessus de la planche — passait a moins de
+    # 150 mm, et la machine partait balayer six poses J1 pour retrouver un
+    # carton qu'elle avait sous les yeux.
     ecart_bras = distance_au_bras(xy, ctx.pont.angles())
-    if ecart_bras < RAYON_MASQUAGE:
-        ctx.note(f'carton "vu" a {ecart_bras:.0f} mm du bras — le bras ou son '
-                 f'ombre, detection ignoree')
+    if ecart_bras < RAYON_MASQUAGE and ctx.carton_vise not in ctx.cartons_marques:
+        ctx.note(f'carton "vu" a {ecart_bras:.0f} mm du bras, sans marqueur pour '
+                 f'le confirmer — le bras ou son ombre, detection ignoree')
         return 'invisible'
     cible, roulis, R = carton_atteignable(ctx, xy, polygone)
     if R is None:
@@ -777,7 +1327,7 @@ def detecte_carton(ctx, patience=1.5):
     ctx.roulis_carton, ctx.R_carton = roulis, R
     ctx.resultats['carton'] = (f'({cible[0]:.1f}, {cible[1]:.1f}) mm — vu, '
                                f'{np.hypot(*cible):.0f} mm')
-    memorise_carton(cible, ctx.roulis_appris)
+    memorise_carton(ctx.carton_vise, cible, ctx.roulis_appris)
     return 'vu'
 
 
@@ -803,7 +1353,8 @@ def carton_pret(ctx):
     return True
 
 
-def va_vers(ctx, q_cible, vitesse=VITESSE, nom='', patience=60, stabilise=True):
+def va_vers(ctx, q_cible, vitesse=VITESSE, nom='', patience=9.0, stabilise=True,
+            enchaine=False):
     """Deplacement valide. Trois controles, tous nes d'un incident reel.
 
     Un seuil de garde ABSOLU ne convient pas : la pointe doit atteindre
@@ -817,51 +1368,109 @@ def va_vers(ctx, q_cible, vitesse=VITESSE, nom='', patience=60, stabilise=True):
     * pas de creux en chemin sous le plus bas des deux bouts.
     """
     q0 = ctx.pont.angles()
-    depart, arrivee = garde_au_sol(q0), garde_au_sol(q_cible)
+    # Le bras peut etre ENCORE EN ROUTE vers la consigne precedente : dans ce cas
+    # le chemin reel n'est pas le segment depuis la position lue, mais l'enveloppe
+    # entre cette position, la consigne encore active et la nouvelle cible. On
+    # verifie les deux, sinon l'enchainement ferait passer un creux inapercu.
+    origines = [q0]
+    if (ctx.derniere_consigne is not None
+            and float(np.abs(ctx.derniere_consigne - q0).max()) > 0.5):
+        origines.append(np.asarray(ctx.derniere_consigne, float))
+    depart, arrivee = min(garde_au_sol(o) for o in origines), garde_au_sol(q_cible)
     if arrivee < PLANCHER:
         ctx.note(f'{nom} REFUSE — cible a {arrivee:.1f} mm, sous le plancher {PLANCHER:.0f}')
         return None
     # La chute se mesure sur la POINTE, pas sur la garde : la garde est le point
     # le plus bas de tout le bras, et un coude reste bas meme bras dresse — elle
     # ne bouge quasiment pas quand la pointe plonge de 590 mm.
-    chute = float(pointe(q0)[2] - pointe(q_cible)[2])
+    # Reference de la chute : la CONSIGNE encore active quand le bras est en vol,
+    # sa position lue sinon. Le garde-fou vise une pose lue PERIMEE (le plongeon
+    # de 590 mm du 20/08) ; une consigne, elle, est ecrite par nous et ne peut pas
+    # l'etre. Mesurer depuis la position lue pendant un enchainement refusait le
+    # trajet entier : le bras a 0,3 s de retard, et l'ecart au palier suivant
+    # passait pour un plongeon.
+    reference = origines[-1]
+    chute = float(pointe(reference)[2] - pointe(q_cible)[2])
     if chute > CHUTE_MAX:
         ctx.note(f'{nom} REFUSE — la pointe plongerait de {chute:.0f} mm en un seul ordre')
         return None
     seuil = min(GARDE_MIN, depart - 2.0, arrivee - 2.0)
-    minimum = min(garde_au_sol(q0 * (1 - t) + q_cible * t) for t in np.linspace(0, 1, 61))
+    minimum = min(garde_au_sol(o * (1 - t) + q_cible * t)
+                  for o in origines for t in np.linspace(0, 1, 61))
     if minimum < seuil:
         ctx.note(f'{nom} REFUSE — creux a {minimum:.1f} mm sous le seuil {seuil:.1f}')
         return None
+    # LE BRAS CONTRE LUI-MEME, sur tout le trajet et pas seulement a l'arrivee.
+    # 0,22 ms le test, 17 sur le chemin : le cout est nul devant un mouvement.
+    # Verifie le 27/08 sur 120 poses de travail (180 a 460 mm, trois azimuts,
+    # trois hauteurs, trois roulis) : AUCUNE refusee, marge la plus faible
+    # +2,2 mm. Le garde-fou ne coute donc rien au travail normal.
+    for o in origines:
+        for t in np.linspace(0, 1, 17):
+            marge, paire = marge_collision(o * (1 - t) + q_cible * t)
+            if marge < 0.0:
+                ctx.note(f'{nom} REFUSE — {paire} a {marge:.1f} mm : le bras se '
+                         f'toucherait lui-meme')
+                return None
     ctx.pont.envoie('send_angles', angles=[round(float(v), 2) for v in q_cible],
                     speed=vitesse)
-    # Arrivee = le bras ne bouge PLUS, et non le bras qui atteint sa consigne.
-    # L'affaissement laisse un ecart permanent d'environ 1,9 deg sur J2,
-    # superieur au seuil : le test sur la consigne n'etait donc jamais satisfait
-    # et l'attente allait au bout de sa patience a CHAQUE mouvement — 22,7 s
-    # mesurees le 24/08, identiques a vitesse 25 et a vitesse 50, ce qui prouve
-    # que le temps ne venait pas du robot.
-    if float(np.abs(q_cible - q0).max()) > 0.05:
-        debut, precedent = time.time(), q0
-        for _ in range(patience):
-            time.sleep(0.15)
-            q = ctx.pont.angles()
-            # Immobile ET assez attendu pour que le mouvement ait pu demarrer.
-            # Exiger d'abord d'avoir VU le bras partir bloquait les corrections
-            # fines : une passe de convergence deplace le bras de moins d'un
-            # degre, le depart n'etait jamais constate et l'attente allait au
-            # bout de sa patience — RECALAGE a 37 s pour quatre passes.
-            immobile = float(np.abs(q - precedent).max()) < 0.2
-            if (float(np.abs(q - q_cible).max()) < 1.2
-                    or (immobile and time.time() - debut > 0.75)):
+    ctx.derniere_consigne = np.asarray(q_cible, float)
+    # TRANSIT : on rend la main des que le mouvement est ENGAGE, sans attendre
+    # l'arret. Mesure du 26/08 : un ordre demarre en 0,30 s et le bras s'immobilise
+    # en 1,2 a 1,9 s — identique a vitesse 25 et a vitesse 80, donc le temps ne
+    # vient pas du robot. Attendre l'arret complet puis dormir une seconde de plus
+    # coutait ~2 s par ordre, et un cycle en compte une douzaine : c'est la, et
+    # nulle part ailleurs, que naissait le rythme saccade « une etape, une pause ».
+    # Le bras enchaine desormais les transits en un seul geste continu. On ne
+    # l'utilise QUE pour les deplacements dont personne ne mesure la pose
+    # d'arrivee : toute etape qui sert de reference (recalage, descente, saisie)
+    # attend toujours l'immobilite.
+    if enchaine:
+        debut = time.time()
+        while time.time() - debut < DEMARRAGE_MAX:
+            time.sleep(0.05)
+            if float(np.abs(ctx.pont.angles() - q0).max()) > 0.5:
                 break
+        return ctx.pont.angles()
+    # Arrivee = le bras ne bouge PLUS, et non le bras qui atteint sa consigne :
+    # l'affaissement laisse un ecart permanent d'environ 1,9 deg sur J2, donc un
+    # test sur la consigne ne serait JAMAIS satisfait.
+    #
+    # L'immobilite se mesure sur plusieurs lectures d'affilee, pas sur deux. Deux
+    # lectures espacees de 0,15 s declarent l'arret des que le bras avance a moins
+    # de 1,3 deg/s — c'est-a-dire en pleine deceleration. Mesure du 26/08 : la
+    # main etait rendue vers 0,75 s alors que le bras s'immobilise entre 0,87 et
+    # 1,32 s, et c'est la seconde de `stabilise` qui masquait l'ecart. On lisait
+    # donc parfois la pose d'un bras encore en mouvement.
+    if float(np.abs(q_cible - q0).max()) > 0.05:
+        debut, calmes, precedent = time.time(), 0, q0
+        while time.time() - debut < patience:
+            q = ctx.pont.angles()                     # 30 ms d'aller-retour
+            calmes = calmes + 1 if float(np.abs(q - precedent).max()) < 0.05 else 0
             precedent = q
+            # On n'exige PAS d'avoir vu le bras partir : une passe de convergence
+            # le deplace de moins d'un degre et le depart n'est jamais constate —
+            # RECALAGE montait alors a 37 s pour quatre passes. Le delai minimal
+            # couvre l'engagement de l'ordre, mesure a 0,30 s.
+            if calmes >= LECTURES_CALMES and time.time() - debut > DEMARRAGE_MAX:
+                break
     if stabilise:
-        # L'affaissement doit s'etablir avant qu'on MESURE la pose. Un simple
-        # transit — se degager, transferer, se retirer — ne mesure rien : cette
-        # seconde y est perdue, et il y a une demi-douzaine de transits par cycle.
-        time.sleep(1.0)
+        # Ce qui reste a attendre une fois le bras VRAIMENT arrete. Mesure du
+        # 26/08 sur cinq mouvements (J1, J2, J3) : la pose derive encore de 0,09
+        # deg au pire a l'instant de l'arret, et de 0,000 deg des +0,3 s. La
+        # seconde d'origine n'attendait donc pas l'affaissement, elle rattrapait
+        # une detection d'arret trop hative.
+        time.sleep(REPOS_MESURE)
     return ctx.pont.angles()
+
+
+# Progres RELATIF exige d'une passe a l'autre. En absolu (1 mm) le garde-fou
+# coupait des convergences qui marchaient : 4,43 -> 3,48 mm, soit 0,95 mm, est un
+# gain de 21 % et une passe de plus passait sous la tolerance. L'emballement, lui,
+# se reconnait a ce qu'il ne gagne presque RIEN sur un ecart enorme : 34,25 ->
+# 33,62 -> 33,48 -> 33,22, donc 1,8 %, 0,4 % puis 0,8 %. Les deux familles sont a
+# un ordre de grandeur l'une de l'autre ; 5 % passe entre elles.
+PROGRES_CONVERGENCE = 0.05
 
 
 def converge(ctx, p_cible, R, passes=4, tol=2.5):
@@ -879,7 +1488,7 @@ def converge(ctx, p_cible, R, passes=4, tol=2.5):
     # redecouvrir. Sans lui, la premiere passe commande la solution IK brute et
     # arrive 10 mm trop bas — deux passes pour rien, a chaque cycle.
     q_commande = q_mesure + affaissement_memorise()
-    ecart = float('inf')
+    ecart, precedent = float('inf'), float('inf')
     for i in range(passes):
         cible = resout_ik(p_cible, R)
         if cible is None:
@@ -895,47 +1504,130 @@ def converge(ctx, p_cible, R, passes=4, tol=2.5):
         ctx.note(f'  convergence passe {i + 1} : ecart {ecart:.2f} mm')
         if ecart < tol:
             break
+        # ARRET SEC des que l'ecart cesse de se refermer. Cette boucle REINJECTE
+        # l'ecart dans la consigne a chaque passe ; sur une pose que le bras ne
+        # peut pas atteindre, il ne se referme jamais et la consigne s'emballe,
+        # poussant les servos dans la butee un peu plus fort a chaque tour.
+        # Mesure du 26/08, cible a 151 mm (blob du robot fusionne avec un cable,
+        # centroide tire pres de la base) : 12 passes, ecart jamais sous 33 mm et
+        # CROISSANT d'un essai a l'autre (34,2 -> 36,0 -> 36,8), jusqu'a ce que
+        # le pont de la Pi cesse de repondre. Une consigne qui ne rapproche pas
+        # de la cible ne doit pas etre renvoyee plus fort.
+        if ecart > precedent * (1.0 - PROGRES_CONVERGENCE):
+            ctx.note(f'  convergence sans progres ({precedent:.1f} -> {ecart:.1f} mm, '
+                     f'{100.0 * (precedent - ecart) / max(precedent, 1e-6):.0f} %) '
+                     f'— pose hors d atteinte, on cesse de reinjecter')
+            return q_mesure, np.zeros(6), False
+        precedent = ecart
     correction = q_commande - q_mesure
     if ecart < 3.0:
         memorise_affaissement(correction)
     return q_mesure, correction, ecart < 3.0
 
 
-def descente_verticale(ctx, p_cible, R, correction, passes=3, tol_xy=2.5):
-    """Descend droit, mesure en bas, REMONTE pour corriger, redescend.
+def descend_par_paliers(ctx, p_cible, R, correction, nom='descente'):
+    """Descend en marches courtes, chacune amorcee sur la pose COURANTE.
 
-    Corriger lateralement doigts en bas pousse l'objet (constate : balle
-    deplacee de 33 mm). Tout recalage se fait donc en hauteur, cible decalee.
-
-    Le biais appris vit dans le contexte : un nouvel essai apres echec reprend
-    ou le precedent s'est arrete, il ne repart pas de zero.
+    `monte_par_paliers` existait deja pour la montee, et pour cette raison
+    exacte : une solution IK cherchee globalement peut etre articulairement
+    loin de la pose actuelle, et l'interpolation du robot passe alors SOUS la
+    planche. La descente, elle, sautait encore d'un seul ordre de Z=110 au ras
+    de la table — 107 mm en une fois, avec une orientation qui change en route.
+    Les doigts raclaient. Le garde-fou de `va_vers` ne le voyait pas : il
+    mesure la pointe de l'outil et les origines de liens, pas le bout des
+    doigts, qui descend plus bas des qu'on couche l'outil.
     """
-    biais = ctx.biais_descente.copy()
-    q_mesure, ecart_xy = None, float('inf')
-    for i in range(passes):
-        cible = resout_ik(p_cible + biais, R)
-        if cible is None:
-            ctx.note('cible decalee insoluble')
-            return q_mesure, False
-        q_mesure = va_vers(ctx, np.clip(cible[0] + correction, LIMITES[:, 0], LIMITES[:, 1]),
-                           nom=f'descente {i + 1}')
+    q_mesure = ctx.pont.angles()
+    depart = float(pointe(q_mesure)[2])
+    marches = (1 if depart <= p_cible[2]
+               else max(1, int(np.ceil((depart - p_cible[2]) / PAS_PALIER_DESCENTE))))
+    # La chaine se poursuit sur le PLAN, pas sur la mesure : les paliers
+    # intermediaires sont enchaines, et `va_vers` rend alors la pose du DEBUT du
+    # mouvement. Amorcer le palier suivant dessus faisait voir un saut de 27 deg
+    # a chaque descente — le retard de l'enchainement, pas un changement de
+    # branche — et le garde-fou refusait tout, y compris a 177 mm d'allonge.
+    q_plan = q_mesure
+    # CORRECTION EN VOL. La descente est purement VERTICALE : d'un palier a
+    # l'autre seul Z change, la cible XY ne bouge pas. L'ecart XY lu pendant la
+    # descente est donc la derive laterale elle-meme, sans penalite de retard —
+    # le retard de l'enchainement ne porte que sur Z. On la corrige palier par
+    # palier au lieu de remonter a Z_SURVOL pour recommencer : le bras ne
+    # s'arrete jamais, et il arrive en bas deja recale.
+    derive = np.asarray(ctx.biais_descente[:2], float).copy()
+    for i in range(1, marches + 1):
+        z = depart + (p_cible[2] - depart) * i / marches
+        cible = np.array([p_cible[0] + derive[0], p_cible[1] + derive[1], z])
+        q_cible = solve_pose(q_plan, cible - R @ TOOL, R, rot_weight=400.0,
+                             max_joint_step_deg=3.0, iterations=300)
+        if float(np.linalg.norm(pointe(q_cible) - cible)) > 2.0:
+            sol = resout_ik(cible, R)
+            if sol is None:
+                ctx.note(f'  palier Z={z:.0f} sans solution — descente interrompue')
+                return None
+            q_cible = sol[0]
+        saut = float(np.abs(q_cible - q_plan).max())
+        if saut > SAUT_PALIER_MAX:
+            ctx.note(f'  palier Z={z:.0f} exige {saut:.0f} deg — changement de branche refuse')
+            return None
+        dernier = i == marches
+        q_mesure = va_vers(ctx, np.clip(q_cible + correction, LIMITES[:, 0], LIMITES[:, 1]),
+                           nom=f'{nom} Z={z:.0f}', vitesse=VITESSE_DESCENTE,
+                           stabilise=dernier, enchaine=not dernier)
         if q_mesure is None:
-            return None, False
-        tp = pointe(q_mesure)
-        reste = p_cible - tp
-        ecart_xy = float(np.linalg.norm(reste[:2]))
-        ctx.note(f'  descente passe {i + 1} : ecart XY {ecart_xy:.2f} mm')
-        if ecart_xy < tol_xy:
-            return q_mesure, True
-        biais[:2] += reste[:2]            # retenu meme au dernier essai : il sert au suivant
-        ctx.biais_descente = biais.copy()
-        if i < passes - 1:
-            haut = resout_ik(np.array([tp[0], tp[1], Z_SURVOL]), R)
-            if haut is None:
-                return q_mesure, False
-            va_vers(ctx, np.clip(haut[0] + correction, LIMITES[:, 0], LIMITES[:, 1]),
-                    nom='remontee de recalage')
-    return q_mesure, ecart_xy < tol_xy
+            return None
+        q_plan = q_cible
+        reste = p_cible[:2] - pointe(q_mesure)[:2]
+        derive = np.clip(derive + reste, -DERIVE_DESCENTE_MAX, DERIVE_DESCENTE_MAX)
+    ctx.biais_descente[:2] = derive
+    return q_mesure
+
+
+# Ecart lateral en dessous duquel la descente est jugee BONNE — donc digne
+# d'etre gardee comme point de depart pour l'objet suivant. Ce n'est plus un
+# veto : on saisit de toute facon, c'est la pince qui tranche. La balle fait
+# 66 mm de diametre, le ventre du petit robot 41 mm de large ; le rouleau reste
+# le plus exigeant, il se prend par sa moitie et pas par son quart.
+TOL_XY_PRISE = {'balle': 6.0, 'robot': 4.0, 'scotch': 3.0}
+TOL_XY_PRISE_DEFAUT = 2.5
+
+
+def descente_verticale(ctx, p_cible, R, correction, tol_xy=None):
+    """UNE descente, d'un trait, en se recalant sans jamais s'arreter.
+
+    L'ancienne version descendait, mesurait en bas, REMONTAIT a Z_SURVOL et
+    redescendait — jusqu'a trois fois. C'est ce va-et-vient qu'on voyait sur le
+    robot, et il coutait une descente entiere par objet parce que le biais
+    repartait de zero a chaque cible.
+
+    Ce qui l'a remplace : la descente est verticale, donc l'ecart XY lu en cours
+    de route EST la derive laterale, sans retard — le retard de l'enchainement
+    ne porte que sur Z. `descend_par_paliers` la corrige palier par palier, et
+    on arrive en bas deja recale.
+
+    Et on saisit. Un ecart residuel n'annule plus la prise : la pince a de la
+    largeur, l'objet a un volume, et c'est la PINCE qui dit si c'est pris. Si
+    elle se referme sur du vide, l'ecart mesure ici est deja dans
+    `ctx.biais_descente` — l'essai suivant part de la, apres avoir ecarte le
+    bras pour revoir l'objet.
+
+    Rend (pose mesuree, descente MENEE A BIEN). Le second terme ne juge pas la
+    precision : il ne vaut False que si un palier a ete refuse, c'est-a-dire si
+    le bras n'est pas descendu.
+    """
+    if tol_xy is None:
+        tol_xy = TOL_XY_PRISE.get(ctx.classe_objet, TOL_XY_PRISE_DEFAUT)
+    q_mesure = descend_par_paliers(ctx, p_cible, R, correction, nom='descente')
+    if q_mesure is None:
+        return None, False
+    ecart_xy = float(np.linalg.norm(p_cible[:2] - pointe(q_mesure)[:2]))
+    ctx.resultats['descente XY'] = f'{ecart_xy:.2f} mm'
+    ctx.note(f'  descente d un trait : ecart XY {ecart_xy:.2f} mm '
+             f'(tolere {tol_xy:.1f}) — on saisit')
+    if ecart_xy < tol_xy:
+        # Ce qui a marche sert de point de depart au prochain objet : la derive
+        # decrit le bras, pas la cible.
+        ctx.biais_appris = ctx.biais_descente.copy()
+    return q_mesure, True
 
 
 def va_vers_par_etapes(ctx, q_cible, nom='', vitesse=VITESSE, stabilise=True):
@@ -974,7 +1666,8 @@ def va_vers_par_etapes(ctx, q_cible, nom='', vitesse=VITESSE, stabilise=True):
     for i in range(1, etapes + 1):
         q = va_vers(ctx, q0 + (q_cible - q0) * (i / etapes), vitesse=vitesse,
                     nom=nom if etapes == 1 else f'{nom} etape {i}/{etapes}',
-                    stabilise=stabilise and i == etapes)
+                    stabilise=stabilise and i == etapes,
+                    enchaine=i < etapes)
         if q is None:
             return None
     return q
@@ -996,11 +1689,13 @@ def monte_par_paliers(ctx, R, hauteurs=(50.0, 110.0, Z_TRANSFERT)):
         if np.linalg.norm(p + Rq @ TOOL - cible) > 2.0:
             ctx.note(f'  palier Z={z:.0f} sans solution proche, arret de la montee')
             break
-        suivant = va_vers(ctx, q_cible, nom=f'palier Z={z:.0f}')
+        dernier = z == hauteurs[-1]
+        suivant = va_vers(ctx, q_cible, nom=f'palier Z={z:.0f}',
+                          stabilise=dernier, enchaine=not dernier)
         if suivant is None:
             break
         q = suivant
-        if ctx.pont.statut_pince() != 2:
+        if not porte_objet(ctx):
             return q, False
     return q, True
 
@@ -1093,7 +1788,7 @@ def cible_a_bouge(ctx, patience=0.5):
              f'({ctx.balle_xy[0]:.0f},{ctx.balle_xy[1]:.0f}) -> ({xy[0]:.0f},{xy[1]:.0f})')
     ctx.balle_xy, ctx.source_cible = xy, ctx.source_balle
     ctx.repart_a_zero()
-    ctx.resultats['balle'] = f'({xy[0]:.1f}, {xy[1]:.1f}) mm — suivie'
+    ctx.resultats['cible'] = f'{ctx.classe_objet or "objet"} ({xy[0]:.1f}, {xy[1]:.1f}) mm — suivie'
     return True
 
 
@@ -1107,6 +1802,66 @@ def dessus(ctx, **kw):
         return ctx.detecteur(exige_dessus=True, **kw)
     except TypeError:
         return ctx.detecteur(**kw)
+
+
+# Garde visee par le relevage. Viser JUSTE au-dessus de GARDE_MIN ne suffit
+# pas : le controle de chemin de `va_vers` prend pour seuil `depart - 2 mm`,
+# donc un depart a 22 mm refuse encore tout trajet qui effleure 19,7 — mesure du
+# 25/08, a 0,3 mm pres. On degage franchement, une fois.
+GARDE_DEGAGEE = 60.0
+
+
+def degage_du_sol(ctx):
+    """Relever le bras s'il est en appui, par un chemin qui ne descend jamais.
+
+    Une pose dont la garde est deja negative bloque TOUT : depuis le contact,
+    n'importe quel trajet interpole creuse encore, donc `va_vers` refuse, donc
+    la machine boucle sur ECHEC sans que rien ne la releve. Constate le 25/08 :
+    le bras avait fini une manoeuvre pointe a -4,6 mm, et trois lancements de
+    suite se sont arretes sur « creux a -13.9 mm sous le seuil -6.6 ».
+
+    On cherche le plus petit relevage sur J2 puis J3 dont le chemin ENTIER reste
+    au-dessus du depart — un mouvement qui ne fait que monter ne peut pas
+    aggraver un appui.
+    """
+    depart = garde_au_sol(ctx.pont.angles())
+    if depart >= GARDE_MIN:
+        return True
+    # En PLUSIEURS passes : depuis un appui franc, aucun relevage d'un seul
+    # tenant n'atteint la garde visee — mesure du 25/08, J2 +20 deg ne monte que
+    # de -4,6 a 30,1 mm. Chaque passe repart d'une pose plus haute, donc d'un
+    # seuil de chemin plus permissif.
+    for _ in range(4):
+        q0 = ctx.pont.angles()
+        courante = garde_au_sol(q0)
+        if courante >= GARDE_DEGAGEE:
+            return True
+        meilleure = None
+        for j in (1, 2):
+            for delta in np.arange(2.0, 30.5, 2.0):
+                q = q0.copy()
+                q[j] += delta
+                arrivee = garde_au_sol(q)
+                if arrivee <= courante:
+                    continue
+                creux = min(garde_au_sol(q0 * (1 - t) + q * t)
+                            for t in np.linspace(0, 1, 61))
+                if creux < min(GARDE_MIN, courante - 2.0, arrivee - 2.0):
+                    continue
+                if meilleure is None or arrivee > meilleure[2]:
+                    meilleure = (j, delta, arrivee, q)
+        if meilleure is None:
+            break
+        j, delta, arrivee, q = meilleure
+        ctx.note(f'bras en appui (garde {courante:.1f} mm) — relevage J{j + 1} '
+                 f'de {delta:+.0f} deg vers {arrivee:.1f} mm')
+        if va_vers(ctx, q, nom='RELEVAGE') is None:
+            break
+    if garde_au_sol(ctx.pont.angles()) >= GARDE_MIN:
+        return True
+    ctx.note(f'bras en appui (garde {depart:.1f} mm) et AUCUN relevage possible '
+             f'sur J2 ni J3 — intervenir a la main')
+    return False
 
 
 def _degagement(ctx):
@@ -1127,7 +1882,27 @@ def _degagement(ctx):
     # L'objet en cours peut avoir disparu (deja depose, ou pousse) : sans cet
     # oubli, le bras balaye indefiniment a la recherche d'une balle qui est deja
     # dans le carton, alors que deux scotchs et un robot attendent.
-    ctx.classe_objet = ''
+    #
+    # Mais JAMAIS quand la pince tient encore quelque chose. La destination se
+    # decide sur ce qui est DANS la pince ; oublier la classe ici la faisait
+    # recalculer depuis un objet reste sur la planche, et le 26/08 les deux
+    # rouleaux sont partis dans le GRAND carton sous les noms « balle » puis
+    # « robot ». Le statut de la pince prime sur le drapeau : `porte_objet` a
+    # rendu un faux negatif a la remontee, `en_main` avait donc deja ete efface
+    # alors que le rouleau etait bel et bien tenu — la suite du journal le dit
+    # elle-meme (« la pince tient l objet, on va le deposer »).
+    if ctx.garde_cible:
+        # Degagement de REPRISE : on s'ecarte pour revoir le meme objet, pas
+        # pour en choisir un autre. Sans ca la classe serait oubliee et la
+        # machine repartirait sur la cible la plus proche, en perdant le
+        # compteur d'essais qui fait descendre d'un cran.
+        ctx.garde_cible = False
+    elif ctx.en_main or porte_objet(ctx):
+        ctx.en_main = ctx.en_main or ctx.classe_objet
+    else:
+        ctx.classe_objet = ''
+    # Avant tout : si le bras est reste en appui, aucun mouvement ne passera.
+    degage_du_sol(ctx)
     if ctx.detecteur is not None and dessus(ctx, patience=0.5) is not None:
         ctx.resultats['degagement'] = 'inutile — objet deja visible de dessus'
         return 'DETECTION'
@@ -1157,13 +1932,48 @@ def _degagement(ctx):
             return 'DETECTION'
         ctx.note(f'  balle invisible de dessus depuis J1={j1:+.0f}, on ecarte davantage')
     ctx.resultats['degagement'] = 'invisible depuis toutes les poses'
-    ctx.note('balle invisible depuis toutes les poses de degagement')
+    # Et on l'OUBLIE, sans quoi ATTENTE le rechoisit et le meme degagement
+    # recommence a l'identique : le 26/08 la boucle a tourne indefiniment,
+    # 21,6 s par tour, sur une cible que plus aucune pose ne voyait, pendant que
+    # trois autres objets attendaient sur la planche.
+    if ctx.balle_xy is not None and not ctx.en_main:
+        ctx.oublie(ctx.balle_xy)
+        ctx.note(f'{ctx.classe_objet or "objet"} invisible depuis toutes les poses '
+                 f'— oublie, on passe au suivant')
+        ctx.classe_objet, ctx.balle_xy = '', None
+    else:
+        ctx.note('objet invisible depuis toutes les poses de degagement')
     return 'ATTENTE'
 
 
-def _detecte(ctx):
+def ouvre_pince(ctx, patience=3.0, force=False):
+    """Ouvrir la pince, et ne rien attendre si elle l'est deja.
+
+    Mesure du 26/08 : un ordre a la pince met 2,16 s a rendre un statut decide,
+    et cette duree ne depend pas de l'angle demande — la ouvrir alors qu'elle
+    est deja ouverte coute donc 2,16 s pour rien, une fois par cycle. La lecture
+    de l'angle, elle, coute 24 ms.
+
+    `force` sert au LARGAGE, et n'est pas une precaution de principe : la pince
+    Pro cale sur l'objet a un angle qui n'est pas celui commande (52 mesure pour
+    une consigne de 20). Un objet assez large la laisse donc au-dessus du seuil
+    d'ouverture tout en etant fermement tenu, et se fier a l'angle reviendrait a
+    ne jamais le relacher.
+    """
+    if not force and ctx.pont.angle_pince() >= PINCE_OUVERTE_MIN:
+        ctx.pince_fermee = False
+        return
+    ctx.pince_fermee = False
     ctx.pont.envoie('pro_gripper_open')
-    time.sleep(2.0)
+    debut = time.time()
+    while time.time() - debut < patience:
+        time.sleep(0.1)
+        if ctx.pont.statut_pince() in (1, 2, 3):
+            return
+
+
+def _detecte(ctx):
+    ouvre_pince(ctx)
     # Le bras vient de se degager : c'est le meilleur moment pour localiser le
     # carton, sans occlusion. Mais on n'en fait PAS une condition de depart :
     # attendre de le voir bloquait tout le cycle (journal du 24/08, la balle
@@ -1175,13 +1985,20 @@ def _detecte(ctx):
                  'la recherche se fera objet en main')
     vu = ctx.detecteur() if ctx.detecteur else None
     if vu is None:
-        ctx.resultats['balle'] = 'non detectee'
+        ctx.resultats['cible'] = 'aucune'
         ctx.note('balle non detectee')
         return 'ATTENTE'
     xy = np.asarray(vu[:2], float)
     portee = float(np.hypot(*xy))
-    ctx.resultats['balle'] = f'({xy[0]:.1f}, {xy[1]:.1f}) mm'
-    ctx.resultats['portee balle'] = f'{portee:.1f} mm'
+    ctx.resultats['cible'] = f'{ctx.classe_objet or "objet"} ({xy[0]:.1f}, {xy[1]:.1f}) mm'
+    ctx.resultats['portee cible'] = f'{portee:.1f} mm'
+    if portee < PORTEE_MIN:
+        ctx.resultats['verdict'] = f'TROP PRES (< {PORTEE_MIN:.0f} mm) — le bras se replie sur lui-meme'
+        ctx.note(f'cible a {portee:.0f} mm, sous le plancher de {PORTEE_MIN:.0f} mm '
+                 f'— la pince vient buter contre le bras')
+        ctx.oublie(ctx.balle_xy)
+        ctx.classe_objet, ctx.balle_xy = '', None
+        return 'ECHEC'
     if portee > PORTEE_MAX:
         ctx.resultats['verdict'] = f'HORS ENVELOPPE (> {PORTEE_MAX:.0f} mm)'
         ctx.note(f'balle a {portee:.0f} mm — hors enveloppe, cible refusee')
@@ -1195,7 +2012,7 @@ def _detecte(ctx):
     ctx.inclinaison_balle, ctx.z_prise = inclinaison, z_prise
     ctx.source_cible = ctx.source_balle
     ctx.repart_a_zero()
-    ctx.resultats['roulis balle'] = f'{roulis:+.0f} deg'
+    ctx.resultats['roulis cible'] = f'{roulis:+.0f} deg'
     ctx.resultats['inclinaison outil'] = (
         'verticale' if inclinaison == 0.0
         else f'{inclinaison:+.0f} deg — prise a Z={z_prise:.0f}')
@@ -1233,8 +2050,9 @@ def _descente(ctx):
     baisse = PAS_DESCENTE_ESSAI * ctx.essais.get('SAISIE', 0)
     if baisse:
         ctx.note(f'essai precedent a vide — on descend {baisse:.0f} mm plus bas')
+    plancher = Z_PRISE_MIN if ctx.z_valide is None else max(Z_PRISE_MIN, ctx.z_valide)
     cible = np.array([ctx.balle_xy[0], ctx.balle_xy[1],
-                      max(Z_PRISE, ctx.z_prise - baisse)])
+                      max(plancher, ctx.z_prise + BIAIS_Z_PRISE - baisse)])
     q, ok = descente_verticale(ctx, cible, ctx.R_balle, ctx.correction)
     if q is not None:
         ctx.resultats['descente'] = f'{np.linalg.norm(pointe(q)[:2] - cible[:2]):.2f} mm'
@@ -1258,8 +2076,20 @@ def _descente(ctx):
 # lachage pendant la remontee ne vient pas d'un manque de serrage mais de
 # l'endroit ou la pince se refermait — sur un membre, et trop bas. Cela se
 # corrige par le point de prise et sa hauteur, pas par la force.
-COUPLE_PINCE = {}
+# Le ROULEAU se serre plus fort. Mesure du 27/08 sur le rouleau bleu a 218 mm :
+# la prise reussit — statut 2, angle 24, exactement la signature « rouleau tenu
+# de pres » — puis l'objet GLISSE pendant la remontee. Les six decalages
+# lateraux essayes ensuite (16 et 22 mm dans les quatre directions) echouent
+# tous : le probleme n'est donc pas de viser a cote, c'est que la pince ne
+# retient pas ce qu'elle a deja. Le couple est le seul levier — viser un angle
+# plus bas ne serre pas davantage, la pince cale sur l'objet.
+#
+# Le PETIT ROBOT reste au defaut, deliberement : piece imprimee en 3D a maillons
+# fins, montee a 250 le 25/08 puis redescendue le meme jour. Son lachage a lui ne
+# vient pas du serrage mais de l'endroit ou la pince se referme.
+COUPLE_PINCE = {'scotch': 250}
 COUPLE_PINCE_DEFAUT = 150
+ATTENTE_PINCE_MAX = 2.4   # s — au-dela, la pince a un probleme, pas un objet dur
 
 
 def _saisie(ctx):
@@ -1269,25 +2099,65 @@ def _saisie(ctx):
         ctx.couple_pince = couple
         time.sleep(0.3)
     ctx.pont.envoie('pro_gripper_angle', angle=20)
+    ctx.pince_fermee = True
     # On attend un statut DECIDE plutot qu'une duree forfaitaire : la pince
     # annonce 0 (« en mouvement ») tant qu'elle serre, et 1/2/3 des qu'elle a
     # conclu. Attendre 2,2 s a tous les coups, c'est attendre le pire cas.
+    # On interroge SOUVENT plutot que par tranches de 0,4 s : un aller-retour TCP
+    # coute 30 ms, et la pince conclut entre 0,6 et 1,6 s selon l'objet. Attendre
+    # par quarts de seconde, c'est ajouter jusqu'a 0,4 s d'immobilite a chaque
+    # prise pour rien — quatre objets, quatre fois.
     statut = 0
-    for _ in range(6):
-        time.sleep(0.4)
+    limite = time.time() + ATTENTE_PINCE_MAX
+    while time.time() < limite:
+        time.sleep(0.12)
         statut = ctx.pont.statut_pince()
         if statut in (1, 2, 3):
             break
-    angle = ctx.pont.envoie('get_pro_gripper_angle').split(':')[-1].strip()
+    angle = ctx.pont.angle_pince()
     ctx.resultats['pince'] = f'{ETAT_PINCE.get(statut, "?")} (angle {angle})'
-    if statut == 2:
+    cle = cle_roulis('balle', ctx.balle_xy)
+    couple_pose = ctx.prise_apprise.get(cle)
+    # LE STATUT SEUL NE SUFFIT PAS DANS CE SENS-LA NON PLUS. Mesure du 28/08 sur
+    # la figurine imprimee, roulis 0 : statut 2 — « objet saisi » — avec un angle
+    # de 22, soit deux degres au-dessus de la pince vide, et la figurine POUSSEE
+    # de 18,3 mm. Rien n'etait tenu. Passer en REMONTEE sur ce statut fait perdre
+    # le cycle ET empeche d'inscrire le roulis rate : la machine rejoue
+    # indefiniment l'angle qui pousse l'objet au lieu de le prendre.
+    vide = 0 <= angle < ANGLE_PINCE_FERMEE + MARGE_ANGLE_TENUE
+    if statut == 2 and not vide:
+        ctx.en_main = ctx.classe_objet
+        ctx.prises_ratees.pop(cle, None)
         return 'REMONTEE'
+    if statut == 2:
+        ctx.note(f'  statut « saisi » DEMENTI par l angle {angle} — pince vide')
+    if couple_pose is not None:
+        rates = ctx.prises_ratees.setdefault(cle, [])
+        if couple_pose not in rates:
+            rates.append(couple_pose)
+        ctx.prise_apprise.pop(cle, None)
+        ctx.note(f'  inclinaison {couple_pose[0]:+.0f} roulis {couple_pose[1]:+.0f} '
+                 f'a ferme a vide — on changera d angle au prochain essai')
     n = ctx.essai('SAISIE')
     if n < ESSAIS_MAX:
+        ctx.pince_fermee = False
         ctx.pont.envoie('pro_gripper_open')
         time.sleep(2.0)
-        ctx.note(f'rien saisi, essai {n + 1}/{ESSAIS_MAX} — on remonte et on recale')
-        return 'RECALAGE'
+        # On ECARTE le bras avant de reessayer, au lieu de recaler sur place.
+        # Doigts au-dessus de l'objet, le bras le cache a l'arducam : le journal
+        # du 26/08 affiche « [scotch non vu] » avant chaque reprise, et la
+        # descente suivante repart donc sur la MEME position memorisee — trois
+        # essais identiques donnent trois echecs identiques. Reculer coute
+        # quelques secondes et rend une position FRAICHE, mesuree sur l'objet
+        # tel qu'il est maintenant, y compris s'il a ete pousse par l'essai rate.
+        ctx.garde_cible = True
+        ctx.note(f'rien saisi, essai {n + 1}/{ESSAIS_MAX} — on ecarte le bras '
+                 f'pour revoir l objet, puis on recommence')
+        return 'DEGAGEMENT'
+    ctx.oublie(ctx.balle_xy)
+    ctx.note(f'{ESSAIS_MAX} saisies a vide — objet mis de cote, on passe au suivant')
+    ctx.pince_fermee = False
+    ctx.pont.envoie('pro_gripper_open')
     return 'RETRAIT'
 
 
@@ -1300,7 +2170,24 @@ def _remontee(ctx):
         # main, on le cherche a nouveau — c'est la seule facon d'etre adaptatif.
         ctx.R_carton = None
         return 'RECHERCHE_CARTON'
-    ctx.note('objet lache pendant la remontee — on refait la saisie')
+    ctx.en_main = ''
+    # ON ROUVRE LA PINCE. Sans ca la machine se contredit elle-meme d'une
+    # seconde a l'autre : la remontee conclut « objet lache », puis la garde de
+    # `pas()` relit la pince, la trouve « pleine », interdit le ramassage et
+    # renvoie deposer — journal du 27/08, deux lignes de suite :
+    #
+    #     objet lache pendant la remontee — on refait la saisie
+    #     DEGAGEMENT interdit — la pince tient l objet, on va le deposer
+    #
+    # Le bras est alors parti larguer du VIDE au-dessus du carton, et
+    # l'inventaire a coche la balle qui n'avait jamais quitte la planche. La
+    # cause est physique : quand l'objet glisse des doigts, la pince adaptative
+    # RESTE a l'angle ou elle s'etait fermee, et son statut bat entre deux
+    # valeurs. Rouvrir remet l'angle a 100 et le statut a plat : les deux
+    # temoins disent alors la meme chose, et c'est la verite.
+    ctx.pince_fermee = False
+    ctx.pont.envoie('pro_gripper_open')
+    ctx.note('objet lache pendant la remontee — pince rouverte, on refait la saisie')
     return 'DEGAGEMENT'
 
 
@@ -1321,6 +2208,13 @@ def _recherche_carton(ctx):
         return 'TRANSFERT'
     if etat == 'hors atteinte':
         return 'ECHEC_PORTANT'
+    # Le BALAYAGE d'abord, la memoire seulement en dernier recours. L'ordre
+    # inverse a ete essaye le 26/08 — aller droit a la position connue au lieu
+    # de promener le bras — et REVERSE : la memoire peut etre fausse, et l'etre
+    # durablement. Constate le meme jour, `carton_position.json` portait
+    # « grand » a (428, -97), du cote du PETIT, a 320 mm du vrai grand ; la
+    # balle est allee s'y poser, sur la planche entre les deux boites. Regarder
+    # coute quelques secondes, croire une memoire fausse coute un objet a terre.
     if ctx.essai('RECHERCHE_CARTON') <= ESSAIS_CARTON:
         for j1 in BALAYAGE_J1:
             pose = POSE_OBSERVATION.copy()
@@ -1345,6 +2239,7 @@ def _recherche_carton(ctx):
                      f'({cible[0]:.0f}, {cible[1]:.0f})')
             ctx.resultats['carton'] = f'({cible[0]:.1f}, {cible[1]:.1f}) mm — memoire'
             return 'TRANSFERT'
+
     return 'ECHEC_PORTANT'
 
 
@@ -1391,6 +2286,7 @@ def _echec(ctx):
 
 def _transfert(ctx):
     if not porte_objet(ctx):
+        ctx.en_main = ''
         ctx.note('prise perdue avant le transfert — on refait la saisie')
         return 'DEGAGEMENT'
     if ctx.carton_xy is None:
@@ -1406,7 +2302,11 @@ def _transfert(ctx):
     # (364, 161). Un point de largage qui a derive de plus d'un carton n'est plus
     # le bon : on refait la recherche plutot que de lacher dans le vide.
     if ctx.detecteur_carton is not None:
-        vu = ctx.detecteur_carton(patience=0.6)
+        # patience NULLE : le carton est deja suivi en continu par le fil camera,
+        # sa position est donc disponible tout de suite. Attendre de nouvelles
+        # images ici, c'est attendre apres avoir vu — une fois le carton detecte,
+        # on depose.
+        vu = ctx.detecteur_carton(patience=0.0)
         if vu is not None:
             derive = float(np.linalg.norm(np.asarray(vu[0], float) - ctx.carton_xy))
             if derive > DERIVE_CARTON_MAX:
@@ -1442,16 +2342,54 @@ def _largage(ctx):
     """
     if ctx.R_carton is None:              # l'operateur a redefini la cible en route
         return 'RECHERCHE_CARTON'
-    cible = resout_ik(np.array([ctx.carton_xy[0], ctx.carton_xy[1], z_largage(ctx)]),
+    cible = resout_ik(np.array([ctx.carton_xy[0], ctx.carton_xy[1],
+                                z_largage_commande(ctx, ctx.carton_xy)]),
                       ctx.R_carton)
     if cible is None or va_vers(ctx, cible[0], nom='largage', stabilise=False) is None:
         ctx.note('descente de largage refusee — objet garde en main')
         return 'ECHEC_PORTANT'
     tp = pointe(ctx.pont.angles())
-    ctx.pont.envoie('pro_gripper_open')
-    time.sleep(2.5)
+    # ON N'OUVRE QUE SI ON EST ARRIVE. `va_vers` rend la main quand le bras ne
+    # bouge plus, ce qui n'est pas la meme chose qu'etre a la cible : un ordre
+    # accepte puis borne par les butees immobilise le bras en chemin. Le 26/08 la
+    # pince s'est ouverte a 256 mm du carton vise et l'objet est tombe sur la
+    # planche. Un objet garde en main se redepose ; un objet lache a cote se
+    # ramasse a la main.
+    ecart = float(np.linalg.norm(np.asarray(tp[:2]) - np.asarray(ctx.carton_xy, float)))
+    if ecart > ECART_LARGAGE_MAX:
+        ctx.note(f'largage ANNULE — pointe a {ecart:.0f} mm du point vise '
+                 f'({tp[0]:.0f}, {tp[1]:.0f}) au lieu de '
+                 f'({ctx.carton_xy[0]:.0f}, {ctx.carton_xy[1]:.0f}) : objet garde en main')
+        ctx.largages_rates.append(np.asarray(ctx.carton_xy, float))
+        del ctx.largages_rates[:-6]
+        ctx.carton_resolu, ctx.R_carton = None, None
+        ctx.resultats['largage'] = f'ANNULE — {ecart:.0f} mm hors du carton'
+        return 'ECHEC_PORTANT'
+    ouvre_pince(ctx, force=True)
     ctx.resultats['largage'] = f'({tp[0]:.1f}, {tp[1]:.1f}) a Z={tp[2]:.1f}'
     ctx.echecs = 0
+    # On COCHE l'objet. Le test geometrique « est-il dans l'ouverture ? » ne
+    # tient que tant que le carton reste visible : le bras qui revient le masque,
+    # l'ouverture disparait, et la balle deja deposee redevient une cible — le
+    # cycle repartait la chercher au fond de la boite. Un largage reussi est un
+    # fait acquis, il ne se redetecte pas.
+    # On ne coche QUE ce qu'on a porte. `ctx.en_main` est la memoire de la
+    # machine : mise a la saisie confirmee, effacee des qu'une prise se perd.
+    # S'y fier plutot qu'a `ctx.classe_objet` empeche de cocher un objet reste
+    # sur la planche parce que la pince a menti (27/08, la balle cochee sans
+    # avoir jamais ete soulevee).
+    if ctx.classe_objet and ctx.en_main:
+        ctx.deposes[ctx.classe_objet] = ctx.deposes.get(ctx.classe_objet, 0) + 1
+    ctx.en_main = ''
+    # Et on retient l'ENDROIT du lacher. Le comptage par categorie ne suffit pas
+    # quand le meme objet a ete vu sous deux noms : le 26/08 la balle sortait a
+    # la fois de son detecteur et de la liste des objets, a 21 mm d'ecart. Le
+    # cycle cochait l'un des deux, l'autre restait « a faire », et le bras
+    # repartait le chercher AU FOND DU CARTON ou il se refermait sur du vide.
+    # Un point ou l'on vient de lacher quelque chose n'est plus une cible,
+    # quel que soit le nom qu'on donne a ce qu'on y voit.
+    ctx.largages.append(np.asarray(tp[:2], float))
+    del ctx.largages[:-12]
     return 'RETRAIT'
 
 
@@ -1462,8 +2400,17 @@ def _retrait(ctx):
     if R is not None:
         haut = resout_ik(np.array([tp[0], tp[1], 175.0]), R)
         if haut is not None:
-            va_vers(ctx, haut[0], nom='remontee de retrait', stabilise=False)
+            va_vers(ctx, haut[0], nom='remontee de retrait', stabilise=False,
+                    enchaine=True)
     va_vers_par_etapes(ctx, POSE_OBSERVATION, nom='retour observation', stabilise=False)
+    # L'objet vient d'etre depose : la cible SUIVIE n'existe plus. Sans cet
+    # effacement, le suivi la garde — il rend la derniere position connue des
+    # que plus aucun exemplaire n'est vu pres d'elle — et le cycle suivant
+    # repart vers l'endroit VIDE d'ou l'objet a ete enleve, y redescend et s'y
+    # referme sur rien. C'est le defaut que l'utilisateur signale depuis une
+    # semaine. Un nouveau cycle rechoisit toujours de zero.
+    ctx.classe_objet, ctx.balle_xy = '', None
+    ctx.repart_a_zero()
     return 'DEGAGEMENT' if ctx.mode_auto else 'ATTENTE'
 
 
@@ -1512,6 +2459,8 @@ class MachineEtats:
         self.ctx.note(f'--- {self.etat} ---')
         if not self.ctx.debut_cycle:          # remis a zero par le RETRAIT precedent
             self.ctx.debut_cycle = time.time()
+        self.ctx.resultats['cycle en cours'] = (
+            f'{time.time() - self.ctx.debut_cycle:.0f} s')
         depart = time.time()
         try:
             suivant = ACTIONS[self.etat](self.ctx)
@@ -1526,6 +2475,8 @@ class MachineEtats:
                                           + time.time() - depart)
         self.ctx.note(f'    {self.etat} : {time.time() - depart:.1f} s')
         if self.etat == 'RETRAIT' and self.ctx.debut_cycle:
+            self.ctx.dernier_cycle = time.time() - self.ctx.debut_cycle
+            self.ctx.resultats['dernier cycle'] = f'{self.ctx.dernier_cycle:.0f} s'
             self.ctx.resultats['cycle'] = resume_chrono(self.ctx)
             self.ctx.note(f'CYCLE COMPLET : {self.ctx.resultats["cycle"]}')
             self.ctx.chrono, self.ctx.debut_cycle = {}, 0.0
