@@ -1,5 +1,401 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (28 août 2026 — après-midi)
+
+### Ce qui a été accompli aujourd'hui
+
+**Cycle de tri complet validé bout à bout, deux fois.** Rouleau → petit carton
+en 56 s, sans un seul échec ; figurine → grand carton en 73 s, avec un
+rattrapage automatique en cours de route. Les trois correctifs du matin ont
+tenu en conditions réelles.
+
+**La figurine ne se prend qu'à certains roulis.** Balayage réel, couple par
+défaut (jamais 250 sur une pièce imprimée) :
+
+| roulis | angle de calage | issue |
+|---|---|---|
+| 0 | 22 (pince vide = 20) | rien saisi, figurine poussée de 18,3 mm |
+| **+30** | **46-47** | **tenue** |
+
+Le même +30 avait déjà été le seul à saisir le rouleau bleu à 389 mm. Deux
+objets de formes très différentes, même réponse : le roulis 0 est mauvais, et
+la géométrie seule ne le dit pas.
+
+**Le cycle s'est rattrapé seul** : première saisie perdue à la remontée, pince
+rouverte, dégagement, nouvelle position mesurée, seconde saisie à l'angle 47,
+dépôt à 6,6 mm du point visé dans le grand carton — lequel, invisible depuis
+l'observation, a été retrouvé objet en main (`vu depuis J1 = -28 deg`).
+
+**Défaut trouvé et corrigé** : la pince rend *statut 2* — « objet saisi » — sur
+une prise vide. Voir CHANGELOG.
+
+**Mesures d'image sur la figurine** (aucune n'a débouché sur un correctif, mais
+elles cadrent le problème) : silhouette 135 × 91 mm membres écartés ; largeur
+locale minimale au point de prise **61,3 mm**, dans la direction 60° ;
+sensibilité à `HAUTEUR_OBJET` de 0,36 mm par mm d'erreur de hauteur ; et surtout
+**~2 mm par pixel** à 260 mm de portée — la figurine ne fait que 68 × 52 px,
+l'érosion ne sépare pas ses jambes du torse à cette échelle.
+
+### Décisions prises
+
+- Ne rien coller sur la figurine (ni cible imprimée ni ArUco) tant que le
+  balayage de roulis suffit à la saisir.
+- Le couple de la pince reste au **défaut** pour la figurine : c'est une pièce
+  imprimée à membres fins.
+
+### Prochaines actions
+
+1. [ROUGE] **Plafonner |J5|.** L'opérateur a signalé un risque de contact entre
+   J4 et la pince. Au point de la figurine, roulis +90 demande **J5 = −121°** et
+   +120 **−160°** ; les capsules annoncent pourtant 26-30 mm de marge, la paire
+   `avant_bras/pince` étant désactivée. Mesuré : un plafond **|J5| ≤ 90°** ne
+   refuse **aucune** des 120 poses de travail (max observé 83°). Le garde-fou
+   n'est **pas** implémenté — le balayage incluant les inclinaisons a été
+   interrompu, il faut le finir avant de figer le seuil.
+2. [ROUGE] Cycle complet à **4 objets et 2 cartons** — les deux cycles validés
+   n'avaient qu'un objet chacun.
+3. [JAUNE] Mesurer la pince Pro ouverte (largeur et longueur) pour activer
+   `avant_bras/pince` et retirer `PORTEE_MIN`.
+4. [VERT] Recoller les marqueurs 10 et 11 : le grand carton reste invisible
+   depuis l'observation miroir.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/Osama_ws/src/mycobot_R6A
+/usr/bin/python3 scripts/pick_dashboard.py
+```
+
+## État actuel (28 août 2026 — soir, simulation)
+
+### Ce qui a été accompli
+
+**La simulation de tri ne saisissait rien — et ne bougeait même pas.** Vérifié :
+`No controllers are currently loaded!`, `/joint_states` à zéro, aucun abonné sur
+les topics `cmd_pos`. La machine à états allait quand même jusqu'à « Sorting
+complete » : elle est en boucle ouverte et **téléportait** les cubes via
+`gz set_pose`. Le commit d'origine du 23/04 le disait déjà (*« emulates
+grasp/release via the set_pose service »*) et l'historique git confirme qu'il
+n'a **jamais** existé de version qui saisissait physiquement.
+
+**Cause trouvée** : le plugin `gz-sim-joint-position-controller-system` a
+disparu de l'URDF de cette copie du dépôt. Il est présent dans `~/ros_jazzy`,
+d'où le souvenir d'une démo qui marchait — le bras y bougeait vraiment, et les
+objets téléportés en même temps rendaient l'illusion complète. **Plugin
+restauré.**
+
+**Mesures faites sur la pince simulée** (elles resserviront) :
+
+| | Écartement des doigts |
+|---|---:|
+| ouverte `[0,0,0,0]` | 136,0 mm |
+| `[±0.7]` (ancienne butée) | 66,9 mm — trop large pour un cube de 40 mm |
+| `[±1.10]` (nouvelle) | 17,9 mm |
+
+Déport bride → milieu des doigts : **105,5 mm**, relevé sur `/world/.../pose/info`.
+`diff_ik.fk_pose` et Gazebo donnent la **même bride au mm près** — l'IK du vrai
+bras est donc directement réutilisable en simulation.
+
+### Décisions prises
+
+- La démo de tri reste **une démo de planification**, téléportation assumée et
+  annoncée. Le travail vers une saisie physique est mis de côté dans le
+  scratchpad, pas committé.
+- Les gains du `mycobot_controller` restent à 100 : les monter empire le suivi.
+
+### Prochaines actions
+
+1. [ROUGE] **`gripper_controller` ne bouge jamais** en simulation, quelle que
+   soit la consigne, alors que ses trois voisines suivent. La pince ne se
+   referme que d'un côté. C'est le seul verrou avant une vraie préhension.
+2. [JAUNE] Reprendre le travail sauvegardé (`ros2_control` + `diff_ik` +
+   suppression de la téléportation) une fois ce joint réparé.
+3. [VERT] Vérifier que la démo restaurée tourne de bout en bout, bras en
+   mouvement — relancée mais non observée jusqu'au bout.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
+ros2 launch mycobot_gateway pick_and_place_sorting.launch.py
+```
+
+## État actuel (28 août 2026 — matin)
+
+### Ce qui a été accompli aujourd'hui
+
+Séance courte, entièrement **mesurée en TCP sur le bras**.
+
+**Le rouleau blanc n'a pas été perdu : il a été jeté.** Il était bel et bien
+saisi (statut 2, angle 26) ; c'est `porte_objet` qui a répondu « lâché » sur une
+lecture parasite, arrêté la remontée, puis ouvert la pince **en l'air**. Douze
+lectures tracées pendant une remontée en trois paliers montrent d'où ça vient :
+deux statuts « 6 » — la pince ne rend que 0 à 3 — et un angle « 65535 », le −1
+du registre lu en 16 bits non signés. Une seule de ces réponses suffisait.
+`porte_objet` relit maintenant jusqu'à trois fois, ignore un témoin illisible,
+et conclut « tenu » quand les deux le restent. Le garde-fou a d'ailleurs joué
+en direct pendant le dépôt du jour : « pince illisible trois fois — on considère
+l'objet TENU », et l'objet était tenu.
+
+**Le rouleau bleu à 389 mm se prend, mais pas avec n'importe quel roulis.** À
+cette allonge l'outil vertical et l'inclinaison −15 **ne résolvent pas du
+tout** ; seules −30 et −45 passent. À −30 les roulis 0, 30, 60 et 90 sont tous
+géométriquement valides — et le roulis 0 referme la pince à vide en **poussant**
+le rouleau de 6,4 mm, tandis que le roulis **+30** le saisit (statut 2, angle 26,
+écart XY 0,59 mm) et le tient jusqu'à Z=170. La géométrie ne sépare pas les deux.
+Le couple qui referme à vide est désormais mémorisé (`ctx.prises_ratees`) et
+passe en dernier au prochain essai — écarté, jamais supprimé.
+
+**Cycle complet rejoué en TCP** : rouleau repris à 283 mm (outil vertical,
+écart XY 2,01 mm, statut 2, angle 25) puis déposé dans le **petit carton**, bord
+proche à 382 mm, outil couché −30. Vérifié caméra : plus aucun rouleau sur la
+planche.
+
+**Seuil vertical/couché corrigé** : `INCLINAISONS_PAR_PORTEE` passe de 325 à
+**320 mm**, mesuré au balayage de `colonne_continue` (le vertical descend
+jusqu'à 320, refuse dès 324).
+
+### Décisions prises
+
+- Entre les deux erreurs possibles de `porte_objet`, on choisit **« tenu »** :
+  croire tenir ce qu'on ne tient pas coûte un cycle, croire avoir lâché ce qu'on
+  tient jette l'objet hors de la planche.
+- Un couple (inclinaison, roulis) raté est **écarté, pas supprimé** — sinon un
+  objet dont tous les couples ont échoué une fois devient insaisissable.
+
+### Prochaines actions
+
+1. [ROUGE] Rejouer un **cycle de tri complet** (4 objets, 2 cartons) avec les
+   trois correctifs du jour — aucun n'a encore été vu bout à bout par la FSM.
+2. [JAUNE] Mesurer la largeur/longueur réelles de la pince Pro ouverte, pour
+   activer la paire de capsules `avant_bras/pince` et retirer `PORTEE_MIN`.
+3. [VERT] Recoller les marqueurs 10 et 11 pour qu'ils restent lisibles des deux
+   côtés de la planche.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/Osama_ws/src/mycobot_R6A
+/usr/bin/python3 scripts/pick_dashboard.py
+```
+
+## État actuel (27 août 2026 — soir)
+
+### Ce qui a été accompli aujourd'hui
+
+Séance entièrement **mesurée sur le bras et les caméras**, pas raisonnée à vide.
+
+**La descente ne fait plus de va-et-vient.** Elle descendait, mesurait en bas,
+remontait à 110 mm et recommençait — jusqu'à trois fois — et le biais repartait
+de zéro à chaque objet, donc les quatre objets payaient chacun la passe perdue.
+Désormais : **une seule descente**, recalée en vol. La descente étant verticale,
+l'écart XY lu en route EST la dérive latérale, sans retard (le retard ne porte
+que sur Z). Puis on saisit : c'est la pince qui tranche, plus un seuil.
+
+**Le largage compense l'affaissement.** Mesuré : la pointe arrive 11,9 mm sous
+la consigne à 340 mm de portée et 25,3 mm à 470 — la garde de 25 mm au-dessus du
+rebord était mangée dès 410 mm et **nulle à 470**. Vérifié à un azimut autre que
+celui de la régression : 108,0 / 107,1 / 109,0 mm atteints pour 108 voulus.
+
+**L'anticollision par capsules est branchée**, rayons tirés des maillages du 320
+(colonne 58, bras 48, avant-bras 43, poignet 44, bride 29 mm). 120 poses de
+travail balayées : **0 refusée**, marge minimale +2,2 mm ; bras replié à 130 mm :
+−5,7 mm, refusé. Coût 0,22 ms, 17 points par trajet.
+
+**Trois défauts trouvés par le journal, pas par déduction :**
+
+1. *La balle cochée sans avoir été soulevée.* Deux lignes consécutives : « objet
+   lâché pendant la remontée » puis « la pince tient l'objet, on va le déposer ».
+   Le bras est parti larguer du vide. Cause physique : l'objet qui glisse laisse
+   les doigts à l'angle où ils s'étaient fermés et le statut bat. Corrigé en
+   **rouvrant la pince** à la perte, et en ne cochant que ce que `ctx.en_main`
+   confirme avoir été porté.
+2. *Une tache de 543 cm² nommée « petit carton » sur la balle.* Bornes d'aire
+   ajoutées (0,4 à 2,0 fois l'attendu), testées **après** le recentrage.
+3. *L'étiquette « petit » posée sur le bras à 210 mm.* La reconstruction par
+   marqueur ne peut plus placer une boîte loin de là où on la suivait.
+
+**Le rouleau : diagnostic complet.** La prise réussit (statut 2, angle 24) puis
+l'objet **glisse à la remontée**, et chaque essai raté le pousse — 65 mm de
+dérive en sept tentatives. Six décalages latéraux (16 et 22 mm, quatre
+directions) échouent ; le couple monté à 250 aussi. Ce n'est donc ni la visée ni
+la force : les doigts ne prenaient qu'un quart de rouleau, parce que le scotch
+visait le **centroïde de son anneau, c'est-à-dire le trou**. Il se prend
+désormais par le **milieu de sa bande** (`PRISE_PAR_EPAISSEUR`).
+
+**La reconnaissance des objets est vérifiée**, 40 images consécutives : rouleau
+bleu 40/40, rouleau blanc 40/40, balle 40/40, petit robot 39/40 — zéro
+hésitation. Correctement rejetés : le câble noir (44 × 101 mm, « pas sombre,
+trop élancé »), les cartons, et quatre taches sous le seuil d'aire.
+
+### Décisions prises
+
+- `PORTEE_MIN` **reste à 170 mm**. Les capsules croisent zéro à ~143 mm, ce qui
+  invitait à l'abaisser — mais l'incident du 26/08 s'est produit à **151 mm**, où
+  le modèle donne une marge POSITIVE de +4 mm. La paire qui l'aurait vu venir
+  (`avant_bras/pince`) est justement celle qu'il faut exclure faute de connaître
+  le volume réel de la pince. Le raisonnement est figé dans un test.
+- `Z_PRISE_MIN` passe de −18 à **−8**, la consigne nominale : les reprises ne
+  creusent plus, la prise nominale ne bouge pas.
+- Le couple monte pour le **rouleau seul** (250). Le petit robot reste au défaut.
+
+### Prochaines actions
+
+1. [ROUGE] Tri complet des 4 objets avec la prise par la bande du rouleau —
+   c'est le seul changement non encore validé sur un cycle entier.
+2. [JAUNE] Mesurer la largeur et la longueur réelles de la pince Pro, doigts
+   ouverts : c'est ce qui débloquerait la paire `avant_bras/pince` et permettrait
+   de supprimer `PORTEE_MIN` au profit du vrai modèle.
+3. [JAUNE] Recoller les marqueurs 10 et 11 : leur lisibilité dépend du côté de la
+   planche (mesuré : 40/40 puis 4/40 après échange des boîtes).
+4. [VERT] Le rejet du câble noir tient à l'élancement — un câble mieux éclairé
+   passerait pour un robot.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/Osama_ws/src/mycobot_R6A
+/usr/bin/python3 -m unittest discover -s tests -p 'test_*.py'
+setsid nohup /usr/bin/python3 scripts/pick_dashboard.py > /tmp/dash.log 2>&1 &
+tail -f /tmp/dash.log        # le journal sort maintenant du tableau de bord
+```
+
+## État actuel (27 août 2026 — après-midi)
+
+### Ce qui a été accompli aujourd'hui
+
+Séance de **mesure sur le vrai bras et les vraies caméras**, pas de conjecture.
+
+- **La panne du 26/08 reproduite puis éteinte.** Le bras placé au-dessus du
+  grand carton pour déposer le masque totalement : boîte vue **0 fois sur 40**
+  pendant deux fenêtres de ~4 s, bien au-delà de `PEREMPTION_CARTON`. C'est là
+  que le suivi la ré-adoptait ailleurs. Après correction : **0 déplacement**, le
+  centre tenu à (388,4 ; 156,7) et retrouvé à 2,5 mm une fois le bras dégagé.
+- **L'allonge n'était PAS la cause du largage raté.** Mesure d'arrivée à
+  l'azimut +27 : écart XY de 2,7 à 7,4 mm à **toutes** les portées de 340 à
+  470 mm. Le garde-fou d'arrivée à 45 mm ne se déclenchera donc pas à tort.
+- **Ce qui manquait, c'est la hauteur.** La pointe arrive 11,9 mm sous la
+  consigne à 340 mm et 25,3 mm à 470 : la garde de 25 mm au-dessus du rebord
+  était mangée dès 410 mm et **nulle à 470** (82,7 mm atteints pour un rebord à
+  82,9). Compensation linéaire ajoutée, vérifiée à un **autre azimut** que celui
+  de la régression : 108,0 / 107,1 / 109,0 mm pour 108 voulus.
+- **La vraie cause de « le petit se trompe ».** Son ouverture sombre a la
+  signature d'un rouleau : trouvée 38 fois sur 40, **volée par le filtre des
+  objets 33 fois**, nommée 5 fois sur 40. Une ouverture là où une boîte est déjà
+  suivie n'est plus jetée → **5/40 puis 75/80**, et 80/80 marqueur revenu, avec
+  0 déplacement fantôme.
+- **Une boîte pleine se place par son marqueur.** Écart marqueur → ouverture
+  appris boîte vide, exprimé dans le repère du marqueur donc valable même boîte
+  tournée. Gelé 5 s, il reconstruit à **6,5 mm médian (13 max)** pour le petit,
+  **10,3 (16,1)** pour le grand — contre 28 à 40 mm de marge intérieure au point
+  de largage.
+- **Suivi pendant que tu déplaces les boîtes** : re-ciblage mesuré en **0,1 à
+  0,9 s**, jamais d'inversion entre les deux, y compris quand tu les as
+  interverties côté pour côté.
+
+### Décisions prises
+
+- `PORTEE_CARTON_MAX` reste à 460 mm : la mesure d'arrivée montre que le bras y
+  va vraiment. C'est la HAUTEUR qui manquait, pas la portée.
+- Aucune position de carton n'est écrite sur disque, y compris la forme apprise
+  (`Vision._forme_carton` vit en mémoire vive).
+
+### Ce qui reste physique, pas logiciel
+
+- **Les marqueurs 10 et 11 se voient mal selon le côté.** Mesuré : id 10 à
+  **40/40** puis **4/40** après que les boîtes ont changé de côté, id 11 à
+  **0/40** puis **27/40**. Celui qui part du côté défavorable devient illisible.
+- Le contour du petit carton est un **C**, pas un rectangle — vu de biais au
+  bord de la planche, son aire se mesure 90 à 117 cm² au lieu de 80. Le point de
+  largage reste bon (28 mm de marge intérieure, croix vérifiée dans l'ouverture
+  en image), mais le critère de TAILLE ne peut plus nommer cette boîte : seuls
+  le marqueur et la continuité le peuvent.
+
+### Prochaines actions
+
+1. [ROUGE] Tri complet des 4 objets avec les cartons à leur place actuelle
+   (grand à 414 mm, petit à 436 mm), puis en les déplaçant entre deux cycles.
+2. [JAUNE] Recoller/agrandir les marqueurs 10 et 11 pour qu'ils restent lisibles
+   des deux côtés de la planche.
+3. [VERT] Rouleau à ~312-320 mm : reprises occasionnelles, non diagnostiquées.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/Osama_ws/src/mycobot_R6A
+/usr/bin/python3 -m unittest discover -s tests -p 'test_*.py'
+setsid nohup /usr/bin/python3 scripts/pick_dashboard.py >/dev/null 2>&1 &
+```
+
+## État actuel (26 août 2026 — soir)
+
+### Ce qui a été accompli aujourd'hui
+
+- **La pince ne s'ouvre plus si le bras n'est pas arrivé.** C'est le défaut qui
+  a mis le petit robot à côté du petit carton : la machine a commandé le largage
+  en (401, 204), à 450 mm, le bras s'est immobilisé en (373, −52) — **256 mm
+  avant** — et la pince s'est ouverte quand même. Rien ne vérifiait l'arrivée,
+  seulement que l'ordre avait été accepté : `va_vers` rend la main quand le bras
+  ne bouge **plus**, ce qui n'est pas la même chose qu'être à la cible (un ordre
+  borné par les butées immobilise le bras en chemin). Écart toléré
+  `ECART_LARGAGE_MAX = 45 mm` — au-delà du biais de modèle (18 mm mesuré à
+  370 mm de portée), très en deçà d'une ouverture de carton (88 à 112 mm de
+  côté). Au-delà, l'objet **reste en main** et le point de largage jamais atteint
+  est mémorisé pour ne plus être proposé.
+- **Un carton loin se vise par son bord proche, plus par son milieu.** Tous les
+  candidats gardent le même recul des parois, donc le bord proche dépose dedans
+  lui aussi. Au-delà de `PORTEE_LARGAGE_CONFORT = 400 mm`, les candidats sont
+  ordonnés du plus proche du robot au plus lointain : sur le carton du 26/08 le
+  premier point passe de 450 à 431 mm.
+- **Une boîte marquée ne se déplace plus sur une occlusion.** Le journal
+  annonçait « carton grand déplacé — point de largage à recalculer » quatre fois
+  d'affilée. Cause : le bras se place **au-dessus** du carton pour déposer, la
+  boîte sort de vue plus que `PEREMPTION_CARTON`, et la détection revient
+  remplie de l'ombre et du bras, décalée de 50 à 170 mm. Cette position
+  d'occlusion était ré-adoptée sans discuter — elle comptait un déplacement,
+  périmait le point de largage **en plein transfert**, et la machine repartait
+  chercher le carton. Désormais : la péremption ne relocalise plus une boîte
+  identifiée par son marqueur, et un saut marqué demande **deux images
+  concordantes** (~0,2 s à 10 im/s, immédiat à l'œil) au lieu d'une seule.
+- **« Marqué » veut dire *cette position vient du marqueur*,** et non « le
+  marqueur est visible quelque part ». Une position relayée par la SVPRO
+  (corrigée d'un décalage appris de 14 à 60 mm) n'a plus cette autorité.
+
+### Décisions prises
+
+- **L'arrivée se mesure, elle ne se suppose pas.** Un objet gardé en main se
+  redépose ; un objet lâché à côté se ramasse à la main.
+- `PORTEE_CARTON_MAX` reste à 460 mm : l'IK y résout réellement (table du
+  24/08), c'est l'**arrivée** qui ne suivait pas. Le contrôle d'arrivée découvre
+  la vraie limite point par point plutôt que de la deviner.
+- La position des cartons n'est toujours écrite nulle part (seul le roulis
+  appris l'est) — voir l'entrée du 26/08 matin.
+
+### Prochaines actions
+
+1. [ROUGE] Séance robot : déplacer les deux cartons **et leurs marqueurs**,
+   enchaîner plusieurs tris des 4 objets, vérifier qu'aucun « carton X déplacé »
+   fantôme n'apparaît et qu'aucun objet ne tombe hors d'une boîte.
+2. [JAUNE] Si un largage est annulé, relever la portée du carton : c'est la
+   mesure qui dira où s'arrête vraiment l'allonge en dépose (460 mm est une
+   limite d'IK, pas une limite mesurée).
+3. [VERT] Rouleau à ~312-320 mm : reprises occasionnelles, non diagnostiquées
+   (centrage XY ou biais de modèle croissant avec la portée).
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/Osama_ws/src/mycobot_R6A
+/usr/bin/python3 -m unittest discover -s tests -p 'test_*.py'
+setsid nohup /usr/bin/python3 scripts/pick_dashboard.py >/dev/null 2>&1 &
+```
+
 ## État actuel (25 août 2026 — matin)
 
 ### Ce qui a été accompli aujourd'hui

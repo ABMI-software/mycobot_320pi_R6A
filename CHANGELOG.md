@@ -9,6 +9,162 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé
+
+- **Le bras bouge à nouveau en simulation de tri.** Le plugin
+  `gz-sim-joint-position-controller-system` avait disparu de
+  `mycobot_pro_320_pi_gazebo.urdf` dans cette copie du dépôt — il est présent
+  dans `~/ros_jazzy`, où la démo fonctionnait. Sans lui, les topics
+  `/model/mycobot_320/joint/<j>/cmd_pos` n'ont **aucun abonné** : mesuré le
+  28/08, `ros2 control list_controllers` rend « No controllers are currently
+  loaded! » et `/joint_states` reste à zéro pendant tout le tri. La démo allait
+  pourtant jusqu'à « Sorting complete » parce qu'elle est en boucle ouverte —
+  seule la **téléportation** des cubes (`gz set_pose`) donnait l'illusion d'un
+  pick-and-place. Plugin restauré tel quel.
+
+### Ajouté
+
+- **Frottement sur les doigts de la pince simulée** (μ = 1,6 sur `gripper_left1`
+  et `gripper_right1`, plus `kp`/`kd`). Ils n'en avaient aucun de déclaré alors
+  que les cubes du monde de tri sont à μ = 1,0.
+- **Course de la pince simulée portée de 0,7 à 1,10 rad.** Mesuré dans Gazebo :
+  les doigts sont écartés de 136 mm au repos et encore de **67 mm** à 0,7 rad —
+  trop pour pincer un cube de 40 mm. La course vaut ~98,6 mm/rad ; à 1,10 rad
+  ils se referment à **17,9 mm**.
+
+### Notes
+
+- La saisie **physique** en simulation reste non fonctionnelle, et le blocage
+  est isolé : `gripper_controller` (servo gauche) ne bouge **jamais**, quelle
+  que soit la consigne, alors que ses trois voisines suivent — la pince ne se
+  referme que d'un côté (136 → 81 mm). Le travail exploratoire
+  (`ros2_control` + `diff_ik` à orientation contrôlée + suppression de la
+  téléportation) n'est **pas** dans ce commit ; la démo de tri est laissée dans
+  son état d'origine, honnête tant qu'on l'annonce comme une démo de
+  **planification**, pas de préhension.
+- Monter les gains du `mycobot_controller` (100 → 2000-4000) a été essayé pour
+  compenser l'affaissement et **retiré** : le suivi empire (J1 raté de 34 deg,
+  J5 de 22 deg, contre 3 à 13 avant).
+
+- **Un statut « objet saisi » sur une pince VIDE ne trompe plus la machine.**
+  Mesuré le 28/08 sur la figurine imprimée, roulis 0 : la pince rend statut 2
+  avec un angle de **22** — deux degrés au-dessus de la pince vide — et la
+  figurine est retrouvée **poussée de 18,3 mm**. `_saisie` concluait sur le
+  statut seul : elle partait en remontée pour rien, *et* n'inscrivait jamais le
+  roulis raté, condamnant la machine à rejouer l'angle qui pousse. Le statut est
+  désormais démenti par l'angle quand celui-ci est lisible (un angle illisible,
+  lui, ne dément rien). `_saisie` lit l'angle via `Pont.angle_pince()` au lieu
+  de reparser la réponse brute.
+
+- **Une lecture parasite de la pince ne fait plus lâcher l'objet.** Mesuré le
+  28/08 sur douze lectures pendant une remontée en trois paliers : deux statuts
+  « 6 » (la pince ne rend que 0-3) et un angle « 65535 » (le −1 du registre lu
+  en 16 bits non signés). Une seule suffisait à conclure « objet lâché » — la
+  remontée s'arrêtait et la pince s'ouvrait **en l'air**, jetant le rouleau
+  hors de la planche. `porte_objet` relit désormais jusqu'à trois fois, ignore
+  tout témoin illisible, et répond « tenu » si les deux témoins le restent :
+  croire tenir ce qu'on ne tient pas coûte un cycle, croire avoir lâché ce
+  qu'on tient jette l'objet.
+- **Un roulis qui POUSSE l'objet n'est plus rejoué** (`ctx.prises_ratees`).
+  À 389 mm seules les inclinaisons −30 et −45 résolvent, et à −30 les roulis
+  0, 30, 60 et 90 passent tous la géométrie : le roulis 0 referme la pince à
+  vide et pousse le rouleau de 6,4 mm, le roulis +30 le saisit (statut 2,
+  angle 26) et le tient jusqu'à Z=170. La géométrie ne les sépare pas ; seule
+  la prise réelle le fait. Le couple raté passe en dernier — écarté, jamais
+  supprimé, sinon un objet devient insaisissable.
+- **L'outil se couche avant que le vertical ne bloque**
+  (`INCLINAISONS_PAR_PORTEE` : seuil 325 → **320 mm**). Le seuil était « un
+  milieu raisonné, jamais vérifié ». Balayage de `colonne_continue` : le
+  vertical descend jusqu'à 320 mm et refuse à partir de 324, l'outil couché
+  passe partout. Le rouleau blanc à 324 mm tombait exactement du mauvais côté
+  et refusait de descendre.
+
+- **Le rouleau se saisit par sa BANDE, plus par son trou**
+  (`PRISE_PAR_EPAISSEUR` inclut `scotch`). Il gardait le centroïde de son
+  anneau — c'est-à-dire le trou. Mesuré le 27/08 sur le rouleau bleu : la prise
+  se fait (statut 2, angle 24, signature d'un rouleau tenu) puis l'objet glisse
+  à la remontée, et chaque essai raté le **pousse** — 65 mm de dérive en sept
+  tentatives. Six décalages latéraux (16 et 22 mm dans les quatre directions)
+  échouent, et le couple monté à 250 aussi : ni la visée ni la force, les
+  doigts ne prenaient qu'un quart de rouleau.
+- **Couple de serrage par catégorie** — `scotch` à 250, le petit robot reste au
+  défaut (pièce imprimée à maillons fins, montée à 250 le 25/08 puis
+  redescendue le même jour).
+- **La descente ne creuse plus sous la planche** — `Z_PRISE_MIN` passe de −18 à
+  **−8 mm**, exactement la consigne nominale. Approfondir ne sert à rien
+  (mesuré : à 312 mm, −14/−18/−20 se referment tous sur du vide et les doigts
+  touchent la planche) et le bras arrive déjà 6 à 25 mm sous sa consigne. La
+  prise nominale ne bouge pas d'un millimètre ; seules les reprises sont bornées.
+- **Une tache trop grande n'est plus un carton** (`AIRE_CARTON_MIN/MAX`, 0,4 à
+  2,0 fois l'aire attendue). Le 27/08, marqueur 11 absent, une tache de
+  230 × 236 mm — **543 cm², plus de quatre fois le grand carton** — a été nommée
+  « petit » à 226 mm, c'est-à-dire sur la balle, et le cycle est parti en boucle.
+  Le gabarit par côtés ne pouvait pas l'arrêter : porté à 260 mm pour un carton
+  vu de biais, il accepte un carré de 236. Le test se fait **après** le
+  recentrage sur le cœur sombre — avant, il effaçait aussi le vrai grand carton.
+- **La reconstruction par marqueur ne téléporte plus une boîte** : elle ne sert
+  qu'à garder en vie une boîte déjà suivie qui vient de perdre son ouverture
+  parce qu'on l'a remplie. Le 27/08 l'étiquette « petit » s'est posée **sur le
+  bras**, à 210 mm, pendant qu'il portait la balle.
+- **Le journal se déverse sur la sortie standard** — il ne vivait que dans la
+  fenêtre Qt, et la seule trace après un cycle raté était une capture tronquée.
+
+### Ajouté
+
+- **Une boîte pleine se place par son marqueur** (`Vision._apprend_forme` /
+  `_forme_depuis_marqueur`). Une boîte qui se remplit perd son ouverture (mesure
+  du 25/08 : 126 → 59 cm²), donc son nom *et* le polygone dont le point de
+  largage a besoin. L'écart marqueur → ouverture, appris quand elle était vide,
+  la replace — exprimé dans le repère du MARQUEUR, il suit aussi une boîte
+  tournée. Mesuré le 27/08 sur le vrai banc, écart gelé 5 s plus tôt :
+  reconstruction à **6,5 mm d'écart médian (13 max)** pour le petit et **10,3
+  (16,1)** pour le grand, contre 28 à 40 mm de marge intérieure du point de
+  largage. Rien n'est persisté.
+- **`pose_marqueur` rend l'orientation du marqueur** dans le plan de la planche,
+  prise sur son premier côté ramené en base.
+
+### Corrigé
+
+- **Une ouverture là où une boîte est déjà suivie n'est plus prise pour un objet
+  à trier.** Une boîte ne cesse pas d'être une boîte parce qu'on y met quelque
+  chose. Mesure du 27/08, petit carton à (392, −133) marqueur 11 invisible : son
+  ouverture est trouvée 38 fois sur 40 et **volée par le filtre des objets 33
+  fois** — nommée « petit » 5 fois sur 40. Après correction : **75/80**, puis
+  80/80 une fois le marqueur revenu.
+- **La hauteur de largage compense l'affaissement du bras**
+  (`z_largage_commande`, `affaissement_largage`). Mesuré le 27/08 : la pointe
+  arrive 11,9 mm sous la consigne à 340 mm de portée et 25,3 mm à 470 — la garde
+  de 25 mm au-dessus du rebord était donc mangée dès 410 mm et **nulle à 470**
+  (pointe à 82,7 mm pour un rebord mesuré à 82,9). Vérifié à un azimut autre que
+  celui de la régression : 108,0 / 107,1 / 109,0 mm atteints pour 108 voulus.
+
+- **La pince ne s'ouvre plus si le bras n'est pas arrivé** (`_largage`,
+  `ECART_LARGAGE_MAX = 45 mm`). Le 26/08 le largage a été commandé en
+  (401, 204) à 450 mm, le bras s'est immobilisé en (373, −52) — 256 mm avant —
+  et la pince s'est ouverte : le petit robot est tombé à côté du petit carton.
+  `va_vers` rend la main quand le bras ne bouge **plus**, ce qui n'est pas la
+  même chose qu'être à la cible. Au-delà de la tolérance, l'objet reste en main
+  (`ECHEC_PORTANT`) et le point jamais atteint est mémorisé
+  (`Contexte.largages_rates`) pour ne plus être proposé.
+- **Une boîte identifiée par son marqueur ne se déplace plus sur une occlusion**
+  (`SuiviCarton.marque_vue`). Le bras qui se place au-dessus du carton pour
+  déposer le fait sortir de vue plus que `PEREMPTION_CARTON`, et la détection
+  revient décalée de 50 à 170 mm ; cette position d'occlusion était adoptée,
+  comptée comme un déplacement (« carton grand déplacé » ×4 dans le journal) et
+  périmait le point de largage en plein transfert. La péremption ne relocalise
+  plus une boîte marquée, et un saut marqué demande **deux images concordantes**
+  (~0,2 s) au lieu d'une seule.
+- **`marque` signifie « cette position vient du marqueur »**, non « le marqueur
+  est visible quelque part » : une position relayée par la SVPRO, corrigée d'un
+  décalage appris de 14 à 60 mm, n'a plus cette autorité.
+
+### Modifié
+
+- **Un carton au-delà de `PORTEE_LARGAGE_CONFORT` (400 mm) se vise par son bord
+  proche**, plus par son milieu : tous les candidats gardent le même recul des
+  parois, donc le bord proche dépose dedans lui aussi. Sur le carton du 26/08 le
+  premier point de largage passe de 450 à 431 mm.
+
 ### Ajouté
 
 - **Un objet déjà dans un carton n'est plus une cible** (`Fenetre._depose`,

@@ -41,6 +41,11 @@ mycobot_controller:
       stopped_velocity_tolerance: 0.01
       goal_time: 0.0
 
+    # Gains d'origine. Les monter a 2000-4000 a ete essaye le 28/08 et RETIRE :
+    # le suivi empire au lieu de s'ameliorer (J1 rate de 34 deg, J5 de 22 deg au
+    # lieu de 3 a 13). L'affaissement se compense en VISANT PLUS BAS, en boucle
+    # fermee sur la pointe reellement atteinte — la meme methode que sur le vrai
+    # bras, ou `BIAIS_Z_PRISE` joue ce role.
     gains:
       joint2_to_joint1:      {p: 100.0, i: 0.01, d: 1.0}
       joint3_to_joint2:      {p: 100.0, i: 0.01, d: 1.0}
