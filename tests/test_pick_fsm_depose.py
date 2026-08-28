@@ -399,17 +399,19 @@ class HauteurDePriseParCategorie(unittest.TestCase):
         On tient donc le HAUT du palier, et ce sont les reprises de `_saisie`
         qui vont chercher plus bas quand il le faut.
         """
-        commande = fsm.Z_PRISE_PAR_CLASSE["scotch"][0] + fsm.BIAIS_Z_PRISE
-        self.assertEqual(commande, -8.0)
-        self.assertGreaterEqual(commande, fsm.Z_PRISE_MIN)
+        vise = fsm.Z_PRISE_PAR_CLASSE["scotch"][0] + fsm.BIAIS_Z_PRISE
+        self.assertEqual(vise, -8.0)
+        # Mais -8 met les doigts DANS la planche : c'est le plancher qui tranche,
+        # et c'est lui que le robot execute (cf. LesDoigtsNeTouchentPasLaPlanche).
+        self.assertEqual(max(fsm.Z_PRISE_MIN, vise), fsm.GARDE_PLANCHE)
 
     def test_le_petit_robot_reste_dans_ce_qui_a_ete_execute(self):
         """Son palier n'a PAS été balayé — contrairement à la balle et au
         rouleau. On ne verrouille donc que ce qui a réellement été exécuté :
         saisi à 177 et 220 mm avec cette valeur, et jamais sous le plancher."""
-        commande = fsm.Z_PRISE_PAR_CLASSE["robot"][0] + fsm.BIAIS_Z_PRISE
-        self.assertEqual(commande, -8.0)
-        self.assertGreaterEqual(commande, fsm.Z_PRISE_MIN)
+        vise = fsm.Z_PRISE_PAR_CLASSE["robot"][0] + fsm.BIAIS_Z_PRISE
+        self.assertEqual(vise, -8.0)
+        self.assertEqual(max(fsm.Z_PRISE_MIN, vise), fsm.GARDE_PLANCHE)
 
     def test_couche_l_outil_vise_la_mi_hauteur_de_l_objet_pas_celle_de_la_balle(self):
         """Le defaut du 24/08 : Z=25 (mi-hauteur de la balle) sur un rouleau de
@@ -1450,3 +1452,131 @@ class UnStatutSAISISurUnePinceVIDE(unittest.TestCase):
         ctx = self._ctx(2, 65535)
         self.assertEqual(fsm._saisie(ctx), 'REMONTEE')
 
+
+
+class LesDoigtsNeTouchentPasLaPlanche(unittest.TestCase):
+    """`pointe()` est le BOUT des doigts, pas le milieu de la pince.
+
+    Mesure : a la pose enseignee du 18/08 ou les doigts touchent la planche,
+    `pointe()` rend Z = -0,23 mm. Une consigne negative les enfonce donc dans le
+    bois. Les objets PLATS visaient -8 (2 mm de palier, -10 de biais) et
+    l'ancien plancher valait -8 lui aussi : rien ne les arretait, ils
+    s'appuyaient sur la planche et se refermaient en raclant. La balle, elle,
+    visait +5 et n'a jamais frotte.
+    """
+
+    def test_la_reference_de_l_outil_est_bien_le_bout_des_doigts(self):
+        """Sans ce fait, tout le reste de cette classe ne veut rien dire."""
+        pose_au_contact = np.array([35.5, -135.7, 73.74, -37.61, -1.4, 11.77])
+        self.assertAlmostEqual(float(fsm.pointe(pose_au_contact)[2]), 0.0, delta=1.0)
+
+    def test_aucune_categorie_ne_commande_les_doigts_dans_la_planche(self):
+        for classe, (debout, couche) in fsm.Z_PRISE_PAR_CLASSE.items():
+            for hauteur in (debout, couche):
+                execute = max(fsm.Z_PRISE_MIN, hauteur + fsm.BIAIS_Z_PRISE)
+                self.assertGreaterEqual(execute, fsm.GARDE_PLANCHE, classe)
+
+    def test_la_garde_reste_basse_on_ne_saisit_pas_de_haut(self):
+        """Une garde genereuse ne raclerait plus mais ne saisirait plus rien :
+        la demande est de quelques millimetres, pas d'un centimetre."""
+        self.assertGreaterEqual(fsm.GARDE_PLANCHE, 2.0)
+        self.assertLessEqual(fsm.GARDE_PLANCHE, 3.0)
+
+    def test_les_reprises_en_profondeur_ne_percent_pas_le_plancher(self):
+        """`_saisie` redescend de PAS_DESCENTE_ESSAI a chaque essai a vide.
+        Trois essais, c'est 12 mm — assez pour traverser la planche si rien ne
+        bornait la descente."""
+        for essais in range(fsm.ESSAIS_MAX + 1):
+            baisse = fsm.PAS_DESCENTE_ESSAI * essais
+            for classe, (debout, _) in fsm.Z_PRISE_PAR_CLASSE.items():
+                execute = max(fsm.Z_PRISE_MIN, debout + fsm.BIAIS_Z_PRISE - baisse)
+                self.assertGreaterEqual(execute, fsm.GARDE_PLANCHE,
+                                        f"{classe}, essai {essais}")
+
+    def test_une_arrivee_TROP_BASSE_est_relevee_avant_la_fermeture(self):
+        """Le plancher ne borne que la CONSIGNE : en Z la descente n'est pas
+        asservie. On verifie donc la hauteur REELLEMENT atteinte."""
+        ctx = _contexte_de_prise()
+        bas = _pose_a_la_hauteur(ctx, -4.0)
+        ctx.pont.q = bas.copy()
+        rendu = fsm.releve_les_doigts(ctx, bas, ctx.balle_xy)
+        self.assertGreaterEqual(float(fsm.pointe(rendu)[2]), fsm.GARDE_PLANCHE - 1.0)
+        self.assertIn("send_angles", ctx.pont.envois)
+
+    def test_une_arrivee_CORRECTE_ne_declenche_aucun_mouvement(self):
+        """Remonter systematiquement couterait un mouvement par prise."""
+        ctx = _contexte_de_prise()
+        bonne = _pose_a_la_hauteur(ctx, fsm.GARDE_PLANCHE + 6.0)
+        ctx.pont.q = bonne.copy()
+        ctx.pont.envois.clear()
+        rendu = fsm.releve_les_doigts(ctx, bonne, ctx.balle_xy)
+        self.assertIs(rendu, bonne)
+        self.assertNotIn("send_angles", ctx.pont.envois)
+
+
+def _contexte_de_prise():
+    ctx = fsm.Contexte() if hasattr(fsm, "Contexte") else types.SimpleNamespace()
+    ctx.pont = FauxPont()
+    ctx.balle_xy = np.array([260.0, 40.0])
+    ctx.R_balle = fsm.orientation(ctx.balle_xy, 0.0)
+    ctx.correction = np.zeros(6)
+    ctx.biais_descente = np.zeros(3)
+    ctx.resultats = {}
+    ctx.journal = []
+    ctx.note = lambda texte: ctx.journal.append(texte)
+    ctx.derniere_consigne = None
+    return ctx
+
+
+def _pose_a_la_hauteur(ctx, z):
+    """Une pose reelle dont la POINTE est a `z`, au-dessus de la cible."""
+    solution = fsm.resout_ik(np.array([ctx.balle_xy[0], ctx.balle_xy[1], z]),
+                             ctx.R_balle)
+    assert solution is not None, f"pas de solution IK a Z={z}"
+    return solution[0]
+
+
+class LEtatDESCENTEVaJusquAuBout(unittest.TestCase):
+    """`_descente` doit rendre un etat, pas lever.
+
+    Les tests de `LesDoigtsNeTouchentPasLaPlanche` appellent `releve_les_doigts`
+    directement : ils n'auraient pas vu qu'un `or q` sur un tableau numpy leve
+    ValueError des la premiere descente reelle. Celui-ci traverse l'etat entier.
+    """
+
+    def setUp(self):
+        self._vrai = fsm.descend_par_paliers
+        self.hauteur = fsm.GARDE_PLANCHE + 4.0
+
+        def espion(ctx, p_cible, R, correction, nom='descente'):
+            sol = fsm.resout_ik(np.array([p_cible[0], p_cible[1], self.hauteur]), R)
+            return sol[0] if sol is not None else fsm.POSE_OBSERVATION.copy()
+
+        fsm.descend_par_paliers = espion
+
+    def tearDown(self):
+        fsm.descend_par_paliers = self._vrai
+
+    def _contexte(self):
+        ctx = fsm.Contexte()
+        ctx.pont = FauxPont(2)
+        ctx.classe_objet = "robot"
+        ctx.balle_xy = np.array([280.0, 40.0])
+        ctx.R_balle = fsm.orientation(ctx.balle_xy, 0.0)
+        ctx.z_prise = fsm.Z_PRISE_PAR_CLASSE["robot"][0]
+        return ctx
+
+    def test_la_descente_rend_SAISIE_sans_lever(self):
+        ctx = self._contexte()
+        self.assertEqual(fsm._descente(ctx), "SAISIE")
+
+    def test_la_garde_des_doigts_est_publiee(self):
+        ctx = self._contexte()
+        fsm._descente(ctx)
+        self.assertIn("garde doigts", ctx.resultats)
+
+    def test_une_arrivee_sous_la_garde_declenche_le_relevage(self):
+        self.hauteur = fsm.GARDE_PLANCHE - 5.0
+        ctx = self._contexte()
+        self.assertEqual(fsm._descente(ctx), "SAISIE")
+        self.assertIn("sous la garde", " ".join(ctx.journal))
