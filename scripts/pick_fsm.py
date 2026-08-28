@@ -188,20 +188,32 @@ PAS_DESCENTE_ESSAI = 4.0
 # machine couche l'outil ; une erreur verticale ne s'y projette plus de la meme
 # facon, et le second terme de `Z_PRISE_PAR_CLASSE` n'a pas ete rejuge.
 BIAIS_Z_PRISE = -10.0
-# Plancher de la descente. Il valait -18 mm, soit 18 mm DANS la table : une
-# reserve creusee a l'epoque ou les reprises approfondissaient la descente. Elle
-# n'a plus de raison d'etre, et deux mesures le disent :
+# Garde SOUS LES DOIGTS. `pointe()` rend le BOUT des doigts, pas le milieu de
+# la pince : a la pose enseignee du 18/08 ou les doigts touchent la planche,
+# elle vaut Z = -0,23 mm. Une consigne negative les enfonce donc dans le bois.
+#
+# C'est exactement ce que faisaient les objets PLATS. `Z_PRISE_PAR_CLASSE` donne
+# 2 mm au scotch comme a la figurine, `BIAIS_Z_PRISE` retire 10 : la consigne
+# tombait a -8, et l'ancien plancher valait -8 lui aussi, donc rien ne
+# l'arretait. Les doigts s'appuyaient sur la planche et se refermaient EN
+# RACLANT — symptome rapporte le 28/08. La balle, elle, visait +5 et n'a jamais
+# frotte : la panne ne touchait que les objets plats.
+#
+# Historique conserve, car il explique pourquoi -8 avait ete choisi :
 #
 #   * approfondir NE SERT PAS — le 26/08 a 312 mm d'allonge, -14, -18 et -20 se
 #     referment tous sur du VIDE (angle 20) et les doigts touchent la planche ;
-#   * le bras arrive de toute facon 6 a 25 mm SOUS sa consigne selon l'allonge
-#     (affaissement mesure le 27/08), donc une consigne deja negative racle.
+#   * le bras arrive 6 a 25 mm SOUS sa consigne selon l'allonge (affaissement
+#     mesure le 27/08) — c'est `converge` qui le rattrape, pas le plancher.
 #
-# Le plancher vaut donc exactement la consigne NOMINALE, -8 : c'est elle qui
-# saisit le rouleau par sa moitie, elle ne change pas d'un millimetre, et plus
-# aucune reprise ne peut descendre en dessous. Monter ce plancher au-dessus de
-# -8 remonterait la prise elle-meme et ferait lacher le rouleau.
-Z_PRISE_MIN = -8.0
+# La prise se faisait donc en APPUI : les doigts butaient sur le bois avant de
+# se fermer. Cela tenait le rouleau, et c'est pourquoi le fichier avertissait
+# que remonter ce plancher pouvait le faire lacher. On accepte desormais ce
+# risque : ne pas racler la planche prime, quitte a laisser quelques dixiemes
+# de millimetre entre les doigts et l'objet. Si un rouleau glisse, le levier
+# reste le COUPLE (`COUPLE_PINCE`), jamais la profondeur.
+GARDE_PLANCHE = 2.5
+Z_PRISE_MIN = GARDE_PLANCHE
 # Saut articulaire maximal tolere entre deux paliers de descente.
 #
 # 25 deg etait trop serre et refusait des descentes parfaitement saines : le
@@ -2046,6 +2058,40 @@ def _recalage(ctx):
     return 'ECHEC'
 
 
+def releve_les_doigts(ctx, q_mesure, cible_xy):
+    """Remonte si les doigts sont sous la garde, AVANT de refermer la pince.
+
+    Le plancher `GARDE_PLANCHE` ne borne que la CONSIGNE. En Z la descente n'est
+    pas asservie — `descend_par_paliers` ne corrige que la derive laterale — et
+    le bras arrive 6 a 25 mm sous sa consigne selon l'allonge quand
+    l'affaissement n'est pas entierement repris. Une consigne propre a +2,5 mm
+    peut donc encore poser les doigts sur la planche, et c'est en se refermant
+    la-dessus qu'ils raclent.
+
+    On mesure donc la hauteur REELLEMENT atteinte, et on ne ferme la pince que
+    si elle est au-dessus de la garde.
+
+    `cible_xy` est celle de l'OBJET, pas la position atteinte : c'est ce que
+    `descend_par_paliers` attend, puisqu'il y ajoute lui-meme le biais lateral.
+    Lui passer la position deja atteinte compterait ce biais deux fois et
+    decalerait le bras juste avant la fermeture.
+    """
+    z = float(pointe(q_mesure)[2])
+    if z >= GARDE_PLANCHE:
+        ctx.resultats['garde doigts'] = f'{z:.1f} mm'
+        return q_mesure
+    haut = np.array([cible_xy[0], cible_xy[1], GARDE_PLANCHE])
+    ctx.note(f'  doigts a {z:.1f} mm, sous la garde {GARDE_PLANCHE:.1f} — '
+             f'on remonte de {GARDE_PLANCHE - z:.1f} mm avant de fermer')
+    q_haut = descend_par_paliers(ctx, haut, ctx.R_balle, ctx.correction,
+                                 nom='garde planche')
+    if q_haut is None:
+        ctx.note('  remontee de garde refusee — on ferme la ou on est')
+        return q_mesure
+    ctx.resultats['garde doigts'] = f'{float(pointe(q_haut)[2]):.1f} mm (remonte)'
+    return q_haut
+
+
 def _descente(ctx):
     baisse = PAS_DESCENTE_ESSAI * ctx.essais.get('SAISIE', 0)
     if baisse:
@@ -2057,6 +2103,7 @@ def _descente(ctx):
     if q is not None:
         ctx.resultats['descente'] = f'{np.linalg.norm(pointe(q)[:2] - cible[:2]):.2f} mm'
     if ok:
+        q = releve_les_doigts(ctx, q, cible[:2])
         return 'SAISIE'
     n = ctx.essai('DESCENTE')
     if n < ESSAIS_MAX:
