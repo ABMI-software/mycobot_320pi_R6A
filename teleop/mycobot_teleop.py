@@ -420,17 +420,21 @@ class RosBridgeArmPublisher:
     def send_gripper_normalized(self, openness: float) -> None:
         """Publish gripper command. openness ∈ [0, 1]: 0 = closed, 1 = open.
 
-        The controller drives four joints explicitly (see controller.yaml):
-            [servo_left, servo_right, tip_left, tip_right]
-        so we build a symmetric 4-element target that keeps the fingers
+        The controller drives six joints explicitly (see controller.yaml):
+            [servo_left, servo_right, tip_left, tip_right, bar_left, bar_right]
+        so we build a symmetric 6-element target that keeps the fingers
         mirrored AND the fingertips parallel to the base across the sweep:
 
-            open  (o=1):  all four at  0 rad
-            close (o=0):  [-0.7, +0.7, +0.7, -0.7]
+            open  (o=1):  all six at  0 rad
+            close (o=0):  [-0.7, +0.7, +0.7, -0.7, -0.7, +0.7]
+
+        Les deux dernieres sont les barres exterieures du parallelogramme,
+        passees de `fixed` a mobiles le 31/08 : soudees a la bride, elles
+        restaient en croix pendant que le doigt tournait.
         """
         o = max(0.0, min(1.0, float(openness)))
         servo = -0.7 * (1.0 - o)          # gripper_controller (left servo)
-        data = [servo, -servo, -servo, servo]
+        data = [servo, -servo, -servo, servo, servo, -servo]
         self.gripper_topic.publish({"data": data})
 
     def set_tfs(self, time_from_start_s: float) -> None:
