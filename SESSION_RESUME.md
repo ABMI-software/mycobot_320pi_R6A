@@ -1,5 +1,56 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (31 août 2026 — nuit, FK validée contre DREAM)
+
+### Ce qui a été accompli
+
+**La question « FK fausse ou DREAM biaisé ? » est tranchée : c'est DREAM.**
+`scripts/fk_vs_dream_diagnostic.py` projette le squelette FK à travers les
+extrinsèques **marqueurs** (indépendantes de DREAM) sur les deux caméras et le
+compare aux détections. Le vert épouse le bras dans les deux vues → FK et
+extrinsèques validées. Figure : `docs/fk_vs_dream.png`.
+
+| caméra | extrinsèque | détectés | écart médian FK↔DREAM | `base` (point fixe) |
+|---|---|---|---|---|
+| arducam | `arducam_extrinsic_pick` (20/08) | 3/7 | 73 px | 57 px |
+| svpro | `svpro_extrinsic_servo` (24/08) | 2/7 | 132 px | 62 px |
+
+Le `base` est le juge de paix : sa projection ne dépend d'aucun angle.
+
+### Décisions prises
+
+- **Aucun marqueur ajouté sur le robot.** Un tag sur la bride aurait départagé
+  FK et DREAM, mais contredisait l'objectif markerless — et s'est avéré inutile :
+  les extrinsèques marqueurs déjà calculées suffisent comme référence extérieure.
+- **`arducam_extrinsic_dream_v4.yaml` est écarté** (mauvais K `cam_0`, montage
+  différent). Son désaccord de 1 m n'est plus une question ouverte.
+- Le diagnostic ne bouge **jamais** le bras.
+
+### Prochaines actions
+
+1. [ROUGE] Refaire le tableau sur des **poses favorables** (bras au-dessus de la
+   planche, outil incliné vers le bas comme aux points de travail). **Le bras
+   bougera** : dégager la zone, `bash scripts/real_robot_preflight.sh` d'abord.
+   C'est là que le vrai biais DREAM devient mesurable.
+2. [JAUNE] Corriger `convert_to_ndds.py:102` (`arducam → cam_0`) ou documenter
+   qu'il vise l'ancien montage, pour que les scripts d'entraînement ne
+   retombent pas dans le piège.
+3. [VERT] Décider quoi faire de `link1`/`link2` confondus dans le schéma à 7
+   keypoints.
+
+### Commande rapide de reprise
+
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+ln -sfn /home/genji/DREAM /tmp/DREAM          # /tmp est vidé au redémarrage
+python3 scripts/fk_vs_dream_diagnostic.py     # bras immobile, capture live
+# rejouer hors ligne, robot éteint :
+python3 scripts/fk_vs_dream_diagnostic.py --brut \
+    --angles 82.7,-122.6,88.76,-61.08,10.89,6.5
+```
+
+---
+
 ## État actuel (31 août 2026 — soir, self-calibration markerless)
 
 ### Ce qui a été accompli
