@@ -19,6 +19,21 @@ No executable found
 - ✅ Modification de `setup.py` pour installer le script dans `lib/mycobot_gateway/`
 - ✅ Rebuild avec `colcon build --symlink-install`
 
+> **Mise à jour du 31/08/2026 — ce contournement ne tenait que pour les nœuds
+> déjà écrits.** `setup.py` installe `glob('scripts/*')` dans `lib/`, ce qui
+> suppose **un fichier wrapper écrit à la main par nœud**. Tout nœud ajouté
+> ensuite sans son wrapper redonnait « No executable found », alors que la
+> compilation réussissait — constaté en ajoutant `sim_sorting_grasp`.
+> Le correctif standard est un **`setup.cfg`** à la racine du paquet :
+> ```ini
+> [develop]
+> script_dir=$base/lib/mycobot_gateway
+> [install]
+> install_scripts=$base/lib/mycobot_gateway
+> ```
+> Il redirige *tous* les `console_scripts` d'un coup, sans wrapper. Ajouté le
+> 31/08 ; les wrappers de `scripts/` restent en place, ils ne gênent pas.
+
 ### 2. **Résolution du conflit Python conda/ROS2**
 
 **Problème** :
@@ -69,6 +84,11 @@ Waiting for at least 1 matching subscription(s)...
 - ✅ `quick_commands.sh` — Alias et fonctions pour usage rapide
 - ✅ Ce fichier `SUMMARY.md` — Résumé du projet
 
+**Ajouté depuis** :
+- 📄 [`PICK_AND_PLACE_SIMULATION.md`](PICK_AND_PLACE_SIMULATION.md) *(31/08/2026)* —
+  Le banc de tri des quatre objets en simulation par saisie physique. L'index
+  complet de la documentation est dans [`INDEX.md`](../INDEX.md).
+
 ## 📁 Structure du package
 
 ```
@@ -118,7 +138,7 @@ send_cmd "test_moteur_1"
 ## 🔧 Configuration technique
 
 ### Réseau
-- **Pi** : 10.10.0.221:5005 (serveur TCP)
+- **Pi** : 10.10.0.224:5005 (serveur TCP)
 - **Tour** : 10.10.0.115 (client TCP)
 - **Protocole** : TCP/IP, messages UTF-8 terminés par `\n`
 
