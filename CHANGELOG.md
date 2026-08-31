@@ -11,6 +11,24 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Corrigé
 
+- **`arducam_extrinsic_dream_v4.yaml` n'était comparable à rien.**
+  `self_calibrate_arducam.py:66-67` charge `cam_0` (focale ≈ 527) via
+  `convert_to_ndds.py:102` (`arducam → cam_0`), alors que l'arducam de ce banc
+  est **`cam_3`** (focale ≈ 495) — c'est ce que déclare
+  `arducam_extrinsic_pick.yaml` et ce qu'utilise `pick_dashboard`. **6,4 %
+  d'écart de focale, plus les mauvais coefficients de distorsion.** S'y ajoute
+  un montage physique différent (cf. `convert_to_ndds.py:87-92`). Le désaccord
+  de ~1 m latéral avec `markers` et `handeye` n'est donc pas une énigme
+  ouverte : ce fichier n'a jamais mesuré la même caméra. Il sort de la liste des
+  questions en suspens. `pick_and_place_live_dashboard.py` n'est **pas**
+  concerné, il prend `cam_3` par le registre.
+
+- **`link1` et `link2` sont le même point 3D dans la FK**, pas un artefact de la
+  vue zénithale comme supposé : ils se projettent sur le pixel **exact** dans
+  les deux caméras (195,5/342,5 et 425,7/299,2). DREAM a donc deux sorties pour
+  un seul point physique — indissociables par construction, quelle que soit la
+  caméra ou le nombre de vues.
+
 - **Le bras bouge à nouveau en simulation de tri.** Le plugin
   `gz-sim-joint-position-controller-system` avait disparu de
   `mycobot_pro_320_pi_gazebo.urdf` dans cette copie du dépôt — il est présent
@@ -23,6 +41,36 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   pick-and-place. Plugin restauré tel quel.
 
 ### Ajouté
+
+- **`scripts/fk_vs_dream_diagnostic.py` — départage la FK et DREAM.** La
+  self-calibration markerless laissait un résidu systématique (`link3` à
+  23,6 px) qu'aucune pose de caméra n'expliquait : erreur de FK, ou biais de
+  détection ? DREAM ne peut pas trancher — dans son schéma la FK est une
+  **entrée** du PnP, pas une sortie, donc s'en servir pour vérifier la FK est
+  circulaire. L'outil prend une référence extérieure aux deux : les extrinsèques
+  **marqueurs** déjà calculées (`arducam_extrinsic_pick` 20/08,
+  `svpro_extrinsic_servo` 24/08), qui ne doivent rien à DREAM. Il projette le
+  squelette FK à travers elles sur **les deux caméras à la fois** et le compare
+  aux détections DREAM. Le bras ne bouge pas. `--brut --angles …` rejoue hors
+  ligne sur les images enregistrées, sans matériel.
+
+  **Verdict mesuré le 31/08 (figure `docs/fk_vs_dream.png`) : la FK et les deux
+  extrinsèques sont validées, l'écart est du côté de DREAM.** Le squelette vert
+  épouse le bras sur toute sa longueur dans les deux vues — deux caméras, deux
+  extrinsèques calculées séparément, deux géométries opposées (zénith / côté) :
+  elles ne peuvent pas se tromper de la même manière par hasard. Le keypoint
+  `base` sert de juge de paix, sa projection étant **fixe** et indépendante des
+  angles : la FK le place juste, DREAM le rate de 57 px (arducam) et 62 px
+  (svpro). Écarts médians FK↔DREAM 73 px et 132 px.
+
+  ⚠ Ceci **ne prouve pas** un biais DREAM général : dans cette pose le bras est
+  sorti de la planche, au-dessus du clavier — le mode d'échec déjà mesuré le
+  31/08 (7/7 → 0-1/7). Les 3/7 et 2/7 « détectés » sont des détections fantômes,
+  instables d'une trame à l'autre (6/7 et 3/7 à la capture précédente). La
+  mesure du vrai biais demande de refaire ce tableau sur des poses favorables.
+
+- **Conséquence : les 23,6 px de `link3` ne sont pas une erreur de FK.** La
+  chaîne cinématique et les intrinsèques `cam_3` / `cam_2` sont saines.
 
 - **`scripts/pick_and_place_live_dashboard.py` — self-calibration markerless au
   lancement.** Même tableau de bord que `pick_dashboard`, mais l'extrinsèque est
