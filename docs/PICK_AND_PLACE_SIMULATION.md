@@ -26,7 +26,22 @@ Pour le vrai bras, voir [`PICK_AND_PLACE_REAL.md`](PICK_AND_PLACE_REAL.md).
 Ouverture utile d'un bac : 95 mm. Les quatre objets reposent **à plat au fond**,
 au millimètre près de la hauteur théorique.
 
-> Un seul passage complet à ce jour. La répétabilité n'est pas mesurée.
+### Répétabilité — trois passages consécutifs
+
+12 dépôts sur 12, tous **à plat** (0,0° d'inclinaison) et au millimètre du fond.
+
+| objet | passage 1 | passage 2 | passage 3 |
+|---|---|---|---|
+| `red_cube` | −6 / +3 | −4 / −5 | −5 / −2 |
+| `blue_cube` | −5 / +0 | −4 / −1 | −7 / +0 |
+| `green_cylinder` | −2 / +4 | −5 / +4 | −6 / +5 |
+| `yellow_box` | −13 / +4 | −12 / +2 | −12 / +2 |
+| **durée** | 115 s | 113 s | 114 s |
+
+Les écarts ne sont pas du bruit, ils sont **reproductibles** : `yellow_box`
+finit systématiquement à −12/−13 mm en X. C'est un biais constant, pas de la
+dispersion — corrigeable par un décalage de consigne si on veut le centrer.
+Les trois autres tiennent dans ±7 mm.
 
 ---
 
@@ -203,7 +218,10 @@ Bacs : 100 × 100 mm hors-tout, parois de 5 mm hautes de 30 mm, fond à z = 2 mm
 
 ## Limites
 
-- **Un seul passage 4/4.** Répétabilité non mesurée.
+- **Trois passages seulement**, tous dans la même session et sur la même scène.
+  Rien ne dit ce que donne un démarrage à froid ou des objets déplacés.
+- **Le biais de `yellow_box` (−12 mm en X) n'est pas expliqué** — mesuré,
+  reproductible, mais la cause n'a pas été cherchée.
 - **Pas de vision.** Les positions viennent de la pose Gazebo des objets, pas du
   détecteur. Brancher `color_object_detector` en entrée est l'étape suivante.
 - **Objets isolés et posés à plat.** Ni empilement, ni objet couché, ni occlusion.
