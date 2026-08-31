@@ -1,5 +1,69 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (31 août 2026 — soir, self-calibration markerless)
+
+### Ce qui a été accompli
+
+**`scripts/pick_and_place_live_dashboard.py`** — le tableau de bord de pick avec
+une extrinsèque **refaite au lancement, sans marqueur** (robot comme mire :
+FK des encodeurs ↔ keypoints DREAM). Il importe `pick_dashboard` et remplace
+`Vision` à l'exécution ; **`pick_dashboard.py` n'est jamais modifié**.
+
+**Bibliothèque DREAM restaurée** dans `/home/genji/DREAM` avec `/tmp/DREAM` en
+lien symbolique. Elle avait disparu — `/tmp` est vidé au redémarrage, et 10
+scripts codent ce chemin en dur. Après un reboot : `ln -sfn /home/genji/DREAM /tmp/DREAM`.
+
+### Trois causes de mauvaise détection, isolées et mesurées
+
+| cause | effet | correction |
+|---|---|---|
+| tampon V4L2 non vidé | 7/7 → 2/7 (trame floue prise pendant le mouvement) | jeter 6 trames |
+| bras hors de la planche | 7/7 → 0-1/7 (fond tapis + trépied) | poses au-dessus du bois |
+| pince à l'horizontale (`J5=90`) | détection erratique | poses dérivées du travail, pince à 7-12° de la verticale |
+
+Après correction : **4/4 keypoints sur 6 poses/8, 29 correspondances** (contre 10).
+
+L'orientation d'outil se mesure sur **−X de la bride**, pas +Z : `pick` est à
+7,2° de la verticale, `pick_approach` à 11,7°, `place` à 15,2°. Mes poses à
+`J5=90` étaient à 90° — l'outil couché, orientation jamais prise en travail.
+
+### Ce qui bloque
+
+Résidu 10,97 px, **`link3` à 23,6 px sur 6 points**. Avec de bonnes détections
+partout, aucune position de caméra n'explique les quatre keypoints : désaccord
+**systématique**, donc problème de MODÈLE et non de capture. Trois pistes à
+départager par la mesure : FK qui ne colle pas au robot réel, biais DREAM propre
+à `link3`, intrinsèque `cam_3`.
+
+### Décisions et faits durs
+
+- **`link1` et `link2` sont le même point 3D** — 400 poses, écart max 0,000 mm.
+  Les utiliser tous les deux compte deux fois la même mesure.
+- **Une self-cal markerless ne peut pas se valider elle-même.** `dream_v4` place
+  la caméra à 1,572 m ; markers et hand-eye disent 1,095 et 1,118 m et
+  s'accordent entre eux à 2,3 cm. Non tranché.
+- La SVPRO a été **écartée** : bonne géométrie de côté, mais DREAM n'y détecte
+  que 0-2/7 — vue hors distribution d'entraînement.
+
+### Prochaines actions
+
+1. [ROUGE] Départager l'origine des 23,6 px de `link3` : reprojection FK contre
+   détection, sur quelques poses.
+2. [JAUNE] Une vérification ArUco ponctuelle, comme référence indépendante — le
+   markerless ne peut pas dire qui a raison entre `dream_v4` et les marqueurs.
+3. [VERT] Plus de poses (15-20) une fois la cause du résidu comprise.
+
+### Commande rapide de reprise
+
+```bash
+ln -sfn /home/genji/DREAM /tmp/DREAM          # apres un reboot
+source ~/ros_jazzy/venv_dream/bin/activate
+cd ~/Osama_ws/src/mycobot_R6A
+python scripts/pick_and_place_live_dashboard.py --calib-only --move   # LE BRAS BOUGE
+```
+
+---
+
 ## État actuel (31 août 2026 — simulation, saisie physique)
 
 ### Ce qui a été accompli aujourd'hui

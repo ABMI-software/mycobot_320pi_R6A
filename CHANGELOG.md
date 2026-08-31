@@ -24,6 +24,18 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **`scripts/pick_and_place_live_dashboard.py` — self-calibration markerless au
+  lancement.** Même tableau de bord que `pick_dashboard`, mais l'extrinsèque est
+  refaite à chaque démarrage avec le robot comme mire (FK des encodeurs ↔
+  keypoints DREAM), sans marqueur. Il **importe** `pick_dashboard` et remplace
+  `Vision` à l'exécution : `pick_dashboard.py` n'est pas modifié.
+  **État : la calibration n'est pas encore exploitable** — voir les Notes.
+
+- **Bibliothèque DREAM restaurée dans `/home/genji/DREAM`** (persistant), avec
+  `/tmp/DREAM` en lien symbolique pour les 10 scripts qui codent ce chemin en
+  dur. Elle avait disparu : `/tmp` est vidé au redémarrage. Après un reboot,
+  refaire `ln -sfn /home/genji/DREAM /tmp/DREAM`.
+
 - **`sim_sorting_grasp` — les quatre objets tries par saisie PHYSIQUE.**
   4/4 le 31/08 sur le banc `sim_grasp.launch.py`, sans aucune téléportation :
   bras au JTC `mycobot_controller`, pince au `gripper_position_controller`,
@@ -86,6 +98,49 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   désormais la durée sur le trajet réel et rend la main dès que l'écart passe
   sous 0,35°. L'IK est passée de 150 à 60 itérations et s'arrête au premier
   résultat franc au lieu de balayer les 12 orientations.
+
+### Notes — self-calibration markerless, mesures du 31/08
+
+Trois causes de mauvaise détection ont été isolées, chacune divisant par trois
+le nombre de keypoints trouvés. Elles valent pour toute capture DREAM en direct :
+
+- **Le tampon V4L2 doit être vidé avant chaque capture.** Sans ça on lit une
+  trame antérieure, prise *pendant* le déplacement, donc floue : détection de
+  7/7 à 2/7 pour cette seule raison. Six lectures à jeter suffisent.
+- **Le bras doit rester au-dessus de la planche en bois.** Des poses plus
+  dépliées le sortent sur le tapis gris et les pieds du trépied : 7/7 → 0-1/7.
+  Le fond compte plus que l'étalement des keypoints.
+- **La pince doit pointer vers le bas**, comme en travail. Les poses de
+  calibration à `J5=90` mettaient l'outil **à l'horizontale** (90° de la
+  verticale mesurés sur −X bride, contre 7-15° pour `pick`/`pick_approach`) :
+  orientation jamais prise en production, donc hors de la distribution sur
+  laquelle DREAM a été affiné. Les poses sont désormais dérivées des points de
+  travail enregistrés, en ne faisant tourner que J1 — cette rotation conserve
+  exactement l'inclinaison de l'outil.
+
+Une fois ces trois points corrigés : **4/4 keypoints sur six poses sur huit,
+29 correspondances**, contre 10 au départ.
+
+**Ce qui bloque encore** : le résidu de reprojection reste à 10,97 px avec
+`link3` à **23,6 px sur 6 points**. Avec de bonnes détections partout, aucune
+position de caméra unique n'explique les quatre keypoints — c'est un désaccord
+**systématique**, donc un problème de MODÈLE et non de capture (FK qui ne colle
+pas au robot réel, biais de détection propre à `link3`, ou intrinsèque `cam_3`).
+Le garde-fou refuse d'écrire l'extrinsèque tant qu'un keypoint est aberrant,
+même quand la médiane passe.
+
+**Fait dur à connaître** : `link1` et `link2` sont le **même point 3D** (vérifié
+sur 400 poses aléatoires, écart maximal 0,000 mm). Les compter tous les deux,
+c'est compter deux fois la même mesure. Et vus d'une caméra au zénith, `base`
+les rejoint sur le même pixel — la perspective ne les sépare que parce que la
+caméra n'est pas exactement à l'aplomb de la base.
+
+**Question ouverte** : `arducam_extrinsic_dream_v4.yaml` (en production) place la
+caméra à **1,572 m** de la base, alors que `arducam_extrinsic_markers.yaml` et
+`arducam_extrinsic_handeye.yaml` disent 1,095 et 1,118 m — ces deux références
+indépendantes s'accordant à 2,3 cm près. Non tranché : une self-calibration
+markerless ne peut pas se valider elle-même, elle dit que deux extrinsèques sont
+en désaccord, pas laquelle a raison.
 
 ### Notes
 
