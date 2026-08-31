@@ -32,6 +32,14 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   du fond), écart au centre −6/+3, −5/+0, −2/+4 et −13/+4 mm pour une ouverture
   utile de 95 mm. Cycle complet en **115 s**.
   `ros2 run mycobot_gateway sim_sorting_grasp`.
+- **[`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md).**
+  Le banc de tri en simulation : résultat mesuré, comment le lancer, le graphe
+  ROS, la géométrie de la pince en chiffres (point outil, ouverture et
+  encombrement selon l'angle), le cycle étape par étape, et les trois
+  contraintes non évidentes — bac vert par-dessus l'épaule, plafond de
+  hauteur à ~140 mm, doigts qui entrent dans le bac mais ne peuvent pas s'y
+  ouvrir.
+
 - **`mycobot_gateway/setup.cfg`.** Il manquait : sans lui `setuptools` installe
   les points d'entrée dans `install/mycobot_gateway/bin`, où `ros2 run` ne
   regarde pas. Tout nœud ajouté au paquet depuis la migration vers Osama_ws
