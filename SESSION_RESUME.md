@@ -1,5 +1,100 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (31 août 2026 — simulation, saisie physique)
+
+### Ce qui a été accompli aujourd'hui
+
+**Les quatre objets triés par saisie physique dans Gazebo, 4/4.** Plus aucune
+téléportation : le bras passe par le JTC `mycobot_controller`, la pince par
+`gripper_position_controller`, et chaque prise est vérifiée sur la pose Gazebo
+de l'objet (il monte avec les doigts). Nouveau nœud
+`mycobot_gateway/mycobot_gateway/sim_sorting_grasp.py`.
+
+| objet | serrage | bac | écart au centre |
+|---|---|---|---|
+| red_cube (40 mm) | 36 mm / 0,823 rad | red_bin | −1 / +0 mm |
+| blue_cube (50 mm) | 46 mm / 0,740 rad | blue_bin | −11 / +10 mm |
+| green_cylinder (⌀44) | 38 mm / 0,807 rad | green_bin | +1 / +2 mm |
+| yellow_box (30 mm pincés) | 26 mm / 0,905 rad | yellow_bin | −13 / +4 mm |
+
+Ouverture utile d'un bac : 95 mm. Les quatre objets finissent **à plat au fond**
+(0,0° d'inclinaison, z au millimètre du fond). Cycle complet en **115 s**.
+
+### Trois défauts corrigés dans la foulée
+
+**Les barres extérieures de la pince étaient soudées à la bride.**
+`gripper_left2` / `gripper_right2` en `fixed` : immobiles pendant que le doigt
+tournait, elles partaient à l'horizontale — la pince paraissait cassée sur les
+côtés. Ce sont les barres d'un quadrilatère articulé, parallèles à **0,0° près**
+à la bielle motrice : parallélogramme, donc même angle que le servo. Passées en
+`revolute` et pilotées, le bout reste à 1,0–1,3 mm du doigt sur toute la course.
+Le contrôleur attend maintenant **6** valeurs (téléop mis à jour).
+
+**L'objet était lâché au-dessus du bac.** Il tombait de 15 à 25 mm, rebondissait
+sur la paroi et restait couché sur le rebord (cube bleu à 44,6°). Or la collision
+doigts/bac demande **deux** conditions à la fois — sous le rebord (30 mm) ET plus
+écarté que la paroi (±47,5 mm) — et refermés les doigts ne font que ±34 à ±44 mm.
+Ils peuvent donc descendre au fond. Lâcher en deux temps : largeur exacte de
+l'objet (force nulle, il repose déjà), remontée, puis ouverture complète. Marge
+la plus faible : 1,5 mm sur le cube bleu.
+
+**Le cycle attendait une durée fixe après chaque mouvement** (4 s + 2,5 s × 8
+mouvements par objet). `move_to` dimensionne la durée sur le trajet et rend la
+main dès que l'écart passe sous 0,35° ; l'IK est passée de 150 à 60 itérations
+et s'arrête au premier résultat franc.
+
+### Décisions prises
+
+**Le point outil est le centre des PATINS, pas le bout des doigts.** Viser
+l'extrémité décale la consigne de 15 mm sur l'axe Z de la pince, la largeur
+d'un patin exactement. Le cube de 40 mm rattrapait l'erreur par sa largeur, le
+cylindre de 44 mm non — les quatre joints atteignaient alors la consigne au
+millième, preuve qu'ils ne touchaient rien.
+`TOOL_OFFSET = (-0.001, +0.0078, 0.166)` m dans link6.
+
+**φ figé sur toute une colonne de poses.** Résoudre l'IK indépendamment à
+chaque hauteur laissait le poignet tourner entre la saisie et la levée : les
+objets se dévissaient des doigts. `solve_column` impose une seule orientation à
+survol + saisie + levée. C'est ce qui a fait passer le cube rouge de raté à
+saisi, sans rien changer d'autre.
+
+**Le bac vert n'est atteignable que par-dessus l'épaule** (J1 ≈ −35°, J3 > 0,
+J5 < 0). L'outil sort à ~22° d'azimut de J1, donc l'azimut 164,7° du bac vert
+demanderait J1 ≈ 187°, au-delà de la butée. Vaut aussi pour le vrai bras.
+
+**Plafond de hauteur : la pointe ne monte pas au-dessus de ~0,14 m** outil à la
+verticale, et pas au-dessus de 0,110 m à r = 0,28. Les 166 mm d'outil mangent
+la course. `TRANSIT_Z = APPROACH_Z = 0.110`.
+
+**Lâcher à 42 mm.** L'encombrement extérieur des doigts refermés (78–93 mm)
+dépasse l'ouverture utile du bac (95 mm) : ils ne peuvent pas y descendre.
+Mais l'objet pend sous les patins, donc à 42 mm il est déjà sous le rebord de
+30 mm pendant que les doigts restent au-dessus.
+
+**`setup.cfg` manquait au paquet** — sans lui les points d'entrée s'installent
+dans `bin/` et `ros2 run` ne les trouve pas. Tout nœud ajouté depuis la
+migration vers Osama_ws était introuvable malgré une compilation réussie.
+
+### Prochaines actions
+
+1. [JAUNE] Rejouer le cycle plusieurs fois de suite pour mesurer la
+   répétabilité (un seul passage 4/4 à ce jour).
+2. [JAUNE] Reporter `TOOL_OFFSET` centre-des-patins sur le vrai bras — la même
+   erreur de 15 mm y est probablement présente.
+3. [VERT] Brancher `color_object_detector` en entrée à la place des poses
+   Gazebo, pour que le tri soit guidé par la vision.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
+ros2 launch mycobot_gateway sim_grasp.launch.py
+ros2 run mycobot_gateway sim_sorting_grasp          # -p only:="red_cube"
+```
+
+---
+
 ## État actuel (28 août 2026 — après-midi)
 
 ### Ce qui a été accompli aujourd'hui

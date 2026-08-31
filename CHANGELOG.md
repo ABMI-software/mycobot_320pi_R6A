@@ -24,6 +24,20 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **`sim_sorting_grasp` — les quatre objets tries par saisie PHYSIQUE.**
+  4/4 le 31/08 sur le banc `sim_grasp.launch.py`, sans aucune téléportation :
+  bras au JTC `mycobot_controller`, pince au `gripper_position_controller`,
+  chaque prise vérifiée sur la pose Gazebo de l'objet. Les quatre objets
+  finissent **à plat au fond** de leur bac (0,0° d'inclinaison, z au millimètre
+  du fond), écart au centre −6/+3, −5/+0, −2/+4 et −13/+4 mm pour une ouverture
+  utile de 95 mm. Cycle complet en **115 s**.
+  `ros2 run mycobot_gateway sim_sorting_grasp`.
+- **`mycobot_gateway/setup.cfg`.** Il manquait : sans lui `setuptools` installe
+  les points d'entrée dans `install/mycobot_gateway/bin`, où `ros2 run` ne
+  regarde pas. Tout nœud ajouté au paquet depuis la migration vers Osama_ws
+  restait donc introuvable (« No executable found ») alors que la compilation
+  réussissait. Les exécutables présents dans `lib/` dataient d'avant.
+
 - **Frottement sur les doigts de la pince simulée** (μ = 1,6 sur `gripper_left1`
   et `gripper_right1`, plus `kp`/`kd`). Ils n'en avaient aucun de déclaré alors
   que les cubes du monde de tri sont à μ = 1,0.
@@ -32,16 +46,58 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   trop pour pincer un cube de 40 mm. La course vaut ~98,6 mm/rad ; à 1,10 rad
   ils se referment à **17,9 mm**.
 
+### Corrigé (suite — 31/08)
+
+- **Les deux barres extérieures de la pince ne sont plus soudées à la bride.**
+  `gripper_left2` / `gripper_right2` étaient déclarées `fixed`, donc absorbées
+  dans `link6` (`link6_fixed_joint_lump__gripper_left2_visual`) : elles
+  restaient immobiles pendant que le doigt tournait, d'où deux bras noirs à
+  l'horizontale — la pince paraissait cassée sur les côtés alors que la saisie
+  fonctionnait. Ce sont en réalité les barres extérieures d'un quadrilatère
+  articulé : mesuré sur les meshes, la barre part du pivot (−0,047 ; −0,010)
+  dans une direction parallèle **à 0,0° près** à la bielle motrice. C'est donc
+  un parallélogramme, et la barre tourne du même angle que son servo. Passées
+  en `revolute` et pilotées : le bout de barre reste à 1,0–1,3 mm du doigt sur
+  toute la course. Le `gripper_position_controller` attend désormais **6**
+  valeurs et non 4 (`teleop/mycobot_teleop.py` mis à jour en conséquence).
+
+- **L'objet est posé au fond du bac, plus lâché au-dessus.** Il tombait de 15 à
+  25 mm, rebondissait sur la paroi et restait couché sur le rebord (mesure :
+  cube bleu à 44,6° d'inclinaison, les trois autres à 0,0°). La collision des
+  doigts avec le bac demande **deux** conditions simultanées — être sous le
+  rebord (30 mm) ET plus écarté que la paroi interne (±47,5 mm) — or refermés
+  sur l'objet les doigts ne font que ±34 à ±44 mm. Ils peuvent donc descendre
+  au fond. Le lâcher se fait en deux temps : on rend la largeur exacte de
+  l'objet (force de serrage nulle, il repose déjà), on remonte, puis seulement
+  on ouvre en grand. Marge latérale la plus faible : 1,5 mm sur le cube bleu.
+  Résultat : les quatre objets à 0,0° d'inclinaison, au fond.
+
+- **Cycle 4 objets ramené à 115 s.** Chaque mouvement attendait une durée
+  **fixe** (4 s de trajectoire + 2,5 s de repos, soit ~6,5 s × 8 mouvements par
+  objet, l'essentiel du temps passé à ne rien faire). `move_to` dimensionne
+  désormais la durée sur le trajet réel et rend la main dès que l'écart passe
+  sous 0,35°. L'IK est passée de 150 à 60 itérations et s'arrête au premier
+  résultat franc au lieu de balayer les 12 orientations.
+
 ### Notes
 
-- La saisie **physique** en simulation reste non fonctionnelle, et le blocage
-  est isolé : `gripper_controller` (servo gauche) ne bouge **jamais**, quelle
-  que soit la consigne, alors que ses trois voisines suivent — la pince ne se
-  referme que d'un côté (136 → 81 mm). Le travail exploratoire
-  (`ros2_control` + `diff_ik` à orientation contrôlée + suppression de la
-  téléportation) n'est **pas** dans ce commit ; la démo de tri est laissée dans
-  son état d'origine, honnête tant qu'on l'annonce comme une démo de
-  **planification**, pas de préhension.
+- La saisie **physique** en simulation fonctionne depuis le 31/08 (voir
+  `sim_sorting_grasp` ci-dessus). Le servo gauche bloqué venait de bornes
+  posées exactement sur 0 dans l'URDF, corrigé le même jour. Trois autres
+  causes ont été mesurées puis levées, et elles valent pour le vrai bras :
+  - **le point outil est le centre des PATINS, pas le bout des doigts.**
+    Viser l'extrémité place la consigne 15 mm trop loin sur l'axe Z de la
+    pince — soit exactement la largeur d'un patin. Le cube de 40 mm rattrapait
+    l'erreur par sa largeur, le cylindre de 44 mm non : les quatre joints
+    atteignaient la consigne **au millième**, preuve de zéro contact.
+    `TOOL_OFFSET` vaut `(-0.001, +0.0078, 0.166)` m dans le repère link6.
+  - **le poignet ne doit pas tourner entre la saisie et la levée.** Résoudre
+    l'IK indépendamment à chaque hauteur laisse φ changer d'un point au
+    suivant, et l'objet se dévisse des doigts. `solve_column` impose un φ
+    unique à toute une colonne de poses.
+  - **le bac vert n'est atteignable que par-dessus l'épaule.** L'outil sort à
+    ~22° d'azimut de J1, ce qui demanderait J1 ≈ 187° à l'azimut 164,7° :
+    au-delà de la butée. La branche J1 ≈ −35°, J3 > 0, J5 < 0 y va.
 - Monter les gains du `mycobot_controller` (100 → 2000-4000) a été essayé pour
   compenser l'affaissement et **retiré** : le suivi empire (J1 raté de 34 deg,
   J5 de 22 deg, contre 3 à 13 avant).
