@@ -46,6 +46,8 @@ Usage (venv_dream) :
 """
 import argparse
 import csv
+import json
+import math
 import subprocess
 import sys
 import time
@@ -75,10 +77,12 @@ PAS_MAX_APPROCHE = 30.0  # pour REJOINDRE un depart de trajectoire, on decoupe
 TOL_IMMOBILE = 0.35     # deg : deux lectures sous ce seuil = bras arrete
 
 CAMERAS = [
-    {'nom': 'arducam', 'v4l2': 'Arducam', 'exposition': 75,
-     'extr': 'arducam_extrinsic_pick'},
-    {'nom': 'svpro', 'v4l2': '5MP', 'exposition': None,
-     'extr': 'svpro_extrinsic_servo'},
+    {'nom': 'arducam', 'v4l2': 'Arducam', 'exposition': 75, 'focus': None,
+     'calib': 'cam_3', 'extr': 'arducam_extrinsic_pick'},
+    # focus 90 : le plateau net de la SVPRO (cf. capture_real_3cam.py), sinon
+    # l'autofocus derive vers la zone catastrophiquement floue du milieu.
+    {'nom': 'svpro', 'v4l2': '5MP', 'exposition': None, 'focus': 90,
+     'calib': 'cam_2', 'extr': 'svpro_extrinsic_servo'},
 ]
 
 # Les trajectoires ne sont pas ecrites a la main : on balaie. Autour de
@@ -121,6 +125,75 @@ def construit_trajectoires():
 
 
 TRAJECTOIRES = construit_trajectoires()
+
+# ---------------------------------------------------------------------------
+# Securite de pose et reglages camera — logique reprise de
+# `training/capture_real_3cam.py` (non modifie, non importe : ce script reste
+# autonome). Les constantes viennent de la geometrie mesuree du 320 Pi.
+# ---------------------------------------------------------------------------
+_BASE_H, _L_UPPER, _L_FORE, _L_FORE_Z = 162.0, 136.35, 120.5, 82.0
+_L_WRIST, _L_EE = 84.0, 66.35
+# La pince Pro montee sur la bride descend ~110 mm SOUS link6. Sans ce terme,
+# des poses jugees « sures » enfoncent les doigts dans la table : link6 passe a
+# 60 mm mais les doigts sont 110 mm plus bas. Mettre 0.0 si la pince est retiree.
+_L_GRIPPER = 110.0
+_TABLE_Z_MIN, _BASE_R_MIN = 60.0, 90.0
+
+
+def _points_cles(j2, j3, j4):
+    a2, a3 = math.radians(j2), math.radians(j2 + j3)
+    a4 = math.radians(j2 + j3 + j4)
+    z_coude = _BASE_H + _L_UPPER * math.cos(a2)
+    r_coude = _L_UPPER * math.sin(a2)
+    z_poignet = z_coude + _L_FORE * math.cos(a3) - _L_FORE_Z * math.sin(a3)
+    r_poignet = r_coude + _L_FORE * math.sin(a3) + _L_FORE_Z * math.cos(a3)
+    l = _L_WRIST + _L_EE + _L_GRIPPER
+    return [(z_coude, abs(r_coude)), (z_poignet, abs(r_poignet)),
+            (z_poignet + l * math.cos(a4), abs(r_poignet + l * math.sin(a4)))]
+
+
+def pose_sure(angles_deg):
+    """Aucun point cle sous la table, ni dans le volume de la base."""
+    for z, r in _points_cles(angles_deg[1], angles_deg[2], angles_deg[3]):
+        if z < _TABLE_Z_MIN or (z < _BASE_H and r < _BASE_R_MIN):
+            return False
+    return True
+
+
+def ecrit_camera_settings(cam, dossier, w, h):
+    """`_camera_settings.json` NDDS dans le dossier images/<cam>/.
+
+    Sans ce fichier la conversion NDDS ne peut pas lire la capture : c'est lui
+    qui porte les intrinseques, remises a l'echelle de la trame reellement
+    capturee (fx, cx avec la largeur ; fy, cy avec la hauteur)."""
+    K, dist = registre.load_intrinsics(cam['calib'], w, h)
+    if K is None:
+        return False
+    reglages = {'camera_settings': [{
+        'name': cam['nom'],
+        'intrinsic_settings': {'fx': float(K[0, 0]), 'fy': float(K[1, 1]),
+                               'cx': float(K[0, 2]), 'cy': float(K[1, 2]),
+                               's': float(K[0, 1])},
+        'captured_image_size': {'width': w, 'height': h},
+        'dist_coeffs': [float(c) for c in np.asarray(dist).ravel()],
+    }]}
+    chemin = Path(dossier) / 'images' / cam['nom'] / '_camera_settings.json'
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    chemin.write_text(json.dumps(reglages, indent=2))
+    return True
+
+
+def identite_physique(index):
+    """Identifiant du CAPTEUR : deux /dev/videoN peuvent etre la meme camera."""
+    sortie = subprocess.run(['udevadm', 'info', '-q', 'property', '-n',
+                             f'/dev/video{index}'], capture_output=True, text=True).stdout
+    for cle in ('ID_SERIAL_SHORT=', 'ID_SERIAL=', 'ID_PATH='):
+        for ligne in sortie.splitlines():
+            if ligne.startswith(cle):
+                return ligne.split('=', 1)[1]
+    return f'video{index}'
+
+
 
 def echantillonne(sommets, pas=PAS_DEG):
     """Poses le long des segments, espacees d'au plus `pas` sur le joint le
@@ -172,18 +245,35 @@ class Camera:
         self.nom = cfg['nom']
         self.index = index_v4l2(cfg['v4l2'])
         self.exposition = cfg['exposition']
+        self.focus = cfg.get('focus')
         self.cap = cv2.VideoCapture(self.index, cv2.CAP_V4L2)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         if not self.cap.isOpened():
             raise SystemExit(f'{self.nom} : /dev/video{self.index} inaccessible')
-        self._expose()
+        self._regle()
 
-    def _expose(self):
+    def _regle(self):
+        """Exposition et mise au point FIGEES — sinon la camera derive d'une
+        pose a l'autre et le jeu de donnees melange plusieurs rendus."""
+        dev = f'/dev/video{self.index}'
         if self.exposition is not None:
-            subprocess.run(['v4l2-ctl', '-d', f'/dev/video{self.index}',
-                            '-c', 'auto_exposure=1',
-                            '-c', f'exposure_time_absolute={self.exposition}'],
+            # `auto_exposure=1` (manuel) d'ABORD, sinon exposure_time_absolute
+            # est ignore. gain et brightness sont epingles aussi : c'est ce qui
+            # evite les trames noires aleatoires (cf. capture_real_3cam.py).
+            subprocess.run(['v4l2-ctl', '-d', dev, '--set-ctrl', 'auto_exposure=1'],
+                           capture_output=True)
+            subprocess.run(['v4l2-ctl', '-d', dev, '--set-ctrl',
+                            f'exposure_time_absolute={self.exposition},'
+                            'gain=0,brightness=0'], capture_output=True)
+        if self.focus is not None:
+            # La SVPRO a un vrai objectif a focale variable : l'autofocus
+            # continu POMPE entre les poses et la nettete s'effondre au milieu
+            # de la plage. On le coupe et on epingle.
+            subprocess.run(['v4l2-ctl', '-d', dev, '--set-ctrl',
+                            'focus_automatic_continuous=0'], capture_output=True)
+            subprocess.run(['v4l2-ctl', '-d', dev, '--set-ctrl',
+                            f'focus_absolute={self.focus},sharpness=0,contrast=1'],
                            capture_output=True)
 
     def lit(self):
@@ -237,16 +327,19 @@ def main():
     args = ap.parse_args()
 
     mdl = modele(CAMERAS[0])          # visibilite jugee sur l'arducam
-    plan, aveugles = [], 0
+    plan, aveugles, dangereuses = [], 0, 0
     for t, sommets in enumerate(TRAJECTOIRES):
         for q in echantillonne(sommets, args.pas):
-            if visible(q, mdl):
+            if not pose_sure(q):
+                dangereuses += 1          # doigts sous la table, ou dans la base
+            elif visible(q, mdl):
                 plan.append((t, q))
             else:
                 aveugles += 1
 
     print(f'{len(TRAJECTOIRES)} trajectoires, pas {args.pas} deg')
-    print(f'{len(plan)} poses retenues, {aveugles} ecartees hors fenetre reseau')
+    print(f'{len(plan)} poses retenues, {aveugles} ecartees hors fenetre reseau, '
+          f'{dangereuses} ecartees comme DANGEREUSES (pince sous la table ou base)')
     ecarts = [float(np.max(np.abs(b - a)))
               for (ta, a), (tb, b) in zip(plan[:-1], plan[1:]) if ta == tb]
     if ecarts:
@@ -274,6 +367,17 @@ def main():
     from pick_and_place_real import Bridge
     pont = Bridge(args.host)
     cams = [Camera(c) for c in CAMERAS]
+    vues = {}
+    for cam, cfg in zip(cams, CAMERAS):
+        ident = identite_physique(cam.index)
+        if ident in vues:
+            raise SystemExit(f'{cam.nom} et {vues[ident]} sont la MEME camera '
+                             f'physique ({ident}) — images en double')
+        vues[ident] = cam.nom
+        if not ecrit_camera_settings(cfg, racine, 640, 480):
+            raise SystemExit(f'{cam.nom} : intrinseque {cfg["calib"]} introuvable, '
+                             'le jeu serait inutilisable pour la conversion NDDS')
+        print(f'  {cam.nom} : /dev/video{cam.index}, _camera_settings.json ecrit')
     entetes = (['index'] + [f'j{k}_rad' for k in range(1, 7)]
                + [f'j{k}_deg' for k in range(1, 7)] + ['camera', 'image_path'])
     neuf = not labels.is_file()
