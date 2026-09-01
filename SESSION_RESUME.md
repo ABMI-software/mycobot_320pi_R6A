@@ -1,5 +1,55 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (1er septembre 2026 — le biais DREAM est chiffré)
+
+### Ce qui a été accompli
+
+Le bras a été bougé sur les poses de travail, FK et extrinsèques déjà validées
+la veille. **Le biais DREAM est mesuré : décalage systématique de ~52 px**,
+soit ~11 cm sur la planche. Une translation `(+31,6, −41,2)` fait tomber le RMS
+de 56,5 à 22,0 px ; échelle et rotation n'apportent que 4,7 px de plus.
+
+**Cause la plus probable** : affinage sur `real_3cam`, où l'arducam était sur un
+autre montage (`convert_to_ndds.py:87-92`) → a priori de point de vue appris.
+Explique aussi la caméra placée ~1 m à côté par la self-cal : le PnP absorbe le
+décalage uniforme en une translation.
+
+**Fenêtre réseau** : `shrink-and-crop` 640×480 → 400×400 ne garde que
+**x ∈ [80, 560]**. Bras à gauche (J1 ≈ 88°) → bride hors champ → 1/7.
+
+### Hypothèses testées et ÉCARTÉES
+
+| hypothèse | mesure | verdict |
+|---|---|---|
+| erreur de FK | vert collé au bras, 2 caméras, 2 poses | écartée (31/08) |
+| exposition arducam | balayage 20→300 : 0 à 4/7, aucun optimum | écartée |
+| recadrage réseau | 7/7 keypoints dans la fenêtre, décalage 51,2 px quand même | écartée |
+| décalage en repère lien | l'écart ne tourne pas avec J1 (12°→58°) | écartée |
+
+Alternative **non exclue** : décalage constant en XY monde — indiscernable d'un
+décalage image sous caméra zénithale. La SVPRO trancherait mais ne détecte que
+0-3/7.
+
+### Prochaines actions
+
+1. [ROUGE] Décider : réentraîner/affiner sur le montage actuel, ou acter que
+   l'extrinsèque marqueurs reste la référence pour le pick. **En l'état, la
+   self-calibration markerless n'est pas utilisable en production** — 11 cm.
+2. [JAUNE] Poses de travail : garder le bras dans x ∈ [80, 560]. J1 ≈ 42° donne
+   7/7, J1 ≈ 88° donne 1/7.
+3. [VERT] Corriger `convert_to_ndds.py:102` (`arducam → cam_0`, or c'est `cam_3`).
+
+### Commande rapide de reprise
+
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+ln -sfn /home/genji/DREAM /tmp/DREAM
+python3 scripts/fk_vs_dream_diagnostic.py     # pose courante, bras immobile
+python3 scripts/fk_vs_dream_series.py --n 4   # LE BRAS BOUGE
+```
+
+---
+
 ## État actuel (31 août 2026 — nuit, FK validée contre DREAM)
 
 ### Ce qui a été accompli
