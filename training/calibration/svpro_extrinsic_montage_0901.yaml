@@ -1,0 +1,59 @@
+source: 'PnP sur les 8 coins des marqueurs 19 et 26, dont les positions 3D sont retro-projetees
+  depuis l ARDUCAM (extrinseque marqueurs validee a 3,5 px). Coins moyennes sur 221
+  trames de la capture real_montage_0901. La SVPRO ne decode que 19 et 26 : 23 est
+  masque par le bras, 25 visible mais mal decode.'
+camera: svpro
+intrinsics_stem: cam_2
+resolution:
+- 640
+- 480
+frame_id: base_link
+markers_used:
+- 19
+- 26
+rms_reproj_px: 0.6637691252677506
+validation_hors_ajustement:
+  marqueur: 25
+  methode: localise par contours sur 27 trames
+  erreur_mediane_px: 4.5
+  erreur_centre_px: 3.2
+  ancienne_extrinseque_px: 18.4
+remplace: svpro_extrinsic_servo.yaml (24/08, 21,5 px) — NON modifie
+T_cam_world:
+- - -0.9614592843621795
+  - 0.19615256247569612
+  - 0.1926660757579908
+  - 0.10724294246181049
+- - 0.015606848335226867
+  - 0.7385433354183629
+  - -0.6740253467000777
+  - 0.14789454700209945
+- - -0.27450404514106336
+  - -0.6450410172565283
+  - -0.713140670034921
+  - 0.9929737861287304
+- - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+T_world_cam:
+- - -0.9614592843621794
+  - 0.015606848335226861
+  - -0.2745040451410634
+  - 0.37337687595893143
+- - 0.1961525624756962
+  - 0.7385433354183636
+  - -0.6450410172565287
+  - 0.5102463111091067
+- - 0.1926660757579908
+  - -0.6740253467000781
+  - -0.713140670034921
+  - 0.7871525876082391
+- - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+camera_position_base_m:
+- 0.37337687595893143
+- 0.5102463111091067
+- 0.7871525876082391

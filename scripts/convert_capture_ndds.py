@@ -45,7 +45,12 @@ sys.path.insert(0, str(RACINE / 'training' / 'dream'))
 from mycobot_fk import forward_kinematics, KEYPOINT_NAMES     # noqa: E402
 
 EXTRINSEQUES = {'arducam': 'arducam_extrinsic_pick',
-                'svpro': 'svpro_extrinsic_servo'}
+                # PAS `svpro_extrinsic_servo` : mesure du 01/09, il place les
+                # marqueurs a 21,5 px de leur position reelle dans les images de
+                # cette capture. Refait a partir des 8 coins de 19 et 26,
+                # retro-projetes depuis l'arducam. Valide hors ajustement sur le
+                # marqueur 25 : 4,5 px contre 18,4 px pour l'ancien.
+                'svpro': 'svpro_extrinsic_montage_0901'}
 # Fenetre reellement vue par le reseau apres `shrink-and-crop` 640x480 -> 400x400.
 FENETRE_X = (80, 560)
 
