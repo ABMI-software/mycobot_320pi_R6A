@@ -33,6 +33,9 @@ Une pose dont les keypoints tombent hors de la fenetre reseau (`shrink-and-crop`
 640x480 -> 400x400 ne garde que x dans [80, 560]) n'apprend rien : elle est
 ecartee AVANT d'etre jouee.
 
+Ce script n'ecrit QUE dans `training/dream/captures/<nom>/`, un dossier neuf.
+Il ne touche ni `dream_data/` ni `capture_real_3cam.py`.
+
 Usage (venv_dream) :
     # ce que ca donnerait, SANS bouger le bras
     python scripts/capture_trajectoires.py --simuler
@@ -54,7 +57,10 @@ import yaml
 
 RACINE = Path(__file__).resolve().parents[1]
 CALIB = RACINE / 'training' / 'calibration'
-DONNEES = RACINE / 'training' / 'dream' / 'dream_data'
+# Dossier NEUF, deliberement hors de `dream_data/` : les jeux qui y vivent
+# (real_3cam, les mix, les *_ndds) sont acquis et ne doivent pas etre
+# melanges avec une capture faite sur un AUTRE montage de camera.
+CAPTURES = RACINE / 'training' / 'dream' / 'captures'
 
 sys.path.insert(0, str(RACINE / 'training' / 'dream'))
 sys.path.insert(0, str(RACINE / 'mycobot_gateway' / 'mycobot_gateway' / 'vision'))
@@ -221,7 +227,8 @@ def rejoint(pont, cible, vitesse=25):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--nom', default='real_montage', help='dossier sous dream_data/')
+    ap.add_argument('--nom', default='real_montage',
+                    help='dossier sous training/dream/captures/ (jamais dream_data)')
     ap.add_argument('--pas', type=float, default=PAS_DEG)
     ap.add_argument('--simuler', action='store_true',
                     help='compter les poses retenues sans bouger le bras')
@@ -252,7 +259,9 @@ def main():
         print('\n--simuler : rien n a bouge, rien n a ete ecrit.')
         return
 
-    racine = DONNEES / args.nom
+    racine = (CAPTURES / args.nom).resolve()
+    if CAPTURES.resolve() not in racine.parents:
+        raise SystemExit(f'refus : {racine} est hors de {CAPTURES}')
     for cam in CAMERAS:
         (racine / 'images' / cam['nom']).mkdir(parents=True, exist_ok=True)
     labels = racine / 'labels.csv'
@@ -308,6 +317,7 @@ def main():
     for cam in cams:
         cam.ferme()
     print(f'\ntermine — {racine}')
+    print('dream_data/ n a pas ete touche.')
     print('etiquettes = angles MESURES bras arrete, jamais la consigne.')
 
 
