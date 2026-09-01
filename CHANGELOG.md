@@ -42,6 +42,39 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **SVPRO récupérée : 21,5 px → 2,7 px, sans nouvelle capture (01/09).**
+  `training/calibration/svpro_extrinsic_montage_0901.yaml`. Le jeu SVPRO n'est
+  plus écarté, il est réétiqueté et utilisable.
+
+  La SVPRO ne décode que **2 marqueurs sur 4** — 23 est masqué par le bras
+  (conséquence directe d'avoir mis le robot au-dessus de la planche), 25 est
+  parfaitement visible mais mal décodé (d'où les faux ID 987, 653… en détection
+  agressive). Deux marqueurs ne donnent pas 2 points mais **8 coins**, et 8
+  points coplanaires suffisent à un PnP.
+
+  Les positions 3D de ces coins ne sont pas supposées : elles sont
+  **rétro-projetées depuis l'arducam** sur le plan Z=0, l'arducam étant validée
+  à 3,5 px. Contrôle de cohérence — les côtés reconstruits valent 50,7 / 49,2 /
+  50,7 / 49,4 mm pour un marqueur de 50 mm. L'ordre canonique des coins ArUco
+  règle la correspondance entre les deux caméras exactement.
+
+  | validation | nouvelle | ancienne |
+  |---|---|---|
+  | marqueur **25**, hors ajustement, localisé par contours sur 27 trames | **4,5 px** (centre 3,2) | 18,4 px |
+  | marqueurs 19/26 sur le NDDS regénéré | 2,7 px | 21,5 px |
+
+  Le test « un marqueur de côté » donnait 11,8 et 14,5 px, mais il est
+  **pessimiste** : ajuster 6 degrés de liberté sur un seul carré de 50 mm est
+  mal conditionné. Le chiffre honnête est celui du marqueur 25 tenu entièrement
+  hors de l'ajustement : **4,5 px**, du même ordre que l'arducam.
+
+  Caméra trouvée à (0,373 ; 0,510 ; 0,787) m contre (0,309 ; 0,512 ; 0,781) —
+  **64 mm de dérive**, essentiellement en X. `svpro_extrinsic_servo.yaml` n'est
+  **pas** modifié : `pick_dashboard` continue de l'utiliser tel quel.
+
+  ⇒ Les deux jeux NDDS sont désormais exploitables : **1102 trames par caméra**,
+  arducam 3,8 px et svpro 2,7 px.
+
 - **Jeu réel capturé sur le montage actuel + conversion NDDS (01/09).**
   `training/dream/captures/real_montage_0901/` — **1102 poses × 2 caméras**,
   885 Mo, capturé en 27 min sans un seul incident (aucune pose ratée, aucune
