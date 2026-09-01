@@ -33,6 +33,7 @@ Usage (venv_dream) :
         --angles 82.7,-122.6,88.76,-61.08,10.89,6.5
 """
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -53,9 +54,18 @@ import dream                                                    # noqa: E402
 from mycobot_fk import forward_kinematics, KEYPOINT_NAMES       # noqa: E402
 import camera_registry as registre                              # noqa: E402
 
+# L'arducam est debranchee/rebranchee de temps en temps : son /dev/videoN
+# change et elle PERD son exposition. On la retrouve donc par son nom V4L2,
+# et on reimpose 75 a chaque capture — la valeur du registre (cam_3) sur
+# laquelle l'extrinseque a ete faite. Sans ce forcage, une camera revenue en
+# auto apres un replug fait croire a une regression de detection.
+# (L'exposition ne change pas la detection : balayee 20-300 le 01/09, 0 a
+# 4/7, aucun optimum. Mais on la fige pour que les mesures soient comparables.)
 VUES = [
-    ('arducam', {'index': 2, 'exposition': 75, 'extr': 'arducam_extrinsic_pick'}),
-    ('svpro',   {'index': 0, 'exposition': None, 'extr': 'svpro_extrinsic_servo'}),
+    ('arducam', {'nom_v4l2': 'Arducam', 'exposition': 75,
+                 'extr': 'arducam_extrinsic_pick'}),
+    ('svpro',   {'nom_v4l2': '5MP', 'exposition': None,
+                 'extr': 'svpro_extrinsic_servo'}),
 ]
 COURT = ['base', 'J1', 'J2', 'J3', 'J4', 'J5', 'bride']
 VERT, ORANGE, BLANC, NOIR = (60, 220, 60), (0, 165, 255), (255, 255, 255), (0, 0, 0)
@@ -80,16 +90,29 @@ def texte(img, s, xy, couleur, echelle=0.5, epais=1, halo=True):
     cv2.putText(img, s, xy, FONT, echelle, couleur, epais, cv2.LINE_AA)
 
 
-def capture(index, exposition):
+def index_v4l2(motif):
+    """Premier /dev/videoN capable de capturer, pour la camera nommee `motif`."""
+    sortie = subprocess.run(['v4l2-ctl', '--list-devices'],
+                            capture_output=True, text=True).stdout
+    for bloc in sortie.split('\n\n'):
+        if motif.lower() in bloc.split('\n')[0].lower():
+            for ligne in bloc.split('\n')[1:]:
+                ligne = ligne.strip()
+                if ligne.startswith('/dev/video'):
+                    return int(ligne.removeprefix('/dev/video'))
+    raise SystemExit(f'camera introuvable : {motif}')
+
+
+def capture(cfg):
     """Trame 640x480 — l'intrinseque n'est valable que dans CE mode."""
+    index = cfg['index'] if 'index' in cfg else index_v4l2(cfg['nom_v4l2'])
     cap = cv2.VideoCapture(index, cv2.CAP_V4L2)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    if exposition is not None:
-        import subprocess
+    if cfg.get('exposition') is not None:
         subprocess.run(['v4l2-ctl', '-d', f'/dev/video{index}',
                         '-c', 'auto_exposure=1',
-                        '-c', f'exposure_time_absolute={exposition}'],
+                        '-c', f"exposure_time_absolute={cfg['exposition']}"],
                        capture_output=True)
     # Vider le tampon V4L2 : sans ca on lit une trame anterieure, prise pendant
     # un mouvement, donc floue — la detection passait de 7/7 a 2/7 (31/08).
@@ -115,7 +138,7 @@ def panneau(nom, cfg, obj, net, brut):
         if image is None:
             raise SystemExit(f'image brute absente : {chemin_brut}')
     else:
-        image = capture(cfg['index'], cfg['exposition'])
+        image = capture(cfg)
         cv2.imwrite(str(chemin_brut), image)
 
     from PIL import Image

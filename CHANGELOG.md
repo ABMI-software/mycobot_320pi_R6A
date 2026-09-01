@@ -42,6 +42,48 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **`scripts/fk_vs_dream_series.py` — le biais DREAM est mesuré : ~52 px
+  systématiques (01/09).** Sur des poses de travail (bras au-dessus de la
+  planche, pince vers le bas), avec une FK et des extrinsèques déjà validées,
+  les keypoints DREAM se décalent **tous dans la même direction** :
+
+  | modèle ajusté (22 correspondances, 4 poses) | RMS résiduel |
+  |---|---|
+  | aucun (DREAM = FK) | 56,5 px |
+  | **translation** `(+31,6, −41,2)` | **22,0 px** |
+  | similitude (échelle 0,905, rot +10,7°) | 17,3 px |
+  | affine complète | 16,8 px |
+
+  Une translation seule absorbe l'essentiel ; échelle et rotation n'apportent
+  que 4,7 px. Décalage moyen **51,2 px**, dispersion 23,3 px. À 1,06 m et
+  f ≈ 495 px, 52 px valent **~11 cm** sur la planche — l'ordre de grandeur des
+  pick qui ratent de quelques centimètres.
+
+  **Cause la plus probable : le réseau a été affiné sur `real_3cam`, où
+  l'arducam était sur un AUTRE montage** (cf. `convert_to_ndds.py:87-92`). Il a
+  appris un a priori de point de vue. Ceci explique aussi que la
+  self-calibration place la caméra ~1 m à côté : le PnP absorbe un décalage
+  uniforme de 52 px en une grande translation.
+
+  Alternative non exclue : un décalage constant en XY monde (indiscernable d'un
+  décalage image sous une caméra zénithale). La SVPRO trancherait, mais elle ne
+  détecte que 0-3/7.
+
+- **DREAM ne voit que 75 % de l'image.** `image_preprocessing: shrink-and-crop`,
+  640×480 → 400×400 : la fenêtre réseau est **x ∈ [80, 560]**, deux bandes
+  verticales de 80 px sont jetées. Quand le bras part à gauche (J1 ≈ 88°) la
+  bride tombe à x ≈ 60, **hors champ réseau** — la détection s'effondre à 1/7.
+  Ce n'est pas « le bras a quitté la planche », c'est le recadrage. La
+  bibliothèque inverse correctement le recadrage (`convert_keypoints_to_raw_from_netin`),
+  donc ce n'est **pas** la cause des 52 px : vérifié, les 7 keypoints étaient
+  dans la fenêtre sur les 4 poses mesurées.
+
+- **Diagnostic robuste au rebranchement de l'arducam.** Caméra retrouvée par son
+  nom V4L2 (son `/dev/videoN` change au replug) et exposition **75** réimposée à
+  chaque capture (elle est perdue au replug). Un balayage 20→300 confirme que
+  l'exposition ne change pas la détection (0 à 4/7, aucun optimum) — on la fige
+  pour que les mesures soient comparables, pas pour améliorer quoi que ce soit.
+
 - **`scripts/fk_vs_dream_diagnostic.py` — départage la FK et DREAM.** La
   self-calibration markerless laissait un résidu systématique (`link3` à
   23,6 px) qu'aucune pose de caméra n'expliquait : erreur de FK, ou biais de
