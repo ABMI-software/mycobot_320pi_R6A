@@ -42,6 +42,44 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **Jeu réel capturé sur le montage actuel + conversion NDDS (01/09).**
+  `training/dream/captures/real_montage_0901/` — **1102 poses × 2 caméras**,
+  885 Mo, capturé en 27 min sans un seul incident (aucune pose ratée, aucune
+  image non lue). Écart médian entre images consécutives **2,46°** contre 94,3°
+  dans `real_3cam`. Luminance et netteté stables de bout en bout : le
+  verrouillage d'exposition (arducam 75) et de focus (SVPRO 90) a tenu.
+
+  `scripts/convert_capture_ndds.py` — convertisseur **autonome**
+  (`convert_to_ndds.py` n'est ni modifié ni importé). Il ne le réutilise pas
+  pour deux raisons : celui-ci mappe `arducam → cam_0` alors que la caméra est
+  `cam_3`, et il s'appuie sur des poses caméra approximatives codées en dur. Ici
+  les intrinsèques viennent du `_camera_settings.json` écrit **par la capture**,
+  et l'extrinsèque est celle des marqueurs, validée. La projection applique la
+  **distorsion** — sans elle les `projected_location` ne tombent pas où le
+  keypoint apparaît et DREAM apprendrait des cartes décalées.
+
+  1102 trames par caméra, 0 hors image, 0 débordant la fenêtre réseau.
+
+- **Étiquettes validées par les marqueurs, et la SVPRO écartée.** Contrôle
+  quantitatif : projeter les 4 ArUco de positions connues et mesurer l'écart à
+  leur détection dans les images de la capture elle-même.
+
+  | caméra | écart projeté ↔ détecté | verdict |
+  |---|---|---|
+  | **arducam** | **médiane 3,5 px** (max 4,0) | étiquettes fiables |
+  | svpro | médiane 21,5 px (max 28,0) | **inutilisable** |
+
+  `svpro_extrinsic_servo.yaml` (24/08) ne décrit plus la position actuelle de la
+  SVPRO. Non corrigeable depuis cette capture : elle ne détecte que **2
+  marqueurs sur 4** (19 et 26, vus 111 fois sur 111 trames analysées ; 23 et 25
+  jamais), or un PnP en demande 4. Le dossier NDDS est renommé
+  `..._ETIQUETTES_FAUSSES_21px` avec un LISEZ_MOI. **Les images et les angles
+  restent bons** — seules les étiquettes sont fausses, une extrinsèque SVPRO
+  refaite suffirait à récupérer le jeu.
+
+  ⇒ **L'affinage se fera sur l'arducam seule**, qui est de toute façon la caméra
+  du pick.
+
 - **`scripts/capture_trajectoires.py` — jeu réel POUR CE MONTAGE, par
   trajectoires à petits pas.** Script **autonome** : il n'importe ni
   `pick_dashboard` ni rien qui le lise. Balaie 72 trajectoires autour de 4

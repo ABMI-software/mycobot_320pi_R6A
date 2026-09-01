@@ -49,3 +49,6 @@ training/dream/checkpoints_dream/
 # Position du carton retenue d une seance a l autre — etat local, pas du code
 scripts/carton_position.json
 scripts/affaissement.json
+
+# Captures reelles et jeux NDDS : 885 Mo + 430 Mo, jamais dans git.
+training/dream/captures/
