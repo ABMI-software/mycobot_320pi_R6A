@@ -135,7 +135,12 @@ TRAJECTOIRES = construit_trajectoires()
 # Ce qui touche, ce sont les DOIGTS, pas le bras (observe le 01/09 : les liens
 # restaient au-dessus de la table, la pointe passait a -4,4 mm). D'ou deux
 # gardes distinctes.
-GARDE_POINTE_MM = 25.0     # hauteur nominale exigee pour la pointe de la pince
+# 40 et non 25 : le bras s'AFFAISSE sous la gravite (J2 tombe ~1,9 deg sous la
+# consigne, documente dans le depot), donc la pose ATTEINTE est plus basse que
+# la pose calculee. Mesure du 01/09 sur 27 poses reellement jouees : plan
+# garanti a 25,2 mm, pointe REELLE a 18,0 mm — 7 mm d'affaissement. A 40 mm de
+# consigne la pointe reelle tient ~33 mm, soit ~18 mm meme en pire cas d'axe.
+GARDE_POINTE_MM = 40.0     # hauteur nominale exigee pour la pointe de la pince
 GARDE_LIENS_MM = 30.0      # pour les liens MOBILES (link3..link6)
 _LONGUEUR_PINCE_MM = 110.0
 # L'axe d'approche de la bride est incertain de 7,7 deg. Sur 110 mm cela vaut
