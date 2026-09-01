@@ -42,6 +42,29 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **SVPRO affinée à 3,5 px — au niveau de l'arducam.** Une fois le bras écarté,
+  le marqueur **23 est redevenu visible** (il était masqué pendant toute la
+  capture). Deux conséquences.
+
+  D'abord une **validation indépendante** de l'extrinsèque à 2 marqueurs : 23
+  n'avait jamais servi à l'ajustement et il y reprojetait déjà à **3,8 px**.
+
+  Ensuite un meilleur ajustement : 3 marqueurs, **12 coins** bien étalés, RMS
+  1,03 px, validation croisée 7,3 / 3,3 / 11,4 px (contre 11,8 / 14,5 à deux
+  marqueurs).
+
+  Arbitrage sur le marqueur **25**, que la SVPRO ne décode pas et qu'aucun
+  ajustement n'a donc pu utiliser — localisé par contours sur 34 trames live :
+
+  | extrinsèque | erreur sur 25 | centre |
+  |---|---|---|
+  | **3 marqueurs (retenue)** | **3,5 px** | 2,9 px |
+  | 2 marqueurs (01/09) | 4,7 px | 3,6 px |
+  | `svpro_extrinsic_servo` (24/08) | 18,3 px | 18,9 px |
+
+  Jeu SVPRO réétiqueté. `svpro_extrinsic_servo.yaml` reste **non modifié** :
+  `pick_dashboard` continue de l'utiliser tel quel.
+
 - **SVPRO récupérée : 21,5 px → 2,7 px, sans nouvelle capture (01/09).**
   `training/calibration/svpro_extrinsic_montage_0901.yaml`. Le jeu SVPRO n'est
   plus écarté, il est réétiqueté et utilisable.
