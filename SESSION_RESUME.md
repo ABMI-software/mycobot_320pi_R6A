@@ -1,5 +1,52 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (1er septembre 2026 — soir, verdict sur DREAM au pick)
+
+### Le résultat
+
+**Le biais DREAM n'est corrigeable par aucune transformation 2D globale.**
+75 correspondances / 13 poses : translation 52 mm, similitude 42 mm, affine
+complète **36 mm**. Le décalage n'est pas constant (`dx` suit J1 : +8 px à
+J1=0° → +53 px à J1=60°). Dispersion par pose 20-24 px ⇒ même systématique
+entièrement retiré, le bruit propre de DREAM vaut **~40 mm**.
+
+Échelle ajustée **0,845** : DREAM voit le robot 15 % plus petit. Cohérent avec
+un affinage sur un autre montage (`real_3cam`).
+
+**La fusion 2 caméras ne sauve pas** : SVPRO 3/7 détectés, 117-207 px d'erreur
+contre 52-98 px pour l'arducam. Le seuil de fusion étant à 15 px, elle recevrait
+un poids nul et la fusion retomberait sur « MONO via arducam ». C'est de la
+robustesse, pas de la correction de biais.
+
+### Décision à prendre
+
+**En l'état DREAM n'est pas utilisable pour le pick sur ce banc** (~40 mm).
+Deux voies :
+1. Réaffiner le réseau sur CE montage d'arducam (la seule qui rende le
+   markerless viable).
+2. Acter que l'extrinsèque marqueurs reste la référence du pick, et cantonner
+   DREAM à la validation d'angles du dashboard.
+
+### Prochaines actions
+
+1. [ROUGE] Trancher entre 1 et 2 ci-dessus. Si 1 : capture d'un jeu réel sur le
+   montage actuel, puis mix-fine-tune comme `vgg_ultimate_v4_mix_ft_e30`.
+2. [JAUNE] Poses de travail : garder le bras dans x ∈ [80, 560]. J1 ≈ 42° donne
+   7/7, J1 ≈ 88° donne 1/7. `--balayage` écarte les poses aveugles avant de
+   bouger.
+3. [VERT] Corriger `convert_to_ndds.py:102` (`arducam → cam_0`, or c'est `cam_3`).
+
+### Commande rapide de reprise
+
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+ln -sfn /home/genji/DREAM /tmp/DREAM
+python3 scripts/fk_vs_dream_diagnostic.py       # pose courante, bras immobile
+python3 scripts/fk_vs_dream_series.py --balayage # LE BRAS BOUGE
+```
+
+---
+
 ## État actuel (1er septembre 2026 — le biais DREAM est chiffré)
 
 ### Ce qui a été accompli

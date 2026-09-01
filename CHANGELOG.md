@@ -42,6 +42,44 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **Le biais DREAM n'est corrigeable par aucune transformation 2D (01/09).**
+  75 correspondances, 13 poses, FK et extrinsèques validées :
+
+  | modèle ajusté | RMS | sur la planche |
+  |---|---|---|
+  | aucun (DREAM = FK) | 56,9 px | 122 mm |
+  | translation | 24,3 px | 52 mm |
+  | similitude (échelle **0,845**, rot +8,1°) | 19,8 px | 42 mm |
+  | affine complète (6 param.) | 17,0 px | **36 mm** |
+
+  Le décalage **n'est pas constant** : `dx` suit J1 (+8 px à J1=0° → +53 px à
+  J1=60°) tandis que `dy` reste à ≈ −43 px. Un décalage constant ne peut donc
+  pas le corriger, et même l'affine complète laisse 36 mm. La dispersion par
+  pose vaut déjà 20-24 px : **une fois tout le systématique retiré il reste le
+  bruit propre de DREAM, ~40 mm.** Pour une saisie au millimètre, rédhibitoire.
+
+  L'échelle **0,845** dit que DREAM voit le robot 15 % plus petit que la
+  réalité — ce qu'on attend d'un réseau affiné caméra plus loin. Converge avec
+  le montage différent de `real_3cam` (`convert_to_ndds.py:87-92`).
+
+  ⇒ **Pour utiliser DREAM sur ce banc il faut le réaffiner sur CE montage.**
+  D'ici là l'extrinsèque marqueurs reste la référence du pick.
+
+- **La fusion multi-caméras ne corrige pas ce biais — mesuré, pas supposé.**
+  Sur une même pose : arducam 7/7 détectés, erreurs 52→98 px ; SVPRO 3/7,
+  erreurs 117→207 px (J4, J5, bride non détectés). La SVPRO est 2 à 3× pire.
+  La fusion `solve-then-fuse` pondère par la reprojection avec
+  `JOINT_CONFIDENCE_PX_THRESHOLD = 15 px` : à 117-207 px la SVPRO reçoit un
+  poids **nul** partout et la fusion se replie sur « MONO via arducam ». C'est
+  un mécanisme de **robustesse** (jamais pire que la meilleure caméra, comble
+  les occlusions), pas un correcteur de biais commun aux deux vues.
+
+- **`fk_vs_dream_series.py --balayage` : écran de visibilité avant de bouger.**
+  Une pose dont les keypoints FK tombent hors de la fenêtre réseau
+  (x ∈ [80, 560], marge 30 px) ne mesure rien — elle est écartée sans être
+  jouée. Sur le balayage du 01/09 : **8 poses sur 21 rejetées**. Répond au
+  constat que le bras est parfois coupé dans l'arducam.
+
 - **`scripts/fk_vs_dream_series.py` — le biais DREAM est mesuré : ~52 px
   systématiques (01/09).** Sur des poses de travail (bras au-dessus de la
   planche, pince vers le bas), avec une FK et des extrinsèques déjà validées,
