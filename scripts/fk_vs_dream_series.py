@@ -53,6 +53,31 @@ POSES = [
 PAS_MAX_DEG = 30.0     # un ordre unique depuis une pose eloignee fait partir
                        # toutes les articulations a fond en meme temps
 
+# Fenetre reellement vue par le reseau : `shrink-and-crop` 640x480 -> 400x400
+# gardre x dans [80, 560] et jette 25 % de l'image en deux bandes verticales.
+# Un keypoint hors de la fenetre n'est pas "mal detecte", il est INVISIBLE.
+FENETRE_X = (80, 560)
+MARGE_PX = 30          # on s'ecarte du bord de coupe, un keypoint a x=82 est
+                       # dans la fenetre mais colle au bord
+
+
+def variantes(base, j1_min=0.0, j1_max=95.0, pas=15.0):
+    """Meme pose a differents azimuts : faire tourner J1 SEUL conserve
+    exactement l'inclinaison de l'outil, donc la pince reste pointee vers le
+    bas comme en travail."""
+    for j1 in np.arange(j1_min, j1_max + 1e-6, pas):
+        yield [float(j1)] + list(base[1:])
+
+
+def visible(q, rvec, tvec, K, dist):
+    """Les 7 keypoints tombent-ils dans la fenetre reseau, avec de la marge ?"""
+    pos, _ = forward_kinematics(np.radians(q))
+    obj = np.array([pos[n] for n in KEYPOINT_NAMES], float)
+    proj = cv2.projectPoints(obj, rvec, tvec, K, dist)[0].reshape(-1, 2)
+    x, y = proj[:, 0], proj[:, 1]
+    return (bool(np.all((FENETRE_X[0] + MARGE_PX <= x) & (x < FENETRE_X[1] - MARGE_PX))
+                 and np.all((0 <= y) & (y < 480))), proj)
+
 
 def rejoint(pont, cible, vitesse=25, tol=0.6, attente=10.0):
     """Rejoint `cible` par paliers, puis attend l'immobilisation reelle."""
@@ -85,83 +110,95 @@ def modele_camera(cfg):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--n', type=int, default=len(POSES))
+    ap.add_argument('--balayage', action='store_true',
+                    help='balayer J1 sur chaque pose de base, pour tester la '
+                         'STABILITE du decalage plutot que sa valeur')
     ap.add_argument('--host', default='10.10.0.224')
     args = ap.parse_args()
-    poses = POSES[:args.n]
+
+    net = dream.create_network_from_config_file(
+        str(CHECKPOINT.with_suffix('.yaml')), str(CHECKPOINT))
+    cameras = {nom: modele_camera(cfg) for nom, cfg in VUES}
+    rvec, tvec, K, dist = cameras['arducam']
+
+    if args.balayage:
+        # Ecran AVANT de bouger : une pose dont les keypoints tombent hors de la
+        # fenetre reseau ne mesure rien, autant ne pas la jouer.
+        candidates, rejetees = [], 0
+        for base in (POSES[0], POSES[3], POSES[6]):
+            for q in variantes(base):
+                ok, _ = visible(q, rvec, tvec, K, dist)
+                candidates.append(q) if ok else None
+                rejetees += 0 if ok else 1
+        poses = candidates
+        print(f'{len(poses)} poses retenues, {rejetees} rejetees hors fenetre '
+              f'reseau (x hors [{FENETRE_X[0]+MARGE_PX}, {FENETRE_X[1]-MARGE_PX}])')
+    else:
+        poses = POSES[:args.n]
 
     from pick_and_place_real import Bridge
     pont = Bridge(args.host)
     print(f'Depart : {np.round(pont.get_angles(), 1).tolist()}')
     print(f'{len(poses)} poses — LE BRAS VA BOUGER\n')
-
-    net = dream.create_network_from_config_file(
-        str(CHECKPOINT.with_suffix('.yaml')), str(CHECKPOINT))
-    cameras = {nom: modele_camera(cfg) for nom, cfg in VUES}
     from PIL import Image
 
-    # {camera: {keypoint: [ecarts px]}} + compte de detections
-    ecarts = {nom: {k: [] for k in COURT} for nom, _ in VUES}
-    detectes = {nom: [] for nom, _ in VUES}
-    vignettes = []
-
+    par_pose = []          # (q, n_detectes, decalage moyen dx dy, dispersion)
+    P_tout, D_tout = [], []
+    print(f'{"pose":>4s} {"J1":>6s} {"det":>5s} {"dx":>7s} {"dy":>7s} '
+          f'{"|d|":>7s} {"disp":>6s}')
     for i, pose in enumerate(poses, 1):
         q = rejoint(pont, pose)
         pos, _ = forward_kinematics(np.radians(q))
         obj = np.array([pos[n] for n in KEYPOINT_NAMES], float)
-        ligne = f'pose {i}/{len(poses)}  q={np.round(q, 1).tolist()}'
+        proj = cv2.projectPoints(obj, rvec, tvec, K, dist)[0].reshape(-1, 2)
+        image = capture(dict(VUES)['arducam'])
+        h, w = image.shape[:2]
+        kps = np.array(net.keypoints_from_image(
+            Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        )['detected_keypoints'], float)
 
-        for nom, cfg in VUES:
-            rvec, tvec, K, dist = cameras[nom]
-            proj = cv2.projectPoints(obj, rvec, tvec, K, dist)[0].reshape(-1, 2)
-            image = capture(cfg)
-            h, w = image.shape[:2]
-            kps = np.array(net.keypoints_from_image(
-                Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-            )['detected_keypoints'], float)
+        e = []
+        for k in range(7):
+            du, dv = kps[k]
+            if np.all(np.isfinite(kps[k])) and 0 <= du < w and 0 <= dv < h:
+                e.append(kps[k] - proj[k])
+                P_tout.append(proj[k]); D_tout.append(kps[k])
+        if len(e) >= 2:
+            e = np.array(e)
+            t = e.mean(axis=0)
+            disp = float(np.sqrt(((e - t) ** 2).sum(axis=1).mean()))
+            par_pose.append((q[0], len(e), t, disp))
+            print(f'{i:4d} {q[0]:6.1f} {len(e):3d}/7 {t[0]:+7.1f} {t[1]:+7.1f} '
+                  f'{np.hypot(*t):7.1f} {disp:6.1f}')
+        else:
+            print(f'{i:4d} {q[0]:6.1f} {len(e):3d}/7  trop peu de detections')
 
-            vus = 0
-            for k, court in enumerate(COURT):
-                fu, fv = proj[k]
-                du, dv = kps[k]
-                if np.all(np.isfinite(kps[k])) and 0 <= du < w and 0 <= dv < h:
-                    ecarts[nom][court].append(float(np.hypot(fu - du, fv - dv)))
-                    vus += 1
-                    cv2.line(image, (int(fu), int(fv)), (int(du), int(dv)),
-                             BLANC, 1, cv2.LINE_AA)
-                    cv2.circle(image, (int(du), int(dv)), 5, ORANGE, -1, cv2.LINE_AA)
-                cv2.circle(image, (int(fu), int(fv)), 7, VERT, 2, cv2.LINE_AA)
-            for a, b in zip(range(6), range(1, 7)):
-                cv2.line(image, tuple(proj[a].astype(int)),
-                         tuple(proj[b].astype(int)), VERT, 2, cv2.LINE_AA)
-            detectes[nom].append(vus)
-            ligne += f'   {nom} {vus}/7'
-            if nom == 'arducam':
-                v = cv2.resize(image, (320, 240))
-                texte(v, f'{i}: {vus}/7', (8, 22), BLANC, 0.5)
-                vignettes.append(v)
-        print(ligne)
+    if len(par_pose) < 2:
+        print('\npas assez de poses exploitables')
+        return
 
-    print('\n=== biais FK<->DREAM sur poses favorables ===')
-    print(f'{"":8s} ' + ' '.join(f'{c:>9s}' for c in COURT))
-    for nom, _ in VUES:
-        med = []
-        for c in COURT:
-            e = ecarts[nom][c]
-            med.append(f'{np.median(e):7.0f}px' if e else f'{"-":>9s}')
-        print(f'{nom:8s} ' + ' '.join(f'{m:>9s}' for m in med))
-        n = detectes[nom]
-        print(f'{"":8s} detections {np.mean(n):.1f}/7 en moyenne '
-              f'(min {min(n)}, max {max(n)})')
+    T = np.array([t for _, _, t, _ in par_pose])
+    moy, ecart = T.mean(axis=0), T.std(axis=0)
+    print(f'\n=== stabilite du decalage sur {len(T)} poses ===')
+    print(f'decalage moyen   ({moy[0]:+.1f}, {moy[1]:+.1f})  = {np.hypot(*moy):.1f} px')
+    print(f'ecart-type       ({ecart[0]:5.1f}, {ecart[1]:5.1f}) px')
+    print(f'etendue          dx {T[:,0].min():+.0f}..{T[:,0].max():+.0f}   '
+          f'dy {T[:,1].min():+.0f}..{T[:,1].max():+.0f}')
 
-    if vignettes:
-        cols = 4
-        lignes = [np.hstack(vignettes[i:i + cols] + [np.zeros(
-            (240, 320 * (cols - len(vignettes[i:i + cols])), 3), np.uint8)]
-            if len(vignettes[i:i + cols]) < cols else vignettes[i:i + cols])
-            for i in range(0, len(vignettes), cols)]
-        grille = np.vstack(lignes)
-        cv2.imwrite(str(SORTIE / 'fk_vs_dream_series.png'), grille)
-        print('\ngrille :', SORTIE / 'fk_vs_dream_series.png')
+    P, D = np.array(P_tout), np.array(D_tout)
+    avant = float(np.sqrt(((D - P) ** 2).sum(axis=1).mean()))
+    apres = float(np.sqrt(((D - P - moy) ** 2).sum(axis=1).mean()))
+    print(f'\nRMS DREAM<->FK   avant correction {avant:5.1f} px')
+    print(f'                 apres correction {apres:5.1f} px  '
+          f'({100*(1-apres/avant):.0f} % absorbes)')
+    mm = apres / 495.0 * 1060.0
+    print(f'\nreste ~{mm:.0f} mm sur la planche apres correction constante')
+    verdict = ('CORRIGEABLE : un decalage constant a deux parametres suffit'
+               if np.hypot(*ecart) < 0.4 * np.hypot(*moy)
+               else 'NON corrigeable par une constante : le decalage depend de la pose')
+    print(f'=> {verdict}')
+    np.savez(SORTIE.parent / 'training' / 'calibration' / 'dream_biais.npz',
+             P=P, D=D, decalage=moy, ecart=ecart)
 
 
 if __name__ == '__main__':
