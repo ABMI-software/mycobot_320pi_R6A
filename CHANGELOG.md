@@ -42,6 +42,43 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **`scripts/capture_trajectoires.py` — jeu réel POUR CE MONTAGE, par
+  trajectoires à petits pas.** Script **autonome** : il n'importe ni
+  `pick_dashboard` ni rien qui le lise. Balaie 72 trajectoires autour de 4
+  configurations de base × 3 azimuts × 6 joints ; `--simuler` compte tout sans
+  bouger le bras. Au pas de 2,5° : **1621 poses retenues, 35 écartées** hors
+  fenêtre réseau, 3242 images (2 caméras), ~70 min. Écart médian entre images
+  consécutives **2,46°** — contre 94,3° dans `real_3cam`.
+
+  Deux enseignements tirés de `panda-3cam_azure` (NVlabs) dictent la méthode :
+
+  | | NVlabs Panda | `real_3cam` |
+  |---|---|---|
+  | images (1 caméra) | 6394 | 2500 |
+  | écart image à image (médiane) | **0,23°** | **94,3°** |
+  | structure | 10 trajectoires continues | 2500 poses indépendantes |
+  | robot pendant la capture | en mouvement, ~10°/s | à l'arrêt |
+  | robot dans le cadre | 53 % de la largeur | 29 % |
+
+  **On ne filme pas en mouvement**, contrairement à eux : NVlabs enregistre
+  l'état articulaire synchronisé à la trame, alors qu'ici les angles arrivent
+  par requête-réponse TCP. À 10°/s, 100 ms de latence font **1° d'erreur
+  d'étiquette**. On garde donc l'arrêt à chaque prise — étiquettes exactes,
+  angles **mesurés** jamais la consigne — avec des pas petits pour retrouver la
+  densité.
+
+- **Agrandir le robot dans le cadre : testé, ÉCARTÉ.** L'arducam sort du
+  1600×1200 ; capturer en grand, recadrer autour du robot et redescendre en
+  640×480 le fait passer de 29 % à **53 %** du cadre, exactement la proportion
+  de NVlabs — et l'erreur **double, 61 → 143 px** (75 px à 42 %). La
+  transformation d'intrinsèque est vérifiée correcte (le squelette FK suit le
+  bras au pixel dans l'image recadrée), donc le résultat est réel : **le réseau
+  est verrouillé sur le cadrage de son affinage**, pas limité par la taille du
+  robot. Une image que l'œil trouve bien meilleure lui est étrangère.
+
+  ⇒ Corollaire pour toute capture future : **le cadrage d'entraînement doit
+  être celui de l'inférence** — 640×480 direct, arducam à sa place, exposition 75.
+
 - **Le biais DREAM n'est corrigeable par aucune transformation 2D (01/09).**
   75 correspondances, 13 poses, FK et extrinsèques validées :
 
