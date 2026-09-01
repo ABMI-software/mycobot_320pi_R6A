@@ -47,7 +47,6 @@ Usage (venv_dream) :
 import argparse
 import csv
 import json
-import math
 import subprocess
 import sys
 import time
@@ -131,33 +130,52 @@ TRAJECTOIRES = construit_trajectoires()
 # `training/capture_real_3cam.py` (non modifie, non importe : ce script reste
 # autonome). Les constantes viennent de la geometrie mesuree du 320 Pi.
 # ---------------------------------------------------------------------------
-_BASE_H, _L_UPPER, _L_FORE, _L_FORE_Z = 162.0, 136.35, 120.5, 82.0
-_L_WRIST, _L_EE = 84.0, 66.35
-# La pince Pro montee sur la bride descend ~110 mm SOUS link6. Sans ce terme,
-# des poses jugees « sures » enfoncent les doigts dans la table : link6 passe a
-# 60 mm mais les doigts sont 110 mm plus bas. Mettre 0.0 si la pince est retiree.
-_L_GRIPPER = 110.0
-_TABLE_Z_MIN, _BASE_R_MIN = 60.0, 90.0
 
 
-def _points_cles(j2, j3, j4):
-    a2, a3 = math.radians(j2), math.radians(j2 + j3)
-    a4 = math.radians(j2 + j3 + j4)
-    z_coude = _BASE_H + _L_UPPER * math.cos(a2)
-    r_coude = _L_UPPER * math.sin(a2)
-    z_poignet = z_coude + _L_FORE * math.cos(a3) - _L_FORE_Z * math.sin(a3)
-    r_poignet = r_coude + _L_FORE * math.sin(a3) + _L_FORE_Z * math.cos(a3)
-    l = _L_WRIST + _L_EE + _L_GRIPPER
-    return [(z_coude, abs(r_coude)), (z_poignet, abs(r_poignet)),
-            (z_poignet + l * math.cos(a4), abs(r_poignet + l * math.sin(a4)))]
+# Ce qui touche, ce sont les DOIGTS, pas le bras (observe le 01/09 : les liens
+# restaient au-dessus de la table, la pointe passait a -4,4 mm). D'ou deux
+# gardes distinctes.
+GARDE_POINTE_MM = 25.0     # hauteur nominale exigee pour la pointe de la pince
+GARDE_LIENS_MM = 30.0      # pour les liens MOBILES (link3..link6)
+_LONGUEUR_PINCE_MM = 110.0
+# L'axe d'approche de la bride est incertain de 7,7 deg. Sur 110 mm cela vaut
+# 110*sin(7,7) = 15 mm : exiger 25 mm nominal garantit >= 10 mm reels.
+_INCERTITUDE_AXE_MM = 15.0
+# Direction de la pince dans le repere bride, MESUREE sur les points de travail
+# enregistres et non supposee : -X est le seul axe qui place la pointe a 23 mm
+# au point `pick` (objet saisi sur la table) et 5 mm au `handover`. +X, ±Y, ±Z
+# la mettraient 120 a 310 mm en l'air, impossible pour une saisie.
+_AXE_PINCE = np.array([-1.0, 0.0, 0.0])
+# `base`, `link1` et `link2` sont sur l'axe du socle (z=0 et r=0 par
+# construction) : les inclure dans la garde au sol rejetterait TOUTES les poses.
+_LIENS_MOBILES = ('mycobot320_link3', 'mycobot320_link4',
+                  'mycobot320_link5', 'mycobot320_link6')
+
+
+def hauteur_pointe_mm(angles_deg):
+    """Hauteur de la pointe de la pince au-dessus de la table, en mm."""
+    pos, T = forward_kinematics(np.radians(angles_deg))
+    pointe = (np.asarray(pos['mycobot320_link6'], float) * 1000.0
+              + T[6][:3, :3] @ (_AXE_PINCE * _LONGUEUR_PINCE_MM))
+    return float(pointe[2])
 
 
 def pose_sure(angles_deg):
-    """Aucun point cle sous la table, ni dans le volume de la base."""
-    for z, r in _points_cles(angles_deg[1], angles_deg[2], angles_deg[3]):
-        if z < _TABLE_Z_MIN or (z < _BASE_H and r < _BASE_R_MIN):
+    """Garde au sol sur la FK REELLE, pince comprise.
+
+    Le filtre plan de `capture_real_3cam.py` (_fk_key_points sur j2, j3, j4)
+    ignore J5, qui incline l'outil : sur le balayage du 01/09 il a laisse passer
+    9 poses avec la pointe sous la table et les doigts ont touche.
+    """
+    pos, _ = forward_kinematics(np.radians(angles_deg))
+    for nom in _LIENS_MOBILES:
+        p = pos[nom]
+        z, r = p[2] * 1000.0, np.hypot(p[0], p[1]) * 1000.0
+        if z < GARDE_LIENS_MM:
             return False
-    return True
+        if z < 162.0 and r < 90.0:      # volume de la base
+            return False
+    return hauteur_pointe_mm(angles_deg) >= GARDE_POINTE_MM
 
 
 def ecrit_camera_settings(cam, dossier, w, h):
@@ -339,7 +357,8 @@ def main():
 
     print(f'{len(TRAJECTOIRES)} trajectoires, pas {args.pas} deg')
     print(f'{len(plan)} poses retenues, {aveugles} ecartees hors fenetre reseau, '
-          f'{dangereuses} ecartees comme DANGEREUSES (pince sous la table ou base)')
+          f'{dangereuses} ecartees comme DANGEREUSES '
+          f'(pointe < {GARDE_POINTE_MM:.0f} mm ou lien < {GARDE_LIENS_MM:.0f} mm)')
     ecarts = [float(np.max(np.abs(b - a)))
               for (ta, a), (tb, b) in zip(plan[:-1], plan[1:]) if ta == tb]
     if ecarts:
