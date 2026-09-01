@@ -78,9 +78,13 @@ TOL_IMMOBILE = 0.35     # deg : deux lectures sous ce seuil = bras arrete
 CAMERAS = [
     {'nom': 'arducam', 'v4l2': 'Arducam', 'exposition': 75, 'focus': None,
      'calib': 'cam_3', 'extr': 'arducam_extrinsic_pick'},
-    # focus 90 : le plateau net de la SVPRO (cf. capture_real_3cam.py), sinon
-    # l'autofocus derive vers la zone catastrophiquement floue du milieu.
-    {'nom': 'svpro', 'v4l2': '5MP', 'exposition': None, 'focus': 90,
+    # 40 et non 90 : apres l'inclinaison de la SVPRO du 01/09 (pour faire
+    # entrer le marqueur 25 dans le champ) la planche s'est rapprochee et 90
+    # est devenu flou. Balayage 0-250 : nettete 417 a focus 40 contre 211 a 90,
+    # et surtout 4/4 marqueurs detectes 12 fois sur 12 contre 2/4 et 14
+    # detections a 90. L'autofocus continu reste COUPE : il pompe entre les
+    # poses. A re-balayer si la camera est rebougee.
+    {'nom': 'svpro', 'v4l2': '5MP', 'exposition': None, 'focus': 40,
      'calib': 'cam_2', 'extr': 'svpro_extrinsic_servo'},
 ]
 
