@@ -1,5 +1,49 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (2 septembre 2026 — soir, la démo markerless est invalidée)
+
+### Ce qui a été accompli
+
+**Le résultat markerless de l'après-midi (27,9 mm / 1,62°) est faux, et on sait
+pourquoi.** Le keypoint `base` de `vgg_montage0901_ft_e30` est une **constante
+par montage** : (211,7 · 342,9) sur l'arducam les deux jours, (384,5 · 333,3)
+sur la svpro les deux jours, (250,0 · 256,4) sur real_3cam — écarts-types 0,00
+à 0,21. Décaler l'image de 30 px déplace `base`, `link1` et `link2` de **0 %**.
+La svpro, réellement déplacée de ~30 px, est vue déplacée de **0,08 px**.
+
+Ces trois keypoints pèsent 75 des 174 correspondances de l'ajustement arducam :
+la pose retrouvée **restitue celle des données d'affinage**, elle ne la mesure
+pas. Circulaire, et d'autant plus flatteuse (0,45 px de résidu) que c'est
+circulaire.
+
+### Décisions prises
+
+- **Ne pas présenter la démo markerless comme validée.** Avec ce checkpoint,
+  DREAM ne s'auto-calibre pas sur une caméra déplacée ; il n'a l'air de marcher
+  que là où la caméra n'a pas bougé.
+- Aucun autre checkpoint ne fait mieux (`vgg_synthetic_e25` : socle à 200 px du
+  vrai ; `vgg_ultimate_v4_mix_ft_e30` : biais connu, 3/10 détections svpro).
+- **La cause est le manque de diversité de points de vue à l'affinage**, pas
+  l'architecture ni le nombre d'epochs.
+- **La validation à 800 trames ne pouvait pas le détecter** : séparation en
+  espace articulaire, point de vue unique.
+
+### Prochaines actions
+
+1. [ROUGE] Régénérer du synthétique à **poses de caméra randomisées** avec
+   `TABLE_CLEARANCE = 0,05`, refaire le mix avec une part synthétique plus grosse.
+2. [ROUGE] Capturer le montage réel depuis **4-5 positions de caméra**.
+3. [JAUNE] Critère d'acceptation : tenir à l'écart un **point de vue**. Test
+   unitaire : décaler l'image de N px, la détection doit suivre de N px.
+
+### Commande rapide de reprise
+
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+python scripts/dream_extrinseque_markerless.py \
+    --capture training/dream/captures/markerless_0902 --cameras arducam,svpro
+```
+
 ## État actuel (2 septembre 2026 — après-midi, DREAM markerless démontré)
 
 ### Ce qui a été accompli
