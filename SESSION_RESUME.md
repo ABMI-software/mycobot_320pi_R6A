@@ -1,5 +1,78 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (2 septembre 2026 — après-midi, DREAM markerless démontré)
+
+### Ce qui a été accompli
+
+**La démonstration markerless est faite, sur l'arducam : 27,9 mm et 1,62°.**
+Le robot sert de mire (FK des encodeurs en 3D, DREAM en 2D, PnP empilé sur
+25 poses), aucun ArUco n'entre dans le calcul — ils ne servent que de juge.
+Résidu 0,95 px, détection 7,0/7 de moyenne, 24 poses sur 25 à 7/7. Le résultat
+ne dépend pas du choix des keypoints : en n'ajustant que sur link3→link6 on
+retombe à 25,4 mm / 1,21°. Écrit dans
+`training/calibration/arducam_extrinsic_markerless.yaml`.
+
+**Pourquoi plusieurs poses.** Sur une seule configuration du bras les 7
+keypoints sont quasi coplanaires et la rotation admet plusieurs branches qui
+reprojettent aussi bien — 27 à 30° d'erreur mesurés en juillet. Le volume
+balayé par une vingtaine de configurations lève l'ambiguïté.
+
+**La SVPRO échoue (54,9 mm / 7,16°), et la cause est mesurée : elle a bougé
+d'environ 30 px et 2,9° depuis l'affinage du 01/09.** Trois mesures
+indépendantes du réseau, avec l'arducam en témoin :
+
+| Mesure | SVPRO | Arducam (témoin) |
+|---|---|---|
+| Coins ArUco 01/09 → 02/09 | 24 à 37 px | 0,4 à 1,2 px |
+| 467 appariements ORB, toutes couronnes | 30 à 43 px, centre optique compris | 1,0 à 1,2 px |
+| Similitude ajustée | échelle 0,98 · rotation +2,90° | 1,0007 · −0,16° |
+| Corrélation du patch socle | (+30, +9) px, corrélation 0,94 | — |
+
+Un déplacement uniforme à **tous** les rayons, centre optique inclus, signe un
+mouvement rigide de la caméra — une respiration de mise au point serait nulle
+au centre. Ceci **valide** l'extrinsèque à 4 marqueurs du 02/09 : c'est elle
+qui décrit la caméra d'aujourd'hui.
+
+**Ce que le réseau fait alors.** DREAM place le socle SVPRO à (384,5 · 333,3),
+le **même pixel** les deux jours à 0,01 px près, alors que le socle a réellement
+bougé de (+30, +9) px. Il reproduit le cadrage sur lequel il a été affiné au
+lieu de suivre l'image. L'écart DREAM ↔ marqueurs d'aujourd'hui, (+28,1 · +6,9)
+px, vaut exactement ce déplacement.
+
+### Décisions prises
+
+- **Réponse à « DREAM calibre tout seul même si je déplace la caméra » : oui
+  pour la pose, non hors domaine d'entraînement.** Il retrouve la caméra sans
+  marqueur à 28 mm près, mais seulement pour un point de vue déjà vu. C'est le
+  même mode d'échec hors-domaine que le biais de 52 px de l'arducam, et le même
+  levier : réaffiner en incluant le nouveau cadrage.
+- **La branche SVPRO du dashboard multicam n'est pas fiable** avec
+  `vgg_montage0901_ft_e30` tant que la caméra reste où elle est. L'arducam l'est.
+- `scripts/capture_markerless.py` n'introduit **aucune** nouvelle règle de
+  sécurité : il importe telles quelles celles de `capture_trajectoires.py`, qui
+  n'est pas modifié. Il ajoute en revanche un contrôle de **trajet** — `pose_sure`
+  protège une pose immobile, pas le chemin qui y mène ; 3 segments sur 24
+  passaient sous la garde avant ce contrôle.
+- Visibilité exigée sur **les deux** caméras, pas seulement l'arducam.
+
+### Prochaines actions
+
+1. [ROUGE] Décider du sort de la SVPRO : la refixer et refaire l'extrinsèque à
+   chaque déplacement, ou la réintégrer dans un prochain fine-tune pour que la
+   markerless y marche aussi.
+2. [JAUNE] Rejouer le dashboard multicam avec `model_name:=vgg_montage0901_ft_e30`
+   et constater la dégradation SVPRO annoncée.
+3. [VERT] Régénérer `docs/METHODOLOGIE_CAPTURE_FINETUNE.docx` (local, jamais commité).
+
+### Commande rapide de reprise
+
+```bash
+source ~/ros_jazzy/venv_dream/bin/activate
+python scripts/capture_markerless.py --simuler          # plan, sans bouger le bras
+python scripts/dream_extrinseque_markerless.py \
+    --capture training/dream/captures/markerless_0902 --cameras arducam
+```
+
 ## État actuel (2 septembre 2026 — matin, le biais DREAM est corrigé)
 
 ### Ce qui a été accompli

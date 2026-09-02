@@ -58,15 +58,26 @@ def intrinseque(stem, largeur, hauteur):
     return K, dist
 
 
+# 1 et non les 3 par defaut d'ArUco. Le marqueur 25 arrive a 3 px du bord bas de
+# l'image SVPRO, et ArUco ecarte tout candidat plus proche du bord que ce seuil
+# — AVANT de tenter le decodage. Mesure du 02/09 sur 10 trames : a 3 et 2 il est
+# invisible, a 1 et 0 il sort 10 fois sur 10. Ce n'etait donc ni un probleme de
+# cadrage, ni de lumiere : sa nettete (contraste 175) depasse celle du marqueur
+# 19, qui passait sans peine.
+MARGE_BORD = 1
+
+
 def detecteur():
     dico = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
     if hasattr(cv2.aruco, 'ArucoDetector'):
         par = cv2.aruco.DetectorParameters()
         par.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+        par.minDistanceToBorder = MARGE_BORD
         moteur = cv2.aruco.ArucoDetector(dico, par)
         return lambda g: moteur.detectMarkers(g)[:2]
     par = cv2.aruco.DetectorParameters_create()
     par.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+    par.minDistanceToBorder = MARGE_BORD
     return lambda g: cv2.aruco.detectMarkers(g, dico, parameters=par)[:2]
 
 
