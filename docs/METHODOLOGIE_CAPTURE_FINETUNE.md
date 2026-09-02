@@ -386,6 +386,22 @@ retourne, l'avant-bras et la bride passent **derrière** lui, ou pointent vers l
 caméra et se raccourcissent jusqu'à quelques pixels. Un keypoint occulté ou
 écrasé n'a pas de position bien définie dans l'image.
 
+La géométrie de pose le mesure directement. Longueur **apparente** du poignet
+dans l'image — le segment `link4`→`link6` — et distance du keypoint distal au
+reste du bras, sur 120 trames de chaque jeu :
+
+| | `real_3cam` | `montage_0901` |
+|---|---|---|
+| poignet apparent, minimum | **4,1 px** | 41,3 px |
+| poignet apparent, médiane | 45,8 px | 52,3 px |
+| poignet écrasé sous 20 px | **12 / 120** | 0 / 120 |
+| distal à moins de 30 px du bras | **12 / 120** | 0 / 120 |
+
+Quand le bras pointe vers la caméra, tout le poignet se réduit à **quatre
+pixels** : les trois keypoints distaux se superposent en une grappe, et il
+n'existe plus de position distincte à trouver. Ce n'est pas une faiblesse du
+réseau, c'est une information absente de l'image.
+
 Le taux de détection le confirme : sur `real_3cam`, `link5` n'est trouvé que
 **70,5 %** du temps et `link6` **73,2 %**. Sur le montage, 100 % partout.
 
