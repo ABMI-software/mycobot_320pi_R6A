@@ -1,5 +1,69 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (2 septembre 2026 — matin, le biais DREAM est corrigé)
+
+### Ce qui a été accompli
+
+**Le biais DREAM de 52 px est résolu.** Fine-tune `vgg_montage0901_ft_e30`
+(30 epochs, 6 h 43, meilleure epoch 29), évalué sur 800 trames tenues à l'écart :
+**53,82 px → 1,81 px** de médiane, détection **54,8 % → 100 %** sur les 7
+keypoints, 0,3 % → 99,9 % sous 10 px. **Sans régression** : `real_3cam` reste à
+2,32 px de médiane, au centième près.
+
+**La cause est établie et écarte l'autre hypothèse.** Ce n'était pas un montage
+de caméra différent : c'était de l'**extrapolation hors domaine**.
+`synthetic_data_collector_v3.py:505` impose `TABLE_CLEARANCE = 0.13` m, le pick
+travaille entre 72,5 et 114,5 mm — 100 % des poses réelles étaient rejetées à la
+génération. D'où le mur sur J2 à −103,5° dans `synthetic_50k`, que le filtre
+rejoué hors ligne reproduit exactement (±103,6°).
+
+**La SVPRO est réparée sur deux plans.** Focus : rien dans le dépôt ne le fixait
+(`pick_dashboard.py` ne mentionne jamais le mot, `camera_registry.py` déclare
+`manual_focus=-1` sans que personne ne le lise), et le défaut du capteur est
+l'autofocus continu — d'où `svpro_verrou_focus.sh`, à rejouer après chaque
+rebranchement, **et après** l'ouverture du flux. Extrinsèque : refaite sur les
+16 coins des 4 marqueurs (le 25 était devenu décodable), validation en laissant
+un marqueur dehors 2,1-3,3 px contre 3,3-11,4 px à 3 marqueurs.
+
+### Décisions prises
+
+- **DREAM sert au markerless**, les 4 ArUco ne sont que le juge indépendant.
+  La hauteur du bras n'est donc pas une exigence en soi — ce qui compte est que
+  DREAM détecte bien. Le fine-tune l'assure désormais dans la zone du pick.
+- **La régénération synthétique à garde basse n'est plus nécessaire.** Le
+  collecteur (`synthetic_data_collector_v3_garde_basse.py`) est écrit et
+  compilé, gardé au cas où.
+- Le test tenu à l'écart se découpe en **bloc contigu de 400 poses**, pas 150 :
+  la trajectoire repasse sur ses pas et à 150 un cinquième du test avait sa
+  jumelle dans le train.
+
+### Prochaines actions
+
+1. **[ROUGE] J5 et J6 ne répondent plus** aux commandes, `power_on` compris
+   (J6 : 0,0° de déplacement pour +20° commandés). J5 est à 91° et J6 à −170°,
+   très hors de leur plage de travail (J5 ∈ [−41, +23], J6 ∈ [−10, +92]), donc
+   la pince pointe à l'horizontale au lieu de 7-12° de la verticale. Le pont
+   n'expose que `power_on` / `power_off` — reprise servo par servo impossible.
+   Vérification physique puis cycle d'alimentation.
+2. **[JAUNE] Démo markerless** : `capture_poses_hautes.py` est prêt (130 poses
+   autour de 3 poses validées, pince vers le bas, bras 143-162 mm), bloqué sur
+   le poignet. Puis `self_calibrate_arducam.py --compare-extrinsic` contre
+   `svpro_extrinsic_4marqueurs.yaml`, référence du jour, même session.
+3. **[VERT] Rejouer `fk_vs_dream_series.py --balayage`** avec le nouveau
+   checkpoint pour confirmer en direct, sur le robot, les 1,81 px hors ligne.
+
+### Commande rapide de reprise
+
+```bash
+bash scripts/svpro_verrou_focus.sh          # apres tout rebranchement
+source ~/ros_jazzy/venv_dream/bin/activate
+cd training/dream && python3 evaluate_dream.py \
+  -w checkpoints_dream/vgg_montage0901_ft_e30/best_network.pth \
+  -d dream_data/mix_montage0901_test --split all -n 800
+```
+
+---
+
 ## État actuel (1er septembre 2026 — soir, verdict sur DREAM au pick)
 
 ### Le résultat

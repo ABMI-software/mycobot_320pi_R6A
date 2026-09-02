@@ -9,6 +9,60 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté
+
+- **Le biais DREAM de 52 px est corrigé : 53,8 px → 1,81 px de médiane.**
+  Fine-tune `vgg_montage0901_ft_e30` (30 epochs, 6 h 43, meilleure epoch 29),
+  parti de `vgg_ultimate_v4_mix_ft_e30` qui n'est **pas** modifié. Mesuré sur
+  **800 trames tenues à l'écart**, dont aucune n'a de jumelle dans
+  l'entraînement (séparation médiane 26° en espace articulaire) :
+
+  | | avant | après |
+  |---|---|---|
+  | médiane | 53,82 px | **1,81 px** |
+  | détection | 54,8 % | **100 %** (7/7 keypoints) |
+  | sous 10 px | 0,3 % | **99,9 %** |
+  | pire trame | 274,79 px | 5,79 px |
+  | `base` | 66,96 px | 1,18 px |
+
+  **Sans régression** sur `real_3cam` : médiane 2,32 px avant *et* après, sous
+  10 px 79,2 % → 78,9 %. Les 12,8 % de `real_3cam` gardés dans le mélange ont
+  fait leur travail.
+
+  **Ce que ça tranche.** L'hypothèse d'un montage de caméra différent est
+  écartée ; celle de l'**extrapolation hors domaine** est confirmée. Le réseau
+  n'avait jamais vu un bras dans cette région parce que
+  `synthetic_data_collector_v3.py:505` impose `TABLE_CLEARANCE = 0.13` m, or le
+  pick travaille entre 72,5 et 114,5 mm : **100 % des poses réelles y étaient
+  rejetées**. D'où le mur mesuré sur J2 dans `synthetic_50k`, qui s'arrête net à
+  −103,5° (432 poses dans la dernière tranche puis zéro) quand J1 va à ±167,9° et
+  J3 à ±145°. Rejoué hors ligne, le filtre à 130 mm reproduit exactement ce mur
+  (±103,6°). 1404 poses réelles ont suffi à le combler.
+
+- **`scripts/build_mix_ndds.py`** — assemblage du mélange par symlinks
+  (39 040 trames : 51,2 % synthétique, 36,0 % montage_0901 ×10, 12,8 %
+  `real_3cam`) et découpe d'un test réellement tenu à l'écart. Le bloc contigu
+  ne suffit pas : la trajectoire repasse sur ses pas, 121 poses sur 1042
+  revenant à moins de 2,5° d'une pose vue plus de 50 trames plus tôt. À 150
+  poses de test, 30 sur 150 avaient leur jumelle dans le train ; à 400, une
+  seule. `purge()` efface les liens d'un assemblage précédent — sans elle un
+  second tirage plus court laissait 2 500 liens périmés, dont 129 pointant sur
+  des trames passées du train au test.
+
+- **`mycobot_gateway/.../synthetic_data_collector_v3_garde_basse.py`** —
+  sous-classe du collecteur v3 exposant `table_clearance` en paramètre ROS
+  (défaut 0,05 m). Le fichier d'origine n'est pas modifié. Écrit avant que le
+  fine-tune ne rende la régénération inutile ; gardé pour le jour où la zone
+  basse devra être couverte en synthétique.
+
+- **`scripts/capture_poses_hautes.py`** — capture dans le domaine
+  d'entraînement, bâtie sur les poses de `pick_place_positions.json` déjà jouées
+  par l'opérateur. Ajoute à `capture_trajectoires.py` un contrôle
+  d'auto-collision par capsules (repris du collecteur synthétique : `pose_sure`
+  ne vérifiait que le sol et le volume de la base) et un critère de direction de
+  la pince. Non exécutée : J5 et J6 ne répondent plus aux commandes, `power_on`
+  compris.
+
 ### Corrigé
 
 - **`arducam_extrinsic_dream_v4.yaml` n'était comparable à rien.**
