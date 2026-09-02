@@ -1,6 +1,7 @@
 # Pourquoi DREAM se trompait de 11 cm — diagnostic et méthode
 
-*31 août – 1er septembre 2026. Branche `feature/pick-and-place-osama`.*
+*31 août – 2 septembre 2026. Branche `feature/pick-and-place-osama`.*
+*Résolu : 53,8 px → 1,81 px. Le chemin complet est ci-dessous.*
 
 Ce document garde le **raisonnement**, pas seulement les résultats. Les
 conclusions sont dans le [`CHANGELOG`](../CHANGELOG.md) ; ce qui suit explique
@@ -200,17 +201,212 @@ deux autres, localisé par contours puisque le détecteur ne le trouve même pas
 Tous **autonomes** : ni `pick_dashboard.py`, ni `capture_real_3cam.py`, ni
 `convert_to_ndds.py` ne sont modifiés ou importés.
 
-## Où on en est
+## Le jeu réel produit
 
-Jeu réel sur le montage actuel : **1102 poses × 2 caméras**, étiquettes validées
-à 3,8 px (arducam) et 2,7 px (svpro), écart médian entre images consécutives
-2,46°.
+**1102 poses × 2 caméras**, étiquettes validées à 3,8 px (arducam) et 2,7 px
+(svpro), écart médian entre images consécutives 2,46°.
 
-**Limite à connaître** : le jeu est dense mais **étroit**. Amplitude par joint
-`[42 21 28 54 64 101]°` contre `[169 161 161 159 169 174]°` pour `real_3cam` —
-conséquence des trois filtres (planche, fenêtre réseau, garde au sol). Le réseau
-affiné là-dessus sera bon **près de ces poses**, pas ailleurs.
+**Limite connue dès la capture** : le jeu est dense mais **étroit**. Amplitude
+par joint `[42 21 28 54 64 101]°` contre `[169 161 161 159 169 174]°` pour
+`real_3cam` — conséquence des trois filtres (planche, fenêtre réseau, garde au
+sol). Cette étroitesse, qu'on prenait pour un défaut, s'est révélée être
+l'indice principal.
 
-Reste à faire : le mix-fine-tune, puis rejouer
-`fk_vs_dream_series.py --balayage` pour mesurer si les 52 px ont bougé. C'est ce
-test, et lui seul, qui prouvera ou réfutera l'hypothèse du montage.
+---
+
+# Deuxième partie — la cause, et sa correction
+
+## L'indice qu'on regardait sans le voir
+
+En comparant les distributions articulaires avant de lancer l'entraînement,
+J2 est apparu **disjoint** :
+
+```
+J2 — histogramme, largeur 10 deg
+synth      .+##################+.
+ancien       .+##############+.
+montage +##
+        -140      -110      -80       -50       -20       10        40       70      100
+```
+
+Le synthétique s'arrête à **−103,5°**, le montage commence à **−110,4°**. Un
+trou de 6,9°, et **0 pose sur 50 000** sous −104°. Sur les six axes
+simultanément, la couverture du montage par le synthétique est de **0,0 %**.
+
+Ce n'était pas une queue de distribution qui s'amenuise : 432 poses dans la
+dernière tranche, puis zéro. Un **mur**. Or J1 atteint ±167,9° et J3 ±145°,
+leurs limites pleines. J2 n'était donc pas bridé par l'échantillonneur.
+
+## La cause : une constante dans le générateur
+
+[`synthetic_data_collector_v3.py:505`](../mycobot_gateway/mycobot_gateway/synthetic_data_collector_v3.py#L505) :
+
+```python
+TABLE_CLEARANCE = 0.13     # toute pose descendant sous 130 mm est rejetee
+```
+
+Et la mesure sur les 1102 poses réelles, avec **la même définition** que le
+filtre (échantillonnage le long des segments, colonne de base exclue) :
+
+```
+hauteur mini du bras   min 72,5 mm   mediane 91,2 mm   max 114,5 mm
+rejetees par le filtre a 130 mm :  1102/1102   (100,0 %)
+```
+
+**Cent pour cent.** Le jeu synthétique ne pouvait structurellement pas contenir
+la tâche. Et descendre bas oblige à fermer l'épaule : interdire le bas coupe J2.
+
+**Vérification directe sur le générateur**, sans Gazebo — le filtre ne dépend que
+de constantes de classe et de sa FK, donc il se rejoue hors ligne sur des poses
+tirées uniformément :
+
+| garde | acceptées | J2 min / max | dans [−131, −110] |
+|---|---|---|---|
+| **130 mm** | 48,4 % | **−103,6 / 103,6** | **0** |
+| 80 mm | 58,6 % | −127,0 / 127,0 | 3,2 % |
+| 50 mm | 62,9 % | −132,8 / 132,8 | 4,0 % |
+
+À 130 mm, le générateur reproduit **exactement** le mur du jeu 50k : ±103,6°
+calculé contre −103,5° mesuré. La cause est établie, pas déduite.
+
+## Ce que ça écarte
+
+L'hypothèse tenue jusque-là — un montage de caméra différent à l'entraînement —
+devient inutile. Et deux autres explications tombent avec elle :
+
+- **Ce n'est pas la calibration.** La vérité terrain reprojette à 2,7–3,8 px,
+  vingt fois moins que l'erreur mesurée. Si la référence était fausse, l'écart
+  serait de son ordre de grandeur.
+- **Ce n'est pas la fusion multi-caméras.** Elle intervient *après* la
+  détection : chaque caméra résout son `q`, puis on fusionne les solutions. Or
+  le keypoint `base` est raté de **57 px sur l'arducam et 62 px sur la SVPRO** —
+  deux montages, deux extrinsèques indépendantes, même erreur. Fusionner 57 et
+  62 ne donne pas 3.
+
+Le 1,1–1,9° du dashboard multicam ne contredit rien : ce solveur part des
+**encodeurs** à chaque trame (`q_init = self.latest_joint_q`) et y est épinglé
+par `_CONSISTENCY_REG_VEC`. Son propre commentaire le dit — *« a
+consistency/refinement result, NOT an independent DREAM prediction »*.
+
+## Construire un test qui ne mente pas
+
+Deux pièges, tous deux mesurés avant d'entraîner.
+
+**Le tirage aléatoire était exclu d'emblée** : deux images consécutives sont à
+2,46° l'une de l'autre, quasi jumelles.
+
+**Mais le bloc contigu ne suffit pas non plus.** La trajectoire repasse sur ses
+pas — 121 poses sur 1042 reviennent à moins de 2,5° d'une pose vue plus de
+50 trames plus tôt :
+
+| test | médiane à la plus proche du train | jumelles < 2,5° |
+|---|---|---|
+| 150 dernières poses | 14,2° | **30 / 150** |
+| 250 dernières poses | 12,6° | 53 / 250 |
+| **400 dernières poses** | **26,0°** | **1 / 400** |
+
+À 150, un cinquième du test avait son jumeau dans l'entraînement. La coupe à 400
+passe avant l'excursion qui revisite la fin de trajectoire.
+
+**Un troisième piège, celui-là de fabrication.** En reconstruisant à 400
+par-dessus un tirage à 150, le dossier gardait la queue du premier : 2 500 liens
+périmés, dont 129 pointant sur des trames passées du train au test — une fuite
+créée par la reconstruction, invisible dans le compte affiché. D'où le `purge()`
+de [`build_mix_ndds.py`](../scripts/build_mix_ndds.py), qui refuse tout ce qui
+n'est pas un lien symbolique.
+
+## Le mélange
+
+```
+synthetique                20 000   51,2 %    le socle general
+montage_0901 (x10)         14 040   36,0 %    la region ou le reseau est aveugle
+real_3cam                   5 000   12,8 %    l assurance contre l oubli
+                           39 040
+```
+
+Les 12,8 % de `real_3cam` ne sont pas décoratifs : sans eux le réseau optimise la
+nouvelle région en abandonnant l'ancienne, et on déplace le problème au lieu de
+le résoudre. Les 36 % reprennent la proportion du mélange qui avait fait passer
+le réel de 26 % à 91,6 % en juillet.
+
+Tout est en liens symboliques : 351 Mo réels, pas une image copiée.
+
+## Le fine-tune
+
+Départ depuis `vgg_ultimate_v4_mix_ft_e30`, **jamais modifié** — seulement lu
+comme poids initiaux. Sortie dans un dossier neuf. Aucun script d'entraînement
+touché : `train_dream_ultimate_v4.py` accepte déjà `--data`, `--pretrained` et
+`--output`.
+
+```bash
+python3 train_dream_ultimate_v4.py \
+  --data dream_data/mix_montage0901_train \
+  --pretrained checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/best_network.pth \
+  --output checkpoints_dream/vgg_montage0901_ft_e30 \
+  --epochs 30 --batch-size 8 --lr 0.0001
+```
+
+30 epochs, 6 h 43, meilleure epoch 29.
+
+## Le verdict
+
+Sur les **800 trames tenues à l'écart** (400 poses × 2 caméras, index 702–1101,
+jamais vues) :
+
+| | avant | après |
+|---|---|---|
+| médiane | 53,82 px | **1,81 px** |
+| détection | 54,8 % | **100 %** (7/7 keypoints) |
+| sous 10 px | 0,3 % | **99,9 %** |
+| pire trame | 274,79 px | 5,79 px |
+| `base` | 66,96 px | 1,18 px |
+| `link5` | 59,64 px | 1,94 px |
+
+Et le contrôle de non-régression sur `real_3cam` : **2,32 px de médiane avant et
+après**, au centième près ; sous 10 px 79,2 % → 78,9 %.
+
+**1404 poses réelles ont suffi.** La régénération synthétique à garde basse,
+préparée et compilée
+([`synthetic_data_collector_v3_garde_basse.py`](../mycobot_gateway/mycobot_gateway/synthetic_data_collector_v3_garde_basse.py),
+`table_clearance` en paramètre ROS), n'a pas eu à servir.
+
+## Ce que ce chiffre ne dit pas
+
+Le 100 % de détection mérite d'être lu correctement. Trois choses jouent :
+
+1. Le jeu est **construit** pour n'avoir aucun keypoint hors champ —
+   `capture_trajectoires.py` pré-filtre avec `visible()`. Mesuré : 100 % des
+   keypoints dans la fenêtre réseau, contre 97,6 % pour `real_3cam`. Ça ne fait
+   que 2,4 points.
+2. La **plage articulaire du test est étroite** : `[41 12 28 53 63 102]°` contre
+   `[168 161 161 159 169 174]°`. Sur `real_3cam` le bras se retourne, se
+   raccourcit en perspective, et les liens distaux passent derrière lui — c'est
+   ce qui fait tomber `link5` à 70,5 % là-bas.
+3. C'est **la même scène** : même planche, même éclairage, mêmes caméras au même
+   endroit.
+
+Le résultat est donc honnête sur ce qu'il mesure — *sur ce banc, dans cette
+configuration, le réseau trouve les 7 points à 1,81 px* — et c'est exactement ce
+qu'il fallait pour le pick et pour la démo markerless. Il ne prouve pas que le
+réseau généralise à une autre scène. Pour trancher ça : déplacer une caméra ou
+changer l'éclairage, et réévaluer **sans** réentraîner.
+
+## Outils laissés (deuxième partie)
+
+| Fichier | Rôle |
+|---|---|
+| [`scripts/build_mix_ndds.py`](../scripts/build_mix_ndds.py) | mélange par symlinks, test tenu à l'écart, `purge()` |
+| [`scripts/svpro_verrou_focus.sh`](../scripts/svpro_verrou_focus.sh) | verrou de mise au point, à rejouer après chaque rebranchement |
+| [`scripts/svpro_extrinsic_4_marqueurs.py`](../scripts/svpro_extrinsic_4_marqueurs.py) | extrinsèque sur 16 coins, validation en laissant un marqueur dehors |
+| [`scripts/capture_poses_hautes.py`](../scripts/capture_poses_hautes.py) | capture dans le domaine d'entraînement, auto-collision par capsules |
+| `synthetic_data_collector_v3_garde_basse.py` | sous-classe, `table_clearance` en paramètre ROS |
+
+## Reste ouvert
+
+- **J5 et J6 ne répondent plus** aux commandes, `power_on` compris (J6 : 0,0° de
+  déplacement pour +20° commandés). Le pont n'expose rien de plus fin.
+- **La démo markerless** attend ce poignet. La condition qui manquait aux deux
+  tentatives de juillet est enfin réunie : référence marqueurs et images de la
+  **même session**, caméras non bougées entre les deux.
+- **Confirmer en direct** avec `fk_vs_dream_series.py --balayage` et le nouveau
+  checkpoint, sur le robot.
