@@ -11,6 +11,61 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 
+- **Auto-calibration markerless démontrée sur l'arducam : 27,9 mm et 1,62°.**
+  `scripts/dream_extrinseque_markerless.py` empile les correspondances
+  FK 3D ↔ détections DREAM 2D sur 25 poses et résout un PnP robuste amorcé par
+  RANSAC — **aucun ArUco en entrée**, les 4 marqueurs ne servent que de juge.
+  Résidu 0,95 px, détection 7,0/7 de moyenne. Stable au choix des keypoints :
+  25,4 mm / 1,21° en n'ajustant que link3→link6. Sortie dans
+  `training/calibration/arducam_extrinsic_markerless.yaml`.
+  L'empilement de poses est nécessaire : sur une pose unique les 7 keypoints
+  sont quasi coplanaires et la rotation reste ambiguë (27–30° mesurés en juillet).
+
+- **`scripts/capture_markerless.py`** — capture courte (25 poses) dédiée à cette
+  démonstration. Réutilise sans les modifier les gardes de
+  `capture_trajectoires.py`, et ajoute deux choses : visibilité exigée sur **les
+  deux** caméras (et non la seule arducam), et un contrôle de **trajet** —
+  `pose_sure` protège une pose immobile, pas le chemin qui y mène ; 3 segments
+  sur 24 passaient sous la garde au sol avant ce contrôle, une pose de transit
+  est insérée quand aucun voisin n'est joignable directement.
+
+- **`MARGE_BORD = 1` dans `scripts/svpro_extrinsic_4_marqueurs.py`.** ArUco
+  écarte tout candidat plus proche du bord que `minDistanceToBorder` (défaut 3)
+  **avant** de tenter le décodage, et le marqueur 25 arrive à 3 px du bord bas
+  de l'image SVPRO. Mesure sur 10 trames : invisible à 3 et 2, détecté 10 fois
+  sur 10 à 1 et 0. Ce n'était ni le cadrage ni la lumière — sa netteté
+  (contraste 175) dépasse celle du marqueur 19, qui passait sans peine.
+  L'extrinsèque SVPRO passe ainsi de 3 à 4 marqueurs (16 coins) : RMS 1,14 px,
+  validation croisée en retirant un marqueur 2,21 / 3,48 / 2,83 / 2,47 px contre
+  9 à 10 px auparavant.
+
+### Mesuré — la SVPRO a bougé, et le réseau ne l'a pas suivie (02/09)
+
+La markerless échoue sur la SVPRO (54,9 mm / 7,16°). Cause mesurée sans passer
+par le réseau, arducam en témoin :
+
+| Mesure | SVPRO | Arducam (témoin) |
+|---|---|---|
+| Coins ArUco 01/09 → 02/09 | 24 à 37 px | 0,4 à 1,2 px |
+| 467 appariements ORB, toutes couronnes | 30 à 43 px, centre optique compris | 1,0 à 1,2 px |
+| Similitude ajustée | échelle 0,98 · rotation +2,90° | 1,0007 · −0,16° |
+| Corrélation du patch socle | (+30, +9) px, corrélation 0,94 | — |
+
+Un déplacement uniforme à **tous** les rayons, centre optique compris, signe un
+mouvement rigide — une respiration de mise au point serait nulle au centre.
+Ceci valide l'extrinsèque à 4 marqueurs du 02/09.
+
+DREAM place pourtant le socle SVPRO au **même pixel** les deux jours
+(384,5 · 333,3 ; écart-type 0,01) : il reproduit le cadrage de son affinage au
+lieu de suivre l'image, et l'écart DREAM ↔ marqueurs (+28,1 · +6,9 px) vaut
+exactement le déplacement mesuré. Même mode d'échec hors domaine que le biais
+de 52 px de l'arducam.
+
+**Conséquence :** DREAM retrouve la caméra sans marqueur, mais seulement pour un
+point de vue qu'il a déjà vu. La branche SVPRO du dashboard multicam n'est pas
+fiable avec `vgg_montage0901_ft_e30` tant que la caméra reste où elle est.
+
+
 - **Le biais DREAM de 52 px est corrigé : 53,8 px → 1,81 px de médiane.**
   Fine-tune `vgg_montage0901_ft_e30` (30 epochs, 6 h 43, meilleure epoch 29),
   parti de `vgg_ultimate_v4_mix_ft_e30` qui n'est **pas** modifié. Mesuré sur
