@@ -71,8 +71,11 @@ COURT = ['base', 'J1', 'J2', 'J3', 'J4', 'J5', 'bride']
 VERT, ORANGE, BLANC, NOIR = (60, 220, 60), (0, 165, 255), (255, 255, 255), (0, 0, 0)
 GRIS, FOND = (190, 190, 190), 32
 FONT = cv2.FONT_HERSHEY_SIMPLEX
-CHECKPOINT = (RACINE / 'training' / 'dream' / 'checkpoints_dream'
-              / 'vgg_ultimate_v4_mix_ft_e30' / 'best_network.pth')
+# Modele par defaut. `--modele` permet de comparer deux checkpoints sur la MEME
+# pose et les MEMES images : c'est la seule facon de mesurer un gain en direct
+# sans que le bras ait bouge entre les deux mesures.
+CHECKPOINTS = RACINE / 'training' / 'dream' / 'checkpoints_dream'
+MODELE_DEFAUT = 'vgg_montage0901_ft_e30'
 
 
 def texte(img, s, xy, couleur, echelle=0.5, epais=1, halo=True):
@@ -188,6 +191,8 @@ def main():
     ap.add_argument('--angles', help='6 angles en degres, separes par des virgules ; '
                                      'sinon lus sur le bridge')
     ap.add_argument('--host', default='10.10.0.224')
+    ap.add_argument('--modele', default=MODELE_DEFAUT,
+                    help='nom du dossier sous checkpoints_dream/')
     args = ap.parse_args()
 
     if args.angles:
@@ -197,10 +202,15 @@ def main():
         angles = np.array(Bridge(args.host).get_angles(), float)
     print('Encodeurs (deg) :', np.round(angles, 2).tolist())
 
+    poids = CHECKPOINTS / args.modele / 'best_network.pth'
+    if not poids.is_file():
+        raise SystemExit(f'modele introuvable : {poids}')
+    print('Modele          :', args.modele)
+
     pos, _ = forward_kinematics(np.radians(angles))
     obj = np.array([pos[n] for n in KEYPOINT_NAMES], float)
     net = dream.create_network_from_config_file(
-        str(CHECKPOINT.with_suffix('.yaml')), str(CHECKPOINT))
+        str(poids.with_suffix('.yaml')), str(poids))
 
     panneaux, tout = [], {}
     for nom, cfg in VUES:

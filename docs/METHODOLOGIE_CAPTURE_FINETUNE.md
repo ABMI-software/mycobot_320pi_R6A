@@ -360,6 +360,47 @@ synthétique ou baisser l'oversampling.
 
 ---
 
+### Pourquoi 1,81 px est plus bas que les 2,32 px de `real_3cam`
+
+Le chiffre du montage est meilleur que celui de l'ancien jeu, et ce n'est pas
+parce que le réseau y serait devenu plus précis. La différence est entièrement
+concentrée sur les **keypoints distaux** :
+
+| keypoint | `mix_montage0901_test` | `real_3cam` |
+|---|---|---|
+| `base` | 1,18 px | 2,10 px |
+| `link1` | 1,20 px | 2,25 px |
+| `link3` | 2,78 px | 7,80 px |
+| `link4` | 2,39 px | **14,68 px** |
+| `link5` | 2,47 px | **23,29 px** |
+| `link6` | 3,22 px | **19,40 px** |
+| médiane | 1,81 px | 2,32 px |
+| moyenne | 2,06 px | 9,17 px |
+
+Sur les points proches de la base, les deux jeux sont comparables. C'est à partir
+de `link4` que ça diverge — six à dix fois pire sur `real_3cam`.
+
+**La cause est la diversité de poses.** `real_3cam` balaie ±80° sur les six axes
+contre `[41 12 28 53 63 102]°` pour le bloc de test du montage. Quand le bras se
+retourne, l'avant-bras et la bride passent **derrière** lui, ou pointent vers la
+caméra et se raccourcissent jusqu'à quelques pixels. Un keypoint occulté ou
+écrasé n'a pas de position bien définie dans l'image.
+
+Le taux de détection le confirme : sur `real_3cam`, `link5` n'est trouvé que
+**70,5 %** du temps et `link6` **73,2 %**. Sur le montage, 100 % partout.
+
+**Et il y a un effet pervers là-dedans** : l'erreur n'est calculée que sur les
+keypoints *détectés*. Les cas les plus difficiles de `real_3cam` — ceux où
+`link5` disparaît — sont donc **exclus du calcul**. Le 23,29 px est déjà la
+version indulgente.
+
+Conclusion : le 1,81 px dit *dans la configuration où le pick travaille, la
+détection est excellente*. Il ne dit pas que le réseau ferait 1,81 px sur des
+poses aussi variées que `real_3cam` — et la ligne `link5 : 23,29 px` prouve le
+contraire.
+
+---
+
 ## Ce qui n'est PAS validé
 
 **[`scripts/capture_poses_hautes.py`](../scripts/capture_poses_hautes.py) n'a
