@@ -152,6 +152,75 @@ TCP, et à 10 °/s une latence de 100 ms fait **1° d'erreur d'étiquette**. D'o
 arrêt à chaque prise — angles **mesurés**, jamais la consigne — avec des pas de
 2,5°.
 
+## Le plan de capture, en détail
+
+Le plan est **déterministe** : aucun tirage aléatoire, aucune pose inventée. Il
+se déduit de quatre poses de travail et de six balayages.
+
+**Les quatre bases** sont des poses réellement jouées par l'opérateur, reprises
+telles quelles :
+
+```python
+BASES = [
+    [30, -118.7, 82.8, -102.6, -17.8, 49.8],
+    [30, -128.7, 76.5,  -53.4,  -3.7, 21.8],
+    [30, -120.0, 90.0,  -60.5,  10.3,  6.2],
+    [30, -110.0, 70.0,  -80.0, -10.0, 30.0],
+]
+```
+
+**Les six balayages** font varier une seule articulation à la fois, sur sa plage
+de travail :
+
+```python
+BALAYAGES = [
+    (0,    8,  58),   # J1 : azimut, conserve l'inclinaison de l'outil
+    (1, -134, -108),  # J2 : hauteur
+    (2,   68,  96),   # J3 : allonge
+    (3, -104, -50),   # J4 : poignet
+    (4,  -42,  22),   # J5 : inclinaison outil
+    (5,  -10,  92),   # J6 : rotation outil, invisible en FK mais vue en image
+]
+```
+
+**4 bases × 3 azimuts × 6 balayages = 72 trajectoires**, échantillonnées à 2,5°.
+Varier un seul axe par trajectoire donne des images voisines qui ne diffèrent
+que par un mouvement, ce qui est exactement ce que fait NVlabs — sans le
+mouvement continu, impossible à étiqueter ici.
+
+J6 est balayé bien qu'aucun keypoint ne dépende de sa rotation : il ne déplace
+rien dans la FK, mais il **change l'image** (la pince tourne), et le réseau doit
+apprendre que cette variation n'est pas un signal.
+
+**Trois filtres, dans cet ordre**, appliqués avant que le bras ne bouge :
+
+| filtre | rôle | écartées |
+|---|---|---|
+| `pose_sure` | pointe ≥ 40 mm, liens mobiles ≥ 30 mm, hors volume de base | **525** |
+| `visible` | les 7 keypoints dans la fenêtre réseau 400×400, marge 30 px | **29** |
+| — | retenues | **1102** |
+
+Les 525 écartées comme dangereuses sont la moitié du plan brut : la sécurité
+n'est pas un garde-fou de principe ici, elle taille vraiment dans le plan.
+
+```
+1102 poses × 2 cameras = 2204 images
+ecart median entre images consecutives : 2,46°   (NVlabs 0,23 ; real_3cam 94,3)
+duree : ~48 min
+```
+
+**Trois règles de fabrication**, chacune apprise à ses dépens :
+
+1. **L'étiquette est l'angle MESURÉ, bras arrêté** — jamais la consigne.
+   `immobile()` attend deux lectures consécutives à moins de 0,35° l'une de
+   l'autre. Une pose que le bras n'atteint pas à 6° près est **ignorée**, pas
+   enregistrée avec sa consigne.
+2. **On rejoint un départ de trajectoire par paliers de 30°.** Un ordre unique
+   depuis loin fait partir toutes les articulations à fond en même temps.
+3. **La capture écrit dans `training/dream/captures/`, jamais dans
+   `dream_data/`**, et le script refuse toute racine hors de là. `labels.csv`
+   s'ouvre en `append` : une capture interrompue reprend où elle s'est arrêtée.
+
 ## Deux corrections venues du réel, pas du calcul
 
 **La pince a touché la table.** Le filtre de sécurité repris de
