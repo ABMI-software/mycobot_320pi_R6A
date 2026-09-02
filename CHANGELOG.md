@@ -39,6 +39,56 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   validation croisée en retirant un marqueur 2,21 / 3,48 / 2,83 / 2,47 px contre
   9 à 10 px auparavant.
 
+### Corrigé — la démonstration markerless du 02/09 est INVALIDE (mesuré le 02/09)
+
+Le chiffre « arducam 27,9 mm / 1,62° » annoncé plus haut **ne mesure pas ce
+qu'il prétend**. Le keypoint `base` de `vgg_montage0901_ft_e30` est une
+**constante par montage**, pas une détection :
+
+| jeu d'images | sortie `base` | écart-type |
+|---|---|---|
+| arducam, 01/09 **et** 02/09 | (211,7 · 342,9) | 0,00 – 0,02 |
+| svpro, 01/09 **et** 02/09 | (384,5 · 333,3) | 0,01 – 0,07 |
+| real_3cam (autre montage) | (250,0 · 256,4) | 0,17 – 0,21 |
+
+Test d'équivariance : décaler l'image de 30 px déplace `base`, `link1` et
+`link2` de **0 %**, sur les deux caméras. Et la SVPRO, qui a réellement bougé de
+~30 px entre les deux captures, est vue déplacée de **0,08 px**.
+
+Conséquence : `base`, `link1` et `link2` pèsent 75 des 174 correspondances de
+l'ajustement arducam. Ajuster une pose de caméra dessus **restitue la pose
+implicite dans les données d'affinage** — c'est circulaire, et le résidu de
+0,45 px est bas *parce que* c'est circulaire. La seule caméra réellement
+déplacée, la SVPRO, échoue (54,9 mm / 7,16°).
+
+**Formulation juste : avec ce checkpoint, DREAM ne s'auto-calibre pas sur une
+caméra déplacée.** Il n'a l'air de marcher que là où la caméra n'a pas bougé,
+c'est-à-dire là où on n'en a pas besoin. Aucun autre checkpoint du dépôt ne fait
+mieux : `vgg_synthetic_e25` place le socle à 200 px du vrai sur l'arducam et ne
+le détecte jamais sur la svpro ; `vgg_ultimate_v4_mix_ft_e30` porte le biais
+connu (250,2 · 301,6) et ne détecte que 3 fois sur 10 sur la svpro, σ 16 px.
+
+**Cause.** DREAM tire sa généralisation aux points de vue nouveaux de
+l'entraînement synthétique à **poses de caméra randomisées**. Notre pipeline a
+affiné sur du réel provenant de **deux caméras fixes** : le réseau a pris le
+raccourci que les données récompensaient — reconnaître le montage et réciter la
+position du socle, qui ne bouge jamais dans l'ensemble d'affinage.
+
+**Pourquoi la validation ne l'a pas vu.** Les 800 trames tenues à l'écart
+étaient séparées en espace **articulaire** (26° de médiane) mais toutes prises
+du **même point de vue**. On a mesuré la généralisation aux poses du bras, pas
+aux points de vue. Le 1,81 px reste exact ; il ne dit simplement pas ce qu'on
+lui faisait dire.
+
+**Ce qu'il faut faire** : de la diversité de points de vue dans les données
+(synthétique à poses de caméra randomisées + `TABLE_CLEARANCE = 0,05` ; et du
+réel capturé depuis 4-5 positions de caméra), et un critère d'acceptation qui
+tient à l'écart un **point de vue** et non des poses. Test unitaire minimal :
+décaler l'image de N px, la détection doit suivre de N px.
+
+Non touché : le pick passe par l'extrinsèque marqueurs, pas par DREAM. Le
+dashboard multicam, lui, ancre sa pose sur ce socle mémorisé.
+
 ### Mesuré — la SVPRO a bougé, et le réseau ne l'a pas suivie (02/09)
 
 La markerless échoue sur la SVPRO (54,9 mm / 7,16°). Cause mesurée sans passer
