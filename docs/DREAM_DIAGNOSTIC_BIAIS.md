@@ -7,6 +7,9 @@ Ce document garde le **raisonnement**, pas seulement les résultats. Les
 conclusions sont dans le [`CHANGELOG`](../CHANGELOG.md) ; ce qui suit explique
 comment on y est arrivé, et surtout pourquoi on ne pouvait pas y arriver plus tôt.
 
+Pour **refaire** la manipulation plutôt que la comprendre, aller directement au
+protocole : [`METHODOLOGIE_CAPTURE_FINETUNE.md`](METHODOLOGIE_CAPTURE_FINETUNE.md).
+
 ---
 
 ## Le point de départ
