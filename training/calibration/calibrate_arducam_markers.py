@@ -33,14 +33,22 @@ HERE = Path(__file__).resolve().parent
 def load_markers(yaml_path):
     d = yaml.safe_load(Path(yaml_path).read_text())
     pts = {int(k): np.array(v, dtype=np.float64) for k, v in d["markers"].items()}
-    return pts, float(d["marker_size_m"])
+    return pts, float(d["marker_size_mm"])
 
 
 def detect_centers(bgr):
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    # Les marqueurs éloignés de la SVPro sont petits et moins contrastés.
+    gray = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8)).apply(gray)
+    params = cv2.aruco.DetectorParameters()
+    params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+    params.adaptiveThreshWinSizeMin = 3
+    params.adaptiveThreshWinSizeMax = 53
+    params.adaptiveThreshWinSizeStep = 4
     det = cv2.aruco.ArucoDetector(
         cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000),
-        cv2.aruco.DetectorParameters())
-    corners, ids, _ = det.detectMarkers(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY))
+        params)
+    corners, ids, _ = det.detectMarkers(gray)
     centers = {}
     if ids is not None:
         for c, i in zip(corners, ids.flatten()):
@@ -51,10 +59,10 @@ def detect_centers(bgr):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--markers", default=str(HERE / "workspace_markers.yaml"))
-    ap.add_argument("--intrinsics-npz", default=str(HERE / "cam_0.npz"))
+    ap.add_argument("--intrinsics-npz", default=str(HERE / "cam_3.npz"))
     ap.add_argument("--out", default=str(HERE / "arducam_extrinsic_markers.yaml"))
     ap.add_argument("--image", help="photo existante ; sinon capture live")
-    ap.add_argument("--index", type=int, default=0)
+    ap.add_argument("--index", type=int, default=3)
     ap.add_argument("--exposure", type=int, default=75)
     args = ap.parse_args()
 
@@ -85,12 +93,25 @@ def main():
     print(f"Marqueurs attendus : {sorted(world)}")
     print(f"Marqueurs détectés : {sorted(centers)}")
     print(f"Utilisables (connus + vus) : {sorted(usable)}  ({len(usable)}/4)")
-    if len(usable) < 4:
-        raise SystemExit("Il faut les 4 marqueurs connus visibles pour un PnP fiable.")
+    if len(usable) < 3:
+        raise SystemExit("Il faut au moins 3 marqueurs connus visibles pour le PnP.")
+    if len(usable) == 3:
+        # Mesure du 09/09 : a 3 centres il reste 6 contraintes pour 6 inconnues,
+        # le systeme est tout juste determine. En retirant tour a tour un des
+        # quatre marqueurs, la position de camera estimee s'est deplacee de 23,
+        # 45, 494 et 664 mm selon le marqueur retire, et la prediction au sol du
+        # marqueur absent allait de 3,8 a 90,0 mm. Utilisable pour un controle
+        # grossier, jamais pour reecrire l'extrinseque de production.
+        print("ATTENTION — 3 marqueurs seulement : pose tout juste determinee, "
+              "donc instable (jusqu'a 664 mm d'ecart mesure le 09/09). "
+              "Degager le bras et refaire a 4 marqueurs avant de commander.")
 
     obj = np.array([world[i] for i in usable], dtype=np.float64)
     img = np.array([centers[i] for i in usable], dtype=np.float64)
-    ok, rvec, tvec = cv2.solvePnP(obj, img, K, dist, flags=cv2.SOLVEPNP_IPPE)
+    # IPPE est privilégié avec les 4 centres coplanaires. SQPnP accepte trois
+    # centres lorsque l'un des marqueurs est temporairement masqué.
+    flag = cv2.SOLVEPNP_IPPE if len(usable) >= 4 else cv2.SOLVEPNP_SQPNP
+    ok, rvec, tvec = cv2.solvePnP(obj, img, K, dist, flags=flag)
     if not ok:
         raise SystemExit("solvePnP a échoué.")
 
