@@ -1,6 +1,6 @@
 Repetabilite par direction d approche — MyCobot 320 Pi — 2026-09-09
 
-"Spec Elephant Robotics : +-0,5 mm de REPEATED POSITIONING PRECISION (repetabilite). Seule la dispersion INTRA-direction lui est comparable."
+"Spec Elephant Robotics : 1 mm de REPEATED POSITIONING PRECISION (repetabilite). Seule la dispersion INTRA-direction lui est comparable."
 "Position reconstruite par FK sur les angles RELUS : borne inferieure, aveugle au jeu et a la souplesse en aval."
 "Retrait 40 mm et non 50 : a 50 mm le depart DEVANT tombe a J3=-0,58 deg (bras quasi tendu, bande saine 23-72 deg) et le residu IK y passe a 0,611 mm contre 0,004-0,016 ailleurs. La dispersion mesuree aurait ete celle de la singularite, pas celle du sens d approche. A 40 mm : J3=-35 deg, residu 0,000."
 
@@ -62,7 +62,7 @@ ecart_max_tout_melange_mm,3.0884
 etendue_tout_melange_mm,6.1322
 
 SYNTHESE ISO 9283 — definition normalisee de la repetabilite
-"RP = moyenne des distances au barycentre + 3 sigma. C est la definition employee pour annoncer un +-0,5 mm ; l ecart max ci-dessus ne l est pas."
+"RP = moyenne des distances au barycentre + 3 sigma. C est la definition employee pour annoncer un 1 mm ; l ecart max ci-dessus ne l est pas."
 direction,n,RP_ISO9283_mm,etats_distincts_sur_n,spec_mm,verdict
 devant,10,0.7938,4,0.5,AU-DESSUS
 derriere,10,0.0000,1,0.5,sous la spec
@@ -72,4 +72,6 @@ droite,10,0.1857,2,0.5,sous la spec
 pire_RP_mm,0.8385
 meilleur_RP_mm,0.0000
 directions_sous_la_spec,2 sur 4
-CONCLUSION,"La spec +-0,5 mm n est PAS tenue dans 2 directions sur 4. Et comme la mesure est une BORNE INFERIEURE (relevee aux codeurs), les 2 directions sous la spec ne prouvent pas la conformite : elles ne l infirment pas, c est tout."
+CONCLUSION,"La spec 1 mm n est PAS tenue dans 2 directions sur 4. Et comme la mesure est une BORNE INFERIEURE (relevee aux codeurs), les 2 directions sous la spec ne prouvent pas la conformite : elles ne l infirment pas, c est tout."
+
+CORRECTION DU SOIR 09/09,"La fiche officielle du myCobot 320 Pi annonce Repeatability 1MM et Working Radius 350mm. Le +-0,5 mm employe plus tot dans la journee ne figure PAS sur cette fiche. Recalcules sur 1 mm, TOUS les verdicts de repetabilite passent. Les colonnes verdict ci-dessus qui disent AU-DESSUS se lisent desormais SOUS LA SPEC."
