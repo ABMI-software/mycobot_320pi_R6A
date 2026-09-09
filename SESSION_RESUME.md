@@ -1,6 +1,71 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-## État actuel (9 septembre 2026 — journée)
+## État actuel (9 septembre 2026 — après-midi, campagne de précision)
+
+### Ce qui a été accompli
+
+**Campagne de précision menée et documentée** →
+[`training/calibration/PRECISION_MYCOBOT_320PI.md`](training/calibration/PRECISION_MYCOBOT_320PI.md).
+Elle corrige une erreur de catégorie qui circulait dans les supports : les
+**±0,5 mm d'Elephant Robotics sont une *repeated positioning precision*** — une
+répétabilité — et non une précision absolue. Comparer notre erreur 3D à ce
+chiffre et conclure « hors spec ×2,18 » n'avait pas de sens.
+
+**Le robot tient sa spécification** : répétabilité **0,306 mm** sur 10 retours
+et **0,424 mm** sur 6, en approche unidirectionnelle par le haut. Sous les
+±0,5 mm. Réserve à toujours citer : la position vient de `FK(angles relus)`,
+donc **borne inférieure** — aveugle au jeu et à la souplesse en aval des
+codeurs (indice : 10 essais ne donnent que 2 valeurs distinctes).
+
+**Le sens d'approche est le vrai sujet** : 0,424 mm en unidirectionnel contre
+**5,847 mm** en mélangeant 4 directions, soit **×21,4**, et presque tout sur Z
+(σZ = 3,90 mm ; retours par le haut à ~48,5 mm, latéraux à ~41 mm pour la même
+consigne). Reconfirme les 5,88 mm du 20/08, indépendamment.
+
+**La vision n'a AUCUNE erreur d'échelle.** Le −3,25 % lu sur un ArUco de 50 mm
+était un artefact : un tag de **100 mm** donne **+0,005 %**, et les trois
+marqueurs de planche de 50 mm donnent −1,27 / −2,81 / −5,23 % **selon leur
+obliquité**. Une vraie erreur d'échelle serait identique à toutes les tailles.
+Le bloc « −2,6 % → 7,4 mm » doit être retiré des supports. Deux hypothèses ont
+été essayées et écartées par la mesure : échelle de chaîne, et biais constant
+de localisation des coins (il prédisait −1,55 % sur le 100 mm).
+
+**Corrigé dans `pick_fsm.py`** : un commentaire comparait un résidu de
+convergence aux ±0,5 mm constructeur. Remplacé par l'explication de la
+distinction.
+
+### Décisions prises
+
+- **Ne pas citer la répétabilité sans sa réserve** (relevé aux codeurs).
+- **Retirer le bloc échelle** des diapos ; le remplacer par la mesure au tag de
+  100 mm si un chiffre est nécessaire.
+- **Ne pas commiter les `.xlsx`** : aucun n'est suivi dans `training/calibration/`.
+
+### Prochaines actions
+
+1. [ROUGE] **Terminer le test 4 directions** (10 retours depuis devant,
+   derrière, gauche, droite ; retrait uniforme 50 mm). Interrompu à 12 essais
+   sur 40 — compter ~30 min, la stabilisation à chaque pose est lente.
+   Script : `scratchpad/test_4directions.py`.
+2. [JAUNE] **Mesurer l'affaissement à 3 portées.** Le modèle `d = L × θ` des
+   diapos prédit un affaissement croissant avec l'allonge, or on mesure 14,8 mm
+   à 332 mm quand le modèle donne 13 mm à 390 mm. Le modèle est indicatif, pas
+   prédictif.
+3. [JAUNE] Rejouer le cas *outil couché* de la prise du scotch avec la classe
+   correctement armée (voir entrée précédente).
+4. [VERT] Remonter l'éclairage vers 86 de luminance avant toute calibration
+   visant le standard de 0,12 mm.
+
+### Commande rapide de reprise
+
+```bash
+cd ~/Osama_ws/src/mycobot_R6A
+python3 /tmp/.../scratchpad/test_4directions.py   # ~30 min, 40 approches
+```
+
+---
+
+## État précédent (9 septembre 2026 — matin, tri complet)
 
 ### Ce qui a été accompli aujourd'hui
 

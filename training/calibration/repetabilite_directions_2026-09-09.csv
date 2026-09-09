@@ -1,0 +1,42 @@
+Repetabilite selon le sens d approche — MyCobot 320 Pi — 2026-09-09
+
+"Le chiffre constructeur (+-0,5 mm, repeated positioning precision) suppose un retour TOUJOURS identique. Seul le bloc UNI lui est comparable."
+Le bloc MULTI decrit le cas reel d un tri : il n est comparable a aucune specification publiee.
+Position reconstruite par FK sur les angles RELUS : aveugle a tout ce qui est en aval des codeurs. Borne inferieure.
+
+Point d arrivee,x_mm,330.476,y_mm,31.843,z_mm,60.0,inclinaison_deg,-15
+
+UNI — 6 retours par le haut
+essai,x_mm,y_mm,z_mm
+1,323.5631,25.3522,48.4796
+2,323.5631,25.3522,48.4796
+3,323.5631,25.3522,48.4796
+4,323.5631,25.3522,48.4796
+5,323.5631,25.3522,48.4796
+6,323.2603,25.6535,48.2025
+n,6
+ecart_max_mm,0.4244
+sigma_3d_mm,0.1898
+etendue_3d_mm,0.5092
+sigma_x_mm,0.1236
+sigma_y_mm,0.1230
+sigma_z_mm,0.1131
+spec_constructeur_mm,0.5
+verdict,COHERENT
+
+"MULTI — 6 retours, 4 directions"
+essai,sens,x_mm,y_mm,z_mm
+1,haut,323.5631,25.3522,48.4796
+2,arriere,320.4053,26.8285,40.9489
+3,gauche,321.5786,27.8735,42.1442
+4,droite,322.0152,24.0628,41.8108
+5,arriere,319.9753,26.4822,39.7413
+6,haut,323.3527,29.3020,48.6003
+n,6
+ecart_max_mm,5.8473
+sigma_3d_mm,4.1614
+etendue_3d_mm,10.8997
+sigma_x_mm,1.4757
+sigma_y_mm,1.8422
+sigma_z_mm,3.9000
+comparable_a_la_spec,NON

@@ -1543,8 +1543,14 @@ PROGRES_CONVERGENCE = 0.05
 # Mesure du 08/09, 9 convergences sur trois portees : 4 abandons, dont
 # 4,53 -> 1,03 -> 0,89 -> 1,56 qui rendait 1,56 apres etre passe par 0,89, et
 # 0,92 -> 0,93 tue au deuxieme passage pour 0,01 mm de recul. En laissant la
-# boucle finir : 0,310 mm au lieu de 0,816, et le bras rentre dans la spec
-# constructeur de +-0,5 mm (Positioning Accuracy) au lieu d'etre a 1,6 fois.
+# boucle finir : 0,310 mm au lieu de 0,816 de residu de convergence.
+# NE PAS comparer ce chiffre aux +-0,5 mm du constructeur : cette valeur-la est
+# une REPETABILITE (repeated positioning precision), c'est-a-dire la dispersion
+# du bras revenant plusieurs fois au meme point. Ce qu'on mesure ici est un
+# ecart a une cible ABSOLUE, ||FK(q_lu) - P_cible||, qui agrege la lecture
+# articulaire, le modele FK, les offsets, la definition du TCP, le settling des
+# servos et les changements de repere. Deux metriques differentes : la seconde
+# ne peut ni valider ni invalider la premiere.
 # L'abandon coutait aussi un essai : `_recalage` repart en APPROCHE sur ok=False.
 SEUIL_GARDE_PROGRES = 3.0
 
