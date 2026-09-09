@@ -269,3 +269,109 @@ La précision utile ne vient donc ni du constructeur ni du solveur, mais du
 | Éclairage à 55 de luminance (réf. 86) | l'extrinsèque du jour plafonne à 0,59 mm au lieu de 0,12 |
 | Une seule portée testée (332 mm) | l'affaissement n'a pas été mesuré à plusieurs allonges |
 | Retrait de **40 mm** au test G | à 50 mm, le départ « avant » tombe à J3 = −0,58° (bras tendu) et le résidu IK passe à 0,611 mm : on aurait mesuré une singularité, pas un sens d'approche |
+
+---
+
+## 8. Ce que mesure vraiment `FK(q_lu)` — et ce qu'il ne mesure pas
+
+Toute la campagne repose sur une seule grandeur :
+
+```
+e = FK(q_lu) − P_cible
+```
+
+Il faut savoir ce qu'elle contient, sous peine de lui faire dire ce qu'elle ne
+dit pas.
+
+### La décomposition
+
+```
+P_cible --IK--> q_cmd --servo--> q_phys --codeur--> q_lu --FK_nominale--> P_mesurée
+```
+
+d'où :
+
+```
+e = [FK(q_lu) − FK(q_cmd)]  +  [FK(q_cmd) − P_cible]
+     erreur de suivi servo      résidu d'IK
+```
+
+Le résidu d'IK a été mesuré sur les 5 poses du test G : **0,004 à 0,016 mm**.
+Négligeable. Il reste donc `e ≃ J(q)·(q_lu − q_cmd)` :
+
+> **`e` est l'erreur de suivi des servos projetée en cartésien par la
+> jacobienne. Ce n'est pas la position physique de la pointe.**
+
+| contenu dans `e` | absent de `e` |
+|---|---|
+| erreur de suivi du servo | écart entre `q_lu` et l'angle réel de l'articulation |
+| affaissement gravitaire (le servo se cale décalé sous charge) | erreurs du modèle : longueurs, offsets, zéros |
+| répétabilité du codeur | jeu de réducteur en aval du codeur |
+| | flexion des bras et de l'outil |
+| | erreur de définition du TCP |
+
+### Pourquoi la répétabilité reste valable, mais pas la précision absolue
+
+Sur un **retour répété**, tous les termes systématiques de la colonne de droite
+(modèle, offsets, TCP) **s'annulent** : ils sont identiques à chaque passage.
+Ne subsistent que les termes non répétables — jeu et flexion. D'où le statut de
+**borne inférieure**, et non d'invalidité.
+
+Sur une **précision absolue**, rien ne s'annule. `e` n'est alors pas une mesure
+physique et ne doit jamais être présentée comme telle.
+
+À noter : le biais de sens d'approche de 5,9 mm est **visible dans `q_lu`** —
+les servos se calent réellement à des angles différents selon le côté d'arrivée.
+Le jeu en aval s'y **ajoute** ; le vrai biais est donc ≥ 5,9 mm.
+
+### Le jeu de données hand-eye de juillet est inexploitable
+
+`handeye_data.npz` contient 22 poses avec un ArUco monté sur J6 —
+`T_base_gripper` par FK, `T_cam_marker` par la caméra, 155 à 198° de
+débattement sur chaque axe. C'est le dispositif qui donnerait la précision
+absolue et la validation de l'extrinsèque. Résolution de `A·X = Y·B` :
+
+| | |
+|---|---|
+| résidu moyen | **24,4 mm** |
+| RMS | 26,9 mm |
+| max | 55,1 mm |
+| désaccord angulaire | 29° en moyenne, 123° au pire |
+
+**La cause n'est pas la FK, c'est le dimensionnement du marqueur.** Il fait
+40 mm et la caméra est à 639–1169 mm : son côté apparent vaut **17 à 31 px**,
+alors que `COTE_MARQUEUR_PX_MIN = 30`. **20 poses sur 22 sont sous le seuil du
+code lui-même.** La profondeur d'un carré de 20 px à 1 m est incertaine de
+plusieurs centimètres et son orientation est ambiguë.
+
+Refait avec le tag de 100 mm à 500–800 mm, le côté apparent passerait à ~71 px
+et l'incertitude de profondeur à ~2 mm — assez pour détecter une erreur de
+modèle ou d'extrinsèque, qui se comptent en millimètres.
+
+### Ce qui exige une référence externe, et ce qui n'en exige pas
+
+| test | référence externe | état |
+|---|---|---|
+| Répétabilité du bras | **oui**, pour se prononcer sur les ±0,5 mm | borne inférieure seulement |
+| Erreur cartésienne reconstruite | non — elle se suffit | fait |
+| Précision physique absolue | **indispensable** | impossible par cette méthode |
+| Répétabilité de la vision | non — auto-référencée | fait |
+| Précision métrique de la vision | **oui** — une longueur connue | fait, référence non vérifiée au pied à coulisse |
+| Calibration extrinsèque | **oui** — un point indépendant | auto-cohérence seulement |
+| Précision globale vision + robot | non — l'objet est sa propre cible | à chiffrer |
+
+Le critère : **une référence externe devient nécessaire dès que l'affirmation
+porte sur le robot lui-même plutôt que sur la boucle de commande.**
+
+### Conséquence pour l'asservissement visuel
+
+En boucle fermée, la précision absolue du bras **n'a pas d'importance** : la
+boucle annule toute erreur de modèle constante. Les 14,8 mm de boucle ouverte
+sont ce que la boucle est là pour absorber.
+
+Ce qui limite réellement la boucle est ce qui n'est **pas** répétable : le bruit
+de la vision, le jeu, et le biais de 5,9 mm selon le sens d'arrivée. D'où une
+contrainte de conception : **si le dernier segment d'approche change de
+direction d'une itération à l'autre, on injecte 5,9 mm de bruit dans une boucle
+qui cherche à converger au millimètre.** Terminer toujours par le même vecteur
+d'approche.
