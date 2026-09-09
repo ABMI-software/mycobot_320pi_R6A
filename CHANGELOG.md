@@ -9,6 +9,43 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — la spécification constructeur était comparée à la mauvaise grandeur (09/09)
+
+- **Les ±0,5 mm d'Elephant Robotics sont une *repeated positioning precision***
+  — une répétabilité, c'est-à-dire la dispersion en revenant plusieurs fois au
+  même point. **Ce n'est pas une précision absolue de positionnement
+  cartésien.** Un commentaire de `pick_fsm.py` comparait un résidu de
+  convergence (0,310 mm) à ce chiffre et concluait « le bras rentre dans la
+  spec au lieu d'être à 1,6 fois ». Remplacé par l'explication de la
+  distinction : `‖FK(q_lu) − P_cible‖` agrège lecture articulaire, modèle FK,
+  offsets, TCP, settling et changements de repère, et ne peut ni valider ni
+  invalider une spécification de répétabilité.
+
+### Ajouté — campagne de précision documentée (09/09)
+
+- **`training/calibration/PRECISION_MYCOBOT_320PI.md`** + données brutes
+  (`precision_campagne_2026-09-09.csv`,
+  `repetabilite_directions_2026-09-09.csv`). Sept tests, chacun rapporté avec
+  sa comparabilité à la spécification constructeur.
+- **Répétabilité tenue** : 0,306 mm sur 10 retours par le haut, 0,424 mm sur 6
+  — sous les ±0,5 mm. **Borne inférieure** : la position vient de `FK(angles
+  relus)`, aveugle au jeu et à la souplesse en aval des codeurs (10 essais ne
+  donnent que 2 valeurs distinctes).
+- **Sens d'approche = ×21,4** : 0,424 mm en unidirectionnel contre 5,847 mm en
+  mélangeant 4 directions, presque tout sur Z (σZ = 3,90 mm ; retours par le
+  haut à ~48,5 mm, latéraux à ~41 mm pour la même consigne). Reconfirme les
+  5,88 mm du 20/08.
+- **Aucune erreur d'échelle de la vision.** Un ArUco de 50 mm donnait −3,25 %,
+  lu à tort comme 7,4 mm d'erreur d'échelle. Un tag de **100 mm donne
+  +0,005 %**, et les trois marqueurs de planche de 50 mm donnent −1,27 / −2,81
+  / −5,23 % **selon leur obliquité** — une vraie erreur d'échelle serait
+  identique à toutes les tailles. Le −3,25 % est un artefact de mesure sur
+  petit marqueur oblique. Hypothèse du biais constant de coins également
+  écartée : elle prédisait −1,55 % sur le 100 mm.
+- **Erreur de cible absolue** : 14,84 mm en boucle **ouverte** à 332 mm de
+  portée, ≈ 2 mm une fois compensée par `converge`. À ne jamais citer sans la
+  mention « non compensé ».
+
 ### Corrigé — le repli générique des hauteurs de prise était silencieux (09/09)
 
 - **`choisit_pose_prise` signale désormais une classe d'objet inconnue.** Quand
