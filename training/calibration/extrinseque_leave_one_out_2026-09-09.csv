@@ -1,0 +1,35 @@
+Validation de l extrinseque par leave-one-out — arducam / myCobot 320 Pi — 2026-09-09
+"Principe : on ajuste la pose camera sur une partie des marqueurs et on PREDIT un marqueur que l ajustement n a jamais vu. L erreur de prediction est une erreur de GENERALISATION, pas un residu d ajustement."
+"Aucune recalibration : arducam_extrinsic_pick.yaml n a pas ete touche. Bras ecarte du champ (pose derriere la base, pointe a 408 mm) car la pose d observation masquait un marqueur."
+"Positions monde des marqueurs : releve au metre ruban du 18/08/2026, erreur bornee a +-5 mm par workspace_markers.yaml lui-meme."
+
+DEGRES DE LIBERTE DE L AJUSTEMENT
+variante,contraintes,inconnues,redondance,residu_reprojection_px,residu_sol_mm
+4 centres,8,6,2,0.3037,—
+16 coins,32,6,26,0.9624,2.011
+
+LEAVE-ONE-OUT SUR 4 CENTRES — systeme tout juste determine, instable
+marqueur_exclu,erreur_image_px,erreur_sol_mm,deplacement_camera_mm
+19,30.04,77.25,494.2
+23,3.11,6.63,45.3
+25,51.12,89.98,664.4
+26,1.64,3.83,22.6
+moyenne,21.48,44.42,307
+"Lecture : ces chiffres ne mesurent PAS la qualite de l extrinseque. En retirant un marqueur sur quatre il reste 6 contraintes pour 6 inconnues : ils mesurent l absence de redondance."
+
+LEAVE-ONE-MARKER-OUT SUR 16 COINS — le test valable
+marqueur_exclu,erreur_image_px,erreur_sol_mm,deplacement_camera_mm
+19,1.82,3.64,17.0
+23,1.48,3.12,31.2
+25,5.75,12.25,78.6
+26,1.22,2.82,26.6
+moyenne,2.57,5.46,38.4
+pire,5.75,12.25,78.6
+
+SYNTHESE
+grandeur,valeur_mm,commentaire
+justesse de l extrinseque en un point non ajuste,5.46,"jusqu a 12,25 mm au marqueur le plus lointain (25)"
+erreur_sol_rms annoncee dans le fichier de calibration,0.594,"RESIDU d ajustement a 4 centres avec 2 degres de liberte — pas une justesse"
+rapport,9.2,"la vraie erreur est 9 fois le residu annonce"
+incertitude du releve au ruban des positions marqueurs,5.0,"on ne peut pas etre plus juste que sa reference"
+CONCLUSION,,"L extrinseque est juste a environ 5 mm, pas a 0,6 mm. Le maillon faible est le releve des positions des marqueurs, pas l ajustement. A corriger : re-relever au pied a coulisse ou par ajustement conjoint deux cameras, et passer l extrinseque de production aux 16 coins."
