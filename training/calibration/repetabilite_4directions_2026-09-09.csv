@@ -1,0 +1,75 @@
+Repetabilite par direction d approche — MyCobot 320 Pi — 2026-09-09
+
+"Spec Elephant Robotics : +-0,5 mm de REPEATED POSITIONING PRECISION (repetabilite). Seule la dispersion INTRA-direction lui est comparable."
+"Position reconstruite par FK sur les angles RELUS : borne inferieure, aveugle au jeu et a la souplesse en aval."
+"Retrait 40 mm et non 50 : a 50 mm le depart DEVANT tombe a J3=-0,58 deg (bras quasi tendu, bande saine 23-72 deg) et le residu IK y passe a 0,611 mm contre 0,004-0,016 ailleurs. La dispersion mesuree aurait ete celle de la singularite, pas celle du sens d approche. A 40 mm : J3=-35 deg, residu 0,000."
+
+point d arrivee,330.476,31.843,60.0,portee_mm,332.01,inclinaison_deg,-15,retrait_mm,40
+
+MESURES
+direction,essai,x_mm,y_mm,z_mm
+devant,1,323.1672,25.0656,44.8740
+devant,2,323.0222,24.9518,44.4506
+devant,3,322.9310,24.8610,44.4363
+devant,4,322.9310,24.8610,44.4363
+devant,5,322.9310,24.8610,44.4363
+devant,6,323.0222,24.9518,44.4506
+devant,7,323.0222,24.9518,44.4506
+devant,8,322.7855,24.7467,44.0133
+devant,9,322.9310,24.8610,44.4363
+devant,10,322.7855,24.7467,44.0133
+derriere,1,320.7608,27.4056,42.6554
+derriere,2,320.7608,27.4056,42.6554
+derriere,3,320.7608,27.4056,42.6554
+derriere,4,320.7608,27.4056,42.6554
+derriere,5,320.7608,27.4056,42.6554
+derriere,6,320.7608,27.4056,42.6554
+derriere,7,320.7608,27.4056,42.6554
+derriere,8,320.7608,27.4056,42.6554
+derriere,9,320.7608,27.4056,42.6554
+derriere,10,320.7608,27.4056,42.6554
+gauche,1,321.4994,28.0002,42.8656
+gauche,2,321.4994,28.0002,42.8656
+gauche,3,321.7899,28.2341,43.7081
+gauche,4,321.6449,28.1174,43.2867
+gauche,5,321.4994,28.0002,42.8656
+gauche,6,321.4994,28.0002,42.8656
+gauche,7,321.4994,28.0002,42.8656
+gauche,8,321.4994,28.0002,42.8656
+gauche,9,321.4994,28.0002,42.8656
+gauche,10,321.4994,28.0002,42.8656
+droite,1,323.7260,25.5044,46.5234
+droite,2,323.7260,25.5044,46.5234
+droite,3,323.8494,25.5031,46.6433
+droite,4,323.8494,25.5031,46.6433
+droite,5,323.8494,25.5031,46.6433
+droite,6,323.8494,25.5031,46.6433
+droite,7,323.8494,25.5031,46.6433
+droite,8,323.8494,25.5031,46.6433
+droite,9,323.8494,25.5031,46.6433
+droite,10,323.8494,25.5031,46.6433
+
+SYNTHESE PAR DIRECTION (repetabilite INTRA — comparable a la spec)
+direction,n,ecart_max_mm,etendue_3d_mm,sigma_x_mm,sigma_y_mm,sigma_z_mm,moyenne_z_mm,verdict
+devant,10,0.5506,0.9941,0.1147,0.0981,0.2442,44.3997,au-dessus
+derriere,10,0.0000,0.0000,0.0000,0.0000,0.0000,42.6554,sous la spec
+gauche,10,0.7831,0.9213,0.0981,0.0790,0.2843,42.9920,au-dessus
+droite,10,0.1377,0.1721,0.0520,0.0006,0.0506,46.6193,sous la spec
+
+SYNTHESE INTER-DIRECTIONS (NON comparable a la spec)
+etalement_des_4_moyennes_mm,5.9177
+ecart_max_tout_melange_mm,3.0884
+etendue_tout_melange_mm,6.1322
+
+SYNTHESE ISO 9283 — definition normalisee de la repetabilite
+"RP = moyenne des distances au barycentre + 3 sigma. C est la definition employee pour annoncer un +-0,5 mm ; l ecart max ci-dessus ne l est pas."
+direction,n,RP_ISO9283_mm,etats_distincts_sur_n,spec_mm,verdict
+devant,10,0.7938,4,0.5,AU-DESSUS
+derriere,10,0.0000,1,0.5,sous la spec
+gauche,10,0.8385,3,0.5,AU-DESSUS
+droite,10,0.1857,2,0.5,sous la spec
+
+pire_RP_mm,0.8385
+meilleur_RP_mm,0.0000
+directions_sous_la_spec,2 sur 4
+CONCLUSION,"La spec +-0,5 mm n est PAS tenue dans 2 directions sur 4. Et comme la mesure est une BORNE INFERIEURE (relevee aux codeurs), les 2 directions sous la spec ne prouvent pas la conformite : elles ne l infirment pas, c est tout."
