@@ -1,35 +1,58 @@
-Validation de l extrinseque par leave-one-out — arducam / myCobot 320 Pi — 2026-09-09
-"Principe : on ajuste la pose camera sur une partie des marqueurs et on PREDIT un marqueur que l ajustement n a jamais vu. L erreur de prediction est une erreur de GENERALISATION, pas un residu d ajustement."
-"Aucune recalibration : arducam_extrinsic_pick.yaml n a pas ete touche. Bras ecarte du champ (pose derriere la base, pointe a 408 mm) car la pose d observation masquait un marqueur."
-"Positions monde des marqueurs : releve au metre ruban du 18/08/2026, erreur bornee a +-5 mm par workspace_markers.yaml lui-meme."
+Validation de l extrinseque — arducam / myCobot 320 Pi — 2026-09-09 (version corrigee du soir)
+"Aucune recalibration : arducam_extrinsic_pick.yaml n a pas ete touche. Bras ecarte du champ (pose derriere la base, pointe a 408 mm) car la pose d observation masquait le marqueur 23."
 
-DEGRES DE LIBERTE DE L AJUSTEMENT
-variante,contraintes,inconnues,redondance,residu_reprojection_px,residu_sol_mm
-4 centres,8,6,2,0.3037,—
-16 coins,32,6,26,0.9624,2.011
+COTE REEL DU MARQUEUR — ajuste en minimisant la reprojection sur les 16 coins
+cote_suppose_mm,reprojection_px
+46.00,1.1585
+48.00,0.8429
+48.49,0.8277
+49.00,0.8442
+50.00,0.9624
+51.00,1.1623
+52.00,1.4094
+optimum_mm,48.49
+ecart_au_yaml_pourcent,-3.02
+"Le YAML declare marker_size_mm: 50. Le -3,02 % retrouve le -3,25 % mesure l apres-midi sur le tag de 50 mm : erreur d impression reelle sur la planche de 50 mm. Le tag de 100 mm, imprime separement, est juste a +0,005 %."
 
-LEAVE-ONE-OUT SUR 4 CENTRES — systeme tout juste determine, instable
-marqueur_exclu,erreur_image_px,erreur_sol_mm,deplacement_camera_mm
-19,30.04,77.25,494.2
-23,3.11,6.63,45.3
-25,51.12,89.98,664.4
-26,1.64,3.83,22.6
-moyenne,21.48,44.42,307
-"Lecture : ces chiffres ne mesurent PAS la qualite de l extrinseque. En retirant un marqueur sur quatre il reste 6 contraintes pour 6 inconnues : ils mesurent l absence de redondance."
+ECART CENTRE VU / POSITION YAML (fit 16 coins, cote 50 mm)
+marqueur,ecart_x_mm,ecart_y_mm,ecart_total_mm,residu_coins_mm
+19,-0.01,0.71,0.71,2.77
+23,-0.12,-0.65,0.66,1.02
+25,-0.15,-0.55,0.57,0.98
+26,0.28,0.49,0.56,2.30
 
-LEAVE-ONE-MARKER-OUT SUR 16 COINS — le test valable
-marqueur_exclu,erreur_image_px,erreur_sol_mm,deplacement_camera_mm
-19,1.82,3.64,17.0
-23,1.48,3.12,31.2
-25,5.75,12.25,78.6
-26,1.22,2.82,26.6
-moyenne,2.57,5.46,38.4
-pire,5.75,12.25,78.6
+FORME DE LA CONSTELLATION — distances entre marqueurs
+"Controle decisif : un ajustement rigide a 6 DoF absorbe une translation ou une rotation globale, mais PAS une deformation."
+paire,distance_yaml_mm,distance_vue_mm,ecart_mm
+19-23,382.63,383.99,1.36
+19-25,438.35,438.18,-0.17
+19-26,575.85,576.23,0.37
+23-25,579.54,579.58,0.04
+23-26,420.01,420.42,0.41
+25-26,391.03,389.99,-1.04
+ecart_moyen_mm,0.57
+ecart_max_mm,1.36
+"Les positions du YAML sont donc BIEN MEILLEURES que le +-5 mm annonce par son en-tete."
+
+LEAVE-ONE-CORNER-OUT — 1 coin sur 16 retire, on reste EN INTERPOLATION
+grandeur,valeur_mm
+moyenne,1.86
+mediane,1.42
+maximum,4.87
+"C est la vraie erreur de generalisation de l extrinseque a l interieur de la constellation."
+
+LEAVE-ONE-MARKER-OUT — retire un COIN ENTIER : extrapolation sur ~400 mm
+marqueur_exclu,erreur_sol_mm
+19,2.81
+23,2.42
+25,12.64
+26,2.38
+"Le 25 est le cas d extrapolation pur. Ce protocole n est PAS adapte a une constellation de 4 marqueurs : il mesure la geometrie du test, pas la justesse."
 
 SYNTHESE
 grandeur,valeur_mm,commentaire
-justesse de l extrinseque en un point non ajuste,5.46,"jusqu a 12,25 mm au marqueur le plus lointain (25)"
-erreur_sol_rms annoncee dans le fichier de calibration,0.594,"RESIDU d ajustement a 4 centres avec 2 degres de liberte — pas une justesse"
-rapport,9.2,"la vraie erreur est 9 fois le residu annonce"
-incertitude du releve au ruban des positions marqueurs,5.0,"on ne peut pas etre plus juste que sa reference"
-CONCLUSION,,"L extrinseque est juste a environ 5 mm, pas a 0,6 mm. Le maillon faible est le releve des positions des marqueurs, pas l ajustement. A corriger : re-relever au pied a coulisse ou par ajustement conjoint deux cameras, et passer l extrinseque de production aux 16 coins."
+justesse de l extrinseque dans la constellation,1.86,"leave-one-corner-out, mediane 1,42 mm"
+ecart centre vu / YAML,0.71,"maximum sur les 4 marqueurs"
+deformation de la constellation,0.57,"moyenne des 6 distances"
+CORRECTION,,"Une premiere version annoncait 5,46 mm. Ce chiffre venait d un leave-one-MARKER-out qui, sur 4 marqueurs, extrapolait sur 400 mm. Il est retire."
+A CORRIGER,,"marker_size_mm doit passer de 50 a ~48,5 dans workspace_markers.yaml, apres verification au pied a coulisse."

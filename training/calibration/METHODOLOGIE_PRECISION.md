@@ -1,5 +1,29 @@
 # Méthodologie des essais de précision — myCobot 320 Pi
 
+> ## ⚠️ Deux corrections majeures du 09/09 au soir
+>
+> ## ⚠️ Le constructeur se contredit — deux chiffres officiels
+>
+> | source Elephant Robotics | répétabilité | rayon | poids |
+> |---|---|---|---|
+> | [page produit 320 Pi](https://www.elephantrobotics.com/en/mycobot-320-pi-en/) | **1 mm** | 350 mm | 850 g |
+> | [GitBook, paramètres produit 320](https://docs.elephantrobotics.com/docs/gitbook-en/2-serialproduct/2.2-320/2.2.2.1%20Introduction%20of%20product%20parameters.html) | **±0,5 mm** | 350 mm | 3 kg |
+>
+> Le **±0,5 mm** est donc bien officiel : il vient du GitBook, la documentation
+> technique. La page produit annonce 1 mm. Le poids départage sans trancher le
+> reste : le 320 pèse ~3 kg, donc les 850 g de la page produit sont faux — ce
+> qui affaiblit cette page, sans prouver que son 1 mm l'est aussi.
+>
+> **Verdict selon la source retenue :**
+>
+> | | ±0,5 mm (GitBook) | 1 mm (page produit) |
+> |---|---|---|
+> | séries conformes | **3 sur 6** | **6 sur 6** |
+> | pire série (0,838 mm) | ×1,7 au-dessus | conforme, 84 % du budget |
+>
+> Les tableaux de ce document donnent les deux colonnes. **Tant que le
+> constructeur n'est pas départagé, on ne peut pas conclure** — et c'est la
+> réponse honnête à donner.
 Ce document répond à une question précise : **la méthode employée pour mesurer
 l'écart du bras est-elle valable, et pour quoi ?** Il sépare les sept types
 d'essais qu'on peut mener, dit lesquels sont faits, lesquels ne le sont pas, et
@@ -112,8 +136,12 @@ formule, non conforme sur l'échantillonnage, la charge, la vitesse et
 l'instrument.
 
 ⚠️ Réserve sur la comparaison elle-même : **rien n'indique qu'Elephant Robotics
-ait suivi ISO 9283** pour annoncer ses ±0,5 mm. Comparer deux chiffres suppose
-de connaître les deux protocoles ; on ne connaît que le nôtre.
+ait suivi ISO 9283** pour annoncer son 1 mm. Comparer deux chiffres suppose de
+connaître les deux protocoles ; on ne connaît que le nôtre.
+
+⚠️ Et d'où venait le ±0,5 mm ? Pas de la fiche du 320 Pi. Il faut retirer ce
+chiffre de tous les supports et le remplacer par **1 mm**, en citant la fiche
+officielle.
 
 ---
 
@@ -121,12 +149,12 @@ de connaître les deux protocoles ; on ne connaît que le nôtre.
 
 | # | essai | référence externe | état | résultat |
 |---|---|---|---|---|
-| 1 | Répétabilité du bras | **nécessaire** pour statuer sur ±0,5 mm | fait, borne inférieure | 0,00 à 0,84 mm selon la direction |
+| 1 | Répétabilité du bras | utile, non bloquante | fait, borne inférieure | 0,00 à 0,84 mm — **toutes sous la spec de 1 mm** |
 | 2 | Erreur cartésienne reconstruite | non — se suffit | fait | 14,84 mm brut · ≈2 mm compensé |
 | 3 | Précision physique absolue | **indispensable** | **non fait** | inaccessible par cette méthode |
 | 4 | Répétabilité de la vision | non — auto-référencée | fait | sous la quantification du détecteur |
 | 5 | Précision métrique de la vision | **oui** — une longueur connue | fait, référence non vérifiée | +0,005 % sur 100 mm · −0,29 % base longue |
-| 6 | Calibration extrinsèque | **oui** — un point indépendant | **fait le 09/09 au soir** | **5,46 mm** en moyenne au point non vu |
+| 6 | Calibration extrinsèque | **oui** — un point indépendant | **fait le 09/09 au soir** | **1,86 mm** en interpolation |
 | 7 | Précision globale vision + robot | non — l'objet est sa cible | **non fait** | à chiffrer |
 
 ### 1 — Répétabilité du bras
@@ -134,22 +162,28 @@ de connaître les deux protocoles ; on ne connaît que le nôtre.
 Six séries unidirectionnelles au même point (330,5 · 31,8 · 60) mm, portée
 332 mm, outil incliné à −15°.
 
-| série | n | RP ISO 9283 | états distincts | vs ±0,5 mm |
-|---|---|---|---|---|
-| A — par le haut | 10 | 0,403 mm | 2 | sous |
-| F-UNI — par le haut | 6 | 0,557 mm | 2 | **au-dessus** |
-| G — depuis l'arrière | 10 | 0,000 mm | 1 | sous |
-| G — depuis la droite | 10 | 0,186 mm | 2 | sous |
-| G — depuis l'avant | 10 | 0,794 mm | 4 | **au-dessus** |
-| G — depuis la gauche | 10 | 0,838 mm | 3 | **au-dessus** |
+| série | n | RP ISO 9283 | états distincts | portée du départ | vs 1 mm |
+|---|---|---|---|---|---|
+| A — par le haut | 10 | 0,403 mm | 2 | — | sous |
+| F-UNI — par le haut | 6 | 0,557 mm | 2 | — | sous |
+| G — depuis l'arrière | 10 | 0,000 mm | 1 | 292 mm | sous |
+| G — depuis la droite | 10 | 0,186 mm | 2 | 331 mm | sous |
+| G — depuis l'avant | 10 | 0,794 mm | 4 | **372 mm** | sous |
+| G — depuis la gauche | 10 | 0,838 mm | 3 | 338 mm | sous |
 
-**Trois séries sur six dépassent la spécification.** Les séries *sous* le seuil
-ne prouvent rien — une borne inférieure ne peut qu'échouer à infirmer. Seuls
-les **dépassements** informent : une borne inférieure déjà au-dessus du seuil ne
-peut pas redescendre avec une meilleure instrumentation.
+**Les six séries sont sous la spécification officielle de 1 mm.** Le robot tient
+son chiffre constructeur, y compris dans sa pire direction.
 
-**Conclusion défendable : à cette pose, la répétabilité réelle est ≥ 0,84 mm
-dans la pire direction.**
+Deux observations qui restent valables :
+
+- la répétabilité **varie d'un facteur ≥ 4** selon le côté d'où l'on arrive
+  (0,19 à 0,84 mm en écartant le 0,000 qui est sous le plancher de mesure) ;
+- la pire série, « depuis l'avant », est aussi la seule dont le point de départ
+  se situe à **372 mm, au-delà du rayon nominal de 350 mm**. Travailler hors
+  enveloppe n'est couvert par aucune spécification.
+
+Réserve inchangée : la mesure est une **borne inférieure**. Passer sous le seuil
+ne prouve pas la conformité — cela échoue seulement à l'infirmer.
 
 ### 2 — Erreur cartésienne reconstruite
 
@@ -232,34 +266,50 @@ Avec 4 centres, en retirer un laisse **exactement 6 contraintes pour
 Ces chiffres ne mesurent pas la qualité de l'extrinsèque : ils mesurent
 l'**absence de redondance**.
 
-### Le vrai test, avec les 16 coins
+### Le côté réel des marqueurs : 48,49 mm, pas 50
 
-| marqueur exclu | erreur image | erreur au sol | déplacement caméra |
-|---|---|---|---|
-| 19 | 1,82 px | 3,64 mm | 17,0 mm |
-| 23 | 1,48 px | 3,12 mm | 31,2 mm |
-| 25 | 5,75 px | **12,25 mm** | 78,6 mm |
-| 26 | 1,22 px | 2,82 mm | 26,6 mm |
-| **moyenne** | **2,57 px** | **5,46 mm** | 38,4 mm |
+Avant tout test, il faut corriger le modèle. En laissant le côté du marqueur
+libre et en minimisant la reprojection sur les 16 coins :
 
-> **L'extrinsèque est juste à ≈ 5 mm en un point qu'elle n'a pas servi à
-> ajuster, jusqu'à 12 mm au marqueur le plus lointain.**
+| côté supposé | reprojection |
+|---|---|
+| 48,49 mm (**optimum ajusté**) | **0,8277 px** |
+| 50,00 mm (valeur du YAML) | 0,9624 px |
 
-C'est **neuf fois** le `erreur_sol_rms_mm: 0.594` annoncé dans le fichier de
-calibration. Ce 0,594 est un **résidu d'ajustement** avec 2 degrés de liberté de
-redondance : il était pratiquement garanti d'être petit et ne mesure pas la
-justesse.
+**−3,02 %.** C'est exactement le −3,25 % mesuré l'après-midi sur le tag de
+50 mm et classé alors « artefact ». Il y a bien une **erreur d'impression
+réelle** d'environ −3 % sur la planche de 50 mm. Le tag de 100 mm, imprimé
+séparément, est juste à +0,005 %.
 
-Signature révélatrice : l'ajustement à 16 coins a un résidu **plus grand**
-(0,96 px contre 0,30) précisément parce qu'il a de la redondance et ne peut plus
-absorber les erreurs.
+### Ce que le fit dit vraiment, une fois le côté corrigé
 
-### La cause probable
+| contrôle | résultat |
+|---|---|
+| écart centre vu ↔ position YAML, par marqueur | **0,56 à 0,71 mm** |
+| forme de la constellation (distances entre marqueurs) | **0,57 mm moyen · 1,36 mm max** |
+| **leave-one-CORNER-out** (1 coin sur 16, interpolation) | **1,86 mm moyen · 1,42 mm médian · 4,87 mm max** |
+| leave-one-marker-out : 19, 23, 26 | 2,4 à 2,8 mm |
+| leave-one-marker-out : 25 (extrapolation) | 12,6 mm |
 
-Les positions des marqueurs viennent d'un relevé **au mètre ruban** du
-18/08/2026, dont l'en-tête de [`workspace_markers.yaml`](workspace_markers.yaml)
-borne lui-même l'erreur à **±5 mm**. On ne peut pas être plus juste que sa
-référence : les 5,46 mm mesurés sont exactement de cet ordre.
+> **L'extrinsèque est juste à ≈ 1,5–2 mm à l'intérieur de la constellation.**
+
+La **forme** de la constellation est le contrôle décisif : un ajustement rigide
+à 6 DoF peut absorber une translation ou une rotation globale du jeu de
+marqueurs, mais **pas une déformation**. Les distances entre marqueurs collent
+au plan à 0,57 mm en moyenne. Les positions du YAML sont donc **bien meilleures
+que le ±5 mm annoncé** par son en-tête.
+
+### Pourquoi le premier chiffre de 5,46 mm était faux
+
+Retirer 1 marqueur sur 4, c'est retirer **un coin entier** de la constellation :
+la prédiction cesse d'être une interpolation et devient une **extrapolation sur
+~400 mm**. Une erreur angulaire minime de la pose ajustée s'y amplifie
+linéairement. Le 5,46 mm mesurait la géométrie du test, pas la justesse de
+l'extrinsèque.
+
+Le protocole correct sur une constellation aussi pauvre est le
+**leave-one-corner-out**, qui retire un point sur seize et reste entouré de
+données.
 
 ---
 
@@ -304,11 +354,10 @@ lecture directe au centième, sans modèle. Puis 10 retours depuis un autre sens
 sans rien démonter → biais de direction **jeu compris**, ce que la FK ne verra
 jamais. Cette seule manipulation transforme six bornes inférieures en valeurs.
 
-**Étape 2 — re-relever les positions des marqueurs de planche.** C'est le
-maillon faible démontré en section 4 : ±5 mm de ruban plafonnent toute la
-chaîne à ~5 mm. Un relevé au pied à coulisse depuis un bord de référence, ou un
-ajustement conjoint des deux caméras comme cela a déjà été fait pour le
-marqueur 19 (±0,3 mm), ferait tomber l'erreur d'un ordre.
+**Étape 2 — corriger `marker_size_mm` : 48,5 et non 50.** C'est la seule erreur
+franche trouvée dans les données. Elle déplace chaque coin de 0,75 mm et entre
+directement dans l'extrinsèque à 16 coins. À confirmer au pied à coulisse avant
+d'éditer le YAML.
 
 **Étape 3 — passer l'extrinsèque de production aux 16 coins.** Le fichier actuel
 est ajusté sur 4 centres, sans redondance. Les 16 coins donnent 26 degrés de

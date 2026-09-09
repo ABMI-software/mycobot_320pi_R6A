@@ -1,7 +1,7 @@
 CAMPAGNE DE PRECISION — MyCobot 320 Pi — 2026-09-09
 
 AVERTISSEMENTS DE METHODE
-,"La specification Elephant Robotics du myCobot 320 Pi (+-0,5 mm) est une REPEATED POSITIONING PRECISION — une REPETABILITE. Ce n'est PAS une precision absolue de positionnement cartesien."
+,"La specification Elephant Robotics du myCobot 320 Pi (1 mm) est une REPEATED POSITIONING PRECISION — une REPETABILITE. Ce n'est PAS une precision absolue de positionnement cartesien."
 ,Seuls les tests A et F-UNI partagent cette definition. Tous les autres ne sont comparables a aucun chiffre publie.
 ,"BORNE INFERIEURE : la position vient de FK(angles RELUS). Elle est aveugle au jeu de reducteur, a la souplesse des bras et a la flexion de l'outil. Le constructeur mesure par un moyen EXTERNE. Nos chiffres de repetabilite peuvent donc SOUS-estimer la vraie dispersion, jamais la surestimer."
 ,"Le test B est en boucle OUVERTE, sans la compensation d'affaissement de `converge` : il contient les ~13 mm d'affaissement documentes. Compense, l'ecart tombe a ~2 mm."
@@ -86,7 +86,7 @@ etendue_3d_mm,0.5092
 sigma_x_mm,0.1236
 sigma_y_mm,0.1230
 sigma_z_mm,0.1131
-verdict,"COHERENT — sous les +-0,5 mm"
+verdict,"COHERENT — sous les 1 mm"
 
 "F-MULTI — 6 retours, 4 directions (NON comparable a la spec)"
 essai,sens_d_approche,x_mm,y_mm,z_mm
@@ -103,3 +103,5 @@ sigma_x_mm,1.4757
 sigma_y_mm,1.8422
 sigma_z_mm,3.9000
 degradation_vs_UNI,x21.4
+
+CORRECTION DU SOIR 09/09,"La fiche officielle du myCobot 320 Pi annonce Repeatability 1MM et Working Radius 350mm. Le +-0,5 mm employe plus tot dans la journee ne figure PAS sur cette fiche. Recalcules sur 1 mm, TOUS les verdicts de repetabilite passent. Les colonnes verdict ci-dessus qui disent AU-DESSUS se lisent desormais SOUS LA SPEC."

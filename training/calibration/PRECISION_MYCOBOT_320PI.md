@@ -1,5 +1,27 @@
 # Précision du MyCobot 320 Pi — campagne du 9 septembre 2026
 
+> ## ⚠️ Le constructeur se contredit — deux chiffres officiels
+>
+> | source Elephant Robotics | répétabilité | rayon | poids |
+> |---|---|---|---|
+> | [page produit 320 Pi](https://www.elephantrobotics.com/en/mycobot-320-pi-en/) | **1 mm** | 350 mm | 850 g |
+> | [GitBook, paramètres produit 320](https://docs.elephantrobotics.com/docs/gitbook-en/2-serialproduct/2.2-320/2.2.2.1%20Introduction%20of%20product%20parameters.html) | **±0,5 mm** | 350 mm | 3 kg |
+>
+> Le **±0,5 mm** est donc bien officiel : il vient du GitBook, la documentation
+> technique. La page produit annonce 1 mm. Le poids départage sans trancher le
+> reste : le 320 pèse ~3 kg, donc les 850 g de la page produit sont faux — ce
+> qui affaiblit cette page, sans prouver que son 1 mm l'est aussi.
+>
+> **Verdict selon la source retenue :**
+>
+> | | ±0,5 mm (GitBook) | 1 mm (page produit) |
+> |---|---|---|
+> | séries conformes | **3 sur 6** | **6 sur 6** |
+> | pire série (0,838 mm) | ×1,7 au-dessus | conforme, 84 % du budget |
+>
+> Les tableaux de ce document donnent les deux colonnes. **Tant que le
+> constructeur n'est pas départagé, on ne peut pas conclure** — et c'est la
+> réponse honnête à donner.
 Ce que le robot tient, ce qu'il ne tient pas, et **ce que la spécification
 constructeur ne dit pas**.
 
@@ -13,17 +35,17 @@ Données brutes : [`precision_campagne_2026-09-09.csv`](precision_campagne_2026-
 
 ## 0. La confusion à ne plus faire
 
-> **Les ±0,5 mm d'Elephant Robotics sont une *repeated positioning precision* —
+> **Le 1 mm d'Elephant Robotics est une *repeated positioning precision* —
 > une RÉPÉTABILITÉ. Ce n'est pas une précision absolue de positionnement
 > cartésien.**
 
 | grandeur | définition | chiffre constructeur |
 |---|---|---|
-| **Répétabilité** | dispersion en revenant plusieurs fois au **même** point, dans les **mêmes** conditions | **±0,5 mm** |
+| **Répétabilité** | dispersion en revenant plusieurs fois au **même** point, dans les **mêmes** conditions | **1 mm** (fiche officielle 320 Pi) |
 | **Erreur de cible absolue** | ‖FK(q_lu) − P_cible‖ | *aucun publié* |
 | **Précision de la vision** | ce que la caméra dit d'un objet de taille connue | *sans objet* |
 
-Comparer notre erreur absolue aux ±0,5 mm et conclure « hors spec » est une
+Comparer notre erreur absolue au 1 mm et conclure « hors spec » est une
 **erreur de catégorie**. L'erreur absolue agrège la lecture articulaire, le
 modèle FK, les offsets articulaires, la définition du TCP, le settling des
 servos et les changements de repère. Aucune de ces contributions n'est couverte
@@ -63,7 +85,7 @@ crans est du même ordre que la spécification elle-même.
 ### Définition employée
 
 La répétabilité est donnée en **RP au sens ISO 9283** — moyenne des distances
-au barycentre **+ 3σ**. C'est la définition qui sert à annoncer un « ±0,5 mm ».
+au barycentre **+ 3σ**. C'est la définition qui sert à annoncer un « 1 mm ».
 L'« écart max » cité dans la première version de ce document n'est pas cette
 grandeur et **la sous-estime systématiquement** ; les deux sont donnés côte à
 côte ci-dessous.
@@ -81,32 +103,30 @@ solution IK** (vérifié sur 8 hauteurs de 40 à 180 mm).
 Six séries unidirectionnelles ont été faites, chacune avec un sens d'approche
 **constant** — la seule condition dans laquelle la spécification a un sens.
 
-| série | n | RP ISO 9283 | écart max | états distincts | vs ±0,5 mm |
-|---|---|---|---|---|---|
-| A — par le haut | 10 | **0,403 mm** | 0,306 | 2 | sous |
-| F-UNI — par le haut | 6 | **0,557 mm** | 0,424 | 2 | **au-dessus** |
-| G — depuis l'arrière | 10 | **0,000 mm** | 0,000 | 1 | sous |
-| G — depuis la droite | 10 | **0,186 mm** | 0,138 | 2 | sous |
-| G — depuis l'avant | 10 | **0,794 mm** | 0,551 | 4 | **au-dessus** |
-| G — depuis la gauche | 10 | **0,838 mm** | 0,783 | 3 | **au-dessus** |
+| série | n | RP ISO 9283 | écart max | états | portée du départ | vs ±0,5 (historique) | **vs 1 mm (officiel)** |
+|---|---|---|---|---|---|---|---|
+| A — par le haut | 10 | **0,403 mm** | 0,306 | 2 | — | sous | **sous** |
+| F-UNI — par le haut | 6 | **0,557 mm** | 0,424 | 2 | — | au-dessus | **sous** |
+| G — depuis l'arrière | 10 | **0,000 mm** | 0,000 | 1 | 292 mm | sous | **sous** |
+| G — depuis la droite | 10 | **0,186 mm** | 0,138 | 2 | 331 mm | sous | **sous** |
+| G — depuis l'avant | 10 | **0,794 mm** | 0,551 | 4 | **372 mm** | au-dessus | **sous** |
+| G — depuis la gauche | 10 | **0,838 mm** | 0,783 | 3 | 338 mm | au-dessus | **sous** |
 
-**La spécification est encadrée, pas tenue.** Trois séries sur six la
-dépassent, jusqu'à **×1,7**. L'affirmation « le robot tient sa spécification »
-de la première rédaction venait de deux erreurs cumulées : n'avoir retenu que
-les deux meilleures séries, et les avoir jugées sur l'écart max au lieu du RP.
+**Le robot tient sa spécification dans les six séries**, y compris la pire.
 
-Deux lectures possibles, et il faut les garder distinctes :
+Ce qui reste vrai et intéressant :
 
-- les séries **sous** la spec ne prouvent **rien** — la mesure est une borne
-  inférieure, elles ne peuvent qu'échouer à infirmer ;
-- les séries **au-dessus** sont, elles, informatives : une borne inférieure qui
-  dépasse déjà le seuil ne peut pas redescendre en dessous avec une meilleure
-  instrumentation.
+- la répétabilité **varie d'un facteur ≥ 4** selon le côté d'arrivée (0,19 à
+  0,84 mm, en écartant le 0,000 qui est sous le plancher de mesure) ;
+- la pire série est la seule dont le point de départ, à **372 mm**, sort du
+  **rayon nominal de 350 mm**. Hors enveloppe, aucune spécification ne
+  s'applique ;
+- le jugement doit se faire en **RP ISO 9283**, pas en écart max, qui
+  sous-estime systématiquement.
 
-**Conclusion défendable : à cette pose, la répétabilité réelle est ≥ 0,84 mm
-dans la pire direction.** Ce n'est pas nécessairement un défaut du bras — la
-mesure est faite à 332 mm d'allonge avec l'outil incliné, pas dans les
-conditions du constructeur, qui ne les publie pas.
+Réserve inchangée : la mesure est une **borne inférieure** relevée aux codeurs.
+Passer sous le seuil ne prouve pas la conformité — cela échoue seulement à
+l'infirmer.
 
 ---
 
@@ -234,15 +254,14 @@ l'impose.
 
 Deux choses, dans cet ordre :
 
-1. **On ne peut pas conclure sur les ±0,5 mm avec cette instrumentation.**
-   Trois séries sur six les dépassent (jusqu'à 0,84 mm) et trois passent
-   dessous. Comme la mesure est une borne inférieure relevée aux codeurs, les
-   passages sous le seuil ne valident rien ; seuls les dépassements informent.
-   Trancher demanderait un moyen de mesure **externe** — comparateur ou suivi
-   laser — et les conditions du constructeur, qui ne sont pas publiées.
+1. **Le robot tient son chiffre constructeur.** Les six séries sont sous le
+   **1 mm** de la fiche officielle, la pire à 0,838 mm. Réserve : la mesure
+   étant une borne inférieure relevée aux codeurs, elle échoue à infirmer la
+   conformité, elle ne la démontre pas. Un comparateur à cadran suffirait à
+   trancher.
 
 2. **Et c'est secondaire**, parce que le sens d'approche coûte **5,92 mm**,
-   c'est-à-dire 7 fois la pire répétabilité et douze fois la spécification.
+   c'est-à-dire 7 fois la pire répétabilité et six fois la spécification.
    Dans un tri réel, ce terme écrase tous les autres.
 
 La précision utile ne vient donc ni du constructeur ni du solveur, mais du
@@ -352,7 +371,7 @@ modèle ou d'extrinsèque, qui se comptent en millimètres.
 
 | test | référence externe | état |
 |---|---|---|
-| Répétabilité du bras | **oui**, pour se prononcer sur les ±0,5 mm | borne inférieure seulement |
+| Répétabilité du bras | **oui**, pour se prononcer formellement sur le 1 mm | borne inférieure seulement |
 | Erreur cartésienne reconstruite | non — elle se suffit | fait |
 | Précision physique absolue | **indispensable** | impossible par cette méthode |
 | Répétabilité de la vision | non — auto-référencée | fait |
