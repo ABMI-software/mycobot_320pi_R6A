@@ -1,5 +1,62 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (9 septembre 2026 — soir, test des 4 directions)
+
+### Ce qui a été accompli
+
+**Le test interrompu a été mené à son terme** : 4 directions × 10 retours,
+40 approches, aucun échec, bras reparqué en pose d'observation.
+
+| direction | RP ISO 9283 | états distincts | Z du barycentre |
+|---|---|---|---|
+| arrière | 0,000 mm | 1 | 42,655 |
+| droite | 0,186 mm | 2 | 46,619 |
+| avant | 0,794 mm | 4 | 44,400 |
+| gauche | 0,838 mm | 3 | 42,992 |
+
+**Trois conclusions du rapport ont dû être corrigées** :
+
+1. « Le robot tient sa spécification » → **faux**. Trois séries sur six
+   dépassent les ±0,5 mm une fois jugées en RP ISO 9283 et non en écart max.
+2. « On mesure la répétabilité du relevé codeur, quantifié » → **faux**. Le
+   plancher vaut 0,099 mm ; les dispersions sont 2 à 8× au-dessus.
+3. « Dégradation presque entièrement verticale » → **surestimé**. L'étalement
+   se répartit X 3,06 · Y 3,15 · Z 3,96 mm.
+
+**Le résultat le plus solide de la campagne** reste le biais de sens
+d'approche : 5,918 mm ici, 5,847 mm ce matin, 5,88 mm le 20/08 — trois
+protocoles indépendants à 0,07 mm près.
+
+### Décisions prises
+
+- Retrait du test fixé à **40 mm** et non 50 : à 50 mm le départ « avant »
+  plaçait le bras à J3 = −0,58°, résidu IK 0,611 mm. On aurait mesuré la
+  singularité, pas le sens d'approche.
+- La répétabilité est désormais toujours donnée en **RP ISO 9283**.
+- Les séries *sous* la spec ne sont plus présentées comme une validation : la
+  mesure étant une borne inférieure, seules les séries *au-dessus* informent.
+
+### Prochaines actions
+
+1. [ROUGE] Rejouer la prise du scotch outil incliné avec `ctx.classe_objet`
+   correctement armé, pour voir si `Z_PRISE_PAR_CLASSE['scotch'][1] = 35,9`
+   suffit ou doit descendre vers les ~8 mm qui saisissent réellement.
+2. [JAUNE] Mesurer l'affaissement à **trois allonges** pour trancher si
+   `d = L × θ` est prédictif (14,8 mm mesurés à 332 mm contre 13 mm modélisés
+   à 390 mm).
+3. [VERT] Reprendre la répétabilité avec un moyen de mesure **externe** si l'on
+   veut réellement statuer sur les ±0,5 mm.
+
+### Commande rapide de reprise
+
+```bash
+cd /home/genji/Osama_ws/src/mycobot_R6A
+python3 -c "import json,socket; s=socket.create_connection(('10.10.0.219',5005),timeout=8); \
+s.sendall(b'{\"action\": \"get_angles\"}\n'); print(s.makefile().readline())"
+```
+
+---
+
 ## État actuel (9 septembre 2026 — après-midi, campagne de précision)
 
 ### Ce qui a été accompli

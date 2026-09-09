@@ -9,6 +9,30 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — la répétabilité était jugée sur la mauvaise statistique (09/09, soir)
+
+- Test des **4 directions × 10 retours** mené sur le bras (40 approches, 0 échec),
+  retrait uniforme de 40 mm autour du tag ArUco :
+  `training/calibration/repetabilite_4directions_2026-09-09.csv`, plus une
+  10ᵉ feuille dans le classeur de campagne.
+- La répétabilité est désormais donnée en **RP au sens ISO 9283**
+  (distances au barycentre + 3σ), la définition qui sert à annoncer un ±0,5 mm.
+  L'« écart max » employé jusqu'ici la sous-estime.
+- **Retrait ramené de 50 à 40 mm** : à 50 mm le départ « avant » plaçait le bras
+  à J3 = −0,58° (quasi tendu) avec un résidu IK de 0,611 mm contre 0,004–0,016 mm
+  ailleurs — on aurait mesuré une singularité au lieu d'un sens d'approche.
+- **Conclusion révisée** : sur six séries unidirectionnelles, **trois dépassent
+  les ±0,5 mm** (jusqu'à 0,838 mm). L'affirmation « le robot tient sa
+  spécification » est retirée du rapport ; elle ne reposait que sur les deux
+  meilleures séries, jugées sur la mauvaise statistique.
+- **Plancher instrumental chiffré** : 1 LSB (0,01°) vaut 0,099 mm en bout d'outil.
+  Les dispersions mesurées sont 2 à 8× au-dessus, donc non limitées par la lecture ;
+  le bras se stabilise sur 1 à 4 **états discrets** séparés de 0,4 à 0,9 mm.
+- **Biais inter-directions reconfirmé une troisième fois** : 5,918 mm, contre
+  5,847 mm (F-MULTI) et 5,88 mm (20/08). Trois protocoles à 0,07 mm près.
+- Corrigé aussi l'affirmation « dégradation presque entièrement verticale » :
+  avec 10 essais par côté, l'étalement vaut X 3,06 · Y 3,15 · Z 3,96 mm.
+
 ### Corrigé — la spécification constructeur était comparée à la mauvaise grandeur (09/09)
 
 - **Les ±0,5 mm d'Elephant Robotics sont une *repeated positioning precision***
