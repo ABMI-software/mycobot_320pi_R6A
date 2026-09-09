@@ -9,6 +9,25 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — méthodologie des essais de précision et validation de l'extrinsèque (09/09, soir)
+
+- `training/calibration/METHODOLOGIE_PRECISION.md` : ce que `FK(q_lu) − P_cible`
+  mesure réellement, la norme ISO 9283, les sept types d'essai, quand une
+  référence externe devient nécessaire, et la méthode proposée pour la suite.
+- **Validation de l'extrinsèque par leave-one-out**, sans recalibrer :
+  `extrinseque_leave_one_out_2026-09-09.csv` + feuille `H` du classeur.
+  L'extrinsèque est juste à **5,46 mm** en un point qu'elle n'a pas servi à
+  ajuster (12,25 mm au marqueur le plus lointain), soit **9× le
+  `erreur_sol_rms_mm: 0.594`** annoncé par le fichier de calibration — lequel
+  est un résidu d'ajustement à 2 degrés de liberté de redondance, pas une
+  justesse. Cause probable : le relevé au mètre ruban des positions marqueurs,
+  dont `workspace_markers.yaml` borne lui-même l'erreur à ±5 mm.
+- Le classeur passe à **13 feuilles**, toutes réécrites au format
+  « ce qui est mesuré · valeur · unité · ce que ça veut dire », plus une feuille
+  `Comment lire ce classeur` qui définit répétabilité, RP ISO 9283, écart max,
+  borne inférieure et base courte/longue. Les verdicts périmés sont corrigés :
+  F-UNI affiche désormais *AU-DESSUS de la spécification*.
+
 ### Corrigé — la répétabilité était jugée sur la mauvaise statistique (09/09, soir)
 
 - Test des **4 directions × 10 retours** mené sur le bras (40 approches, 0 échec),

@@ -1,5 +1,64 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (9 septembre 2026 — soir, méthodologie et extrinsèque)
+
+### Ce qui a été accompli
+
+**Le maillon faible de la chaîne est identifié, et ce n'est pas le bras.**
+
+Validation de l'extrinsèque par leave-one-out, sans recalibrer : on ajuste la
+pose caméra sur une partie des marqueurs, on prédit un marqueur jamais vu.
+
+| ajustement | redondance | erreur au point non vu |
+|---|---|---|
+| 4 centres | 2 ddl | inexploitable (le système s'effondre) |
+| 16 coins | 26 ddl | **5,46 mm** en moyenne, 12,25 mm au pire |
+
+Le fichier de calibration annonce `erreur_sol_rms_mm: 0.594` — c'est un
+**résidu d'ajustement**, pas une justesse. La vraie erreur est **9× plus
+grande**, et du même ordre que le biais de sens d'approche (5,9 mm).
+
+Cause probable : les positions des marqueurs viennent d'un relevé au mètre
+ruban dont `workspace_markers.yaml` borne l'erreur à ±5 mm. On ne peut pas être
+plus juste que sa référence.
+
+**Document de méthodologie** :
+[`METHODOLOGIE_PRECISION.md`](training/calibration/METHODOLOGIE_PRECISION.md) —
+ce que `FK(q_lu)` mesure, ISO 9283, les 7 types d'essai, quand une référence
+externe est nécessaire.
+
+### Décisions prises
+
+- **Jamais d'ArUco sur la pince** : le montage n'est pas stable, l'hypothèse de
+  transformation rigide constante tombe. Le hand-eye du 10/07 est abandonné
+  (résidu 24,4 mm ; 20 poses sur 22 sous le seuil de 30 px du code).
+- La répétabilité est donnée en **RP ISO 9283**, jamais en écart max.
+- On ne recalibre pas : la validation évalue, elle n'écrase rien.
+
+### Prochaines actions
+
+1. [ROUGE] Re-relever les positions des 4 marqueurs de planche au pied à
+   coulisse ou par ajustement conjoint des deux caméras (±0,3 mm comme déjà
+   fait pour le 19). C'est ce qui plafonne toute la chaîne à ~5 mm.
+2. [ROUGE] Passer l'extrinsèque de production aux **16 coins** au lieu des
+   4 centres — 26 degrés de liberté de redondance au lieu de 2.
+3. [JAUNE] Chiffrer la **précision globale en boucle fermée** (essai 7) :
+   `P_vision`, `P_atteint`, correction, itérations, statut pince sur ~30
+   tentatives. Aucune métrologie externe requise.
+4. [JAUNE] Comparateur numérique (~60 €) pour transformer les bornes
+   inférieures de répétabilité en vraies valeurs.
+5. [VERT] Vérifier le tag de 100 mm au pied à coulisse.
+
+### Commande rapide de reprise
+
+```bash
+cd /home/genji/Osama_ws/src/mycobot_R6A
+python3 -c "import socket; s=socket.create_connection(('10.10.0.219',5005),timeout=8); \
+s.sendall(b'{\"action\": \"get_angles\"}\n'); print(s.makefile().readline())"
+```
+
+---
+
 ## État actuel (9 septembre 2026 — soir, test des 4 directions)
 
 ### Ce qui a été accompli
