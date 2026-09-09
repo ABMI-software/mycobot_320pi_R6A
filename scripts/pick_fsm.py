@@ -91,7 +91,48 @@ TOOL = np.array(json.loads((RACINE / 'scripts' / 'tool_offset.json').read_text()
 Q_REFERENCE = np.array([45.43, -86.57, -96.76, 135.52, 1.84, -43.33])
 AZIMUT_REFERENCE = 7.2
 
-Z_PRISE = -5.0
+# --------------------------------------------------------------------------- #
+#  Recalage du deport d'outil, 08/09/2026 — TOUTES les hauteurs de ce fichier
+#  ont ete decalees de +16,9 mm EN MEME TEMPS que `tool_offset.json` a ete
+#  raccourci de 17,33 mm. Les deux vont ENSEMBLE : appliquer l'un sans l'autre
+#  deplace la hauteur physique des doigts et casse toutes les prises reglees.
+#
+#  Mesure : sept lectures au reglet, bras immobile, contre la prediction du
+#  modele. Le point d'outil se trouvait 16,9 mm SOUS le bout des doigts pince
+#  fermee — ecart-type 1,0 mm sur trois azimuts couvrant 59 deg, pente
+#  0,014 mm/deg. La DIRECTION du deport est donc bonne, c'est sa LONGUEUR qui
+#  etait fausse : cela leve le doute inscrit dans `a_revalider` depuis le 20/08.
+#
+#  L'echelle verticale etait deja juste : descente commandee 44,6 mm, realisee
+#  45,0. L'erreur etait un decalage, pas une dilatation.
+#
+#  CE QUE LE PATCH PRESERVE, ET CE QU'IL CHANGE — verifie, pas suppose :
+#
+#  * En Z l'invariant tient exactement. Avant, commander Z=15 mettait les
+#    doigts a 31,9 ; desormais on commande 31,9 et ils y sont.
+#  * En XY la cible se DEPLACE de 3,7 mm. L'axe outil n'est pas parfaitement
+#    vertical ([-0,02, -0,31, -0,95] dans le monde), donc reculer de 17,33 mm
+#    le long de cet axe vaut 16,5 mm en Z ET 5,4 mm de lateral. Les constantes
+#    ci-dessous ne corrigent que le Z. Le reliquat lateral n'est pas un effet
+#    de bord : l'ancien modele, a qui on demandait (280, 30), plaçait les
+#    doigts en (277,8 ; 32,9). Ce patch les met en (280, 30).
+#
+#  Ce n'est donc PAS un patch neutre : c'est aussi une correction de 3,7 mm en
+#  XY, dans le sens de la verite mais jamais validee par une prise.
+#
+#  A surveiller : sur les cibles de largage, l'IK bascule de branche entre
+#  l'ancien et le nouveau reglage (jusqu'a 64 deg d'ecart articulaire pour le
+#  meme point atteint). Le point final est bon, la POSTURE pour y aller change.
+#
+#  Ce qui s'ameliore : le modele dit enfin la verite. `garde_au_sol` et
+#  `PLANCHER` protegent la vraie extremite des doigts, et non un point fictif
+#  17 mm plus bas qui ne correspondait a aucune piece de la pince.
+#
+#  NON VALIDE PAR UNE SAISIE REELLE. Les deux cycles autonomes du 20/08 l'ont
+#  ete avec l'ancien couple (deport long + hauteurs basses). Refaire une saisie
+#  de balle avant de faire confiance a ce reglage.
+# --------------------------------------------------------------------------- #
+Z_PRISE = 11.9
 # Hauteur de POINTE a la prise, par categorie. La balle fait 66 mm : elle tient
 # les doigts ecartes, la pointe peut viser sous le plan de la table. Un rouleau
 # de scotch couche ne fait que ~22 mm et le robot imprime ~20 : viser -5 ferait
@@ -153,8 +194,8 @@ Z_PRISE = -5.0
 # reellement plus bas. On revient a +2, la valeur qui a saisi tout au long de la
 # journee sur toute la bande d'allonge, et on laisse les reprises de `_saisie`
 # chercher 4 mm plus bas quand c'est necessaire.
-Z_PRISE_PAR_CLASSE = {'balle': (15.0, 25.0), 'scotch': (2.0, 19.0),
-                      'robot': (2.0, 10.0)}
+Z_PRISE_PAR_CLASSE = {'balle': (31.9, 41.9), 'scotch': (18.9, 35.9),
+                      'robot': (18.9, 26.9)}
 # Et si ca rate quand meme, on ne refait PAS le meme geste : chaque nouvel essai
 # descend d'un cran. Trois tentatives identiques donnent trois echecs identiques.
 PAS_DESCENTE_ESSAI = 4.0
@@ -212,7 +253,7 @@ BIAIS_Z_PRISE = -10.0
 # risque : ne pas racler la planche prime, quitte a laisser quelques dixiemes
 # de millimetre entre les doigts et l'objet. Si un rouleau glisse, le levier
 # reste le COUPLE (`COUPLE_PINCE`), jamais la profondeur.
-GARDE_PLANCHE = 2.5
+GARDE_PLANCHE = 19.4
 Z_PRISE_MIN = GARDE_PLANCHE
 # Saut articulaire maximal tolere entre deux paliers de descente.
 #
@@ -247,17 +288,17 @@ DERIVE_DESCENTE_MAX = 25.0
 # La descente se fait plus lentement que les transits : c'est le seul moment ou
 # la pince arrive au contact, et une approche lente laisse le temps de couper.
 VITESSE_DESCENTE = 15
-Z_SURVOL = 110.0        # au-dessus du sommet de la balle (~71 mm)
-Z_TRANSFERT = 170.0
-Z_LARGAGE = 100.0       # plancher, quand la hauteur du rebord n'est pas mesuree
-GARDE_LARGAGE = 25.0    # mm au-dessus du rebord MESURE, quand on le connait
+Z_SURVOL = 126.9        # au-dessus du sommet de la balle (~71 mm)
+Z_TRANSFERT = 186.9
+Z_LARGAGE = 116.9       # plancher, quand la hauteur du rebord n'est pas mesuree
+GARDE_LARGAGE = 41.9    # mm au-dessus du rebord MESURE, quand on le connait
 # Affaissement de la pointe en pose de largage, mesure le 27/08 (voir
 # `affaissement_largage`). Sans compensation la garde ci-dessus est mangee des
 # 410 mm de portee et nulle a 470.
 PENTE_AFFAISSEMENT_LARGAGE = 0.0943
 ORIGINE_AFFAISSEMENT_LARGAGE = -20.43
-GARDE_MIN = 25.0
-PLANCHER = -20.0        # mm — aucune pose legitime sous la planche
+GARDE_MIN = 41.9
+PLANCHER = -3.1        # mm — aucune pose legitime sous la planche
 CHUTE_MAX = 220.0       # mm — descente verticale maximale en UN seul ordre
 ETAPES_MAX = 12         # decoupage maximal d'un grand deplacement
 ESSAIS_MAX = 3
@@ -344,7 +385,7 @@ INCLINAISONS_PAR_PORTEE = ((320.0, 0.0), (370.0, -15.0), (425.0, -30.0),
                            (1e9, -45.0))
 # Incline, la pointe vise le CENTRE de la balle et non le ras de la table : les
 # doigts l'abordent de biais, descendre au ras la pousserait.
-Z_PRISE_INCLINE = 25.0
+Z_PRISE_INCLINE = 41.9
 # Le largage est PLUS exigeant que la prise : la pointe doit etre loin ET haut
 # (transfert a 170 puis lacher a 100), alors que la prise se fait au ras de la
 # table. Outil tenu vertical il plafonne a 355 mm — c'est ce qui bloquait TOUT
@@ -787,6 +828,16 @@ def choisit_pose_prise(ctx, xy):
     memo = ctx.prise_apprise.get(cle)
     if memo in couples and memo not in rates:
         couples.insert(0, couples.pop(couples.index(memo)))
+    # Le repli generique doit se VOIR. Le 09/09 un rouleau a ete vise avec
+    # `classe_objet` vide — vide par les sorties d'echec de `_detecte`, jamais
+    # rearme par l'appelant : la machine a pris (11,9 ; 41,9) au lieu des
+    # (18,9 ; 35,9) du scotch, a commande 32 mm au lieu de 26, et s'est refermee
+    # quatre fois sur du vide 23 mm au-dessus du rouleau, en le poussant de 382
+    # a 401 mm d'allonge. Le journal ne disait que « prise a Z=42 » : rien qui
+    # laisse deviner que la classe manquait.
+    if ctx.classe_objet not in Z_PRISE_PAR_CLASSE:
+        ctx.note(f'classe "{ctx.classe_objet}" inconnue — hauteurs de prise '
+                 f'GENERIQUES ({Z_PRISE}, {Z_PRISE_INCLINE}), pas celles de l objet')
     debout, couche = Z_PRISE_PAR_CLASSE.get(ctx.classe_objet,
                                             (Z_PRISE, Z_PRISE_INCLINE))
     for theta, roulis in couples:
@@ -1484,6 +1535,19 @@ def va_vers(ctx, q_cible, vitesse=VITESSE, nom='', patience=9.0, stabilise=True,
 # un ordre de grandeur l'une de l'autre ; 5 % passe entre elles.
 PROGRES_CONVERGENCE = 0.05
 
+# Le test de progres ci-dessus n'a de sens que LOIN de la cible. Sous ce seuil on
+# est au plancher de bruit du servo (ecart-type mesure le 08/09 : 0,25 mm en X,
+# 0,40 en Y, 0,60 en Z) et exiger 5 % de progres y demande moins que sa propre
+# repetabilite : la condition ne peut plus etre satisfaite, la boucle declare la
+# pose « hors d'atteinte » et rend la main EN GARDANT LE PIRE de ses passages.
+# Mesure du 08/09, 9 convergences sur trois portees : 4 abandons, dont
+# 4,53 -> 1,03 -> 0,89 -> 1,56 qui rendait 1,56 apres etre passe par 0,89, et
+# 0,92 -> 0,93 tue au deuxieme passage pour 0,01 mm de recul. En laissant la
+# boucle finir : 0,310 mm au lieu de 0,816, et le bras rentre dans la spec
+# constructeur de +-0,5 mm (Positioning Accuracy) au lieu d'etre a 1,6 fois.
+# L'abandon coutait aussi un essai : `_recalage` repart en APPROCHE sur ok=False.
+SEUIL_GARDE_PROGRES = 3.0
+
 
 def converge(ctx, p_cible, R, passes=4, tol=2.5):
     """Compense l'affaissement en reinjectant l'ecart articulaire mesure.
@@ -1525,7 +1589,8 @@ def converge(ctx, p_cible, R, passes=4, tol=2.5):
         # CROISSANT d'un essai a l'autre (34,2 -> 36,0 -> 36,8), jusqu'a ce que
         # le pont de la Pi cesse de repondre. Une consigne qui ne rapproche pas
         # de la cible ne doit pas etre renvoyee plus fort.
-        if ecart > precedent * (1.0 - PROGRES_CONVERGENCE):
+        if (ecart > SEUIL_GARDE_PROGRES
+                and ecart > precedent * (1.0 - PROGRES_CONVERGENCE)):
             ctx.note(f'  convergence sans progres ({precedent:.1f} -> {ecart:.1f} mm, '
                      f'{100.0 * (precedent - ecart) / max(precedent, 1e-6):.0f} %) '
                      f'— pose hors d atteinte, on cesse de reinjecter')
@@ -1820,7 +1885,7 @@ def dessus(ctx, **kw):
 # pas : le controle de chemin de `va_vers` prend pour seuil `depart - 2 mm`,
 # donc un depart a 22 mm refuse encore tout trajet qui effleure 19,7 — mesure du
 # 25/08, a 0,3 mm pres. On degage franchement, une fois.
-GARDE_DEGAGEE = 60.0
+GARDE_DEGAGEE = 76.9
 
 
 def degage_du_sol(ctx):
@@ -2058,38 +2123,81 @@ def _recalage(ctx):
     return 'ECHEC'
 
 
-def releve_les_doigts(ctx, q_mesure, cible_xy):
-    """Remonte si les doigts sont sous la garde, AVANT de refermer la pince.
+# Ecart vertical au-dela duquel on recale les doigts avant de fermer. En deca,
+# reprendre couterait un mouvement pour rien : la pince a de la course.
+TOLERANCE_Z_PRISE = 2.0
 
-    Le plancher `GARDE_PLANCHE` ne borne que la CONSIGNE. En Z la descente n'est
-    pas asservie — `descend_par_paliers` ne corrige que la derive laterale — et
-    le bras arrive 6 a 25 mm sous sa consigne selon l'allonge quand
-    l'affaissement n'est pas entierement repris. Une consigne propre a +2,5 mm
-    peut donc encore poser les doigts sur la planche, et c'est en se refermant
-    la-dessus qu'ils raclent.
+# Plancher de la pointe REELLEMENT ATTEINTE, et course maximale que le calage
+# s'autorise sur la consigne.
+#
+# La garde de 2,5 mm etait appliquee a la CONSIGNE, alors qu'elle protege la
+# PLANCHE — et entre les deux il y a l'affaissement. Sur le rouleau du 07/09 une
+# consigne de 2,5 atterrissait a 5,8 mm : l'ecart valait -4,8, donc
+# `max(GARDE_PLANCHE, 2,5 - 4,8)` rendait 2,5, la consigne INCHANGEE. Les trois
+# passes renvoyaient la meme valeur et le journal le dit mot pour mot :
+# « doigts a 7,3 mm au lieu de 2,5 — on vise 2,5 (passe 1) », puis 5,8 -> 2,5,
+# puis 5,8 -> 2,5. La boucle tournait a vide et la pince fermait au-dessus.
+#
+# La borne porte donc desormais sur la hauteur MESUREE, qu'on relit apres chaque
+# palier, et la consigne est libre de passer sous la garde. Mesures du 07/09 sur
+# le rouleau : pointe a -4,7 mm elle racle la planche, a -3,1 elle tient sans
+# racler, a -2,4 elle ferme a vide.
+PLANCHER_POINTE = 13.9
+COURSE_CALAGE_MAX = 12.0   # mm sous la hauteur voulue — l'affaissement mesure
+                           # plafonne a 8 mm, au-dela c'est un emballement
 
-    On mesure donc la hauteur REELLEMENT atteinte, et on ne ferme la pince que
-    si elle est au-dessus de la garde.
 
-    `cible_xy` est celle de l'OBJET, pas la position atteinte : c'est ce que
-    `descend_par_paliers` attend, puisqu'il y ajoute lui-meme le biais lateral.
-    Lui passer la position deja atteinte compterait ce biais deux fois et
-    decalerait le bras juste avant la fermeture.
+def cale_les_doigts(ctx, q_mesure, cible, passes=3):
+    """Amene les doigts a la hauteur voulue en REINJECTANT l'ecart mesure.
+
+    En Z la descente n'est pas asservie : `descend_par_paliers` ne corrige que
+    la derive laterale. L'ecart vertical est libre, il est GRAND, et son SIGNE
+    depend de la pose — les deux ont ete mesures le 28/08 :
+
+      * a 305 mm d'allonge, consigne 2,5 -> 3,36 / 6,07 / 5,97 mm atteints,
+        soit jusqu'a 3,5 mm TROP HAUT ;
+      * sur la visee du tag a 284 mm, consigne 14 -> 6,68, consigne 8 -> 0,59,
+        consigne 2,5 -> -4,86, soit 7,4 mm TROP BAS, de facon reproductible.
+
+    Une premiere version se contentait de RECOMMANDER la hauteur voulue. C'est
+    sans effet quand le bras la rate deja : reappliquee sur le cas a -4,86, elle
+    a rendu -9,04 mm, c'est-a-dire pire. Une consigne qui n'a pas marche ne
+    marche pas mieux la seconde fois.
+
+    On corrige donc comme `converge` : on mesure, on reinjecte l'ecart dans la
+    consigne, on recommence. La consigne n'est jamais poussee SOUS la garde —
+    quand le bras arrive trop bas, la correction la fait monter, ce qui est le
+    sens sur ; quand il arrive trop haut, elle la fait descendre, et c'est la
+    que la borne compte.
+
+    `cible` est celle de l'OBJET : `descend_par_paliers` y ajoute lui-meme le
+    biais lateral, et lui passer la position atteinte le compterait deux fois.
     """
-    z = float(pointe(q_mesure)[2])
-    if z >= GARDE_PLANCHE:
-        ctx.resultats['garde doigts'] = f'{z:.1f} mm'
-        return q_mesure
-    haut = np.array([cible_xy[0], cible_xy[1], GARDE_PLANCHE])
-    ctx.note(f'  doigts a {z:.1f} mm, sous la garde {GARDE_PLANCHE:.1f} — '
-             f'on remonte de {GARDE_PLANCHE - z:.1f} mm avant de fermer')
-    q_haut = descend_par_paliers(ctx, haut, ctx.R_balle, ctx.correction,
-                                 nom='garde planche')
-    if q_haut is None:
-        ctx.note('  remontee de garde refusee — on ferme la ou on est')
-        return q_mesure
-    ctx.resultats['garde doigts'] = f'{float(pointe(q_haut)[2]):.1f} mm (remonte)'
-    return q_haut
+    # Plancher MESURE et non plancher de consigne : voir PLANCHER_POINTE.
+    voulu = max(PLANCHER_POINTE, float(cible[2]))
+    commande = voulu
+    for i in range(passes):
+        z = float(pointe(q_mesure)[2])
+        ecart = voulu - z
+        if abs(ecart) <= TOLERANCE_Z_PRISE:
+            ctx.resultats['garde doigts'] = f'{z:.1f} mm'
+            return q_mesure
+        if z <= PLANCHER_POINTE:
+            ctx.note(f'  doigts a {z:.1f} mm — plancher {PLANCHER_POINTE:.1f} '
+                     f'atteint, on ferme ici')
+            ctx.resultats['garde doigts'] = f'{z:.1f} mm (plancher)'
+            return q_mesure
+        commande = max(voulu - COURSE_CALAGE_MAX, commande + ecart)
+        ctx.note(f'  doigts a {z:.1f} mm au lieu de {voulu:.1f} — on vise '
+                 f'{commande:.1f} (passe {i + 1})')
+        suivant = descend_par_paliers(ctx, np.array([cible[0], cible[1], commande]),
+                                      ctx.R_balle, ctx.correction, nom='calage Z')
+        if suivant is None:
+            ctx.note('  calage refuse — on ferme la ou on est')
+            return q_mesure
+        q_mesure = suivant
+    ctx.resultats['garde doigts'] = f'{float(pointe(q_mesure)[2]):.1f} mm (recale)'
+    return q_mesure
 
 
 def _descente(ctx):
@@ -2103,7 +2211,18 @@ def _descente(ctx):
     if q is not None:
         ctx.resultats['descente'] = f'{np.linalg.norm(pointe(q)[:2] - cible[:2]):.2f} mm'
     if ok:
-        q = releve_les_doigts(ctx, q, cible[:2])
+        # La descente grossiere reste bornee a Z_PRISE_MIN : elle ne mesure rien
+        # et l'affaissement change de SIGNE selon la pose (07/09 : consigne -2,9
+        # atterrit a +3,4 a un endroit, consigne +2 a -6 a un autre). Le calage,
+        # lui, relit la hauteur apres chaque palier et peut donc viser la vraie
+        # hauteur de l'objet, jusqu'a PLANCHER_POINTE. Sans ca la borne de 2,5 mm
+        # ecrasait la cible d'un rouleau plat et la pince fermait au-dessus :
+        # 07/09, « garde doigts 3,4 mm » puis « ferme a vide », alors que la
+        # prise tient a -3 mm.
+        cible_calage = np.array([cible[0], cible[1],
+                                 max(PLANCHER_POINTE,
+                                     ctx.z_prise + BIAIS_Z_PRISE - baisse)])
+        q = cale_les_doigts(ctx, q, cible_calage)
         return 'SAISIE'
     n = ctx.essai('DESCENTE')
     if n < ESSAIS_MAX:
