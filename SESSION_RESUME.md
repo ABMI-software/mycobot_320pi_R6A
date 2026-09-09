@@ -1,5 +1,86 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (9 septembre 2026 — journée)
+
+### Ce qui a été accompli aujourd'hui
+
+**Tri complet réussi sur le robot réel : 3 objets, 3 destinations.** Balle jaune
+au centre du grand carton (largage à 2 mm du milieu), scotch bleu et scotch
+blanc dans le petit carton. Cycles pilotés par `pick_fsm` en tête-à-tête avec le
+robot, sans le tableau de bord. Vérifié à la SVPRO, planche vide en fin de
+séance.
+
+**La caméra avait bougé, et l'extrinsèque du 08/09 était périmée.** Sur les
+pixels du jour elle reprojetait à **6,54 px** et laissait **14,1 mm** d'erreur au
+sol (contre 0,022 px / 0,119 mm la veille) ; la position caméra avait bougé de
+**9,9 mm et 1,63°**. Recalibration au protocole du 08/09 (60 trames, 4 centres
+ArUco, SQPNP) : **14,220 → 0,594 mm**. Sans elle la pince visait 14,9 mm à côté
+du centre de la balle, soit 45 % de son rayon. Ancienne version conservée en
+`arducam_extrinsic_pick.avant_0909.yaml`. **Non commitée**, comme le reste des
+extrinsèques.
+
+**Le montage caméra ne bouge pas** — vérifié, contrairement à ma première
+conclusion. Trois tests concordants : propagation Monte-Carlo du bruit pixel
+mesuré (jitter prédit 1,57/2,29/0,83 mm contre 1,72/2,19/0,74 observé, rapport
+≈ 1), moyennes par blocs sans excès, autocorrélation lag-1 ≈ 0. Le tremblement
+de 2 à 3 mm est **entièrement** du bruit de détection, amplifié par un éclairage
+faible (luminance 55 contre 86 de référence). L'exposition arducam est restée à
+75, le réglage du registre.
+
+**Shepard / IDW sur les 4 marqueurs : rien à corriger.** Les résidus aux coins
+ne sont pas cohérents entre eux (+0,54 / −0,59 / −0,14 / +0,18 en X), donc
+l'interpolation ne rend que **0,12 à 0,18 mm** — sous la dispersion de la
+détection (σ 0,5 mm). L'erreur de 14 mm était un décalage **global**, pas une
+déformation locale de la zone : un recalibrage global suffit.
+
+**Le tag ArUco du carton fonctionne** (id 10 = grand, id 11 = petit, 30/30
+trames, `DICT_4X4_50`, sans prétraitement). Il n'apparaissait pas sur les
+premiers scans parce que le bras stationnait au-dessus du carton. Sa hauteur de
+rebord reste non mesurable (12,8 px de côté contre 30 px requis — un tag de
+30 mm à 1,16 m ne peut structurellement pas y arriver, il en faudrait ~70), mais
+**l'identification, elle, est exacte** — et c'est tout ce qu'on lui demande.
+
+**Un bug de fond trouvé dans `pick_fsm`** : le repli sur les hauteurs de prise
+génériques était silencieux. Voir CHANGELOG. Corrigé par une trace ; les
+constantes mesurées n'ont pas été touchées.
+
+### Décisions prises
+
+- **Ne pas modifier `Z_PRISE_PAR_CLASSE`.** La mesure ne montre pas que ces
+  valeurs sont fausses, elle montre qu'elles n'ont jamais été utilisées. Les
+  écraser sur une séance serait une régression probable contre des balayages
+  documentés du 26/08.
+- **Ne pas agrandir le tag du carton** : l'identification seule suffit à l'usage
+  visé, la hauteur de rebord n'est pas nécessaire.
+- **Ne pas rapprocher le petit carton** malgré 426 mm au point de largage :
+  décision explicite de tenter tel quel. Les deux largages sont passés.
+
+### Prochaines actions
+
+1. **[ROUGE]** Rejouer le cas *outil couché* avec la classe correctement armée.
+   Avec `scotch: (18.9, 35.9)` la cible devient 25,9 mm, alors que ce qui a
+   réellement saisi est 8,3 mm. Si 25,9 ferme encore à vide, **là** on aura la
+   mesure qui justifie de descendre 35,9.
+2. **[ROUGE]** Ne plus laisser la FSM enchaîner ses trois essais internes de
+   saisie sans surveillance : les 4 fermetures à vide du 09/09 ont déplacé le
+   rouleau de 19 mm.
+3. **[JAUNE]** Un client TCP résiduel (`/tmp/mycobot_centroid_grasp/run_staged.py`,
+   lancé depuis 18 h) tient une connexion en `CLOSE-WAIT` sur le pont. Inoffensif
+   tant que le pont répond, mais premier suspect s'il se fige.
+4. **[JAUNE]** Remonter l'éclairage vers une luminance de 86 avant toute
+   calibration visant le standard de 0,12 mm. À 55, on plafonne à 0,59 mm — assez
+   pour saisir, pas pour la référence.
+5. **[VERT]** Arbre de travail très chargé : 62 fichiers modifiés, 321 non
+   suivis, dont ~90 Mo de poids YOLO et de dossiers `training/`. À trier.
+
+### Commande rapide de reprise
+
+```bash
+# Le tableau de bord tourne en Python SYSTÈME — le .venv casse Qt en xcb
+cd ~/Osama_ws/src/mycobot_R6A
+env -u VIRTUAL_ENV MYCOBOT_PI=10.10.0.219 /usr/bin/python3 scripts/pick_dashboard.py
+```
+
 ## État actuel (2 septembre 2026 — soir, la démo markerless est invalidée)
 
 ### Ce qui a été accompli

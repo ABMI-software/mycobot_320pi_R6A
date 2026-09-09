@@ -9,7 +9,49 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — le repli générique des hauteurs de prise était silencieux (09/09)
+
+- **`choisit_pose_prise` signale désormais une classe d'objet inconnue.** Quand
+  `ctx.classe_objet` n'est pas dans `Z_PRISE_PAR_CLASSE`, la fonction retombait
+  sans un mot sur `(Z_PRISE, Z_PRISE_INCLINE)` = (11,9 ; 41,9) au lieu des
+  valeurs mesurées de l'objet. Constaté sur un rouleau de scotch : classe vidée
+  par les sorties d'échec de `_detecte` et jamais réarmée par l'appelant, donc
+  hauteurs (11,9 ; 41,9) au lieu de (18,9 ; 35,9), consigne de descente à 32 mm
+  au lieu de 26, et **quatre fermetures à vide 23 mm au-dessus du rouleau** —
+  qui l'ont poussé de 382 à 401 mm d'allonge. Le journal n'affichait que
+  « prise a Z=42 », rien qui laisse deviner que la classe manquait. Les
+  constantes ne sont **pas** modifiées : elles n'étaient pas fausses, elles
+  n'étaient pas utilisées.
+
+### Mesuré — hauteur de prise d'un rouleau presque vide (09/09)
+
+- Comparaison sur trois prises du même type d'objet, garde des doigts en fin de
+  descente : **8,3 mm → tenu** (angle 24), **31,1 mm → à vide** (angle 20, la
+  signature d'une pince arrivée à sa consigne), **4,8 mm posé à la main → tenu**
+  (angle 26). Le frottement sur la planche à 8 mm n'est pas un défaut, c'est la
+  **condition** de la prise sur un rouleau : sa paroi utile fait 3 à 5 mm, et
+  l'erreur latérale de descente (2 à 2,6 mm, pourtant dans la tolérance
+  `TOL_XY_PRISE['scotch'] = 3.0`) suffit sinon à mettre les doigts dans le trou.
+- `PLANCHER_POINTE = 13.9` est mesuré sur la **pointe** et ne protège pas les
+  doigts quand l'outil est couché — ils descendent plus bas.
+
 ### Ajouté
+
+- **Enveloppe de fonctionnement J5 mesurée sur le robot réel : viser 0° à −60°.**
+  Balayage J5 et J6 sur le robot physique, bras au-dessus de la planche, vérité
+  terrain encodeurs + FK projetée par l'extrinsèque marqueurs, checkpoint
+  `vgg_v5_geo_ft_e30`, caméra SVPRO. Détection 100 % / ~6 px de 0° à −60°, puis
+  85,7 % / 24,8 px à −80° et 42,9 % / 47,7 px à −100°. **J6 n'a aucun effet** :
+  14/14 keypoints détectés sur les 8 poses de −52,6° à +46,7°, et le
+  déplacement FK des 7 keypoints sur cette plage vaut exactement 0,0000 mm —
+  confirmation numérique de l'inobservabilité structurelle de J6. Détail dans
+  `training/dream/README.md` § J5/J6 measured on the real robot.
+- **Comparaison `vgg_v5_geo_ft_e30` vs `vgg_ultimate_v4_mix_ft_e30` sur images
+  réelles**, 9 poses, vérité terrain encodeurs + FK : SVPRO **92,6 % / 15,7 px**
+  contre **6,9 % / 105,5 px** ; arducam 74,1 % / 21,9 px contre 16,9 % / 80,7 px.
+  Rapprocher le bras de la planche divise l'erreur du v5 par huit (122,7 →
+  15,7 px) : la pose haute repliée en arrière est hors distribution
+  d'entraînement.
 
 - **Auto-calibration markerless démontrée sur l'arducam : 27,9 mm et 1,62°.**
   `scripts/dream_extrinseque_markerless.py` empile les correspondances
