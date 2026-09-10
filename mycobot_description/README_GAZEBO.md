@@ -43,7 +43,9 @@ sudo apt install ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
 | `worlds/real_table.sdf` | Plateau mesuré 622×449×8,5 mm + ArUco 19/23/25/26 de 50 mm + caméra de dessus + cube et bac |
 
 Pour le plateau réel : `ros2 launch mycobot_gateway real_table.launch.py`
-(`demo:=true` pour le cycle physique du cube rouge). Voir
+(`demo:=true` pour le cycle physique du cube rouge). **La séquence complète
+commence par `conda deactivate` puis un `colcon build`** — sans le build,
+`models/` n'est pas installé et la scène se lance sans bois ni marqueurs. Voir
 [le guide du plateau réel](../docs/GAZEBO_REAL_TABLE.md) pour la construction,
 les coordonnées et les hypothèses de placement.
 

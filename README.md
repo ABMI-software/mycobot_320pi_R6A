@@ -573,9 +573,16 @@ reconstruite depuis les photos du plan de travail, et les **quatre ArUco 19 /
 23 / 25 / 26 de 50 mm** aux positions relevées.
 
 ```bash
+conda deactivate
+cd ~/ros_jazzy
+colcon build --packages-select mycobot_description mycobot_gateway --symlink-install
 source install/setup.bash
 ros2 launch mycobot_gateway real_table.launch.py
 ```
+
+> `conda deactivate` est obligatoire, et le `colcon build` aussi : sans lui
+> `models/` n'est pas installé et la scène apparaît **sans bois ni marqueurs**,
+> silencieusement.
 
 | argument | défaut | effet |
 |---|---|---|
