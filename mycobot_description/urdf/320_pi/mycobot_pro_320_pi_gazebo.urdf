@@ -164,14 +164,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_base.dae"/>
+        <box size="0.1048 0.0434 0.0362"/>
       </geometry>
-      <origin xyz="-0.02 0.012 -0.018" rpy="1.5708 0 1.5708"/>
+      <origin xyz="-0.0016 -0.0168 0.0001" rpy="0 0 0"/>
     </collision>
     <inertial>
       <mass value="0.1"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+      <origin xyz="-0.0016 -0.0168 0.0001" rpy="0 0 0"/>
+      <inertia ixx="0.00002662" ixy="0" ixz="0" iyy="0.00010245" iyz="0" izz="0.00010722"/>
     </inertial>
   </link>
 
@@ -184,14 +184,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left1.dae"/>
+        <box size="0.0110 0.0055 0.0055"/>
       </geometry>
-      <origin xyz="0.048 -0.035 -0.003" rpy="1.5708 0 1.5708"/>
+      <origin xyz="-0.0042 0.0251 0.0004" rpy="0 0 0"/>
     </collision>
     <inertial>
       <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+      <origin xyz="-0.0042 0.0251 0.0004" rpy="0 0 0"/>
+      <inertia ixx="0.00000010" ixy="0" ixz="0" iyy="0.00000025" iyz="0" izz="0.00000025"/>
     </inertial>
   </link>
 
@@ -204,14 +204,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left2.dae"/>
+        <box size="0.0085 0.0085 0.0268"/>
       </geometry>
-      <origin xyz="0.026 0.022 -0.018" rpy="1.5708 0 1.5708"/>
+      <origin xyz="-0.0497 0.0347 -0.0116" rpy="0 0 0"/>
     </collision>
     <inertial>
       <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+      <origin xyz="-0.0497 0.0347 -0.0116" rpy="0 0 0"/>
+      <inertia ixx="0.00000132" ixy="0" ixz="0" iyy="0.00000132" iyz="0" izz="0.00000024"/>
     </inertial>
   </link>
 
@@ -224,14 +224,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left3.dae"/>
+        <box size="0.0653 0.0435 0.0108"/>
       </geometry>
-      <origin xyz="0.0 0.0 -0.018" rpy="1.5708 0 1.5708"/>
+      <origin xyz="-0.0126 0.0012 -0.0126" rpy="0 0 0"/>
     </collision>
     <inertial>
       <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+      <origin xyz="-0.0126 0.0012 -0.0126" rpy="0 0 0"/>
+      <inertia ixx="0.00000335" ixy="0" ixz="0" iyy="0.00000730" iyz="0" izz="0.00001026"/>
     </inertial>
   </link>
 
@@ -244,14 +244,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right1.dae"/>
+        <box size="0.0110 0.0055 0.0055"/>
       </geometry>
-      <origin xyz="-0.086 -0.036 -0.003" rpy="1.5708 0 1.5708"/>
+      <origin xyz="0.0028 0.0240 0.0004" rpy="0 0 0"/>
     </collision>
     <inertial>
       <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+      <origin xyz="0.0028 0.0240 0.0004" rpy="0 0 0"/>
+      <inertia ixx="0.00000010" ixy="0" ixz="0" iyy="0.00000025" iyz="0" izz="0.00000025"/>
     </inertial>
   </link>
 
@@ -264,14 +264,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right2.dae"/>
+        <box size="0.0597 0.0493 0.0200"/>
       </geometry>
-      <origin xyz="-0.062 0.0224 -0.018" rpy="1.5708 0 1.5708"/>
+      <origin xyz="0.0256 0.0167 -0.0080" rpy="0 0 0"/>
     </collision>
     <inertial>
       <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+      <origin xyz="0.0256 0.0167 -0.0080" rpy="0 0 0"/>
+      <inertia ixx="0.00000472" ixy="0" ixz="0" iyy="0.00000661" iyz="0" izz="0.00000999"/>
     </inertial>
   </link>
 
@@ -284,14 +284,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right3.dae"/>
+        <box size="0.0653 0.0435 0.0086"/>
       </geometry>
-      <origin xyz="-0.034 0.0 -0.018" rpy="1.5708 0 1.5708"/>
+      <origin xyz="0.0153 0.0012 -0.0153" rpy="0 0 0"/>
     </collision>
     <inertial>
       <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+      <origin xyz="0.0153 0.0012 -0.0153" rpy="0 0 0"/>
+      <inertia ixx="0.00000328" ixy="0" ixz="0" iyy="0.00000723" iyz="0" izz="0.00001026"/>
     </inertial>
   </link>
 
@@ -352,10 +352,11 @@
   </joint>
 
   <!-- ==================== ADAPTIVE GRIPPER JOINTS ==================== -->
-  <!-- gripper_controller drives the left-finger stack through a revolute
-       joint. The right-finger stack mirrors it via a URDF <mimic> tag with
-       multiplier=-1. All "tip" joints (left1, right1, left2, right2) stay
-       fixed — only the two servo joints move. -->
+  <!-- Four revolute joints commanded explicitly via gripper_position_controller.
+       gz-physics (DART) does not support <mimic> constraints, so left and right
+       finger chains are driven independently with opposite-sign commands.
+       Close command: [servo_left=-0.7, servo_right=+0.7, tip_left=+0.7, tip_right=-0.7]
+       Open command:  [0, 0, 0, 0] -->
 
   <joint name="joint6output_to_gripper_base" type="fixed">
     <parent link="link6"/>
