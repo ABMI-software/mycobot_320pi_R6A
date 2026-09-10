@@ -521,17 +521,19 @@ intrinsèques par caméra) : [`training/CAPTURE_3CAM.md`](training/CAPTURE_3CAM.
 > Nécessaire **uniquement** pour l'entraînement DREAM — inutile pour la
 > simulation, le pick-and-place ou le contrôle du robot.
 
-### Jeux en service
-
-Ils vivent sous `training/dream/dream_data/`, **pas** sous `datasets/`.
-
-| Jeu | Poses | Caméras | Images | Taille |
+| Dataset | Poses | Caméras | Images | Taille |
 |---|---|---|---|---|
-| **Synthétique** — `synthetic_50k/` | 12 500 | 4 (front, left, right, top) | **50 000** | 7,2 Go |
-| **Réel** — `real_3cam/` | 2 500 | 3 (**arducam, svpro, astra**) | **7 500** | 2,7 Go |
+| **Synthétique** (`datasets/synthetic_dataset/`) | 5 000 | 4 (front, left, right, top) | 20 000 | 8,3 Go |
+| **Réel** (`datasets/real_dataset/`) | 2 000 | 2 (cam0, cam3) | 4 000 | 1,2 Go |
+| **Synthétique 50k** (`training/dream/dream_data/synthetic_50k/`) | 12 500 | 4 (front, left, right, top) | **50 000** | **7,2 Go** |
+| **Réel 3 caméras** (`training/dream/dream_data/real_3cam/`) | 2 500 | 3 (**arducam, svpro, astra**) | **7 500** | **2,7 Go** |
 
-Le réel est accumulé sur 5 sessions de 500 poses (index 0 → 2499), les trois
-caméras déclenchant sur la même pose.
+Les deux premiers sont les jeux d'origine ; **les deux derniers sont ceux qu'on
+entraîne aujourd'hui**, et ils vivent sous `training/dream/dream_data/`, pas
+sous `datasets/`.
+
+Le réel 3 caméras est accumulé sur 5 sessions de 500 poses (index 0 → 2499),
+les trois caméras déclenchant sur la même pose.
 
 ### Découpes et mélanges
 
@@ -543,10 +545,9 @@ caméras déclenchant sur la même pose.
 | `real_3cam_train_x5_ndds/` | le même, converti au format NDDS | **11 Go** |
 | `mix_20k3_50k/` | 110 000 entrées — le mélange du point de contrôle courant | 867 Mo |
 
-Les trois premières découpes ne pèsent que quelques centaines de kilo-octets :
-ce sont des **`labels.csv` qui pointent vers les images de `real_3cam`**, pas
-des copies. C'est la **conversion NDDS** qui duplique les images, et qui coûte
-les 11 Go.
+Les découpes ne contiennent **aucune image** — seulement un `labels.csv`
+pointant vers `real_3cam/`. Ne pas supprimer le jeu source. La conversion NDDS,
+elle, duplique : 3,5 Mo → 11 Go.
 
 ### Encombrement total
 
@@ -568,12 +569,8 @@ index,j1_rad,...,j6_rad,j1_deg,...,j6_deg,camera,image_path
 0,-0.5245,...,-0.7255,-30.05,...,-41.57,arducam,images/arducam/000000.png
 ```
 
-### Jeux antérieurs
-
-`datasets/synthetic_dataset/` (5 000 poses, 4 caméras, 20 000 images, 8,3 Go) et
-`datasets/real_dataset/` (2 000 poses, 2 caméras, 4 000 images, 1,2 Go) existent
-toujours mais **ne sont plus ceux qu'on entraîne**. Leur `labels.csv` suit
-l'ancien format `camera,image_path,j1..j6`, en degrés seulement.
+⚠️ Les deux jeux d'origine suivent l'**ancien format** de `labels.csv`
+(`camera,image_path,j1..j6`, en degrés seulement).
 
 ⚠️ Le lien `dream_data/` à la racine du dépôt est **mort** — passer par
 `training/dream/dream_data/`.
