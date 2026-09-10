@@ -23,6 +23,7 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
+    TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -124,6 +125,24 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('rviz')),
     )
 
+    # ---------- controller spawners (delayed to let Gazebo start) ----------
+    def make_spawner(controller_name, delay=5.0):
+        return TimerAction(
+            period=delay,
+            actions=[
+                Node(
+                    package='controller_manager',
+                    executable='spawner',
+                    arguments=[controller_name],
+                    output='screen',
+                )
+            ],
+        )
+
+    joint_state_broadcaster_spawner = make_spawner('joint_state_broadcaster', delay=5.0)
+    mycobot_controller_spawner = make_spawner('mycobot_controller', delay=6.0)
+    gripper_controller_spawner = make_spawner('gripper_position_controller', delay=7.0)
+
     # ---------- assemble ----------
     return LaunchDescription([
         rviz_arg,
@@ -132,5 +151,8 @@ def generate_launch_description():
         spawn_entity,
         gz_bridge,
         gz_image_bridge,
+        joint_state_broadcaster_spawner,
+        mycobot_controller_spawner,
+        gripper_controller_spawner,
         rviz_node,
     ])
