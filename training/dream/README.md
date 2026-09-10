@@ -299,21 +299,72 @@ window into one fit — see `CHANGELOG.md` [1.16.0].
 
 ## Files
 
+### Kinematics & angle recovery
+
 | File | Description |
 |------|-------------|
 | `mycobot_fk.py` | Forward kinematics — computes 3D joint positions from angles |
 | `mycobot_ik.py` | Inverse kinematics (Jacobian-based numerical solver) |
-| `dream_angle_solver.py` | Recovers joint angles from 2D keypoints (fixed-pose and joint+pose variants) |
+| `dream_angle_solver.py` | Recovers joint angles from 2D keypoints (fixed-pose and joint+pose variants, two-pass warm-started) |
+| `estimate_angles_from_keypoints.py` | Reprojection-min angle recovery against a fixed eye-to-hand camera (`camera_extrinsic.yaml`) — used by the angle-error curve pipeline |
 | `j5_observability_test.py` | J5 observability sensitivity sweep — see section above |
+
+### Data conversion & merging
+
+| File | Description |
+|------|-------------|
 | `convert_to_ndds.py` | Converts our datasets to DREAM's NDDS format |
+| `convert_to_ndds_gripper.py` | NDDS conversion variant including gripper keypoints |
 | `merge_and_convert.py` | Merges real + synthetic datasets with oversampling → NDDS |
+| `merge_ndds.py` | Simple merge of two already-NDDS datasets (real + synthetic), fixed paths |
+| `merge_mix.py` | Symlink-based multi-source merge with per-source oversampling and seeded shuffle (no domain leakage across the train/val split) — used for the 50K synth + real_3cam ×5 mix |
+| `visualize_ndds.py` | Sanity check — overlays keypoint annotations on images |
+
+### Training
+
+| File | Description |
+|------|-------------|
 | `train_dream.py` | Training wrapper (calls DREAM's train_network.py) |
 | `train_dream_augmented.py` | Training with aggressive augmentation for sim-to-real |
 | `train_dream_weighted.py` | Training with per-keypoint loss weighting (link6 × 5.0) |
-| `evaluate_dream.py` | Comprehensive evaluation with per-keypoint metrics |
-| `infer_dream.py` | Inference — keypoint detection + PnP solving |
-| `visualize_ndds.py` | Sanity check — overlays keypoint annotations on images |
+| `train_dream_weighted_augmented.py` | Weighted loss + augmentation combined (link5=3.0, link6=5.0) |
+| `train_dream_grid_search.py` | Grid search driver over per-keypoint loss weights (68 configs, produced the w4=1.5/w5=1.5/w6=6.0 optimum) |
+| `train_dream_ultimate.py` | First "ultimate" weighted-loss recipe (base=1.0…link4=1.5, link5=1.5, link6=6.0) + cosine LR + early stopping |
+| `train_dream_ultimate_v2.py` | Same recipe, reached the 97.7% / 92.6% link6 record (21/05/2026) |
+| `train_dream_ultimate_v3.py` | v2 + native `--seed` argument for reproducibility |
+| `train_dream_ultimate_v4.py` | **Actif** — same proven recipe as v2, targets the corrected 50K synthetic dataset (capsule self-collision filter); reached the 99.4% record (06/07/2026). `--pretrained` warm-starts fine-tuning (used for the 91.6%-real mix checkpoint) |
 | `finetune_real.py` | Custom fine-tuning (⚠️ non-functional — see Lessons Learned) |
+
+### Evaluation & diagnostics
+
+| File | Description |
+|------|-------------|
+| `evaluate_dream.py` | Comprehensive evaluation with per-keypoint metrics |
+| `evaluate_dream_relaxed.py` | `evaluate_dream.py` with lowered belief-map peak thresholds (`--peak-thresh`, `--next-best-score`) — tested the "relaxed thresholding" hypothesis, refuted (see root README) |
+| `evaluate_grid.py` | Runs evaluation over every `checkpoints_dream/vgg_grid_*` checkpoint, tabulates results to CSV |
+| `diagnose_peaks.py` | Measures actual belief-map peak height per keypoint — distinguishes "network never formed a peak" from "MSE looks fine but detection is low" |
+| `diagnose_link6_data.py` | Per-keypoint data-quality diagnostic (in-frame %, depth, nearest-neighbour distance, last-segment span) — explains why link6 detects differently across datasets |
+| `infer_dream.py` | Inference — keypoint detection + PnP solving |
+
+### Eye-to-hand angle-error pipeline (§ Pistes pour la suite)
+
+| File | Description |
+|------|-------------|
+| `capture_astra_rgbd.py` | Captures a small Astra RGB-D + encoder-angle dataset for the angle-error curve (commands safe random poses, records real encoders as ground truth) |
+| `plot_angle_error_curve.py` | Replays DREAM on the captured images, recovers angles via depth, plots `\|estimated − encoder\|` per joint j1-j6 |
+
+### Vendored DREAM library (NVIDIA, do not modify casually)
+
+| File | Description |
+|------|-------------|
+| `image_proc.py` | Belief-map peak detection, image preprocessing (shrink-and-crop) |
+| `spatial_softmax.py` | Soft-argmax keypoint head used by the DOPE-style decoder |
+| `utilities.py` | Seed management, YAML config loading |
+
+### Config
+
+| File | Description |
+|------|-------------|
 | `manip_configs/mycobot320.yaml` | Manipulator keypoint configuration |
 
 ## Quick Start
