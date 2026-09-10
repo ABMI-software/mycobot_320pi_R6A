@@ -1,5 +1,66 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (10 septembre 2026 — après-midi, Gazebo réaliste et protocole d'essais)
+
+### Ce qui a été accompli aujourd'hui
+
+**La simulation reproduit enfin le banc réel.** `worlds/real_table.sdf` ne pose
+plus une table générique mais le plateau mesuré — 622 × 449 × 8,5 mm — avec sa
+texture bois reconstruite depuis les photos, et les quatre ArUco de 50 mm aux
+positions relevées. Une apparence réaliste du robot est disponible en option
+(`robot_appearance:=realistic`), strictement visuelle.
+
+**Le protocole d'essais de précision est indexé.**
+`training/calibration/PROTOCOLE_ESSAIS_PRECISION.md` relie chacun des treize
+essais à sa norme, son mode opératoire, son résultat et ses quatre supports
+(les deux MD, l'onglet du classeur, la section du rapport).
+
+**Une conclusion fausse a été retirée.** Les marqueurs ArUco font bien 50 mm.
+Le −2,6 % mesuré sur leurs côtés est un biais de détection lié à l'obliquité
+(r = −0,920), pas une erreur d'impression : les distances entre centres, elles,
+sont justes à −0,044 %. Une vraie erreur d'échelle frapperait les deux à
+l'identique.
+
+### Décisions prises
+
+- **Ne pas recalibrer l'extrinsèque arducam.** La planche a bougé le 10/09
+  (rotation −1,750°, translation 18,8 / −6,5 mm, résidu 0,39 mm) mais **pas la
+  caméra** — le trépied du fond n'a bougé que de 0,2 px. Le lien caméra ↔ base
+  robot est donc intact ; refaire l'ajustement contre des positions nominales
+  périmées y injecterait les 19 mm.
+- **`workspace_markers.yaml` est périmé** et doit être considéré comme tel par
+  toute calibration future.
+- **Le protocole du stylo est abandonné.** Faire tracer un point au robot pour
+  mesurer la justesse contre une croix demandait un appui dont l'amplitude
+  n'était pas maîtrisable : le stylo a ripé et est sorti de la pince.
+
+### Prochaines actions
+
+1. **[ROUGE]** Mesurer un marqueur **au pied à coulisse**. C'est l'artefact
+   étalonné qu'exige VDI/VDE 2634-1, et son absence est exactement ce qui a
+   laissé vivre deux jours la conclusion fausse sur la taille des tags.
+2. **[ROUGE]** Le bridge de la Pi est tombé **deux fois** en une heure pendant
+   des séquences de mouvement (`Connection refused` ensuite). Regarder ce qu'il
+   affiche sur la Pi au moment où il meurt.
+3. **[JAUNE]** Recalibrer avec des marqueurs **à plusieurs hauteurs** : les
+   extrinsèques ne valent aujourd'hui que dans le plan Z = 0.
+4. **[JAUNE]** Remonter dans le dépôt les scripts d'essai restés dans le
+   répertoire de session — **onze essais sur treize ne sont pas rejouables**.
+5. **[VERT]** ISO 9283 § 7.3, exactitude et répétabilité de **distance** : la
+   seule caractéristique normalisée qu'une mesure aux codeurs puisse rapporter
+   en valeur vraie, un décalage constant s'annulant dans la différence.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/ros_jazzy && colcon build --packages-select mycobot_description mycobot_gateway --symlink-install
+source install/setup.bash
+ros2 launch mycobot_gateway real_table.launch.py robot_appearance:=realistic
+```
+
+---
+
 ## État actuel (9 septembre 2026 — soir, méthodologie et extrinsèque)
 > **Date de dernière mise à jour :** 9 juin 2026 (calibration main-œil — nœud hand-eye en cours de validation)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0-pre (calibration) · 1.15.2-pre (pick-and-place ArUco)

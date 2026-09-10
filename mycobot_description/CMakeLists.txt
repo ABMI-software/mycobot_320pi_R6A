@@ -14,6 +14,7 @@ install(DIRECTORY
   launch
   worlds
   materials
+  models
   DESTINATION share/${PROJECT_NAME}
   FILES_MATCHING PATTERN "*"
 )

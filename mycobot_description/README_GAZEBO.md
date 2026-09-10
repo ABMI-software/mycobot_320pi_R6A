@@ -40,6 +40,12 @@ sudo apt install ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
 | `worlds/randomized_v2.sdf` | 6 lumières, 12 objets clutter (cubes/cylindres/sphères), 3 murs — domain randomization avancée |
 | `worlds/pick_and_place.sdf` | Table 0.8×0.8 m + cube cible rouge + zone de dépose verte (mono-objet) |
 | `worlds/pick_and_place_sorting.sdf` | Table 1.0×0.6 m + 4 objets dynamiques (cube R, cube B, cylindre G, boîte Y) côté +X + 4 bacs colorés à parois côté −X (multi-objet par couleur) |
+| `worlds/real_table.sdf` | Plateau mesuré 622×449×8,5 mm + ArUco 19/23/25/26 de 50 mm + caméra de dessus + cube et bac |
+
+Pour le plateau réel : `ros2 launch mycobot_gateway real_table.launch.py`
+(`demo:=true` pour le cycle physique du cube rouge). Voir
+[le guide du plateau réel](../docs/GAZEBO_REAL_TABLE.md) pour la construction,
+les coordonnées et les hypothèses de placement.
 
 ## Visuels caméra (URDF Gazebo)
 

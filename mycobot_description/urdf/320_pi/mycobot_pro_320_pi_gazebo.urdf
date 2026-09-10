@@ -11,6 +11,69 @@
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mycobot_320_pi">
 
+  <!-- Appearance is opt-in: the original training render stays available.
+       These macros affect visuals only; all meshes, visual origins, joints,
+       collisions, inertias and controller parameters are shared unchanged. -->
+  <xacro:arg name="robot_appearance" default="original"/>
+  <xacro:property name="realistic_robot" value="${'$(arg robot_appearance)' == 'realistic'}"/>
+
+  <xacro:macro name="robot_surface" params="name colour">
+    <xacro:if value="${realistic_robot}">
+      <!-- The installed SDFormat URDF converter multiplies RGB by 1.25.
+           Compensate here so Gazebo receives the declared target colour. -->
+      <material name="${name}">
+        <color rgba="${0.8 * float(colour.split()[0])} ${0.8 * float(colour.split()[1])} ${0.8 * float(colour.split()[2])} 1"/>
+      </material>
+    </xacro:if>
+  </xacro:macro>
+
+  <xacro:macro name="robot_pbr_surface" params="link roughness specular">
+    <xacro:if value="${realistic_robot}">
+      <!-- SDFormat applies this extension to every visual on the link.
+           Leave ambient/diffuse to each visual's URDF material, so the
+           narrow dark seams keep their colour alongside the pale shell. -->
+      <gazebo reference="${link}">
+        <visual>
+          <material>
+            <specular>${specular}</specular>
+            <pbr><metal><metalness>0</metalness><roughness>${roughness}</roughness></metal></pbr>
+          </material>
+        </visual>
+      </gazebo>
+    </xacro:if>
+  </xacro:macro>
+
+  <xacro:macro name="robot_collar_band" params="name xyz radius width colour">
+    <xacro:if value="${realistic_robot}">
+      <visual name="${name}">
+        <origin xyz="${xyz}" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://mycobot_description/models/realistic_robot/meshes/joint_collar.dae"
+                scale="${radius} ${radius} ${width}"/>
+        </geometry>
+        <xacro:robot_surface name="${name}_material" colour="${colour}"/>
+      </visual>
+    </xacro:if>
+  </xacro:macro>
+
+  <xacro:macro name="robot_joint_collar" params="link xyz radius">
+    <xacro:robot_collar_band name="${link}_joint_collar" xyz="${xyz}" radius="${radius}" width="0.000768" colour="0.56 0.58 0.59 1"/>
+    <xacro:robot_collar_band name="${link}_joint_seam_lower"
+      xyz="${xyz.split()[0]} ${xyz.split()[1]} ${float(xyz.split()[2]) - 0.000492}"
+      radius="${radius}" width="0.000216" colour="0.18 0.19 0.19 1"/>
+    <xacro:robot_collar_band name="${link}_joint_seam_upper"
+      xyz="${xyz.split()[0]} ${xyz.split()[1]} ${float(xyz.split()[2]) + 0.000492}"
+      radius="${radius}" width="0.000216" colour="0.18 0.19 0.19 1"/>
+  </xacro:macro>
+
+  <xacro:robot_pbr_surface link="base" roughness="0.72" specular="0.10 0.10 0.10 1"/>
+  <xacro:robot_pbr_surface link="link1" roughness="0.48" specular="0.18 0.18 0.18 1"/>
+  <xacro:robot_pbr_surface link="link2" roughness="0.48" specular="0.18 0.18 0.18 1"/>
+  <xacro:robot_pbr_surface link="link3" roughness="0.48" specular="0.18 0.18 0.18 1"/>
+  <xacro:robot_pbr_surface link="link4" roughness="0.48" specular="0.18 0.18 0.18 1"/>
+  <xacro:robot_pbr_surface link="link5" roughness="0.48" specular="0.18 0.18 0.18 1"/>
+  <xacro:robot_pbr_surface link="link6" roughness="0.36" specular="0.24 0.24 0.24 1"/>
+
   <!-- ==================== LINKS ==================== -->
 
   <link name="base">
@@ -19,6 +82,7 @@
         <mesh filename="package://mycobot_description/urdf/320_pi/base.dae"/>
       </geometry>
       <origin xyz="0.0 0 0" rpy="0 0 3.1415926"/>
+      <xacro:robot_surface name="realistic_base_grey" colour="0.46 0.48 0.47 1"/>
     </visual>
     <collision>
       <geometry>
@@ -39,7 +103,11 @@
         <mesh filename="package://mycobot_description/urdf/320_pi/link1.dae"/>
       </geometry>
       <origin xyz="0.115 -0.172 -0.086" rpy="0 0 3.1415926"/>
+      <xacro:robot_surface name="realistic_shell_1" colour="0.88 0.87 0.84 1"/>
     </visual>
+    <!-- Centres/radii follow the circular end profiles of the original DAE
+         in this link's frame, including their existing sub-mm offsets. -->
+    <xacro:robot_joint_collar link="link1" xyz="0 0 -0.0770" radius="0.03754"/>
     <collision>
       <geometry>
         <mesh filename="package://mycobot_description/urdf/320_pi/link1.dae"/>
@@ -59,7 +127,9 @@
         <mesh filename="package://mycobot_description/urdf/320_pi/link2.dae"/>
       </geometry>
       <origin xyz="-0.075 -0.115 -0.022" rpy="1.5708 0 1.5708"/>
+      <xacro:robot_surface name="realistic_shell_2" colour="0.88 0.87 0.84 1"/>
     </visual>
+    <xacro:robot_joint_collar link="link2" xyz="0.0008 0 0.0482" radius="0.03779"/>
     <collision>
       <geometry>
         <mesh filename="package://mycobot_description/urdf/320_pi/link2.dae"/>
@@ -79,7 +149,9 @@
         <mesh filename="package://mycobot_description/urdf/320_pi/link3.dae"/>
       </geometry>
       <origin xyz="-0.22 -0.115 0.142" rpy="1.5708 0 1.5708"/>
+      <xacro:robot_surface name="realistic_shell_3" colour="0.88 0.87 0.84 1"/>
     </visual>
+    <xacro:robot_joint_collar link="link3" xyz="-0.0002 0 0.0430" radius="0.03404"/>
     <collision>
       <geometry>
         <mesh filename="package://mycobot_description/urdf/320_pi/link3.dae"/>
@@ -99,7 +171,9 @@
         <mesh filename="package://mycobot_description/urdf/320_pi/link4.dae"/>
       </geometry>
       <origin xyz="-0.115 0.338 -0.1435" rpy="1.5708 0 0"/>
+      <xacro:robot_surface name="realistic_shell_4" colour="0.88 0.87 0.84 1"/>
     </visual>
+    <xacro:robot_joint_collar link="link4" xyz="0 0.0012 -0.0483" radius="0.02914"/>
     <collision>
       <geometry>
         <mesh filename="package://mycobot_description/urdf/320_pi/link4.dae"/>
@@ -119,7 +193,9 @@
         <mesh filename="package://mycobot_description/urdf/320_pi/link5.dae"/>
       </geometry>
       <origin xyz="-0.1149 -0.0322 -0.482" rpy="0 0 0"/>
+      <xacro:robot_surface name="realistic_shell_5" colour="0.88 0.87 0.84 1"/>
     </visual>
+    <xacro:robot_joint_collar link="link5" xyz="0.0001 0.00078 -0.0490" radius="0.02914"/>
     <collision>
       <geometry>
         <mesh filename="package://mycobot_description/urdf/320_pi/link5.dae"/>
@@ -139,7 +215,9 @@
         <mesh filename="package://mycobot_description/urdf/320_pi/link6_2022.dae"/>
       </geometry>
       <origin xyz="0.0 0.0 -0.0115" rpy="1.5708 1.5708 0"/>
+      <xacro:robot_surface name="realistic_flange_silver" colour="0.56 0.58 0.59 1"/>
     </visual>
+    <xacro:robot_joint_collar link="link6" xyz="0.000105 -0.000204 -0.0104" radius="0.02914"/>
     <collision>
       <geometry>
         <mesh filename="package://mycobot_description/urdf/320_pi/link6_2022.dae"/>

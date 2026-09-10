@@ -42,6 +42,7 @@ import numpy as np
 
 import rclpy
 from builtin_interfaces.msg import Duration
+from controller_manager_msgs.srv import ListControllers
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray, String
@@ -186,12 +187,27 @@ class SimSortingGrasp(Node):
         self.declare_parameter('move_duration', 0.0)   # 0 = dimensionnee au trajet
         self.declare_parameter('settle_time', 1.5)     # plafond d'attente
         self.declare_parameter('only', '')
+        self.declare_parameter('startup_timeout', 60.0)
         self.world = str(self.get_parameter('world_name').value)
         move_dur = float(self.get_parameter('move_duration').value)
         self.move_dur = move_dur if move_dur > 0.0 else None
         self.settle = float(self.get_parameter('settle_time').value)
         only = str(self.get_parameter('only').value)
         self.only = [m.strip() for m in only.split(',') if m.strip()]
+        self.startup_timeout = float(self.get_parameter('startup_timeout').value)
+        if not math.isfinite(self.startup_timeout) or self.startup_timeout <= 0.0:
+            raise ValueError('startup_timeout doit etre positif et fini')
+        self.targets = []
+        for target in TARGETS:
+            param = f'bin_xy.{target.model}'
+            self.declare_parameter(param, list(target.bin_xy))
+            bin_xy = tuple(self.get_parameter(param).value)
+            if len(bin_xy) != 2 or not all(math.isfinite(v) for v in bin_xy):
+                raise ValueError(
+                    f'{param} doit contenir deux coordonnees finies en metres')
+            self.targets.append(Target(
+                target.model, target.height, target.grip_mm, bin_xy,
+                phi_deg=target.phi_deg, squeeze_mm=target.squeeze_mm))
 
         self.q_deg: Optional[np.ndarray] = None
         self.grip_pos: Optional[float] = None
@@ -202,6 +218,8 @@ class SimSortingGrasp(Node):
             Float64MultiArray, '/gripper_position_controller/commands', 10)
         self.pub_status = self.create_publisher(String, '/pickplace/status', 10)
         self.create_subscription(JointState, '/joint_states', self._joint_cb, 10)
+        self.controller_client = self.create_client(
+            ListControllers, '/controller_manager/list_controllers')
 
     # ── etat ────────────────────────────────────────────────────────────
     def _joint_cb(self, msg: JointState):
@@ -386,6 +404,35 @@ class SimSortingGrasp(Node):
         self.set_gripper(0.0)
 
     # ── cycle ───────────────────────────────────────────────────────────
+    def wait_until_ready(self):
+        """Attendre aussi les actionneurs, pas seulement le broadcaster."""
+        self.status('attente des controleurs actifs et de /joint_states…')
+        required = {'mycobot_controller', 'gripper_position_controller'}
+        deadline = time.monotonic() + self.startup_timeout
+        while rclpy.ok() and time.monotonic() < deadline:
+            if not self.controller_client.service_is_ready():
+                rclpy.spin_once(self, timeout_sec=0.2)
+                continue
+            future = self.controller_client.call_async(ListControllers.Request())
+            rclpy.spin_until_future_complete(
+                self, future,
+                timeout_sec=min(2.0, max(0.0, deadline - time.monotonic())))
+            if future.done() and future.exception() is None:
+                active = {c.name for c in future.result().controller
+                          if c.state == 'active'}
+                if (required <= active and self.q_deg is not None
+                        and self.grip_pos is not None
+                        and self.pub_arm.get_subscription_count() > 0
+                        and self.pub_grip.get_subscription_count() > 0):
+                    return
+            elif not future.done():
+                self.controller_client.remove_pending_request(future)
+                future.cancel()
+            rclpy.spin_once(self, timeout_sec=0.2)
+        raise RuntimeError(
+            'controleurs ou /joint_states indisponibles '
+            f'apres {self.startup_timeout:.0f} s — le banc tourne-t-il ?')
+
     def transit(self, q_goal, label: str) -> bool:
         """Rejoint `q_goal` en garantissant que la pointe ne racle rien."""
         if self._path_clears_table(self.q_deg, q_goal):
@@ -482,15 +529,10 @@ class SimSortingGrasp(Node):
                 f'z={landed[2]:.3f}')
 
     def run(self) -> Dict[str, str]:
-        self.status('attente de /joint_states…')
-        deadline = time.time() + 30.0
-        while self.q_deg is None and time.time() < deadline:
-            rclpy.spin_once(self, timeout_sec=0.2)
-        if self.q_deg is None:
-            raise RuntimeError('pas de /joint_states — le banc tourne-t-il ?')
+        self.wait_until_ready()
 
         results: Dict[str, str] = {}
-        for target in TARGETS:
+        for target in self.targets:
             if self.only and target.model not in self.only:
                 continue
             poses = self.object_poses()
@@ -517,7 +559,7 @@ def main(args=None):
         rclpy.shutdown()
 
     print('\n' + '=' * 62)
-    print('  TRI DES QUATRE OBJETS — RESULTAT')
+    print('  TRI DES OBJETS — RESULTAT')
     print('=' * 62)
     for model, verdict in results.items():
         mark = '✔' if verdict.startswith('OK') else '✘'

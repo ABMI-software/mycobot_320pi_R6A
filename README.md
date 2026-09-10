@@ -102,7 +102,7 @@ Ce dépôt intègre :
 │                                                ┌─────────────────┐                   │
 │                                                │  MyCobot 320 Pi │                   │
 │                                                └─────────────────┘                   │
-│                          RASPBERRY PI (10.10.0.221)                                  │
+│                          RASPBERRY PI (10.10.0.224)                                  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -159,7 +159,7 @@ source install/setup.bash
 
 ```bash
 # Sur le Pi — Terminal 1 : bridge robot
-ssh er@10.10.0.221
+ssh er@10.10.0.224
 python3 bridge_pi_simple.py
 
 # Sur le Pi — Terminal 2 : serveur caméras
@@ -468,7 +468,7 @@ bash training/capture_session.sh
 # Commande directe (preview + 5 poses de test)
 python3 training/capture_real_3cam.py --preview --num-samples 5 \
   --output /tmp/dream_data/real_3cam_test \
-  --pi-host 10.10.0.221 \
+  --pi-host 10.10.0.224 \
   --arducam-index /dev/v4l/by-id/usb-Arducam_Technology_Co.__Ltd._Arducam_8mp_SN0001-video-index0 \
   --svpro-index   /dev/v4l/by-id/usb-5MP_USB_Camera_5MP_USB_Camera_01.00.00-video-index0 \
   --arducam-exposure 75 --svpro-focus 90 \
@@ -564,6 +564,30 @@ python3 performance_analyzer.py --guided
 ---
 
 ## 🎯 Pick-and-place (Gazebo)
+
+### Réplique du banc réel — `real_table`
+
+Monde qui reproduit le poste physique plutôt qu'une table générique : plateau
+**622 × 449 × 8,5 mm** aux dimensions mesurées le 09/09/2026, texture bois
+reconstruite depuis les photos du plan de travail, et les **quatre ArUco 19 /
+23 / 25 / 26 de 50 mm** aux positions relevées.
+
+```bash
+source install/setup.bash
+ros2 launch mycobot_gateway real_table.launch.py
+```
+
+| argument | défaut | effet |
+|---|---|---|
+| `demo:=true` | `false` | exécute un cycle de préhension physique du cube rouge vers le bac |
+| `robot_appearance:=realistic` | `original` | base grise et coques blanc satiné — **visuel seulement**, la cinématique, les collisions et les inerties sont inchangées |
+| `headless:=true` | `false` | sans interface graphique |
+| `bridge_camera:=false` | `true` | ne publie pas les images de la caméra de dessus |
+
+Guide complet : [docs/GAZEBO_REAL_TABLE.md](docs/GAZEBO_REAL_TABLE.md) ·
+provenance de la texture : [models/wood_table/README.md](mycobot_description/models/wood_table/README.md)
+
+### Les deux pipelines de tri
 
 Deux pipelines complets de pick-and-place en simulation, utilisés pour démontrer la chaîne perception → IK → contrôle moteur :
 
@@ -691,7 +715,7 @@ mycobot_R6A/
 | Machine | IP | Ports |
 |---------|-----|-------|
 | PC Tour | 10.10.0.115 | — |
-| Raspberry Pi | 10.10.0.221 | 5005 (robot) + 5006 (caméras) |
+| Raspberry Pi | 10.10.0.224 | 5005 (robot) + 5006 (caméras) |
 
 ```bash
 ros2 launch mycobot_gateway simple_gui.launch.py pi_ip:=<VOTRE_IP_PI>
@@ -709,9 +733,9 @@ conda deactivate
 
 ### Connexion TCP échoue
 ```bash
-ping 10.10.0.221
-nc -zv 10.10.0.221 5005   # robot bridge
-nc -zv 10.10.0.221 5006   # camera server
+ping 10.10.0.224
+nc -zv 10.10.0.224 5005   # robot bridge
+nc -zv 10.10.0.224 5006   # camera server
 ```
 
 ### Git LFS — images manquantes après clone
