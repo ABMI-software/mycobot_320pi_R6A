@@ -140,20 +140,49 @@ Ce dépôt intègre :
 - Ubuntu, pymycobot (`pip3 install pymycobot`)
 - Caméras USB Arducam (pour capture réelle)
 
+**Pour la simulation Gazebo** (scène `real_table`, pick-and-place) :
+```bash
+sudo apt install ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
+```
+Gazebo **Harmonic** — pas Gazebo Classic, les noms de paquets diffèrent.
+
 ### Installation
 
 ```bash
-# Cloner le repo (avec Git LFS pour les datasets)
+# 1. Sortir de conda — son Python 3.13 masque celui de ROS2 et tout échoue
+#    avec des erreurs d'extension C incompréhensibles. À faire en premier,
+#    dans CHAQUE terminal.
+conda deactivate
+
+# 2. Cloner
 cd ~/ros_jazzy/src
 git clone https://github.com/ABMI-software/mycobot_320pi_R6A.git
 cd mycobot_320pi_R6A
-git lfs pull   # Télécharge les images des datasets (~9.5 GB)
 
-# Compiler les packages ROS2
+# 3. Git LFS — UNIQUEMENT pour les datasets d'entraînement DREAM (~9,5 Go).
+#    Inutile pour la simulation, le pick-and-place ou le contrôle du robot :
+#    seul `datasets/**/*.png` passe par LFS, tout le reste est dans git.
+git lfs pull
+
+# 4. Compiler
 cd ~/ros_jazzy
 colcon build --packages-select mycobot_gateway mycobot_description --symlink-install
 source install/setup.bash
 ```
+
+> **`colcon build` se lance depuis `~/ros_jazzy`, jamais depuis `src/`.** Colcon
+> écrit `build/`, `install/` et `log/` dans son répertoire courant, et on les
+> veut à la racine de l'espace de travail.
+
+**Vérifier que tout est en place**, en une commande :
+
+```bash
+ros2 launch mycobot_gateway real_table.launch.py
+```
+
+Une fenêtre Gazebo doit s'ouvrir sur le plateau bois avec ses quatre marqueurs
+ArUco et le bras. Si le plateau apparaît **gris et sans marqueurs**, c'est que
+`models/` n'a pas été installé : refaire le `colcon build`.
 
 ### Démarrage du robot
 
@@ -571,6 +600,8 @@ Monde qui reproduit le poste physique plutôt qu'une table générique : plateau
 **622 × 449 × 8,5 mm** aux dimensions mesurées le 09/09/2026, texture bois
 reconstruite depuis les photos du plan de travail, et les **quatre ArUco 19 /
 23 / 25 / 26 de 50 mm** aux positions relevées.
+
+Depuis un clone neuf, faire d'abord [Installation](#installation). Ensuite :
 
 ```bash
 conda deactivate
