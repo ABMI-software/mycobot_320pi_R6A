@@ -152,10 +152,10 @@ officielle.
 | 1 | Répétabilité du bras | utile, non bloquante | fait, borne inférieure | 0,00 à 0,84 mm — **toutes sous la spec de 1 mm** |
 | 2 | Erreur cartésienne reconstruite | non — se suffit | fait | 14,84 mm brut · ≈2 mm compensé |
 | 3 | Précision physique absolue | **indispensable** | **non fait** | inaccessible par cette méthode |
-| 4 | Répétabilité de la vision | non — auto-référencée | fait | sous la quantification du détecteur |
-| 5 | Précision métrique de la vision | **oui** — une longueur connue | fait, référence non vérifiée | +0,005 % sur 100 mm · −0,29 % base longue |
+| 4 | Répétabilité de la vision | non — auto-référencée | **refait le 10/09** | **0,725 mm** (6 trames) · **17,5 mm** (1 trame) |
+| 5 | Précision métrique de la vision | **oui** — un artefact étalonné | repris le 10/09 | échelle longue **−0,044 %** · le tag fait bien **50 mm**, le biais est dans la détection |
 | 6 | Calibration extrinsèque | **oui** — un point indépendant | **fait le 09/09 au soir** | **1,86 mm** en interpolation |
-| 7 | Précision globale vision + robot | non — l'objet est sa cible | **non fait** | à chiffrer |
+| 7 | Précision globale vision + robot | non — l'objet est sa cible | **FAIT le 10/09, 20 essais** | **10,79 mm** brut → **0,63 mm** après 2 corrections |
 
 ### 1 — Répétabilité du bras
 
@@ -197,10 +197,32 @@ chiffre constructeur** — Elephant Robotics n'en publie pas.
 
 ### 4 — Répétabilité de la vision
 
-Tag et caméra immobiles, 60 trames : sortie du détecteur **identique** d'une
-trame à l'autre (vérifié par md5 que les images étaient bien distinctes, 30/30).
-Sur les marqueurs de planche, l'écart-type des centres vaut **0,008 à 0,166 px**
-sur 20 trames. Ce n'est pas une précision, c'est une **absence de gigue**.
+**Mesure refaite le 10/09, et la première conclusion était fausse.** Le premier
+essai concluait à une « absence de gigue » : sortie du détecteur identique d'une
+trame à l'autre. C'était un artefact du détecteur par défaut, dont les coins ne
+sont pas raffinés au sous-pixel — sur une scène immobile il retombe sur les
+mêmes pixels entiers.
+
+Refait avec `CORNER_REFINE_SUBPIX`, 60 détections, bras écarté, scène immobile :
+
+| méthode | n | l̄ | σ | RP ISO 9283 | max |
+|---|---|---|---|---|---|
+| détection brute, 1 trame | 60 | 0,610 mm | 2,220 | 7,270 mm | **17,46 mm** |
+| sous-pixel, 1 trame | 60 | 0,632 mm | 2,251 | 7,384 mm | 17,52 mm |
+| **sous-pixel + moyenne de 6 trames** | 55 | **0,141 mm** | 0,195 | **0,725 mm** | **0,80 mm** |
+
+**Le raffinement sous-pixel n'était pas le problème** — il ne change presque
+rien (0,610 → 0,632 mm). Le vrai coupable, ce sont les **trames corrompues** :
+le flux MJPEG du pilote perd régulièrement des segments (messages
+`Corrupt JPEG data`), l'image arrive tronquée et le marqueur est détecté de
+travers, jusqu'à **17,5 mm**. Rare, mais énorme.
+
+Moyenner six trames l'élimine : le maximum tombe de 17,5 mm à **0,80 mm**.
+
+> **Règle opérationnelle.** Ne jamais commander le robot sur une seule trame.
+> Une prise sur trame unique rate de temps en temps, de près de 2 cm, sans que
+> rien ne le signale. Le test 7 était déjà dans ce régime — il moyenne six
+> trames — donc ses chiffres tiennent.
 
 ### 5 — Précision métrique de la vision
 
@@ -217,12 +239,48 @@ ayant été posée à l'œil.
 | distances 19–25 / 19–26 / 25–26 | 380–580 mm | — | — | **−0,29 % moyen** |
 
 **Aucune erreur d'échelle dans la chaîne** : une vraie erreur d'échelle serait
-identique à toutes les tailles. Les trois marqueurs de 50 mm, physiquement
-identiques, donnent −1,3 à −5,2 % selon leur obliquité. Le −3,25 % est un
-**artefact de mesure sur petit marqueur oblique**.
+identique à toutes les tailles. Le +0,005 % sur le tag de 100 mm le montre.
 
-⚠️ Réserve : la taille imprimée **n'a pas été vérifiée au pied à coulisse**.
-Tant que ce contrôle n'est pas fait, le +0,005 % reste une auto-cohérence.
+**Correction du 10/09 — et cette fois dans l'autre sens.** Ce document a
+d'abord dit « artefact de mesure », puis « vraie erreur d'impression ». La
+deuxième affirmation était fausse : **la première avait raison.**
+
+Cinq marqueurs identiques, 12 acquisitions chacun, extrinsèque recalibrée :
+
+| marqueur | côté mesuré | obliquité |
+|---|---|---|
+| 19 | **49,725 ± 0,019 mm** | 1,0096 |
+| 25 | 49,154 ± 0,040 | 1,0197 |
+| 23 | 48,472 ± 0,107 | 1,0181 |
+| 1 | 48,306 ± 0,131 | 1,0246 |
+| 26 | 47,749 ± 0,242 | 1,0287 |
+
+Répétabilité sur un **même** marqueur : **± 0,108 mm**. Étalement entre
+marqueurs **identiques** : **1,98 mm**, soit 18 fois plus. La mesure est précise
+et fausse.
+
+Corrélation du côté mesuré avec l'**obliquité : r = −0,920**. Ajustement
+`côté = −97,96 × obliquité + 148,62`, résidus 0,27 mm RMS. Extrapolé à une vue
+de face : **50,65 mm**.
+
+Preuve indépendante — les **grandes distances** entre centres (383 à 580 mm)
+sont justes à **−0,044 %**, contre **−2,6 %** sur les côtés de 50 mm. Une vraie
+erreur d'échelle frapperait les deux à l'identique.
+
+> **La calibration est juste ; c'est la détection des coins ArUco qui rétrécit
+> les petits carrés vus de biais. Les tags font 50 mm.**
+
+Le biais porte sur la **taille**, jamais sur la **position** : les centres
+tombent à 0,11–0,42 mm de leurs valeurs connues, parce que les quatre coins sont
+tirés vers l'intérieur de façon symétrique.
+
+**Certitude : 50,7 ± 0,7 mm** (0,27 mm de résidu d'ajustement, ~0,6 mm de la
+référence d'échelle au ruban). Cela encadre 50 et **exclut 48,3** à plus de
+trois écarts. Un artefact étalonné resserrerait à 0,05 mm et satisferait
+VDI/VDE 2634-1, mais **ne changerait aucune décision** : l'argument ne repose
+pas sur la valeur absolue, mais sur le fait qu'une erreur d'échelle serait
+identique à toutes les longueurs — or elle vaut −0,044 % sur 383–580 mm et
+−2,6 % sur 50 mm.
 
 ### 6 — Calibration extrinsèque caméra ↔ robot
 
@@ -230,9 +288,12 @@ Voir la section 4 ci-dessous : c'est le résultat neuf de la soirée.
 
 ### 7 — Précision globale vision + robot
 
-**Non chiffrée.** C'est pourtant le seul nombre qui décrit le système tel qu'il
-fonctionne, et **il ne demande aucune métrologie externe** : l'objet est sa
-propre cible.
+**Chiffrée le 10/09, 20 essais.** Voir la section 8 ci-dessous : c'est le seul
+nombre qui décrit le système tel qu'il fonctionne, et il n'a demandé **aucune
+métrologie externe** — l'objet est sa propre cible.
+
+**10,79 mm en boucle ouverte, 0,63 mm après deux corrections.** L'erreur est à
+100 % un biais.
 
 ---
 
@@ -266,20 +327,36 @@ Avec 4 centres, en retirer un laisse **exactement 6 contraintes pour
 Ces chiffres ne mesurent pas la qualité de l'extrinsèque : ils mesurent
 l'**absence de redondance**.
 
-### Le côté réel des marqueurs : 48,49 mm, pas 50
+### Le côté ajusté à 48,49 mm — ce que ça mesurait vraiment
 
-Avant tout test, il faut corriger le modèle. En laissant le côté du marqueur
-libre et en minimisant la reprojection sur les 16 coins :
+*Section écrite le 09/09, corrigée le 10/09. Conservée parce que le raisonnement
+qu'elle contient est un piège instructif.*
+
+En laissant le côté du marqueur libre et en minimisant la reprojection sur les
+16 coins :
 
 | côté supposé | reprojection |
 |---|---|
 | 48,49 mm (**optimum ajusté**) | **0,8277 px** |
 | 50,00 mm (valeur du YAML) | 0,9624 px |
 
-**−3,02 %.** C'est exactement le −3,25 % mesuré l'après-midi sur le tag de
-50 mm et classé alors « artefact ». Il y a bien une **erreur d'impression
-réelle** d'environ −3 % sur la planche de 50 mm. Le tag de 100 mm, imprimé
-séparément, est juste à +0,005 %.
+J'en avais conclu à une erreur d'impression de −3 %, en la croyant confirmée par
+la mesure directe du côté. **Les deux étaient fausses, et pour la même raison.**
+
+L'ajustement minimise l'écart aux **coins détectés**. Or la détection ArUco tire
+les coins d'un petit carré **vers l'intérieur** (§ 3, essai 5 — corrélation
+−0,920 avec l'obliquité). Un ajustement sur ces coins trouve donc
+*nécessairement* un côté trop petit : il reproduit fidèlement le biais au lieu
+de le révéler. Le gain de 0,96 à 0,83 px est réel, mais il mesure **l'ampleur du
+biais de détection**, pas la taille du marqueur.
+
+**C'était un piège circulaire** : je validais une mesure biaisée par un
+ajustement sur les mêmes données biaisées, et je comptais l'accord des deux
+comme une confirmation indépendante.
+
+Ce qui l'a détecté, en fin de compte, c'est la seule chose que le biais ne peut
+pas atteindre : les **grandes distances**, justes à −0,044 % quand les petits
+côtés sont faux de −2,6 %.
 
 ### Ce que le fit dit vraiment, une fois le côté corrigé
 
@@ -418,3 +495,375 @@ Ce qui limite réellement la boucle est ce qui n'est **pas** répétable :
 - [Measuring position repeatability of industrial robots — Robohub](https://robohub.org/measuring-position-repeatability-of-industrial-robots/)
 - [Repeatability and Accuracy of an Industrial Robot — TIIJ](https://tiij.org/issues/issues/spring2009/11_Sirinterlikci/Sirinterlikci-Robot%20Repeatability.pdf)
 - [ISO 9283 — GlobalSpec](https://standards.globalspec.com/std/323561/ISO%209283)
+
+
+---
+
+## 8. Test 7 — précision globale vision + robot (10/09/2026)
+
+### Ce qui est mesuré
+
+L'écart entre la position que la **caméra** attribue à une cible et celle que
+les **encodeurs** attribuent au bout des doigts après un déplacement commandé.
+C'est la précision d'une **prise du premier coup**, puis après correction.
+
+### Protocole — 20 essais, 3 mesures chacun
+
+Cible : un tag ArUco 50 mm posé au **centre** du plan de travail, à
+(260,49 · 21,66) mm, portée 261 mm. Caméra **arducam seule**.
+
+À chaque essai :
+
+1. le bras s'écarte à la pose d'observation ;
+2. la caméra détecte le tag — **moyenne de 6 trames**, jamais une seule ;
+3. le bras y va **en une seule fois, sans correction** → mesure (passe 0) ;
+4. on réinjecte l'écart articulaire consigne − mesure → mesure (passe 1) ;
+5. on réinjecte de nouveau → mesure (passe 2) ;
+6. le bras revient, la caméra revoit le tag pour **prouver qu'il n'a pas bougé**.
+
+Survol à **Z = 30 mm : aucun contact avec la table.** Pince fermée, le déport
+d'outil désignant le bout des doigts fermés.
+
+### Résultats
+
+| passe | ce que c'est | erreur moy. | biais | dispersion RP ISO | erreur Z | retard | < 2 mm | < 1 mm |
+|---|---|---|---|---|---|---|---|---|
+| 0 | **boucle ouverte** | **10,79 mm** | 10,79 | 0,671 mm | −9,78 mm | 2,07° | 0/20 | 0/20 |
+| 1 | après **une** réinjection | **1,29 mm** | 1,27 | 0,810 mm | −0,42 mm | 0,24° | 20/20 | 4/20 |
+| 2 | après **deux** | **0,63 mm** | 0,54 | 0,956 mm | **+0,06 mm** | 0,17° | 20/20 | **18/20** |
+
+### Le résultat, en une phrase
+
+**Les 10,8 mm sont à 100 % un biais.** Le biais s'effondre de 10,79 à 0,54 mm —
+vingt fois moins — pendant que la dispersion, elle, ne bouge pas : 0,230 puis
+0,291 puis 0,337 mm.
+
+C'est la signature d'une erreur **purement systématique** : l'affaissement
+gravitaire, qui tire toujours dans le même sens (X −7,65 et Y −7,60 mm, jamais
+l'inverse sur 20 essais). Un biais se rattrape par une correction ; une
+dispersion, non.
+
+> **C'est exactement la condition pour qu'un asservissement visuel fonctionne :
+> la boucle annule toute erreur de modèle constante.**
+
+En Z c'est plus net encore : **−9,78 mm** en boucle ouverte, **+0,06 mm** après
+deux passes. L'affaissement est intégralement repris.
+
+### Contrôles de validité
+
+- **Le tag n'a pas bougé** : déplacement maximal 0,767 mm sur 20 vérifications.
+- **L'IK n'est pas en cause** : résidu moyen 0,021 mm, maximum 0,024 mm.
+- **La vision était dans le bon régime** : moyenne de 6 trames (cf. § 3, essai 4).
+
+### Réserve
+
+C'est une **borne inférieure**. La position atteinte est reconstruite par
+`FK(q_lu)` : elle ignore l'écart encodeur↔articulation, les erreurs du modèle
+cinématique, le jeu des réducteurs et la flexion. Le vrai chiffre physique est
+plus grand. Le mesurer demande un comparateur à cadran (~60 €).
+
+---
+
+## 9. Les extrinsèques ne valent que dans le plan de la table (10/09/2026)
+
+C'est la découverte la plus lourde de conséquence de la campagne, et elle n'a
+été trouvée qu'en cherchant à mesurer autre chose.
+
+### Comment elle est apparue
+
+En essayant de trancher optiquement les **17,33 mm** de doute sur le déport
+d'outil (`tool_offset.json`, champ `contradiction_non_resolue`), la SVPRO a
+d'abord été recalibrée : elle avait dérivé de **21,3 mm** depuis le 24/08 et de
+**6,6 mm** depuis le 02/09. Recalibrée sur la planche, elle retombe à
+**0,38–0,72 mm**.
+
+Son marqueur 25 reste indétectable. Il est **physiquement présent**, mais son
+bord bas tombe **8,8 px sous le cadre** — ArUco exige les quatre coins. Vérifié
+à toutes les résolutions du capteur (2592×1944 à 640×480) : le champ est
+identique, ce n'est pas une question de définition. Le corriger demande de
+bouger la caméra, jamais la planche.
+
+### La validation croisée, sur un point neuf
+
+Le tag posé au centre n'a servi à **aucun** des deux ajustements — l'arducam est
+ajustée sur 19/23/25/26, la SVPRO sur 19/23/26. Chaque caméra le prédit
+indépendamment.
+
+| point | arducam (X,Y) | SVPRO (X,Y) | désaccord |
+|---|---|---|---|
+| **tag central — jamais utilisé** | 260,84 / 21,59 | 259,44 / 22,90 | **1,92 mm** |
+| marqueur 19 | 96,66 / 202,66 | 96,78 / 203,96 | 1,30 mm |
+| marqueur 26 | 529,43 / −175,68 | 529,93 / −175,61 | 0,50 mm |
+
+Ces **1,92 mm** bornent l'erreur des **deux chaînes optiques réunies**, sur un
+point neuf et central. C'est le premier contrôle vraiment indépendant de la
+campagne : ce n'est pas un résidu qui se mesure lui-même, ce sont deux
+intrinsèques, deux extrinsèques et deux angles de vue qui convergent.
+
+### La découverte
+
+Les quatre marqueurs de planche sont **tous à Z = 0**. Douze coins coplanaires
+fixent très bien la pose **dans** le plan — d'où les 0,4 mm de résidu et les
+1,92 mm de recoupement — mais **contraignent mal la rotation hors plan**. C'est
+la dégénérescence classique de la cible plane, et **le résidu ne peut pas la
+voir** : il est mesuré sur ce même plan.
+
+Contrôle direct, pince à **Z = 172 mm**, patins verts vus par les deux caméras :
+
+| patin | l'arducam dit | la SVPRO dit |
+|---|---|---|
+| arrière | (192 / +7) | (299 / +127) |
+| avant | (194 / −43) | (243 / +153) |
+
+Or **toute la pince tient entre Y = +92 mm** (le flasque) **et Y = −20 mm** (la
+pointe). La SVPRO les place *derrière* le flasque, là où il n'y a rien. Et la
+triangulation des deux rayons rend un point à **Z = −12 mm, sous la table** :
+physiquement impossible.
+
+### Conséquence
+
+| | |
+|---|---|
+| **Reste valide** | viser un objet **posé sur la table** — le pick-and-place, validé à 1,92 mm, et le test 7 ci-dessus |
+| **N'est pas valide** | toute mesure **en hauteur** : position de la pince en vol, hauteur d'un objet, obstacle |
+| **Pour lever la limite** | refaire la calibration avec des marqueurs à **plusieurs hauteurs** — un tag collé sur une boîte de hauteur connue suffit |
+
+Deux ou trois niveaux rendent la rotation hors plan observable, et débloquent du
+même coup la mesure du déport d'outil, restée indécidable.
+
+### Pourquoi le déport d'outil n'a pas pu être tranché
+
+Les deux candidats sont distants de 17,33 mm, mais **16,9 mm de cet écart est
+vertical** et seulement 3,9 mm latéral. Or les deux caméras regardent d'en haut :
+
+| caméra | élévation au-dessus de l'horizontale | séparation des deux candidats |
+|---|---|---|
+| arducam | ~85° | < 2 px |
+| SVPRO | 58° | **4,2 px** |
+
+La mesure n'est pas dans l'image. Ce n'est ni un problème de calibration ni
+d'algorithme.
+
+**Ce que dit le faisceau d'indices**, à défaut de preuve : le déport actuel
+repose sur **7 mesures au réglet, 3 azimuts couvrant 59°, écart-type 1,0 mm**.
+Ce qui le contredit est **un seul** point enseigné du 18/08, à une pose qui
+n'est même plus atteignable (J2 à −135,7°, au-delà de la butée −135°). Sept
+mesures reproductibles contre une non reproductible.
+
+### Une méthode écartée, et pourquoi
+
+La première approche proposée était de **descendre jusqu'au contact avec la
+table** et de lire la hauteur. Elle a été rejetée, à raison : le bras a
+**1,0–2,1° de retard de suivi**, soit 6 à 10 mm en cartésien. Une détection de
+contact par écart d'encodeurs ne se déclenche donc qu'après plusieurs
+millimètres d'appui. **La résolution du protocole était pire que la grandeur
+cherchée**, et il abîmait le matériel en prime.
+
+> Règle générale qui en découle : avant de proposer un protocole, chiffrer sa
+> résolution et la comparer à la grandeur cherchée.
+
+
+---
+
+## 10. Les normes : celles que j'ai suivies, celles que j'ai ignorées
+
+Cette section répond à une question directe : *cette méthodologie s'appuie-t-elle
+sur des normes publiées et nommées, ou est-elle inventée ?*
+
+**Réponse honnête : une seule norme a été suivie, et seulement en partie. Toute
+la moitié « vision » de la campagne repose sur des protocoles construits pour
+l'occasion.**
+
+### 10.1 Ce qui a été suivi
+
+| norme | ce qui en a été pris | ce qui a été laissé |
+|---|---|---|
+| **ISO 9283:1998** — *Manipulating industrial robots — Performance criteria and related test methods* | la **définition** de la répétabilité de pose : `RP = l̄ + 3S_l` (distance moyenne au barycentre + 3 écarts-types) | **tout le protocole** : cube ISO, 5 poses P1–P5 sur plan incliné, 30 cycles, 100 % de la charge nominale, 100 % de la vitesse |
+| **ISO 9787:1999** — *Coordinate systems and motion nomenclatures* | suivie **de fait** sans être citée : toutes les poses sont rapportées dans un repère de base unique (`base_link`), ce qu'ISO 9283 exige en s'y référant | rien |
+| **ISO 8373** — *Vocabulary* | le vocabulaire employé | rien |
+
+Nos essais sont donc menés dans des conditions **plus favorables** que la norme
+(à vide, à vitesse réduite, sur une seule pose). Les chiffres sont optimistes,
+et c'était déjà signalé au § 2.
+
+### 10.2 La norme qui manquait : VDI/VDE 2634 Partie 1
+
+**C'est la norme du test E, et je ne la connaissais pas en le concevant.**
+
+VDI/VDE 2634 *Optical 3-D measuring systems* définit les méthodes de réception
+et de re-vérification des systèmes de mesure optique 3D. La **partie 1** couvre
+les systèmes à **palpage point par point** — exactement notre cas : on mesure la
+position de points (centres et coins de marqueurs) dans un volume.
+
+Elle définit **un seul paramètre de qualité**, l'**erreur de mesure de
+longueur** :
+
+```
+Δl = l_m − l_k          l_m = longueur mesurée, l_k = longueur étalonnée
+E  = A + K·L ≤ B        tolérance admissible, dépendante de la longueur
+```
+
+Et elle impose une manière de la mesurer :
+
+| exigence VDI/VDE 2634-1 | notre campagne | conforme |
+|---|---|---|
+| artefact **étalonné**, dimensions et forme certifiées (marques circulaires sur cales étalon) | un tag ArUco **imprimé**, taille jamais vérifiée au pied à coulisse | **non** |
+| **7 lignes de mesure** réparties dans le **volume** de mesure | **1 seule**, et entièrement dans le plan Z = 0 | **non** |
+| **≥ 5 longueurs** de test par ligne | quelques distances inter-marqueurs | **non** |
+| tolérance déclarée sous la forme `A + K·L` | aucune tolérance déclarée | **non** |
+
+### 10.3 Ce que cette norme aurait évité
+
+Les deux difficultés majeures de la campagne sont **exactement** ce que
+VDI/VDE 2634-1 prévient.
+
+**1. L'artefact non étalonné.** Le « −3,25 % » du tag de 50 mm a demandé six
+mesures indépendantes et deux jours pour être tranché, parce que la caméra était
+comparée à une référence elle-même fausse. La norme exige un artefact **calibré**
+précisément pour rendre cette ambiguïté impossible. Le tag de 100 mm reste dans
+ce cas aujourd'hui.
+
+**2. Les 7 lignes dans le VOLUME, pas dans un plan.** La dégénérescence
+découverte au § 9 — extrinsèques justes à 1,92 mm dans le plan de la table,
+sans aucune validité 17 cm plus haut — est précisément ce qu'un plan
+d'échantillonnage volumique interdit. **La norme l'avait anticipée ; je l'ai
+redécouverte à mes dépens.**
+
+Elle dit enfin une chose contre-intuitive et utile :
+
+> *« Separate testing of the probing error is not required as this effect is
+> considered in the determination of the length measurement error. »*
+
+Autrement dit, notre **test C** (bruit de détection, § 3 essai 4) est, du point
+de vue de la norme, **redondant** avec un test E correctement mené. Il garde sa
+valeur de diagnostic — c'est lui qui a révélé les trames MJPEG corrompues — mais
+il ne constitue pas un paramètre de qualité au sens VDI/VDE 2634.
+
+### 10.4 Ce qui reste sans norme, assumé
+
+| protocole | statut |
+|---|---|
+| validation *leave-one-out* de l'extrinsèque | **construit pour l'occasion** — pas de norme connue |
+| validation croisée à deux caméras sur un point neuf | **construit pour l'occasion** |
+| test 7, précision globale vision + robot en boucle fermée | **construit pour l'occasion** — ISO 9283 ne couvre pas les systèmes asservis par vision |
+| réinjection de l'écart articulaire | pratique d'ingénierie, pas une norme |
+
+Ces protocoles ne sont pas moins valides pour autant — ils sont simplement
+**non normalisés**, et doivent donc être décrits intégralement pour être
+reproductibles. C'est l'objet de ce document.
+
+### 10.5 Ce qu'il faudrait faire pour être conforme
+
+Par ordre de coût croissant :
+
+1. **Faire étalonner l'artefact** — mesurer les tags au pied à coulisse.
+   Resserre le test E de ±0,7 mm à ±0,05 mm. **Ne change aucune décision** : la
+   conclusion « les tags font 50 mm » est déjà établie à plus de trois écarts.
+   Utile pour une déclaration de conformité, pas pour le projet.
+2. **Étendre le test E à plusieurs hauteurs** — des marqueurs sur des cales de
+   hauteur connue, 3 niveaux minimum. Lève **du même coup** la dégénérescence du
+   § 9 et la question du déport d'outil. C'est la seule action qui débloque
+   trois problèmes à la fois.
+3. **Déclarer une tolérance** sous la forme `E = A + K·L`, seule façon de dire
+   « conforme » ou « non conforme » au lieu de donner un chiffre nu.
+4. **Suivre le protocole ISO 9283 complet** pour la partie robot : cube ISO,
+   5 poses, 30 cycles, charge et vitesse nominales. C'est le plus lourd, et le
+   moins urgent — le robot tient déjà sa spec dans des conditions plus douces.
+
+### 10.6 Traçabilité — quel essai, contre quelle norme, avec quel résultat
+
+Le tableau ci-dessous relie **chaque essai réellement mené** à la norme dont il
+relève, à ce qui a été fait, et à ce qui manque pour être conforme. C'est la
+lecture à faire si l'on veut savoir *sur quoi repose* un chiffre donné.
+
+| essai | norme applicable | ce que j'ai fait | résultat | conforme ? |
+|---|---|---|---|---|
+| **A** — répétabilité, 10 A/R verticaux | **ISO 9283:1998** § répétabilité de pose | 10 retours au même point, sens d'approche constant, `RP = l̄ + 3S_l` | **0,403 mm** | **définition oui**, protocole non (1 pose au lieu de 5, 10 cycles au lieu de 30, à vide, vitesse réduite) |
+| **F-UNI** — contrôle, 6 A/R | ISO 9283:1998 | idem, série indépendante | **0,557 mm** | idem |
+| **G** — 40 A/R, 10 par côté | ISO 9283:1998 | 4 séries unidirectionnelles, une par côté | **0,000 à 0,838 mm** | idem — et c'est la seule à explorer la dépendance au sens d'approche, que la norme n'impose pas |
+| **F-MULTI / D** — sens mélangés | **hors norme par construction** | sens d'approche alternés | 5,847 / 8,091 mm | **non applicable** : ISO 9283 définit la répétabilité *« in the same direction »*. Une série multidirectionnelle est hors du champ de la norme |
+| **B** — erreur de cible absolue | ISO 9283:1998 § **exactitude** de pose (AP) | écart consigne ↔ position atteinte, boucle ouverte | 14,84 mm → ≈2 mm compensé | **non** — AP exige une mesure externe, la nôtre est reconstruite aux codeurs |
+| **C** — bruit de la vision | **VDI/VDE 2634-1** — mais la norme le déclare **redondant** | 60 trames, scène immobile, avec et sans sous-pixel | **0,725 mm** (6 trames) · 17,5 mm (1 trame) | **sans objet** : *« separate testing of the probing error is not required »*. Gardé comme **diagnostic** — c'est lui qui a trouvé les trames MJPEG corrompues |
+| **E** — échelle de la vision | **VDI/VDE 2634-1** § erreur de mesure de longueur `Δl = l_m − l_k` | grandes distances (383–580 mm) contre relevé ; côtés de 50 mm contre l'obliquité | **−0,044 %** sur l'échelle longue · le tag fait **50 mm** | **non** — artefact **non étalonné** (c'est ce qui a produit l'erreur de deux jours), 1 plan au lieu du volume, aucune tolérance `A + K·L` |
+| **H** — extrinsèque, leave-one-out | **aucune norme connue** | ajustement sur 3 marqueurs, prédiction du 4ᵉ | 1,86 mm en interpolation | **protocole construit pour l'occasion** |
+| **K** — validation croisée 2 caméras | **aucune norme connue** ; l'esprit de VDI/VDE 2634-3 (vues multiples) | point neuf jamais utilisé par aucun des deux ajustements | **1,92 mm** | **protocole construit pour l'occasion**, mais c'est le contrôle le plus solide de la campagne |
+| **7** — précision globale vision + robot | **aucune norme** — ISO 9283 ne couvre pas les systèmes asservis par vision | 20 essais, 3 passes, cible détectée puis atteinte | **10,79 mm** brut → **0,63 mm** | **protocole construit pour l'occasion** |
+| tous | **ISO 9787:1999** — systèmes de coordonnées | toutes les poses rapportées dans `base_link`, repère de base unique | — | **oui**, de fait |
+| tous | **ISO 8373** — vocabulaire | termes employés conformes | — | **oui** |
+
+**Ce que ce tableau montre en une lecture :** sur onze lignes, **deux seulement
+sont conformes** (ISO 9787 et ISO 8373, les plus faciles), **trois suivent une
+définition normalisée sans son protocole** (A, F-UNI, G), et **cinq n'ont aucune
+norme applicable** — dont les trois résultats les plus intéressants de la
+campagne (H, K et le test 7).
+
+Ce n'est pas un défaut à cacher : la précision d'un système **vision + robot en
+boucle fermée** n'est normalisée nulle part à ma connaissance. ISO 9283 mesure
+le bras seul, VDI/VDE 2634 mesure l'optique seule. Le chiffre qui compte pour un
+asservissement visuel — *quand la caméra dit d'aller là, on arrive à combien ?* —
+tombe entre les deux. D'où l'obligation de décrire le protocole intégralement,
+ce que fait le § 8.
+
+---
+
+### Sources — et ce que j'ai testé contre chacune
+
+Chaque source est suivie de **ce qu'elle contient** et de **quel essai s'y
+rapporte**.
+
+**[ISO 9283:1998 — *Manipulating industrial robots: performance criteria and related test methods*](https://standards.iteh.ai/catalog/standards/iso/b00c9665-53ff-4265-933d-77a544eb4e26/iso-9283-1998)**
+· [version européenne EN ISO 9283:1998](https://standards.iteh.ai/catalog/standards/cen/bd6e0b51-df41-44c2-806f-fbd0f53f30de/en-iso-9283-1998)
+Définit l'exactitude de pose (AP) et la **répétabilité de pose (RP)**, ainsi que
+le protocole d'essai : cube ISO, 5 poses, 30 cycles, charge et vitesse
+nominales. → **Essais A, F-UNI, G** en reprennent la formule `RP = l̄ + 3S_l`,
+sans le protocole. **Essai B** relève de l'AP mais n'y satisfait pas, faute de
+mesure externe. C'est aussi cette norme qui pose la répétabilité *« in the same
+direction »*, ce qui met **F-MULTI et D hors de son champ**.
+
+**[ISO 9787:1999 — *Coordinate systems and motion nomenclatures*](https://cdn.standards.iteh.ai/samples/26484/10ceacc990ec4f968ca74878008f0364/ISO-9787-1999.pdf)**
+Définit les repères monde, base, interface mécanique et outil. ISO 9283 s'y
+réfère explicitement : les poses mesurées doivent être rapportées dans un repère
+de base commun. → **Tous les essais** : tout est exprimé dans `base_link`,
+origine au centre de la base, Z = 0 au plan de travail. Conforme de fait.
+
+**[ISO — portail Robotique](https://www.iso.org/sectors/engineering/robotics)** ·
+**ISO 8373 — *Vocabulary***
+Vocabulaire normalisé des robots. → **Tous les essais**, pour la terminologie.
+
+**[VDI/VDE 2634 Blatt 1 — *Optical 3-D measuring systems, point-by-point probing*](https://store.accuristech.com/standards/vdi-vdi-vde-2634-blatt-1?product_id=2936117)**
+**La norme du test E, et la plus importante de cette liste.** Définit l'erreur
+de mesure de longueur `Δl = l_m − l_k`, la tolérance `E = A + K·L ≤ B`, et la
+procédure : artefact **étalonné**, **7 lignes de mesure dans le volume**, **≥ 5
+longueurs par ligne**. Précise que le test séparé de l'erreur de palpage n'est
+pas requis. → **Essai E** en relève directement et **n'y satisfait sur aucun
+point**. **Essai C** est déclaré redondant par cette norme. Ses 7 lignes *dans
+le volume* sont exactement ce dont l'absence a produit la dégénérescence du § 9.
+
+**[VDI/VDE 2634 Blatt 2 — *area scanning*](https://standards.globalspec.com/std/9914533/VDI/VDE%202634%20BLATT%202)** ·
+**[Blatt 3 — *multiple view systems*](https://standards.globalspec.com/std/9914423/vdi-vde-2634-blatt-3)**
+Parties 2 et 3, pour les systèmes à balayage surfacique et à vues multiples.
+→ Ne s'appliquent pas directement (nous faisons du palpage point par point),
+mais **la partie 3 est l'esprit de l'essai K** : évaluer un système à plusieurs
+vues. À consulter si la fusion arducam + SVPRO devient un mode de mesure et non
+un simple recoupement.
+
+**[VDI/VDE 2634-1 performance evaluation tests and systematic errors in passive stereo vision systems — ScienceDirect](https://www.sciencedirect.com/science/article/abs/pii/S0141635922002318)** ·
+[fiche ResearchGate](https://www.researchgate.net/publication/365369859_VDIVDE_2634-1_performance_evaluation_tests_and_systematic_errors_in_passive_stereo_vision_systems)
+Article scientifique appliquant VDI/VDE 2634-1 à la stéréovision passive et
+analysant ses **erreurs systématiques**. → C'est la source qui donne le contenu
+concret de la partie 1 sans acheter la norme, et le cadre le plus proche de
+notre configuration à deux caméras (**essai K**).
+
+**[NIST — *Industrial Robotics Standards*, chapitre 27](https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=820605)**
+Panorama des normes de robotique industrielle et de leurs organismes.
+→ Sert à **vérifier qu'aucune norme n'a été oubliée** pour les essais H, K et 7.
+C'est sur cette base que j'affirme qu'il n'en existe pas pour la précision d'un
+système vision + robot en boucle fermée.
+
+⚠️ **Réserve sur ces sources.** Les textes intégraux d'ISO 9283 et de
+VDI/VDE 2634 sont **payants**. Tout ce qui est rapporté ici provient des résumés
+publics des organismes de normalisation et de la littérature scientifique citée,
+**jamais du texte normatif lui-même**. C'est suffisant pour orienter une
+méthode et pour un rapport de stage ; **ce n'est pas suffisant pour écrire
+« conforme à ISO 9283 » sur un document officiel.** Il faut alors se procurer
+les normes.
