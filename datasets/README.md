@@ -1,6 +1,12 @@
 # 📦 Datasets - MyCobot 320 Pi Pose Estimation
 
-Ce dossier contient les données d'entraînement pour le pipeline de pose estimation CNN.
+Ce dossier contient le dataset **legacy** (régression directe ResNet, 5K synth
++ 2K réel) utilisé par `training/train.py`.
+
+> ℹ️ Le pipeline actif (DREAM, format NDDS) utilise des données bien plus
+> volumineuses qui ne vivent **pas** ici mais dans `training/dream/dream_data/`
+> (50K synthétique v3 + `real_3cam`) — voir [`../training/dream/README.md`](../training/dream/README.md)
+> et [`../README.md` § Datasets](../README.md#-datasets).
 
 > ⚠️ **Les images PNG sont stockées via [Git LFS](https://git-lfs.github.com/).**  
 > Après `git clone`, exécutez `git lfs pull` pour télécharger les images.
