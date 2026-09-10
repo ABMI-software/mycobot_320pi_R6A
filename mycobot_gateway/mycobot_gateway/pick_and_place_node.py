@@ -40,8 +40,8 @@ from std_msgs.msg import Float64, Float64MultiArray, String
 # Add dream module for IK/FK
 DREAM_DIR_ALT = '/home/genji/ros_jazzy/src/mycobot_R6A/training/dream'
 DREAM_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '..', '..', '..', '..', 'training', 'dream'
+    os.path.dirname(os.path.realpath(__file__)),
+    '..', '..', 'training', 'dream'
 )
 DREAM_DIR = os.path.normpath(DREAM_DIR)
 for p in [DREAM_DIR, DREAM_DIR_ALT]:

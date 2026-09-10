@@ -37,8 +37,8 @@ from std_msgs.msg import Float64, String
 
 DREAM_DIR_ALT = '/home/genji/ros_jazzy/src/mycobot_R6A/training/dream'
 DREAM_DIR = os.path.normpath(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '..', '..', '..', '..', 'training', 'dream',
+    os.path.dirname(os.path.realpath(__file__)),
+    '..', '..', 'training', 'dream',
 ))
 for p in [DREAM_DIR, DREAM_DIR_ALT]:
     if os.path.isdir(p) and p not in sys.path:
