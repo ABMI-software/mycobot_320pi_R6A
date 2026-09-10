@@ -13,7 +13,7 @@ class BridgeTour(Node):
         self.subscription = self.create_subscription(String, '/to_robot', self.send_callback, 10)
         
         # Pi IP is configurable via ROS parameter
-        self.declare_parameter('pi_ip', '10.10.0.221')
+        self.declare_parameter('pi_ip', '10.10.0.224')
         self.declare_parameter('pi_port', 5005)
         self.pi_ip = self.get_parameter('pi_ip').get_parameter_value().string_value
         self.port = self.get_parameter('pi_port').get_parameter_value().integer_value
