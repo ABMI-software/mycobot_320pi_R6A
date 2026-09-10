@@ -1,302 +1,15 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
 ## État actuel (9 septembre 2026 — soir, méthodologie et extrinsèque)
-> **Date de dernière mise à jour :** 9 juin 2026 (calibration main-œil — nœud hand-eye en cours de validation)
-> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0-pre (calibration) · 1.15.2-pre (pick-and-place ArUco)
-> **Branche active :** `feature/pick-and-place`
+> **Date de dernière mise à jour :** 9 septembre 2026 (méthodologie des essais de précision + validation extrinsèque par leave-one-out)
+> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
+> **Branche :** `main` (pick-and-place + DREAM mergés via PR #9 le 09/09/2026)
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.221` (pas `.223`/`.225` comme certains anciens docs)
 
 ---
 
-## État actuel (9 juin 2026 — soir — calibration main-œil sur robot réel)
-
-### Ce qui a été accompli aujourd'hui
-
-- **Nœud `calibrate_hand_eye_node`** : implémenté et lancé sur robot réel.
-  - Souscrit à `/camera/image_raw` (Orbbec, ~5 Hz) + `/joint_states`.
-  - Détecte le marqueur ID 20 (3 cm, DICT_4X4_1000) via ArUco + solvePnP.
-  - Balayage automatique (`a`) : génère 30 poses en perturbant j4/j5/j6 autour
-    de la base, attend 3 s de stabilisation, capture si marqueur visible.
-  - Solve Tsai (OpenCV hand-eye) + sauvegarde `hand_eye_calibration.yaml`.
-- **Validation robot réel** : connexion confirmée à `10.10.0.221:5005`.
-  - Angles lus : `[14.58, -136.05, 20.83, 32.43, -89.64, 0.26]°`.
-  - Marqueur ID 20 détecté à `[0.001, -0.038, 0.510]` m (position stable).
-  - Commande servo release opérationnelle : `ros2 topic pub --once /to_robot std_msgs/msg/String 'data: "stop"'`.
-- **`aruco_localizer_node`** : mis à jour avec les vrais IDs et tailles mesurées
-  (IDs 19/25/23/26, 25 mm) et chargement positions depuis `workspace_markers.yaml`.
-- **`joint_sync.py`** : parsing d'angles refactorisé — accepte `ANGLES:`, `angles:`,
-  `angles_ok:` ; ignore les réponses d'erreur `-1`.
-- **Nodes caméra** : `orbbec_camera_publisher`, `camera_live_view`, `camera_web_view`
-  ajoutés + enregistrés dans `setup.py`.
-- **`calibrate_extrinsic_node`** : nœud d'étalonnage extrinsèque caméra (PnP 4 marqueurs sol).
-- **`reach_target_aruco_node`** : nœud de déplacement vers cible ArUco.
-- **`bridge_tour.py`** : IP par défaut `.225` → `.221` ; logs send/recv passés en `debug`.
-- **Calibration sauvegardée** : `training/calibration/camera_extrinsic.yaml` + `workspace_markers.yaml`.
-
-### Décisions prises
-
-- Pi réelle confirmée à `10.10.0.221` (mettre à jour CLAUDE.md séparément).
-- `aruco_detect_scale = 1.6` pas de callback live → redémarrer le nœud pour changer.
-- Marqueur ID 20 (3 cm) à 51 cm détectable mais instable (~50 % des frames) :
-  cause probable = éclairage rasant ou légère inclinaison. Pas bloquant pour le balayage.
-
-### Prochaines actions
-
-1. [ROUGE] Lancer le balayage auto (`a`) avec le marqueur stable face caméra — collecter ≥ 20 échantillons.
-2. [ROUGE] Lancer `s` pour résoudre et sauvegarder `hand_eye_calibration.yaml`.
-3. [JAUNE] Valider la calibration : envoyer une pose connue, comparer position prédite vs réelle.
-4. [VERT] Commiter `scripts/real_robot_preflight.sh` (IP `.221`) sur `feature/teleoperation`.
-5. [VERT] Mettre à jour `CLAUDE.md` : Pi IP `10.10.0.223` → `10.10.0.221`.
-
-### Commande rapide de reprise
-
-```bash
-conda deactivate && source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
-# Terminal 1 — bridge
-ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
-# Terminal 2 — nœud hand-eye (log vers fichier pour surveillance)
-ros2 run mycobot_gateway calibrate_hand_eye_node \
-  --ros-args -p aruco_detect_scale:=2.5 -p marker_size:=0.03 -p marker_id:=20 \
-  2>&1 | tee /tmp/handeye.log
-# Surveiller
-tail -f /tmp/handeye.log | grep -E "VISIBLE|hors champ|Capture|Balayage"
-```
-
----
-
-## Handoff pick-and-place (a lire en premier pour la prochaine session)
-
-- Handoff detaille du 4 juin 2026 : [`docs/PICK_AND_PLACE_HANDOFF_2026-06-04.md`](docs/PICK_AND_PLACE_HANDOFF_2026-06-04.md)
-- Handoff detaille du 3 juin 2026 : [`docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md`](docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md)
-- Contient :
-  - ce qui a ete implemente aujourd'hui (sim + reel),
-  - l'etat exact de validation,
-  - les commandes de reprise,
-  - le plan de test onsite avec interfaces graphiques.
-
-### Ce qui a été accompli
-
-**Le maillon faible de la chaîne est identifié, et ce n'est pas le bras.**
-
-Validation de l'extrinsèque par leave-one-out, sans recalibrer : on ajuste la
-pose caméra sur une partie des marqueurs, on prédit un marqueur jamais vu.
-
-| ajustement | redondance | erreur au point non vu |
-|---|---|---|
-| 4 centres | 2 ddl | inexploitable (le système s'effondre) |
-| 16 coins | 26 ddl | **5,46 mm** en moyenne, 12,25 mm au pire |
-
-Le fichier de calibration annonce `erreur_sol_rms_mm: 0.594` — c'est un
-**résidu d'ajustement**, pas une justesse. La vraie erreur est **9× plus
-grande**, et du même ordre que le biais de sens d'approche (5,9 mm).
-
-Cause probable : les positions des marqueurs viennent d'un relevé au mètre
-ruban dont `workspace_markers.yaml` borne l'erreur à ±5 mm. On ne peut pas être
-plus juste que sa référence.
-
-**Document de méthodologie** :
-[`METHODOLOGIE_PRECISION.md`](training/calibration/METHODOLOGIE_PRECISION.md) —
-ce que `FK(q_lu)` mesure, ISO 9283, les 7 types d'essai, quand une référence
-externe est nécessaire.
-
-### Décisions prises
-
-- **Jamais d'ArUco sur la pince** : le montage n'est pas stable, l'hypothèse de
-  transformation rigide constante tombe. Le hand-eye du 10/07 est abandonné
-  (résidu 24,4 mm ; 20 poses sur 22 sous le seuil de 30 px du code).
-- La répétabilité est donnée en **RP ISO 9283**, jamais en écart max.
-- On ne recalibre pas : la validation évalue, elle n'écrase rien.
-
-### Prochaines actions
-
-1. [ROUGE] Re-relever les positions des 4 marqueurs de planche au pied à
-   coulisse ou par ajustement conjoint des deux caméras (±0,3 mm comme déjà
-   fait pour le 19). C'est ce qui plafonne toute la chaîne à ~5 mm.
-2. [ROUGE] Passer l'extrinsèque de production aux **16 coins** au lieu des
-   4 centres — 26 degrés de liberté de redondance au lieu de 2.
-3. [JAUNE] Chiffrer la **précision globale en boucle fermée** (essai 7) :
-   `P_vision`, `P_atteint`, correction, itérations, statut pince sur ~30
-   tentatives. Aucune métrologie externe requise.
-4. [JAUNE] Comparateur numérique (~60 €) pour transformer les bornes
-   inférieures de répétabilité en vraies valeurs.
-5. [VERT] Vérifier le tag de 100 mm au pied à coulisse.
-
-### Commande rapide de reprise
-
-```bash
-cd /home/genji/Osama_ws/src/mycobot_R6A
-python3 -c "import socket; s=socket.create_connection(('10.10.0.219',5005),timeout=8); \
-s.sendall(b'{\"action\": \"get_angles\"}\n'); print(s.makefile().readline())"
-# TOUJOURS exécuter avant ROS2
-conda deactivate
-
-source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/install/setup.bash
-```
-
----
-
 ## État actuel (9 septembre 2026 — soir, test des 4 directions)
-## État actuel (3 juin 2026 — nuit — pick-and-place Gazebo visual debug)
-
-### Ce qui a été accompli (session de débogage visuel Gazebo)
-
-- **Ouverture GUI Gazebo** : modifié `pick_and_place_aruco.launch.py` pour retirer le flag `-s` (server-only)
-  et activer l'affichage graphique via `DISPLAY=:1`.
-- **Marqueurs ArUco texturés** :
-  - Généré 5 PNG ArUco DICT_4X4_1000 (IDs 0,1,2,3,10) via OpenCV, stockés dans
-    `mycobot_description/worlds/textures/` et `materials/textures/`.
-  - Remplacé les cubes colorés génériques dans `precision_benchmark.sdf` par des
-    dalles 10×10 cm avec texture PBR (`albedo_map`) portant les vrais patterns ArUco.
-  - Cube cible rouge conservé + face supérieure avec texture ArUco ID 10.
-- **Correction tremblement HOME** :
-  - `HOME_ANGLES` dans `pick_and_place_aruco_node.py` : `[0,0,0,0,0,0]` → `[0,-0.8,1.4,-0.8,0,0]` rad
-    (position stable au-dessus du workspace, évite l'instabilité gravitationnelle).
-  - URDF `mycobot_pro_320_pi_benchmark.urdf` : `initial_value` des joints 2/3/4 mis
-    à jour pour correspondre, évitant le tremblement avant la première commande.
-- **Correction suivi cube pendant transport** :
-  - Ajout de `_gripper_base_world()` : calcule la position de `gripper_base` en frame
-    monde via la chaîne FK complète + transform fixe `joint6output_to_gripper_base`.
-  - `_do_grasp()` et SETTLING-carrying utilisent maintenant `gripper_base_world` au lieu
-    de `ee_pos + 0.02` (le cube ne flotte plus au-dessus du bras).
-  - **Limite connue** : l'IK ne contraint pas l'orientation ; la pince pointe latéralement
-    (~5 cm en Y) à la position de saisie. Fix complet = IK avec contrainte d'orientation.
-- CMakeLists.txt : `materials/` ajouté à l'install list.
-
-### Décisions prises
-
-- Textures ArUco stockées dans `worlds/textures/` (chemin relatif direct, sans `..`) :
-  Gazebo Harmonic ne résout pas `../` dans les `albedo_map` PBR.
-- `HOME_ANGLES` aligné avec `initial_value` URDF pour une initialisation stable.
-
-### Prochaines actions
-
-1. [ROUGE] IK avec contrainte d'orientation → pince pointe vers le bas au pick/place
-2. [JAUNE] Imprimer marqueurs ArUco réels + test sur banc avec caméra
-3. [VERT] `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
-
-### Commande rapide de reprise (sim avec GUI)
-
-```bash
-conda deactivate
-source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
-export DISPLAY=:1
-ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
-```
-
----
-
-## État actuel (3 juin 2026 — soir — pick-and-place Gazebo validé)
-
-### Ce qui a été accompli aujourd'hui
-
-- Scaffoldé l'orchestrateur FSM `pick_and_place_aruco_node.py` (10 segments,
-  modes `sim` / `real`, IK numérique, interface `/aruco/object_pose` unifiée)
-- Créé les deux launch files (`pick_and_place_aruco.launch.py` et `_real.launch.py`)
-- Corrigé `KeyError: 'angles'` (FSM lisait le mauvais segment via index déjà incrémenté)
-- **Cycle pick-and-place Gazebo complet validé** : home → approach_pick → grasp_pos
-  → GRASP (gz set_pose) → lift → approach_place → place_pos → RELEASE → retreat
-  → home_end → DONE, IK 0.0 mm d'erreur sur chaque waypoint
-
-### Décisions prises
-
-- Interface commune `gz_sim_localizer` (sim) / `aruco_localizer` (réel) → nœud
-  orchestrateur identique en sim et sur robot
-- `self._current_seg` stocké avant transition MOVING pour éviter off-by-one sur l'index
-
-### Prochaines actions
-
-1. [ROUGE] Imprimer marqueurs ArUco (4 workspace IDs 0-3, 50 mm + 1 objet ID 10, 40 mm)
-2. [JAUNE] `bash scripts/real_robot_preflight.sh` + bridge Pi actif sur 10.10.0.223
-3. [VERT] `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
-
-### Commande rapide de reprise
-
-```bash
-conda deactivate
-source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
-
-# Simulation (validation déjà passée)
-ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
-
-# Robot réel (prérequis ci-dessus)
-ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
-```
-
----
-
-## État actuel (3 juin 2026 — pick-and-place ArUco scaffoldé)
-
-### 🧭 Prochaine action prioritaire
-
-**Valider le pick-and-place en Gazebo :** ✅ validé (voir entrée du soir)
-
-**Ensuite — robot réel (prérequis) :**
-1. Imprimer les 5 marqueurs ArUco (4 workspace IDs 0-3 + 1 objet ID 10)
-2. `bash scripts/real_robot_preflight.sh`
-3. `ssh er@10.10.0.223 'python3 bridge_pi_simple.py'`
-4. `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
-
----
-
-## État actuel (28 avril 2026 — soir)
-
-### Ce qui a été accompli
-
-**Le test interrompu a été mené à son terme** : 4 directions × 10 retours,
-40 approches, aucun échec, bras reparqué en pose d'observation.
-
-| direction | RP ISO 9283 | états distincts | Z du barycentre |
-|---|---|---|---|
-| arrière | 0,000 mm | 1 | 42,655 |
-| droite | 0,186 mm | 2 | 46,619 |
-| avant | 0,794 mm | 4 | 44,400 |
-| gauche | 0,838 mm | 3 | 42,992 |
-
-**Trois conclusions du rapport ont dû être corrigées** :
-
-1. « Le robot tient sa spécification » → **faux**. Trois séries sur six
-   dépassent les ±0,5 mm une fois jugées en RP ISO 9283 et non en écart max.
-2. « On mesure la répétabilité du relevé codeur, quantifié » → **faux**. Le
-   plancher vaut 0,099 mm ; les dispersions sont 2 à 8× au-dessus.
-3. « Dégradation presque entièrement verticale » → **surestimé**. L'étalement
-   se répartit X 3,06 · Y 3,15 · Z 3,96 mm.
-
-**Le résultat le plus solide de la campagne** reste le biais de sens
-d'approche : 5,918 mm ici, 5,847 mm ce matin, 5,88 mm le 20/08 — trois
-protocoles indépendants à 0,07 mm près.
-
-### Décisions prises
-
-- Retrait du test fixé à **40 mm** et non 50 : à 50 mm le départ « avant »
-  plaçait le bras à J3 = −0,58°, résidu IK 0,611 mm. On aurait mesuré la
-  singularité, pas le sens d'approche.
-- La répétabilité est désormais toujours donnée en **RP ISO 9283**.
-- Les séries *sous* la spec ne sont plus présentées comme une validation : la
-  mesure étant une borne inférieure, seules les séries *au-dessus* informent.
-
-### Prochaines actions
-
-1. [ROUGE] Rejouer la prise du scotch outil incliné avec `ctx.classe_objet`
-   correctement armé, pour voir si `Z_PRISE_PAR_CLASSE['scotch'][1] = 35,9`
-   suffit ou doit descendre vers les ~8 mm qui saisissent réellement.
-2. [JAUNE] Mesurer l'affaissement à **trois allonges** pour trancher si
-   `d = L × θ` est prédictif (14,8 mm mesurés à 332 mm contre 13 mm modélisés
-   à 390 mm).
-3. [VERT] Reprendre la répétabilité avec un moyen de mesure **externe** si l'on
-   veut réellement statuer sur les ±0,5 mm.
-
-### Commande rapide de reprise
-
-```bash
-cd /home/genji/Osama_ws/src/mycobot_R6A
-python3 -c "import json,socket; s=socket.create_connection(('10.10.0.219',5005),timeout=8); \
-s.sendall(b'{\"action\": \"get_angles\"}\n'); print(s.makefile().readline())"
-```
-
----
-
 ## État actuel (9 septembre 2026 — après-midi, campagne de précision)
 
 ### Ce qui a été accompli
@@ -1960,3 +1673,290 @@ La transaction produite était seulement une sonde temporaire :
   `marker_size_m: 0.080` contre commentaire `50 mm`. La frontière actuelle
   utilise les centres et n'utilise pas cette taille, mais elle devra être
   mesurée/corrigée avant un futur PnP par coins.
+## État actuel (9 juin 2026 — soir — calibration main-œil sur robot réel)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Nœud `calibrate_hand_eye_node`** : implémenté et lancé sur robot réel.
+  - Souscrit à `/camera/image_raw` (Orbbec, ~5 Hz) + `/joint_states`.
+  - Détecte le marqueur ID 20 (3 cm, DICT_4X4_1000) via ArUco + solvePnP.
+  - Balayage automatique (`a`) : génère 30 poses en perturbant j4/j5/j6 autour
+    de la base, attend 3 s de stabilisation, capture si marqueur visible.
+  - Solve Tsai (OpenCV hand-eye) + sauvegarde `hand_eye_calibration.yaml`.
+- **Validation robot réel** : connexion confirmée à `10.10.0.221:5005`.
+  - Angles lus : `[14.58, -136.05, 20.83, 32.43, -89.64, 0.26]°`.
+  - Marqueur ID 20 détecté à `[0.001, -0.038, 0.510]` m (position stable).
+  - Commande servo release opérationnelle : `ros2 topic pub --once /to_robot std_msgs/msg/String 'data: "stop"'`.
+- **`aruco_localizer_node`** : mis à jour avec les vrais IDs et tailles mesurées
+  (IDs 19/25/23/26, 25 mm) et chargement positions depuis `workspace_markers.yaml`.
+- **`joint_sync.py`** : parsing d'angles refactorisé — accepte `ANGLES:`, `angles:`,
+  `angles_ok:` ; ignore les réponses d'erreur `-1`.
+- **Nodes caméra** : `orbbec_camera_publisher`, `camera_live_view`, `camera_web_view`
+  ajoutés + enregistrés dans `setup.py`.
+- **`calibrate_extrinsic_node`** : nœud d'étalonnage extrinsèque caméra (PnP 4 marqueurs sol).
+- **`reach_target_aruco_node`** : nœud de déplacement vers cible ArUco.
+- **`bridge_tour.py`** : IP par défaut `.225` → `.221` ; logs send/recv passés en `debug`.
+- **Calibration sauvegardée** : `training/calibration/camera_extrinsic.yaml` + `workspace_markers.yaml`.
+
+### Décisions prises
+
+- Pi réelle confirmée à `10.10.0.221` (mettre à jour CLAUDE.md séparément).
+- `aruco_detect_scale = 1.6` pas de callback live → redémarrer le nœud pour changer.
+- Marqueur ID 20 (3 cm) à 51 cm détectable mais instable (~50 % des frames) :
+  cause probable = éclairage rasant ou légère inclinaison. Pas bloquant pour le balayage.
+
+### Prochaines actions
+
+1. [ROUGE] Lancer le balayage auto (`a`) avec le marqueur stable face caméra — collecter ≥ 20 échantillons.
+2. [ROUGE] Lancer `s` pour résoudre et sauvegarder `hand_eye_calibration.yaml`.
+3. [JAUNE] Valider la calibration : envoyer une pose connue, comparer position prédite vs réelle.
+4. [VERT] Commiter `scripts/real_robot_preflight.sh` (IP `.221`) sur `feature/teleoperation`.
+5. [VERT] Mettre à jour `CLAUDE.md` : Pi IP `10.10.0.223` → `10.10.0.221`.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate && source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+# Terminal 1 — bridge
+ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
+# Terminal 2 — nœud hand-eye (log vers fichier pour surveillance)
+ros2 run mycobot_gateway calibrate_hand_eye_node \
+  --ros-args -p aruco_detect_scale:=2.5 -p marker_size:=0.03 -p marker_id:=20 \
+  2>&1 | tee /tmp/handeye.log
+# Surveiller
+tail -f /tmp/handeye.log | grep -E "VISIBLE|hors champ|Capture|Balayage"
+```
+
+---
+
+## Handoff pick-and-place (a lire en premier pour la prochaine session)
+
+- Handoff detaille du 4 juin 2026 : [`docs/PICK_AND_PLACE_HANDOFF_2026-06-04.md`](docs/PICK_AND_PLACE_HANDOFF_2026-06-04.md)
+- Handoff detaille du 3 juin 2026 : [`docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md`](docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md)
+- Contient :
+  - ce qui a ete implemente aujourd'hui (sim + reel),
+  - l'etat exact de validation,
+  - les commandes de reprise,
+  - le plan de test onsite avec interfaces graphiques.
+
+### Ce qui a été accompli
+
+**Le maillon faible de la chaîne est identifié, et ce n'est pas le bras.**
+
+Validation de l'extrinsèque par leave-one-out, sans recalibrer : on ajuste la
+pose caméra sur une partie des marqueurs, on prédit un marqueur jamais vu.
+
+| ajustement | redondance | erreur au point non vu |
+|---|---|---|
+| 4 centres | 2 ddl | inexploitable (le système s'effondre) |
+| 16 coins | 26 ddl | **5,46 mm** en moyenne, 12,25 mm au pire |
+
+Le fichier de calibration annonce `erreur_sol_rms_mm: 0.594` — c'est un
+**résidu d'ajustement**, pas une justesse. La vraie erreur est **9× plus
+grande**, et du même ordre que le biais de sens d'approche (5,9 mm).
+
+Cause probable : les positions des marqueurs viennent d'un relevé au mètre
+ruban dont `workspace_markers.yaml` borne l'erreur à ±5 mm. On ne peut pas être
+plus juste que sa référence.
+
+**Document de méthodologie** :
+[`METHODOLOGIE_PRECISION.md`](training/calibration/METHODOLOGIE_PRECISION.md) —
+ce que `FK(q_lu)` mesure, ISO 9283, les 7 types d'essai, quand une référence
+externe est nécessaire.
+
+### Décisions prises
+
+- **Jamais d'ArUco sur la pince** : le montage n'est pas stable, l'hypothèse de
+  transformation rigide constante tombe. Le hand-eye du 10/07 est abandonné
+  (résidu 24,4 mm ; 20 poses sur 22 sous le seuil de 30 px du code).
+- La répétabilité est donnée en **RP ISO 9283**, jamais en écart max.
+- On ne recalibre pas : la validation évalue, elle n'écrase rien.
+
+### Prochaines actions
+
+1. [ROUGE] Re-relever les positions des 4 marqueurs de planche au pied à
+   coulisse ou par ajustement conjoint des deux caméras (±0,3 mm comme déjà
+   fait pour le 19). C'est ce qui plafonne toute la chaîne à ~5 mm.
+2. [ROUGE] Passer l'extrinsèque de production aux **16 coins** au lieu des
+   4 centres — 26 degrés de liberté de redondance au lieu de 2.
+3. [JAUNE] Chiffrer la **précision globale en boucle fermée** (essai 7) :
+   `P_vision`, `P_atteint`, correction, itérations, statut pince sur ~30
+   tentatives. Aucune métrologie externe requise.
+4. [JAUNE] Comparateur numérique (~60 €) pour transformer les bornes
+   inférieures de répétabilité en vraies valeurs.
+5. [VERT] Vérifier le tag de 100 mm au pied à coulisse.
+
+### Commande rapide de reprise
+
+```bash
+cd /home/genji/Osama_ws/src/mycobot_R6A
+python3 -c "import socket; s=socket.create_connection(('10.10.0.219',5005),timeout=8); \
+s.sendall(b'{\"action\": \"get_angles\"}\n'); print(s.makefile().readline())"
+# TOUJOURS exécuter avant ROS2
+conda deactivate
+
+source /opt/ros/jazzy/setup.bash
+source ~/ros_jazzy/install/setup.bash
+```
+
+---
+
+## État actuel (3 juin 2026 — nuit — pick-and-place Gazebo visual debug)
+
+### Ce qui a été accompli (session de débogage visuel Gazebo)
+
+- **Ouverture GUI Gazebo** : modifié `pick_and_place_aruco.launch.py` pour retirer le flag `-s` (server-only)
+  et activer l'affichage graphique via `DISPLAY=:1`.
+- **Marqueurs ArUco texturés** :
+  - Généré 5 PNG ArUco DICT_4X4_1000 (IDs 0,1,2,3,10) via OpenCV, stockés dans
+    `mycobot_description/worlds/textures/` et `materials/textures/`.
+  - Remplacé les cubes colorés génériques dans `precision_benchmark.sdf` par des
+    dalles 10×10 cm avec texture PBR (`albedo_map`) portant les vrais patterns ArUco.
+  - Cube cible rouge conservé + face supérieure avec texture ArUco ID 10.
+- **Correction tremblement HOME** :
+  - `HOME_ANGLES` dans `pick_and_place_aruco_node.py` : `[0,0,0,0,0,0]` → `[0,-0.8,1.4,-0.8,0,0]` rad
+    (position stable au-dessus du workspace, évite l'instabilité gravitationnelle).
+  - URDF `mycobot_pro_320_pi_benchmark.urdf` : `initial_value` des joints 2/3/4 mis
+    à jour pour correspondre, évitant le tremblement avant la première commande.
+- **Correction suivi cube pendant transport** :
+  - Ajout de `_gripper_base_world()` : calcule la position de `gripper_base` en frame
+    monde via la chaîne FK complète + transform fixe `joint6output_to_gripper_base`.
+  - `_do_grasp()` et SETTLING-carrying utilisent maintenant `gripper_base_world` au lieu
+    de `ee_pos + 0.02` (le cube ne flotte plus au-dessus du bras).
+  - **Limite connue** : l'IK ne contraint pas l'orientation ; la pince pointe latéralement
+    (~5 cm en Y) à la position de saisie. Fix complet = IK avec contrainte d'orientation.
+- CMakeLists.txt : `materials/` ajouté à l'install list.
+
+### Décisions prises
+
+- Textures ArUco stockées dans `worlds/textures/` (chemin relatif direct, sans `..`) :
+  Gazebo Harmonic ne résout pas `../` dans les `albedo_map` PBR.
+- `HOME_ANGLES` aligné avec `initial_value` URDF pour une initialisation stable.
+
+### Prochaines actions
+
+1. [ROUGE] IK avec contrainte d'orientation → pince pointe vers le bas au pick/place
+2. [JAUNE] Imprimer marqueurs ArUco réels + test sur banc avec caméra
+3. [VERT] `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
+
+### Commande rapide de reprise (sim avec GUI)
+
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+export DISPLAY=:1
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
+```
+
+---
+
+## État actuel (3 juin 2026 — soir — pick-and-place Gazebo validé)
+
+### Ce qui a été accompli aujourd'hui
+
+- Scaffoldé l'orchestrateur FSM `pick_and_place_aruco_node.py` (10 segments,
+  modes `sim` / `real`, IK numérique, interface `/aruco/object_pose` unifiée)
+- Créé les deux launch files (`pick_and_place_aruco.launch.py` et `_real.launch.py`)
+- Corrigé `KeyError: 'angles'` (FSM lisait le mauvais segment via index déjà incrémenté)
+- **Cycle pick-and-place Gazebo complet validé** : home → approach_pick → grasp_pos
+  → GRASP (gz set_pose) → lift → approach_place → place_pos → RELEASE → retreat
+  → home_end → DONE, IK 0.0 mm d'erreur sur chaque waypoint
+
+### Décisions prises
+
+- Interface commune `gz_sim_localizer` (sim) / `aruco_localizer` (réel) → nœud
+  orchestrateur identique en sim et sur robot
+- `self._current_seg` stocké avant transition MOVING pour éviter off-by-one sur l'index
+
+### Prochaines actions
+
+1. [ROUGE] Imprimer marqueurs ArUco (4 workspace IDs 0-3, 50 mm + 1 objet ID 10, 40 mm)
+2. [JAUNE] `bash scripts/real_robot_preflight.sh` + bridge Pi actif sur 10.10.0.223
+3. [VERT] `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+source /opt/ros/jazzy/setup.bash && source ~/ros_jazzy/install/setup.bash
+
+# Simulation (validation déjà passée)
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
+
+# Robot réel (prérequis ci-dessus)
+ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
+```
+
+---
+
+## État actuel (3 juin 2026 — pick-and-place ArUco scaffoldé)
+
+### 🧭 Prochaine action prioritaire
+
+**Valider le pick-and-place en Gazebo :** ✅ validé (voir entrée du soir)
+
+**Ensuite — robot réel (prérequis) :**
+1. Imprimer les 5 marqueurs ArUco (4 workspace IDs 0-3 + 1 objet ID 10)
+2. `bash scripts/real_robot_preflight.sh`
+3. `ssh er@10.10.0.223 'python3 bridge_pi_simple.py'`
+4. `ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py`
+
+---
+
+## État actuel (28 avril 2026 — soir)
+
+### Ce qui a été accompli
+
+**Le test interrompu a été mené à son terme** : 4 directions × 10 retours,
+40 approches, aucun échec, bras reparqué en pose d'observation.
+
+| direction | RP ISO 9283 | états distincts | Z du barycentre |
+|---|---|---|---|
+| arrière | 0,000 mm | 1 | 42,655 |
+| droite | 0,186 mm | 2 | 46,619 |
+| avant | 0,794 mm | 4 | 44,400 |
+| gauche | 0,838 mm | 3 | 42,992 |
+
+**Trois conclusions du rapport ont dû être corrigées** :
+
+1. « Le robot tient sa spécification » → **faux**. Trois séries sur six
+   dépassent les ±0,5 mm une fois jugées en RP ISO 9283 et non en écart max.
+2. « On mesure la répétabilité du relevé codeur, quantifié » → **faux**. Le
+   plancher vaut 0,099 mm ; les dispersions sont 2 à 8× au-dessus.
+3. « Dégradation presque entièrement verticale » → **surestimé**. L'étalement
+   se répartit X 3,06 · Y 3,15 · Z 3,96 mm.
+
+**Le résultat le plus solide de la campagne** reste le biais de sens
+d'approche : 5,918 mm ici, 5,847 mm ce matin, 5,88 mm le 20/08 — trois
+protocoles indépendants à 0,07 mm près.
+
+### Décisions prises
+
+- Retrait du test fixé à **40 mm** et non 50 : à 50 mm le départ « avant »
+  plaçait le bras à J3 = −0,58°, résidu IK 0,611 mm. On aurait mesuré la
+  singularité, pas le sens d'approche.
+- La répétabilité est désormais toujours donnée en **RP ISO 9283**.
+- Les séries *sous* la spec ne sont plus présentées comme une validation : la
+  mesure étant une borne inférieure, seules les séries *au-dessus* informent.
+
+### Prochaines actions
+
+1. [ROUGE] Rejouer la prise du scotch outil incliné avec `ctx.classe_objet`
+   correctement armé, pour voir si `Z_PRISE_PAR_CLASSE['scotch'][1] = 35,9`
+   suffit ou doit descendre vers les ~8 mm qui saisissent réellement.
+2. [JAUNE] Mesurer l'affaissement à **trois allonges** pour trancher si
+   `d = L × θ` est prédictif (14,8 mm mesurés à 332 mm contre 13 mm modélisés
+   à 390 mm).
+3. [VERT] Reprendre la répétabilité avec un moyen de mesure **externe** si l'on
+   veut réellement statuer sur les ±0,5 mm.
+
+### Commande rapide de reprise
+
+```bash
+cd /home/genji/Osama_ws/src/mycobot_R6A
+python3 -c "import json,socket; s=socket.create_connection(('10.10.0.219',5005),timeout=8); \
+s.sendall(b'{\"action\": \"get_angles\"}\n'); print(s.makefile().readline())"
+```
+
+---
+

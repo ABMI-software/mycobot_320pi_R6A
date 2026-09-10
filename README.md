@@ -2,18 +2,12 @@
 
 **Plateforme de recherche pour le MyCobot 320 Pi 6-DoF — substrat d'un POC ABMI digital-twin / VLA / AI-physics**
 
-Ce projet intègre :
-- Un **bridge ROS2 TCP** pour contrôler un MyCobot 320 Pi depuis un PC distant
-- Une **simulation Gazebo Harmonic** avec gripper adaptatif, 4 caméras et domain randomization
-- Un **pipeline ML DREAM** : keypoint detection (VGG-19) → belief maps → PnP → pose 3D, avec un **dashboard de validation multi-caméras** (Arducam + SVPRO, auto-détection 1 ou 2 vues, fusion *solve-then-fuse* par joint) — `ros2 launch mycobot_gateway dream_multicam.launch.py`. Voir [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md) et [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md)
-- Une **téléopération par la main** (Wilor + Orbbec Astra) avec dashboard de tuning et rapport Excel — adapté du pipeline R5A / LeRobot. **Pipeline validé sur robot physique le 22/04/2026**
-- Des **datasets** synthétiques (Gazebo, 50K frames) et réels (caméras Pi, 4K images) via Git LFS
 Ce dépôt intègre :
-- Un **bridge ROS2 TCP** Tour ↔ Raspberry Pi pour contrôler le robot physique (`10.10.0.223`)
+- Un **bridge ROS2 TCP** Tour ↔ Raspberry Pi pour contrôler le robot physique (`10.10.0.221`)
 - Un **digital twin Gazebo Harmonic** : URDF + gripper adaptatif + 4 caméras + worlds randomisés
-- Un **pipeline DREAM** (NVlabs) de pose-estimation par keypoints : VGG-19 → belief maps → PnP → pose 6-DoF
+- Un **pipeline DREAM** (NVlabs) de pose-estimation par keypoints : VGG-19 → belief maps → PnP → pose 6-DoF, écart sim-to-real **fermé côté détection** (27% → 91.6% sur réel), avec un **dashboard de validation multi-caméras** (Arducam + SVPRO, auto-détection 1 ou 2 vues, fusion *solve-then-fuse* par joint) — `ros2 launch mycobot_gateway dream_multicam.launch.py`. Voir [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md) et [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md)
 - Une **téléopération par la main** (Astra → Wilor → rosbridge → JTC) avec dashboard ABMI 3-onglets et performance analyzer Excel — *validée sur robot physique le 22/04/2026*
-- Un **pipeline pick-and-place + sorting 4 couleurs** en simulation (`pick_and_place.launch.py`, `sorting_orchestrator`)
+- Un **pipeline pick-and-place + sorting 4 couleurs** en simulation (`pick_and_place.launch.py`, `sorting_orchestrator`) — *testé end-to-end le 23/04/2026*
 - Une **calibration intrinsèque ChArUco** des caméras (cam_0, cam_3, Astra) avec auto-save et rejet d'outliers — *cam_0 + cam_3 mesurées le 28/04/2026*
 - Des **datasets** Git LFS : 50 K synth (Gazebo, randomized v1/v2) + 4 K réels (Arducam Pi cam_0/cam_3)
 
@@ -230,20 +224,22 @@ Le projet utilise **deux approches** de pose estimation, la seconde (DREAM) éta
 ═══════════════════════════════════════════════════════════════
   Image → VGG-19 → 7 belief maps → keypoints 2D → PnP → pose
 
-  VGG synth-only 20K : 97% det synth, 3.1px médiane ✅
-  VGG synth-only 50K (v4, 2026-07-06) : 99.4% det synth, 2.61px ✅
-  Fine-tune custom (σ=4 / σ=2)  : ❌ deux échecs documentés (abandonné, voir plus bas)
-  VGG mix fine-tune (v4_mix_ft_e30, 2026-07-08) :
+  VGG synth-only 20K (03-15/04) : 97% det synth, 3.1px médiane ✅ / ~26% det réel ❌
+  VGG weighted 50K (15/04) : 98.3% det synth, 3.15px ✅ / gap réel majeur ❌
+  Fine-tune custom (σ=4 / σ=2, 15-16/04) : ❌ deux échecs documentés (abandonné)
+  VGG mixte 18K, 10K réel ×5 + 8K synth (16-28/04) :
+        synth val : 91.9% det, 2.72px médiane (régression -6.4 pts vs synth-only, contrôlée)
+        réel all  : 47.3% det, 2.78px médiane proximaux (+21 pts vs synth-only)
+        bottleneck restant : link4-6 sur réel (link6 à 3.0% / 61.6 px médiane)
+  Relaxed thresholding (peak=0.001) : ❌ +0.7 pt det mais médianes explosées (peaks low-conf = bruit)
+  Calibration intrinsèque cam_0/cam_3 (28/04) : ✅ RMS 0.67/0.68 px — révèle un fx/fy dataset faux de ~14%
+
+  VGG synth-only 50K v4 (2026-07-06) : 99.4% det synth, 2.61px ✅ — record
+  VGG mix fine-tune v4_mix_ft_e30 (2026-07-08) :
         50K synth + 6K réel ×5 oversampling → ~80K frames
         99.4% det synth (pas de régression) / 91.6% det réel ✅
-        → écart sim-to-real fermé (27% → 91.6%)
-  VGG synth-only 50K : 98.3% det synth, 3.15px ✅ / 26% det réel ❌
-  VGG mixte 18K (10K réel ×5 + 8K synth, 50 epochs) :
-        synth val : 91.9% det, 2.72px médiane ✅ (régression -6.4 pts vs synth-only, contrôlée)
-        réel all  : 47.3% det, 2.78px médiane proximaux ✅✅ (+21 pts vs synth-only)
-        bottleneck restant : link4-6 sur réel (link6 à 3.0% / 61.6 px médiane)
-  Fine-tune custom (σ=4 / σ=2)  : ❌ deux échecs documentés
-  Relaxed thresholding (peak=0.001) : ❌ +0.7 pt det mais médianes explosées (peaks low-conf = bruit)
+        → écart sim-to-real DÉTECTION fermé (27% → 91.6%)
+  Reste ouvert : écart ANGULAIRE J1-J6 (détection ≠ angle), voir "Pistes pour la suite"
 ```
 
 ### Approche DREAM (active)
@@ -262,20 +258,16 @@ Image 640×480 → VGG-19 → 6 stages cascadés → 7 belief maps 100×100
 
 | Modèle | Dataset entraînement | Eval synth | Eval réel | Notes |
 |--------|----------------------|------------|-----------|-------|
-| VGG base (synth-only) | 20K synth (5K poses × 4 vues) | 97% det · 3.1 px | ~26% det | val=0.000438, baseline DREAM |
-| VGG augmenté (synth-only) | 20K synth + augmentation aggressive | 97% det · 3.1 px | 22.9 → 25.7% det | val=0.000667, gain marginal |
-| VGG weighted (50K synth) | 50K synth + loss pondérée par keypoint | 98.3% det · 3.15 px | 13.2% det · 172 px | meilleure perf synth (ancien), gap sim-to-real majeur |
-| VGG fine-tune v1 (σ=4) | 2K réel, single-stage | — | 0% det | ❌ pics belief écrasés, modèle mort |
-| VGG fine-tune v2 (σ=2) | 2K réel, MSE direct | — | 0% det | ❌ belief maps effondrées (max ≈ 0) |
+| VGG base (synth-only, 03/04) | 20K synth (5K poses × 4 vues) | 97% det · 3.1 px | ~26% det | val=0.000438, baseline DREAM |
+| VGG augmenté (synth-only, 03/04) | 20K synth + augmentation agressive | 97% det · 3.1 px | 22.9 → 25.7% det | val=0.000667, gain marginal |
+| VGG weighted (50K synth, 15/04) | 50K synth + loss pondérée par keypoint | 98.3% det · 3.15 px | ⚠️ **13.2% det · 172 px** ou **26% det · 128 px** selon la source (chiffres contradictoires dans l'historique du dépôt, non vérifiés) | meilleure perf synth de l'époque, gap sim-to-real majeur dans tous les cas |
+| VGG fine-tune v1 (σ=4, 15/04) | 2K réel, single-stage | — | 0% det | ❌ pics belief écrasés, modèle mort |
+| VGG fine-tune v2 (σ=2, 16/04) | 2K réel, MSE direct | — | 0% det | ❌ belief maps effondrées (max ≈ 0) |
+| **VGG mixte v1** (DREAM natif, e50, 16/04) | **18K = 2K cam0 ×5 + 8K synth, 50 epochs** | **91.9% det · 2.72 px** | **47.3% det · 2.78 px (proximaux)** | ✅ **+21 pts réel** vs synth-only, régression contrôlée -6.4 pts sur synth |
+| └─ relaxed (peak_thresh=0.001, 28/04) | (même checkpoint, threshold abaissé) | — | 48.0% det · base 328 px ⚠️ | ❌ peaks low-conf = bruit, hypothèse réfutée |
+| **VGG mixte v2** (cam0 + cam3, e25, 28/04) | **18K = 2K cam0 ×3 + 2K cam3 ×3 + 6K synth** | 93.1% det · 2.93 px | cam0: **40.2%** (-7.1 pts) · cam3: **35.1%** (+10 pts vs eval croisée v1) | 🟰 trade-off cam0↔cam3, extrinsèques cam3 approximatives load-bearing → calibration nécessaire |
 | **vgg_ultimate_v4_e50** (2026-07-06) | 50K synth v3 (intrinsèques corrigées, filtre capsule) | **99.4% det · 2.61 px** (13920/14000) | ≈27% det | Record synthétique — voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](training/dream/VGG_ULTIMATE_V4_50K.md) |
-| **vgg_ultimate_v4_mix_ft_e30** (2026-07-08) | 50K synth + 6K réel (real_3cam) ×5 oversampling → ~80K | 99.4% det (pas de régression) | **91.6% det · 2.91 px médiane** (9618/10500, 1500 frames jamais vues, 3 caméras) | **Écart sim-to-real fermé** — voir [`training/dream/README.md`](training/dream/README.md#fine-tune-mixte-réel-real_3cam-×5-oversampling--2026-07-03--2026-07-08) |
-| VGG augmenté (synth-only) | 20K synth + augmentation agressive | 97% det · 3.1 px | 22.9 → 25.7% det | val=0.000667, gain marginal |
-| VGG weighted (50K synth) | 50K synth + loss pondérée par keypoint | **98.3% det · 3.15 px** | **26% det · 128 px** | meilleur perf synth, gap sim-to-real majeur |
-| VGG fine-tune v1 (σ=4) | 2K réel, single-stage | — | **0% det** | ❌ pics belief écrasés, modèle mort |
-| VGG fine-tune v2 (σ=2) | 2K réel, MSE direct | — | **0% det** | ❌ belief maps effondrées (max ≈ 0) |
-| **VGG mixte v1 (DREAM natif, e50)** | **18K = 2K cam0 ×5 + 8K synth, 50 epochs** | **91.9% det · 2.72 px** | **47.3% det · 2.78 px (proximaux)** | ✅ **+21 pts réel** vs synth-only, régression contrôlée -6.4 pts sur synth |
-| └─ relaxed (peak_thresh=0.001) | (même checkpoint, threshold abaissé) | — | 48.0% det · base 328 px ⚠️ | ❌ peaks low-conf = bruit, hypothèse réfutée |
-| **VGG mixte v2 (cam0 + cam3, e25)** | **18K = 2K cam0 ×3 + 2K cam3 ×3 + 6K synth** | 93.1% det · 2.93 px | cam0: **40.2%** (-7.1 pts) · cam3: **35.1%** (+10 pts vs eval croisée v1) | 🟰 trade-off cam0↔cam3, extrinsèques cam3 approximatives load-bearing → calibration nécessaire |
+| **vgg_ultimate_v4_mix_ft_e30** (2026-07-08) | 50K synth + 6K réel (real_3cam) ×5 oversampling → ~80K | 99.4% det (pas de régression) | **91.6% det · 2.91 px médiane** (9618/10500, 1500 frames jamais vues, 3 caméras) | **Checkpoint actif — écart sim-to-real détection fermé** — voir [`training/dream/README.md`](training/dream/README.md#fine-tune-mixte-réel-real_3cam-×5-oversampling--2026-07-03--2026-07-08) |
 
 **Détail eval mixte e50 sur réel par keypoint** (28/04/2026, 500 frames de `real_cam0`) :
 
@@ -354,40 +346,10 @@ Précision par seuil : 35.1% <2px · 54.4% <5px · 64.8% <10px · 78.6% <20px ·
 
 ### Pistes pour la suite
 
-L'écart sim-to-real est fermé (27% → 91.6%). Direction actuelle (voir `CHANGELOG.md` [1.13.0]) :
-| Dataset mixte 18K créé (2K×5 + 8K) | 16/04/2026 | ✅ |
-| Training mixte natif 50 epochs | 16/04/2026 | ✅ checkpoint sauvegardé |
-| Resume training e25→e50 (option 1) | 23/04/2026 | ⚠️ détection inchangée 47.3 %, val loss plafond |
-| **Eval finale (a) strict réel** | 28/04/2026 | ✅ 47.3 % confirmé |
-| **Eval finale (b) strict synth val** | 28/04/2026 | ✅ 91.9 % — régression -6.4 pts contrôlée |
-| **Eval finale (c) relaxed réel** | 28/04/2026 | ❌ 48.0 % mais médianes explosées |
-| Eval croisée v1 sur cam3 (extr. approx.) | 28/04/2026 PM | ⚠️ 25.1 % / 237 px — zéro cross-view generalization |
-| Convert cam3 → NDDS (extr. approx.) | 28/04/2026 PM | ✅ 2000 frames |
-| Build `mixed_v2_cam03` (cam0 + cam3 + synth) | 28/04/2026 PM | ✅ 18K symlinks |
-| Retrain v2 25 epochs sur mixed_v2_cam03 | 28/04/2026 PM | ✅ 2h35, val=0.000356 |
-| Eval v2 cam0 / cam3 / synth | 28/04/2026 PM | 🟰 cam0 -7.1 pts, cam3 +10 pts, synth +1.2 pts |
-| **Calibration intrinsèque cam_0 + cam_3** (ChArUco) | 28/04/2026 soir | ✅ cam_0 RMS 0.67 px / cam_3 RMS 0.68 px — voir [docs/CAMERA_CALIBRATION.md](docs/CAMERA_CALIBRATION.md) |
-| **Finding K dataset DREAM** | 28/04/2026 soir | ❌ `fx=fy=610` du `_camera_settings.json` faux de ~14 % vs caméras physiques (cam_0: fx=525.67) — cause probable du gap distal |
-
-### Pistes pour la suite
-
-> Mise à jour 28/04/2026 (PM) : test cheap cam0+cam3 fait. Verdict = **calibrer cam3 avant tout retrain v3**. Sans calibration on échange perf cam0 contre perf cam3 sans gain global.
->
-> Mise à jour 28/04/2026 (soir) : **points 1 + 2 faits** sur la branche `feature/calibration-cam`. cam_0 mesurée à fx=525.67 fy=529.70 cx=317.73 cy=226.00 (RMS 0.67 px) ; cam_3 mesurée à fx=496.31 fy=494.14 cx=313.37 cy=248.01 (RMS 0.68 px). Le `fx=fy=610` du `_camera_settings.json` du dataset DREAM est **faux de ~14 %** par rapport aux deux Arducams physiques — c'est probablement la cause majeure du gap distal observé en 1.11.0/1.12.0. Voir [`docs/CAMERA_CALIBRATION.md`](docs/CAMERA_CALIBRATION.md). Astra **différée** (logistique : board jamais dans le frame, FOV trop large, capteur RGB trop "soft" pour les patterns 4×4 — à refaire avec setup mural fixe).
-
-1. ~~**🔴 Calibrer cam3**~~ ✅ fait — `training/calibration/cam_3.{npz, meta.json}` (RMS 0.68 px, 21 vues).
-2. ~~**🔴 Calibrer cam0**~~ ✅ fait — `training/calibration/cam_0.{npz, meta.json}` (RMS 0.67 px, 18 vues). **Confirmé** : `fx=610` du dataset est faux.
-3. **🔴 Refactor `training/dream/convert_to_ndds.py`** : `REAL_CAMERA_INTRINSICS` devient un dict par-cam, `REAL_CAMERA_TRANSFORMS["cam3"]` mis à jour avec les valeurs calibrées.
-4. **🔴 Régénérer `real_cam0_v3` + `real_cam3_v3`** + build `mixed_v3` (18K même structure que v2).
-5. **🔴 Retrain v3 50 epochs** (vs 25 en v2 — la val loss n'avait pas plateauté). **Cible** : ≥ 50 % cam0 + ≥ 50 % cam3 simultanément.
-6. **🟡 Si v3 < 50 % per-cam** → revenir à l'option historique : capture poses bras-étendu sur `cam0` (`|j2| < 30°` + `j3 ∈ [60°, 110°]`), retrain v4.
-7. **🟡 Vérifier collecte 30K synth v2** dans `/tmp/dream_data/synthetic_50k_v2/` (worlds `randomized_v2.sdf`).
-8. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — Isaac Sim + Isaac Lab pour rendu photoréaliste, devrait fermer le gap sim-to-real à la racine plutôt que par oversampling.
-9. **🟢 Tester l'inférence DREAM en sim Gazebo** (`pick_and_place.launch.py`) avec le checkpoint **v1** (toujours le meilleur sur cam0).
-10. **🟢 Bench pose-driven pick-and-place sur robot réel** une fois la détection ≥ 70 %.
+L'écart sim-to-real **détection** est fermé (27% → 91.6%, voir `CHANGELOG.md` [1.13.0]). Ce qui reste ouvert :
 
 1. **🔴 Pose estimation eye-to-hand + courbe d'écart par joint** — caméra fixe devant le bras, DREAM → angles articulaires (reprojection-min sur `mycobot_fk.py`/`mycobot_ik.py`) → comparaison angles estimés vs encodeurs réels. Outillage en place (`training/dream/estimate_angles_from_keypoints.py`, `plot_angle_error_curve.py`), calibration extrinsèque `T_base_camera` de la caméra fixe (astra) en cours.
-2. **🟡 Fermer l'écart angulaire J1-J6** — le detection gap est fermé mais l'angle gap ne l'est pas (cible José : 0.5-0.9°, mesuré 10-20× ça). J6 structurellement non-observable (aucun keypoint ne dépend de sa rotation), J5 faiblement observable — nécessite une 2e caméra ou un keypoint supplémentaire en aval de J6. Voir `CLAUDE.md` § DREAM pose-estimation — validation status.
+2. **🟡 Fermer l'écart angulaire J1-J6** — le gap de détection est fermé mais le gap angulaire ne l'est pas (cible José : 0.5-0.9°, mesuré 10-20× ça). J6 structurellement non-observable (aucun keypoint ne dépend de sa rotation), J5 faiblement observable — nécessite une 2e caméra ou un keypoint supplémentaire en aval de J6. Voir `CLAUDE.md` § DREAM pose-estimation — validation status.
 3. **🟢 Visual servoing** — une fois la courbe d'écart par joint validée, boucler la pose DREAM dans le contrôle pour le pick-and-place.
 4. **🟡 Re-training Isaac Sim** (cf. [`POC direction`](CLAUDE.md) §1) — substitution de Gazebo par Isaac Sim + Isaac Lab pour rendu photoréaliste, piste de fond pour la suite du POC.
 

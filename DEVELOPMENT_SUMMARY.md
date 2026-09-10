@@ -3,7 +3,7 @@
 > **Date de dernière mise à jour:** 24 août 2026
 > **Version:** 2.1.0
 > **Repository GitHub:** https://github.com/ABMI-software/mycobot_320pi_R6A
-> **Branche:** `feature/pick-and-place-osama`
+> **Branche:** `main` (pick-and-place + DREAM mergés via PR #9 le 09/09/2026)
 
 ---
 
@@ -434,7 +434,7 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 - [ ] Fermer l'écart **angulaire** J1-J6 (le gap de détection est fermé, pas l'angle : cible 0.5-0.9°, mesuré 10-20× ça — J6 structurellement non-observable, J5 faiblement observable)
 - [x] **Évaluation finale du modèle mixte** sur réel + synth + relaxed (28/04/2026) — voir [`CHANGELOG.md` § 1.12.0](CHANGELOG.md). Verdict : 47.3 % réel / 91.9 % synth, distal keypoints (link4-6) = bottleneck restant.
 - [x] **Test cheap d'ajout cam3** dans le mix (extrinsèques approximatives, 25 epochs) — voir [`CHANGELOG.md` § 1.13.0](CHANGELOG.md). Verdict : trade-off cam0↔cam3 sans gain net, calibration cam3 nécessaire.
-- [ ] **Calibrer cam0 + cam3** (chessboard OpenCV) puis retrain v3 — étape suivante
+- [x] **Calibrer cam0 + cam3** (ChArUco) — `training/calibration/cam_0.npz` (RMS 0.67 px) / `cam_3.npz` (RMS 0.68 px), 28/04/2026 — voir [`docs/CAMERA_CALIBRATION.md`](docs/CAMERA_CALIBRATION.md)
 - [ ] **Self-supervised labeling** : FK + caméra calibrée → annotations GT automatiques sur réel
 - [ ] Fine-tune sur données réelles auto-annotées
 
