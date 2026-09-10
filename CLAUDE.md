@@ -6,7 +6,7 @@
 
 ## Project in one paragraph
 
-A research platform built around a **MyCobot 320 Pi** 6-DoF arm. Today the repo covers (a) direct control via a ROS2/TCP bridge, (b) a Gazebo Harmonic digital twin with synthetic data collection, (c) a vision-based **pose-estimation** pipeline built on NVlabs' DREAM (VGG-19 → belief maps → PnP), and (d) a hand-teleoperation pipeline (Orbbec Astra → Wilor → rosbridge → joints) validated on the physical robot on 22/04/2026. The system runs split across a **PC Tour** (`10.10.0.115`) and a **Raspberry Pi** on the arm (`10.10.0.221` — not `.223` or `.225`, older docs are wrong).
+A research platform built around a **MyCobot 320 Pi** 6-DoF arm. Today the repo covers (a) direct control via a ROS2/TCP bridge, (b) a Gazebo Harmonic digital twin with synthetic data collection, (c) a vision-based **pose-estimation** pipeline built on NVlabs' DREAM (VGG-19 → belief maps → PnP), and (d) a hand-teleoperation pipeline (Orbbec Astra → Wilor → rosbridge → joints) validated on the physical robot on 22/04/2026. The system runs split across a **PC Tour** and a **Raspberry Pi** on the arm. **Neither address is fixed** — measured 2026-09-10: PC Tour **`10.10.0.111`**, Pi **`10.10.0.219`** (the Pi was `.218` on 07/09). Config files say `10.10.0.224`; that host answers `ping` **without necessarily serving the bridge**, so always identify the Pi by a **TCP round-trip on port 5005**, never by ping.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full diagram, [`SESSION_RESUME.md`](SESSION_RESUME.md) for where active work stands, and [`CHANGELOG.md`](CHANGELOG.md) for the version history.
 
@@ -108,6 +108,62 @@ joint_sync (/joint_states)  ·  bridge_tour (↔ Pi TCP 5005)                   
 
 ---
 
+## Gazebo — la réplique du banc réel (10/09/2026)
+
+`worlds/real_table.sdf` reproduit **le poste physique** et non une table
+générique : plateau **622 × 449 × 8,5 mm** aux dimensions mesurées, texture
+bois reconstruite depuis les photos du plan de travail, et les **quatre ArUco
+19 / 23 / 25 / 26 de 50 mm** aux positions relevées.
+
+```bash
+source install/setup.bash
+ros2 launch mycobot_gateway real_table.launch.py
+```
+
+`demo:=true` exécute un cycle de préhension du cube rouge.
+`robot_appearance:=realistic` donne base grise et coques blanc satiné —
+**visuel uniquement** : meshes, origines visuelles, articulations, collisions,
+inerties et paramètres de contrôleur sont partagés inchangés, le rendu
+d'entraînement d'origine reste le défaut.
+
+⚠ **`mycobot_description/CMakeLists.txt` doit installer `models/`.** Sans cette
+ligne les `package://mycobot_description/models/...` ne se résolvent pas et la
+scène se lance **sans bois ni marqueurs**, silencieusement.
+
+Détail : [`docs/GAZEBO_REAL_TABLE.md`](docs/GAZEBO_REAL_TABLE.md) · provenance
+de la texture : [`models/wood_table/README.md`](mycobot_description/models/wood_table/README.md).
+
+---
+
+## Précision — l'état du banc au 10/09/2026
+
+**La planche a bougé** : rotation **−1,750°**, translation **(18,8 · −6,5) mm**,
+mesuré sur les 4 marqueurs, résidu 0,39 mm, distances entre centres conservées
+à 0,14 %. **La caméra, elle, n'a pas bougé** — le trépied du fond n'a été
+déplacé que de 0,2 px dans l'image. Deux conséquences **opposées**, à ne pas
+confondre :
+
+- **`arducam_extrinsic_pick.yaml` reste VALABLE.** Le lien caméra ↔ base robot
+  est intact. **Ne pas la recalibrer** : la refaire contre des positions
+  nominales périmées y injecterait les 19 mm.
+- **`workspace_markers.yaml` est PÉRIMÉ.** Toute calibration qui s'appuie
+  dessus sera fausse de 12 à 28 mm selon le marqueur.
+
+**Les marqueurs font bien 50 mm.** Le −2,6 % qu'on mesure sur leurs côtés à
+l'image est un **biais de détection** lié à l'obliquité (r = −0,920), pas une
+erreur d'impression : les distances entre centres sont justes à −0,044 %. Une
+vraie erreur d'échelle frapperait les deux à l'identique. **Ne jamais corriger
+`marker_size_mm`** sur la foi d'une mesure optique.
+
+**Les extrinsèques ne valent que dans le plan de la table** (Z = 0) : tous les
+marqueurs d'étalonnage y sont. 1,92 mm en validation croisée deux caméras au
+sol, sans valeur à 17 cm de haut.
+
+Le protocole complet des treize essais, avec pour chacun sa norme, son mode
+opératoire, son résultat et ses supports :
+[`training/calibration/PROTOCOLE_ESSAIS_PRECISION.md`](training/calibration/PROTOCOLE_ESSAIS_PRECISION.md).
+
+
 ## Three Python environments — never mix them
 
 This is the single most common source of breakage. **Always know which env you are in.**
@@ -151,7 +207,8 @@ cd ~/ros_jazzy && colcon build --packages-select mycobot_gateway mycobot_descrip
 source install/setup.bash
 
 # Control a live robot (bridge must run on the Pi)
-ssh er@10.10.0.221        # Pi — start `python3 gripper_bridge.py` (voir avertissement ci-dessous)
+ssh er@10.10.0.224        # adresse non fixe : voir l'avertissement en tête de fichier
+                          # puis `python3 gripper_bridge.py` (voir avertissement ci-dessous)
 ros2 launch mycobot_gateway simple_gui.launch.py
 
 # Gazebo simulation
@@ -224,7 +281,7 @@ la connexion TCP est acceptée mais plus rien ne répond.
 
 ## Safety — real robot
 
-- Default IP is `10.10.0.221`. Always `ping` before launching anything that commands motion.
+- Config files say `10.10.0.224`, but **the Pi's address moves** (`.218` on 07/09, `.219` on 10/09). A successful `ping` proves nothing — `.224` answers it without serving the bridge. Confirm with a **TCP round-trip on port 5005** before launching anything that commands motion.
 - Run [`scripts/real_robot_preflight.sh`](scripts/real_robot_preflight.sh) before each physical session.
 - On `feature/teleoperation`: start every session with the `🐢 Safe start` preset (gains 0.6/0.6/0.6, tfs 0.3). Only go to `⚙️ Nominal` (1.2/1.2/1.6/0.25 — the validated default) once calibration is clean.
 - **Le robot a désormais une pince Pro adaptative** (`gripper_id=14`, ~1,6 s entre

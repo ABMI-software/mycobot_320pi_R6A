@@ -1,0 +1,309 @@
+<?xml version="1.0"?>
+<!-- Real worktop for MyCobot: 622 x 449 x 8.5 mm (user measurement 2026-09-09).
+     Robot base remains at world origin; X forward, Y left, Z up.
+     Board placement is inferred from calibration notes, not a new measurement.
+     ArUco black squares: 50 mm, DICT_4X4_50 (same IDs in DICT_4X4_1000).
+     Launch: ros2 launch mycobot_gateway real_table.launch.py
+-->
+<sdf version="1.9">
+  <world name="real_table">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics" />
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands" />
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster" />
+    <!-- The spawned MyCobot URDF loads the shared Sensors system. Loading a
+         second instance here creates two Ogre scenes and crashes rendering. -->
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+      <background>0.8 0.82 0.85 1</background>
+    </scene>
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.85 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.3 -0.9</direction>
+    </light>
+    <light type="directional" name="fill_light">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 8 0 0 0</pose>
+      <diffuse>0.4 0.4 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.5 -0.3 -0.7</direction>
+    </light>
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.55 0.55 0.52 1</ambient>
+            <diffuse>0.6 0.6 0.57 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <pose>0 0 -0.0085 0 0 0</pose>
+    </model>
+    <!--622 mm along X, 449 mm along Y, 8.5 mm thick. Top Z=0; near edge X=-50 mm.-->
+    <model name="table">
+      <static>true</static>
+      <pose>0.261 0.017 -0.00425 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <!-- Explicit UVs: the full wood image covers the board once,
+               with the grain running along its 622 mm length (+X). -->
+          <geometry>
+            <mesh>
+              <uri>package://mycobot_description/models/wood_table/meshes/tabletop.dae</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.08 0.08 0.08 1</specular>
+            <pbr>
+              <metal>
+                <albedo_map>package://mycobot_description/models/wood_table/materials/textures/wood_albedo.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>0.65</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.622 0.449 0.0085</size>
+            </box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.9</mu>
+                <mu2>0.9</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+    </model>
+    <!--Optional physical demo: red cube to red bin, both inside the measured board.-->
+    <model name="red_cube">
+      <pose>0.22 -0.08 0.020 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.04 0.04 0.04</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.7 0.05 0.05 1</ambient>
+            <diffuse>0.95 0.10 0.10 1</diffuse>
+            <specular>0.4 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.04 0.04 0.04</size>
+            </box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1.0</mu>
+                <mu2>1.0</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <inertial>
+          <mass>0.05</mass>
+          <inertia>
+            <ixx>1.33e-5</ixx>
+            <iyy>1.33e-5</iyy>
+            <izz>1.33e-5</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+    <model name="red_bin">
+      <static>true</static>
+      <pose>0.22 0.10 0 0 0 0</pose>
+      <link name="link">
+        <visual name="floor">
+          <pose>0 0 0.001 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.10 0.10 0.002</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.05 0.05 1</ambient>
+            <diffuse>0.85 0.10 0.10 1</diffuse>
+          </material>
+        </visual>
+        <visual name="wn">
+          <pose>0 0.05 0.015 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.10 0.005 0.03</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.05 0.05 1</ambient>
+            <diffuse>0.85 0.10 0.10 1</diffuse>
+          </material>
+        </visual>
+        <visual name="ws">
+          <pose>0 -0.05 0.015 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.10 0.005 0.03</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.05 0.05 1</ambient>
+            <diffuse>0.85 0.10 0.10 1</diffuse>
+          </material>
+        </visual>
+        <visual name="we">
+          <pose>0.05 0 0.015 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.005 0.10 0.03</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.05 0.05 1</ambient>
+            <diffuse>0.85 0.10 0.10 1</diffuse>
+          </material>
+        </visual>
+        <visual name="ww">
+          <pose>-0.05 0 0.015 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.005 0.10 0.03</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.05 0.05 1</ambient>
+            <diffuse>0.85 0.10 0.10 1</diffuse>
+          </material>
+        </visual>
+        <collision name="floor_c">
+          <pose>0 0 0.001 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.10 0.10 0.002</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="wn_c">
+          <pose>0 0.05 0.015 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.10 0.005 0.03</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="ws_c">
+          <pose>0 -0.05 0.015 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.10 0.005 0.03</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="we_c">
+          <pose>0.05 0 0.015 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.005 0.10 0.03</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="ww_c">
+          <pose>-0.05 0 0.015 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.005 0.10 0.03</size>
+            </box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+    <!--Centres: training/calibration/workspace_markers.yaml; orientations: arducam_extrinsic_servo.yaml.-->
+    <include>
+      <uri>package://mycobot_description/models/aruco_19</uri>
+      <name>aruco_19</name>
+      <pose>0.0968 0.2034 0 0 0 -1.549547177458</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/aruco_23</uri>
+      <name>aruco_23</name>
+      <pose>0.11 -0.179 0 0 0 -1.550472159638</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/aruco_25</uri>
+      <name>aruco_25</name>
+      <pose>0.535 0.215 0 0 0 -1.567821028086</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/aruco_26</uri>
+      <name>aruco_26</name>
+      <pose>0.53 -0.176 0 0 0 -0.053626108386</pose>
+    </include>
+    <!--Synthetic overhead camera; calibrated independently from the physical Arducam.-->
+    <model name="table_camera">
+      <static>true</static>
+      <pose>0.261 0.017 0.90 0 1.570796326794897 0</pose>
+      <link name="camera_link">
+        <sensor name="table_camera" type="camera">
+          <always_on>true</always_on>
+          <update_rate>10</update_rate>
+          <topic>/camera/image_raw</topic>
+          <camera>
+            <camera_info_topic>/camera/camera_info</camera_info_topic>
+            <horizontal_fov>1.05</horizontal_fov>
+            <image>
+              <width>1280</width>
+              <height>960</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.02</near>
+              <far>3.0</far>
+            </clip>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

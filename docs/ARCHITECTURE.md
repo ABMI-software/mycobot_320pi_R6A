@@ -49,7 +49,7 @@ intelligente combinant :
 │    │  /dev/ttyAMA0    │  │  cam0 + cam3     │                              │
 │    └────────┬─────────┘  └──────────────────┘                              │
 │             ▼                                                              │
-│    ┌──────────────────┐          RASPBERRY PI  (10.10.0.225)               │
+│    ┌──────────────────┐          RASPBERRY PI  (10.10.0.224)               │
 │    │  MyCobot 320 Pi  │          Ubuntu 20.04 / ROS2 Galactic              │
 │    └──────────────────┘                                                    │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -103,6 +103,8 @@ intelligente combinant :
 | Monde v2 | `worlds/randomized_v2.sdf` | 6 lumières, 12 objets clutter, 3 murs |
 | Monde pick-and-place | `worlds/pick_and_place.sdf` | Table + cube cible rouge + zone verte |
 | Monde sorting | `worlds/pick_and_place_sorting.sdf` | Table 1.0×0.6 m + 4 objets colorés (cube R/B, cylindre G, boîte Y) + 4 bacs colorés |
+| **Monde plateau réel** | `worlds/real_table.sdf` | Réplique mesurée du banc : plateau bois 622×449×8,5 mm texturé, ArUco 19/23/25/26 de 50 mm aux positions relevées, caméra de dessus, cube et bac |
+| **Modèles Gazebo** | `models/` | `wood_table/` (mesh + texture albédo du plan de travail) et `aruco_19|23|25|26/`. Installés par `CMakeLists.txt`, sans quoi `real_table.sdf` ne résout pas ses `package://` |
 | Config RViz | `config/mycobot_320_pi.rviz` | Préréglage visualisation |
 | Visuels caméra | `urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf` | 4 caméras stylisées (corps + objectif + LED) — visuellement distinctes des objets à trier |
 

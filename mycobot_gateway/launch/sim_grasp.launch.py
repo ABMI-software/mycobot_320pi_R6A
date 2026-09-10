@@ -17,6 +17,7 @@ grasp work:
 Usage:
   ros2 launch mycobot_gateway sim_grasp.launch.py
   ros2 launch mycobot_gateway sim_grasp.launch.py headless:=true
+  ros2 launch mycobot_gateway sim_grasp.launch.py robot_appearance:=realistic
 """
 
 import os
@@ -31,10 +32,9 @@ from launch.actions import (
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
-from launch.substitutions import Command
 
 
 WORLD_NAME = 'pick_and_place_sorting'
@@ -46,7 +46,9 @@ def generate_launch_description():
 
     urdf_path = os.path.join(
         desc_pkg, 'urdf', '320_pi', 'mycobot_pro_320_pi_gazebo.urdf')
-    world_path = os.path.join(desc_pkg, 'worlds', f'{WORLD_NAME}.sdf')
+    world_name = LaunchConfiguration('world_name')
+    world_path = PathJoinSubstitution(
+        [desc_pkg, 'worlds', [world_name, '.sdf']])
     controller_cfg = os.path.join(desc_pkg, 'config', 'controller.yaml')
 
     set_gz_resource = SetEnvironmentVariable(
@@ -58,10 +60,21 @@ def generate_launch_description():
     )
 
     headless_arg = DeclareLaunchArgument('headless', default_value='false')
+    world_arg = DeclareLaunchArgument(
+        'world_name', default_value=WORLD_NAME,
+        description='World name and SDF basename in mycobot_description/worlds')
+    camera_arg = DeclareLaunchArgument(
+        'bridge_camera', default_value='false',
+        description='Bridge /camera/image_raw and /camera/camera_info to ROS')
+    appearance_arg = DeclareLaunchArgument(
+        'robot_appearance', default_value='original',
+        choices=['original', 'realistic'],
+        description='Robot visual materials; kinematics and collisions are unchanged')
     headless = LaunchConfiguration('headless')
 
     robot_description = ParameterValue(
-        Command(['xacro ', urdf_path]), value_type=str)
+        Command(['xacro ', urdf_path, ' robot_appearance:=',
+                 LaunchConfiguration('robot_appearance')]), value_type=str)
     rsp = Node(
         package='robot_state_publisher', executable='robot_state_publisher',
         output='screen',
@@ -72,14 +85,14 @@ def generate_launch_description():
     gz_gui = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(gz_pkg, 'launch', 'gz_sim.launch.py')),
-        launch_arguments={'gz_args': f'-r {world_path}',
+        launch_arguments={'gz_args': ['-r ', world_path],
                           'on_exit_shutdown': 'true'}.items(),
         condition=UnlessCondition(headless),
     )
     gz_headless = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(gz_pkg, 'launch', 'gz_sim.launch.py')),
-        launch_arguments={'gz_args': f'-r -s --headless-rendering {world_path}',
+        launch_arguments={'gz_args': ['-r -s --headless-rendering ', world_path],
                           'on_exit_shutdown': 'true'}.items(),
         condition=IfCondition(headless),
     )
@@ -87,7 +100,7 @@ def generate_launch_description():
     spawn = Node(
         package='ros_gz_sim', executable='create', output='screen',
         arguments=['-topic', 'robot_description', '-name', 'mycobot_320',
-                   '-z', '0.0'],
+                   '-world', world_name, '-z', '0.0'],
     )
 
     # /clock is what makes use_sim_time work; dynamic_pose/info is how a grasp
@@ -96,12 +109,20 @@ def generate_launch_description():
         package='ros_gz_bridge', executable='parameter_bridge', output='screen',
         arguments=[
             '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
-            f'/world/{WORLD_NAME}/dynamic_pose/info'
-            '@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V',
+            ['/world/', world_name, '/dynamic_pose/info'
+             '@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V'],
         ],
         remappings=[
-            (f'/world/{WORLD_NAME}/dynamic_pose/info', '/gz/dynamic_poses'),
+            (['/world/', world_name, '/dynamic_pose/info'], '/gz/dynamic_poses'),
         ],
+    )
+    camera_bridge = Node(
+        package='ros_gz_bridge', executable='parameter_bridge', output='screen',
+        arguments=[
+            '/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+        ],
+        condition=IfCondition(LaunchConfiguration('bridge_camera')),
     )
 
     def spawner(name):
@@ -115,11 +136,15 @@ def generate_launch_description():
     return LaunchDescription([
         set_gz_resource,
         headless_arg,
+        world_arg,
+        camera_arg,
+        appearance_arg,
         rsp,
         gz_gui,
         gz_headless,
         spawn,
         gz_bridge,
+        camera_bridge,
         TimerAction(period=4.0, actions=[Node(
             package='controller_manager', executable='spawner',
             arguments=['joint_state_broadcaster',
