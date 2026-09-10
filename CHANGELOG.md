@@ -1681,7 +1681,7 @@ Calibration ChArUco des deux Arducams Pi (cam_0, cam_3) avec un nouvel outil `tr
 | cx | 320 | 317.73 | −0.7 % |
 | cy | 240 | 226.00 | **−5.8 %** |
 
-**Implication** : les `projected_location` GT du dataset ont été calculées avec un `fx=610` qui ne correspond à aucune caméra physique. Pour un point 3D à distance D, l'erreur sur le pixel projeté est ~14 % et **croît avec la distance au centre image**. Cohérent avec les link4-6 (loin du centre quand le bras est étendu) à 3-36 % de détection en 1.12.0. Le réseau a entraîné sur des GT erronés sur les distal — convergence impossible.
+**Implication** : les `projected_location` GT du dataset ont été calculées avec un `fx=610` qui ne correspond à aucune caméra physique. Pour un point 3D à distance D, l'erreur sur le pixel projeté est ~14 % et **croît avec la distance au centre image**. Cohérent avec les link4-6 (loin du centre quand le bras est étendu) à 3-36 % de détection en 1.12.0-pre. Le réseau a entraîné sur des GT erronés sur les distal — convergence impossible.
 
 ### Différé — calibration Astra
 
@@ -1701,7 +1701,7 @@ Tentatives infructueuses (cf. SESSION_RESUME.md) :
 
 ---
 
-## [1.13.0] - 2026-04-28 (après-midi)
+## [1.13.0-pre] - 2026-04-28 (après-midi) — branche `feature/calibration-cam`
 
 ### 🧪 DREAM — test cheap d'ajout de cam3 dans le mix (extrinsèques approximatives)
 
@@ -1773,7 +1773,7 @@ Plan v3 (post-calibration) :
 
 ---
 
-## [1.12.0] - 2026-04-28
+## [1.12.0-pre] - 2026-04-28 — branche `feature/calibration-cam`
 
 ### 🧪 DREAM — évaluation finale du modèle mixte sur tous les splits
 

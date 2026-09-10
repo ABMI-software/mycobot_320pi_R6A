@@ -432,8 +432,8 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 - [x] **vgg_ultimate_v4_e50** — **99.4% détection synth, 2.61px moyenne** (13920/14000), nouveau record, 06/07/2026 — voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](training/dream/VGG_ULTIMATE_V4_50K.md)
 - [x] **Évaluer le modèle mixte sur données réelles** — `vgg_ultimate_v4_mix_ft_e30` (50K synth + 6K réel real_3cam ×5 oversampling → ~80K), **91.6% détection réel** (9618/10500, 1500 frames jamais vues), sans régression synthétique — écart sim-to-real fermé (27% → 91.6%), 08/07/2026 — voir [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md)
 - [ ] Fermer l'écart **angulaire** J1-J6 (le gap de détection est fermé, pas l'angle : cible 0.5-0.9°, mesuré 10-20× ça — J6 structurellement non-observable, J5 faiblement observable)
-- [x] **Évaluation finale du modèle mixte** sur réel + synth + relaxed (28/04/2026) — voir [`CHANGELOG.md` § 1.12.0](CHANGELOG.md). Verdict : 47.3 % réel / 91.9 % synth, distal keypoints (link4-6) = bottleneck restant.
-- [x] **Test cheap d'ajout cam3** dans le mix (extrinsèques approximatives, 25 epochs) — voir [`CHANGELOG.md` § 1.13.0](CHANGELOG.md). Verdict : trade-off cam0↔cam3 sans gain net, calibration cam3 nécessaire.
+- [x] **Évaluation finale du modèle mixte** sur réel + synth + relaxed (28/04/2026) — voir [`CHANGELOG.md` § 1.12.0-pre](CHANGELOG.md). Verdict : 47.3 % réel / 91.9 % synth, distal keypoints (link4-6) = bottleneck restant.
+- [x] **Test cheap d'ajout cam3** dans le mix (extrinsèques approximatives, 25 epochs) — voir [`CHANGELOG.md` § 1.13.0-pre](CHANGELOG.md). Verdict : trade-off cam0↔cam3 sans gain net, calibration cam3 nécessaire.
 - [x] **Calibrer cam0 + cam3** (ChArUco) — `training/calibration/cam_0.npz` (RMS 0.67 px) / `cam_3.npz` (RMS 0.68 px), 28/04/2026 — voir [`docs/CAMERA_CALIBRATION.md`](docs/CAMERA_CALIBRATION.md)
 - [ ] **Self-supervised labeling** : FK + caméra calibrée → annotations GT automatiques sur réel
 - [ ] Fine-tune sur données réelles auto-annotées
@@ -827,7 +827,7 @@ cd /tmp/DREAM && pip install -e . -r requirements.txt
 | DREAM eval (a) strict réel — 47.3 % det | 28/04/2026 | ✅ Baseline reproduit |
 | DREAM eval (b) strict synth val — 91.9 % det | 28/04/2026 | ✅ Régression -6.4 pts contrôlée |
 | DREAM eval (c) relaxed réel — 48.0 % det | 28/04/2026 | ❌ Médianes explosées (peaks low-conf = bruit) |
-| Diagnostic distal keypoints (link4-6) bottleneck | 28/04/2026 | ✅ Cf. CHANGELOG 1.12.0 + SESSION_RESUME |
+| Diagnostic distal keypoints (link4-6) bottleneck | 28/04/2026 | ✅ Cf. CHANGELOG 1.12.0-pre + SESSION_RESUME |
 | Convert cam3 → NDDS (extrinsèques approximatives) | 28/04/2026 PM | ✅ 2000 frames |
 | Eval croisée v1 sur cam3 — 25.1 % / 237 px | 28/04/2026 PM | ⚠️ Zéro cross-view generalization |
 | Build `mixed_v2_cam03` (18K = cam0 ×3 + cam3 ×3 + 6K synth) | 28/04/2026 PM | ✅ |

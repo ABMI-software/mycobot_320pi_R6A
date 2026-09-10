@@ -236,7 +236,7 @@ Outputs : `training/calibration/cam_{0,3}.{npz,meta.json,snapshot.png}`.
 | cx | 320 | 317.73 | 313.37 | −0.7 % |
 | cy | 240 | 226.00 | 248.01 | **−5.8 %** |
 
-**Implication** : les `projected_location` GT du dataset `real_cam0` ont été calculées avec un `fx=610` qui ne correspond à AUCUNE caméra physique. Pour un point 3D à distance D, le pixel projeté est **faux d'un facteur ~14 %**. Cette erreur croît avec la distance au centre image → cohérent avec les link4-6 (loin du centre quand le bras est étendu) à 3-36 % de détection en 1.12.0. Le réseau a entraîné sur des **GT erronés** sur les distal — il ne peut pas converger sur les bonnes positions.
+**Implication** : les `projected_location` GT du dataset `real_cam0` ont été calculées avec un `fx=610` qui ne correspond à AUCUNE caméra physique. Pour un point 3D à distance D, le pixel projeté est **faux d'un facteur ~14 %**. Cette erreur croît avec la distance au centre image → cohérent avec les link4-6 (loin du centre quand le bras est étendu) à 3-36 % de détection en 1.12.0-pre. Le réseau a entraîné sur des **GT erronés** sur les distal — il ne peut pas converger sur les bonnes positions.
 
 **Probablement la cause majeure** du gap distal. Si la régénération GT débloque ça, pas besoin de capturer un nouveau dataset.
 
@@ -276,7 +276,7 @@ Test cheap d'ajout de cam3 dans le mix terminé. Le retrain v2 (`vgg_mixed_v2_ca
 
 En parallèle, l'option 2 d'origine (collecte de poses bras étendu sur cam0) reste valide mais devient secondaire — la valeur marginale de plus de cam0 est moindre qu'une 2ᵉ caméra exploitable.
 
-Avant de calibrer, plan v3 détaillé dans CHANGELOG 1.13.0 § "Décision pour la prochaine session".
+Avant de calibrer, plan v3 détaillé dans CHANGELOG 1.13.0-pre § "Décision pour la prochaine session".
 
 Commande rapide pour reproduire l'éval (résultats attendus dans le tableau ci-dessous) :
 ```bash
@@ -617,7 +617,7 @@ décalage image sous caméra zénithale. La SVPRO trancherait mais ne détecte q
 | 28/04/2026 | DREAM eval (a) strict réel — 47.3 % det confirmé | ✅ Baseline 1.11.0 reproduit |
 | 28/04/2026 | DREAM eval (b) strict synth val — 91.9 % det | ✅ Régression contrôlée vs synth-only |
 | 28/04/2026 | DREAM eval (c) relaxed réel (peak=0.001) — 48.0 % | ❌ Médianes explosées, hypothèse réfutée |
-| 28/04/2026 | Verdict diagnostic complet : distal keypoints = bottleneck | ✅ Cf. CHANGELOG 1.12.0 |
+| 28/04/2026 | Verdict diagnostic complet : distal keypoints = bottleneck | ✅ Cf. CHANGELOG 1.12.0-pre |
 | 28/04/2026 (PM) | Convert cam3 → NDDS (extrinsèques approximatives) | ✅ 2000 frames |
 | 28/04/2026 (PM) | Eval croisée v1 sur cam3 : 25.1 % / 237 px d'erreur | ✅ Confirme zéro cross-view generalization |
 | 28/04/2026 (PM) | Build `mixed_v2_cam03` (18K) + retrain 25 epochs | ✅ 2h35, val=0.000356 |
@@ -1640,7 +1640,7 @@ La transaction produite était seulement une sonde temporaire :
    .venv/bin/python scripts/adaptive_pick_by_demo.py --show
    .venv/bin/python scripts/adaptive_pick_by_demo.py --plan-live
    ```
-> Mise à jour 28/04 (PM) : test cheap cam0+cam3 fait. Signal clair : **cam3 utile mais extrinsèques approximatives load-bearing**. Plan v3 = **calibrer cam3 avant retrain**. Les résultats détaillés sont dans CHANGELOG 1.13.0.
+> Mise à jour 28/04 (PM) : test cheap cam0+cam3 fait. Signal clair : **cam3 utile mais extrinsèques approximatives load-bearing**. Plan v3 = **calibrer cam3 avant retrain**. Les résultats détaillés sont dans CHANGELOG 1.13.0-pre.
 
 1. **[ROUGE] Calibrer cam3** :
    - Intrinsèques : chessboard OpenCV (~5 min, donne fx, fy, cx, cy spécifiques à cam3)
