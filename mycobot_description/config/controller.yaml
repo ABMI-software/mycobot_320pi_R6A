@@ -34,8 +34,6 @@ mycobot_controller:
     action_monitor_rate: 20.0
 
     allow_partial_joints_goal: true
-    hardware_state_has_offset: true
-    deduce_states_from_derivatives: true
 
     constraints:
       stopped_velocity_tolerance: 0.01

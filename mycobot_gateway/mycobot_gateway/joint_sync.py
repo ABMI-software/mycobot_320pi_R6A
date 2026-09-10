@@ -85,42 +85,37 @@ class JointStateSynchronizer(Node):
         return degrees * math.pi / 180.0
     
     def response_callback(self, msg: String):
-        """Traite les réponses du robot."""
+        """Traite les réponses du robot.
+
+        Formats acceptés (insensible à la casse) :
+          - "ANGLES: [0.43, 0.35, ...]"   (bridge Pi simple)
+          - "angles:[0.35, 0.0, ...]"      (ancien format)
+          - "angles_ok:[...],s=20"         (après set_angles)
+        Les réponses d'erreur ("ANGLES: -1", "-1") sont ignorées.
+        """
         data = msg.data.strip()
-        
-        # Parser les angles reçus: "angles:[0.35, 0.0, 0.0, 0.35, 0.35, 0.26]"
-        if data.startswith('angles:'):
+        low = data.lower()
+
+        # Ignorer les réponses d'erreur du robot (lecture série ratée).
+        if 'angles' in low and '-1' in low and '[' not in data:
+            self.get_logger().warn('⚠️ Robot a renvoyé -1 (lecture ratée), ignoré.')
+            return
+
+        # Cas angles / ANGLES / angles_ok : on extrait la première liste [...].
+        if 'angles' in low:
+            match = re.search(r'\[([-\d\.,\s]+)\]', data)
+            if not match:
+                return
             try:
-                # Extraire la liste d'angles
-                angles_str = data.replace('angles:', '')
-                # Parser la liste Python
-                angles_deg = eval(angles_str)
-                
+                angles_deg = [float(a.strip()) for a in match.group(1).split(',')]
                 if len(angles_deg) == 6:
-                    # Convertir en radians
                     self.current_angles = [
                         self.degrees_to_radians(a) for a in angles_deg
                     ]
                     self.get_logger().debug(f'📐 Angles mis à jour: {angles_deg}°')
-                    
             except Exception as e:
                 self.get_logger().warn(f'⚠️ Erreur parsing angles: {e}')
-        
-        # Parser aussi angles_ok après set_angles
-        elif 'angles_ok:' in data:
-            try:
-                # Format: "angles_ok:[0.0, 0.0, ...],s=20"
-                match = re.search(r'\[([\d\., -]+)\]', data)
-                if match:
-                    angles_str = match.group(1)
-                    angles_deg = [float(a.strip()) for a in angles_str.split(',')]
-                    if len(angles_deg) == 6:
-                        self.current_angles = [
-                            self.degrees_to_radians(a) for a in angles_deg
-                        ]
-                        self.get_logger().debug(f'📐 Angles confirmés: {angles_deg}°')
-            except Exception as e:
-                self.get_logger().warn(f'⚠️ Erreur parsing angles_ok: {e}')
+
     
     def request_angles(self):
         """Demande les angles actuels au robot."""
