@@ -550,7 +550,7 @@
 
   <joint name="world_to_camera_right" type="fixed">
     <parent link="world"/>
-    <child link="camera_link_right"/>
+    <child link="camera_link_1"/>
     <origin xyz="0.0 1.1 0.4" rpy="0 0.3 -1.5708"/>
   </joint>
   <gazebo reference="camera_link_1">
@@ -587,7 +587,7 @@
 
   <joint name="world_to_camera_left" type="fixed">
     <parent link="world"/>
-    <child link="camera_link_left"/>
+    <child link="camera_link_2"/>
     <origin xyz="0.0 -1.1 0.4" rpy="0 0.3 1.5708"/>
   </joint>
   <gazebo reference="camera_link_2">
@@ -623,7 +623,7 @@
 
   <joint name="world_to_camera_top" type="fixed">
     <parent link="world"/>
-    <child link="camera_link_top"/>
+    <child link="camera_link_3"/>
     <origin xyz="0.0 0.0 1.0" rpy="0 1.5708 0"/>
   </joint>
   <gazebo reference="camera_link_3">
