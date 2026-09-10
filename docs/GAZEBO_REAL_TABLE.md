@@ -17,6 +17,7 @@ sont conservés dans le paquet ROS.
 Depuis la racine de ce dépôt :
 
 ```bash
+conda deactivate
 source /opt/ros/jazzy/setup.bash
 colcon build --packages-select mycobot_description mycobot_gateway --symlink-install
 source install/setup.bash

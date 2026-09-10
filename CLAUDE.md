@@ -116,9 +116,17 @@ bois reconstruite depuis les photos du plan de travail, et les **quatre ArUco
 19 / 23 / 25 / 26 de 50 mm** aux positions relevées.
 
 ```bash
+conda deactivate
+cd ~/ros_jazzy
+colcon build --packages-select mycobot_description mycobot_gateway --symlink-install
 source install/setup.bash
 ros2 launch mycobot_gateway real_table.launch.py
 ```
+
+`conda deactivate` d'abord — sans quoi le Python 3.13 de conda masque
+celui de ROS2. Et le `colcon build` est nécessaire : sans lui `models/`
+n'est pas installé dans `share/` et **la scène se lance sans bois ni
+marqueurs**, sans message d'erreur.
 
 `demo:=true` exécute un cycle de préhension du cube rouge.
 `robot_appearance:=realistic` donne base grise et coques blanc satiné —
