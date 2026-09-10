@@ -517,18 +517,66 @@ intrinsèques par caméra) : [`training/CAPTURE_3CAM.md`](training/CAPTURE_3CAM.
 
 ## 💾 Datasets
 
-> ⚠️ Les images sont stockées via **Git LFS**. Après `git clone`, exécutez `git lfs pull`.
+> ⚠️ Les images sont stockées via **Git LFS**. Après `git clone`, `git lfs pull`.
+> Nécessaire **uniquement** pour l'entraînement DREAM — inutile pour la
+> simulation, le pick-and-place ou le contrôle du robot.
 
-| Dataset | Poses | Caméras | Images | Taille |
-|---------|-------|---------|--------|--------|
-| **Synthétique** (`datasets/synthetic_dataset/`) | 5,000 | 4 (front, left, right, top) | 20,000 | ~8.3 GB |
-| **Réel** (`datasets/real_dataset/`) | 2,000 | 2 (cam0, cam3) | 4,000 | ~1.2 GB |
+### Jeux en service
 
-Format `labels.csv` :
+Ils vivent sous `training/dream/dream_data/`, **pas** sous `datasets/`.
+
+| Jeu | Poses | Caméras | Images | Taille |
+|---|---|---|---|---|
+| **Synthétique** — `synthetic_50k/` | 12 500 | 4 (front, left, right, top) | **50 000** | 7,2 Go |
+| **Réel** — `real_3cam/` | 2 500 | 3 (**arducam, svpro, astra**) | **7 500** | 2,7 Go |
+
+Le réel est accumulé sur 5 sessions de 500 poses (index 0 → 2499), les trois
+caméras déclenchant sur la même pose.
+
+### Découpes et mélanges
+
+| Dossier | Contenu | Taille |
+|---|---|---|
+| `real_3cam_train/` | 6 000 lignes | 708 Ko |
+| `real_3cam_val/` | 1 500 lignes | 184 Ko |
+| `real_3cam_train_x5/` | 30 000 lignes — train suréchantillonné ×5 pour équilibrer le mélange | 3,5 Mo |
+| `real_3cam_train_x5_ndds/` | le même, converti au format NDDS | **11 Go** |
+| `mix_20k3_50k/` | 110 000 entrées — le mélange du point de contrôle courant | 867 Mo |
+
+Les trois premières découpes ne pèsent que quelques centaines de kilo-octets :
+ce sont des **`labels.csv` qui pointent vers les images de `real_3cam`**, pas
+des copies. C'est la **conversion NDDS** qui duplique les images, et qui coûte
+les 11 Go.
+
+### Encombrement total
+
+| Emplacement | Taille |
+|---|---|
+| `training/dream/dream_data/` — tous les jeux, mélanges et conversions | **212 Go** |
+| `datasets/` — les jeux antérieurs | 9,5 Go |
+
+Les 212 Go accumulent une trentaine de variantes (bruts, NDDS, CLAHE, CycleGAN,
+mélanges). **Rien de tout cela n'est versionné** — seul `datasets/**/*.png`
+passe par Git LFS.
+
+### Format `labels.csv`
+
+Les angles sont donnés **en radians et en degrés**, une ligne par image :
+
 ```
-camera,image_path,j1,j2,j3,j4,j5,j6
-cam0,images/cam0/000000.png,-45.23,12.67,-30.45,5.12,-15.89,22.34
+index,j1_rad,...,j6_rad,j1_deg,...,j6_deg,camera,image_path
+0,-0.5245,...,-0.7255,-30.05,...,-41.57,arducam,images/arducam/000000.png
 ```
+
+### Jeux antérieurs
+
+`datasets/synthetic_dataset/` (5 000 poses, 4 caméras, 20 000 images, 8,3 Go) et
+`datasets/real_dataset/` (2 000 poses, 2 caméras, 4 000 images, 1,2 Go) existent
+toujours mais **ne sont plus ceux qu'on entraîne**. Leur `labels.csv` suit
+l'ancien format `camera,image_path,j1..j6`, en degrés seulement.
+
+⚠️ Le lien `dream_data/` à la racine du dépôt est **mort** — passer par
+`training/dream/dream_data/`.
 
 Plus de détails : [`datasets/README.md`](datasets/README.md)
 
