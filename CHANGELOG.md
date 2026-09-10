@@ -9,6 +9,47 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — le tri de reference est celui a saisie physique (10/09)
+
+- **`sim_sorting_grasp` devient le pipeline de tri documente.** La pince se
+  ferme reellement, le contact passe par `gz_ros2_control`, et **chaque prise
+  est verifiee sur la pose Gazebo de l'objet** : il monte avec les doigts, ou
+  la prise est declaree ratee.
+
+  ```bash
+  # Terminal 1 — le banc
+  ros2 launch mycobot_gateway sim_grasp.launch.py
+  # Terminal 2 — le tri des 4 objets
+  ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
+  ```
+
+- **`sorting_orchestrator` et `pick_and_place_node` sont retrogrades** au rang
+  de pipelines anterieurs. Ils **n'attrapent rien** : ils appellent le service
+  Gazebo `set_pose` pour coller l'objet a l'effecteur pendant le transport.
+  C'est ce qui fait **sauter** l'objet au lieu d'etre saisi — un symptome
+  regulierement pris pour une panne. Ils datent d'avant la pince modelisee et
+  restent utiles pour la perception (HSV + retroprojection).
+- La documentation disait l'inverse : le README presentait les deux pipelines a
+  teleportation comme les seuls, sans mentionner `sim_sorting_grasp`. README,
+  README_GAZEBO et CLAUDE.md donnent maintenant la commande de reference, les
+  quatre cibles avec leur largeur de prehension, et le piege des noms.
+- Signale aussi que `real_table.launch.py demo:=true` appelle bien
+  `sim_sorting_grasp` mais **bride a `only: red_cube`** : pour les quatre
+  objets il faut les deux terminaux.
+
+### Corrige — les noeuds de tri ne trouvaient plus le module IK (10/09)
+
+- `sorting_orchestrator.py` et `pick_and_place_node.py` cherchaient
+  `mycobot_ik` a deux chemins en dur, dont
+  `/home/genji/ros_jazzy/src/mycobot_R6A/training/dream`. Ce dossier **existe
+  encore** mais ne contient plus le module, et le garde-fou testait `isdir()`
+  au lieu du fichier : un chemin mort etait insere dans le `sys.path` et
+  l'import echouait par `ModuleNotFoundError`, tuant le noeud au demarrage.
+- Les deux remontent desormais leurs repertoires parents jusqu'a trouver
+  `training/dream/mycobot_ik.py`, **en verifiant le fichier**. Plus de chemin
+  en dur, et ca fonctionne depuis n'importe quel espace de travail.
+
+
 ### Ajouté — réplique Gazebo du banc réel, plateau bois et apparence réaliste (10/09)
 
 - **`worlds/real_table.sdf`** — le monde ne reproduit plus une table générique
