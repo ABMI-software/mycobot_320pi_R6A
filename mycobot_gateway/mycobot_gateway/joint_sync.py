@@ -86,13 +86,18 @@ class JointStateSynchronizer(Node):
     
     def response_callback(self, msg: String):
         """Traite les réponses du robot."""
-        data = msg.data.strip()
-        
-        # Parser les angles reçus: "angles:[0.35, 0.0, 0.0, 0.35, 0.35, 0.26]"
-        if data.startswith('angles:'):
+        # bridge_tour peut regrouper plusieurs réponses coalescées dans un seul
+        # recv() TCP (pas de framing par ligne côté bridge) ; ne garder que la
+        # dernière ligne non vide évite les erreurs eval() sur du multi-lignes.
+        lines = [l.strip() for l in msg.data.splitlines() if l.strip()]
+        data = lines[-1] if lines else msg.data.strip()
+
+        # Parser les angles reçus. bridge_pi_simple.py répond "ANGLES: [...]"
+        # (majuscules, espace après ':') ; on matche insensible à la casse.
+        if data.upper().startswith('ANGLES:'):
             try:
-                # Extraire la liste d'angles
-                angles_str = data.replace('angles:', '')
+                # Extraire la liste d'angles (après le premier ':')
+                angles_str = data.split(':', 1)[1].strip()
                 # Parser la liste Python
                 angles_deg = eval(angles_str)
                 
