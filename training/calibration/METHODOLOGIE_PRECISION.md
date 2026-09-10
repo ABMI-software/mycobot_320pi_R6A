@@ -1,7 +1,5 @@
 # Méthodologie des essais de précision — myCobot 320 Pi
 
-> ## ⚠️ Deux corrections majeures du 09/09 au soir
->
 > ## ⚠️ Le constructeur se contredit — deux chiffres officiels
 >
 > | source Elephant Robotics | répétabilité | rayon | poids |
@@ -139,9 +137,9 @@ l'instrument.
 ait suivi ISO 9283** pour annoncer son 1 mm. Comparer deux chiffres suppose de
 connaître les deux protocoles ; on ne connaît que le nôtre.
 
-⚠️ Et d'où venait le ±0,5 mm ? Pas de la fiche du 320 Pi. Il faut retirer ce
-chiffre de tous les supports et le remplacer par **1 mm**, en citant la fiche
-officielle.
+⚠️ Les deux chiffres constructeur sont officiels — voir l'en-tête. **1 mm**
+vient de la page produit, **±0,5 mm** du GitBook. Les tableaux de ce document
+donnent donc les deux colonnes plutôt que d'en choisir une.
 
 ---
 
@@ -193,7 +191,20 @@ chiffre constructeur** — Elephant Robotics n'en publie pas.
 
 ### 3 — Précision physique absolue
 
-**Non mesurée, et non mesurable par notre méthode.** Exige un moyen externe.
+**Non mesurée.** C'est le seul des sept essais qui reste à faire, et le seul
+qui exige un achat.
+
+Notre méthode reconstruit la position par `FK(q_lu)` : elle ne peut voir ni
+l'écart entre le codeur et l'articulation, ni les erreurs du modèle
+cinématique, ni le jeu des réducteurs, ni la flexion. Aucun raffinement du
+protocole ne changera cela — il faut un instrument qui touche le bras.
+
+| ce qu'il faut | comparateur à cadran sur base magnétique |
+|---|---|
+| résolution | 0,01 mm, soit 40 à 80× plus fin que la grandeur cherchée |
+| coût | 20 à 200 € |
+| durée | environ 1 h |
+| ce que ça change | les six répétabilités passent de **bornes inférieures** à des **valeurs** |
 
 ### 4 — Répétabilité de la vision
 
@@ -284,16 +295,28 @@ identique à toutes les longueurs — or elle vaut −0,044 % sur 383–580 mm e
 
 ### 6 — Calibration extrinsèque caméra ↔ robot
 
-Voir la section 4 ci-dessous : c'est le résultat neuf de la soirée.
+**1,86 mm** de justesse à l'intérieur de la constellation de marqueurs, mesurés
+par *leave-one-corner-out* : on ajuste sur 15 coins et on prédit le 16ᵉ.
+
+Deux contrôles complémentaires. La **forme** de la constellation est reproduite
+à 0,57 mm en moyenne — un ajustement rigide peut absorber une translation ou une
+rotation globale, jamais une déformation. Et une **validation croisée à deux
+caméras**, sur un point que ni l'une ni l'autre n'a utilisé pour s'ajuster,
+donne **1,92 mm**.
+
+Protocole et chiffres détaillés au § 4.
 
 ### 7 — Précision globale vision + robot
 
-**Chiffrée le 10/09, 20 essais.** Voir la section 8 ci-dessous : c'est le seul
-nombre qui décrit le système tel qu'il fonctionne, et il n'a demandé **aucune
-métrologie externe** — l'objet est sa propre cible.
+**10,79 mm en boucle ouverte, 0,63 mm après deux corrections**, sur 20 essais.
 
-**10,79 mm en boucle ouverte, 0,63 mm après deux corrections.** L'erreur est à
-100 % un biais.
+C'est le seul chiffre qui décrive le système tel qu'il fonctionne, et il n'a
+demandé aucune métrologie externe : l'objet est sa propre référence. L'erreur
+est **à 100 % un biais** — il chute d'un facteur 20 pendant que la dispersion
+reste plate, ce qui est exactement la condition pour qu'un asservissement
+visuel la corrige.
+
+Protocole et chiffres détaillés au § 8.
 
 ---
 
@@ -431,10 +454,12 @@ lecture directe au centième, sans modèle. Puis 10 retours depuis un autre sens
 sans rien démonter → biais de direction **jeu compris**, ce que la FK ne verra
 jamais. Cette seule manipulation transforme six bornes inférieures en valeurs.
 
-**Étape 2 — corriger `marker_size_mm` : 48,5 et non 50.** C'est la seule erreur
-franche trouvée dans les données. Elle déplace chaque coin de 0,75 mm et entre
-directement dans l'extrinsèque à 16 coins. À confirmer au pied à coulisse avant
-d'éditer le YAML.
+**Étape 2 — ~~corriger `marker_size_mm` : 48,5 et non 50~~ — RETIRÉ le 10/09.**
+Cette consigne était fausse, **ne pas l'appliquer** : les marqueurs font bien
+50 mm et `marker_size_mm` doit rester à 50. Le −2,6 % mesuré sur leurs côtés est
+un biais de détection lié à l'obliquité, pas une erreur d'impression (§ 3,
+essai 5). Le texte est barré plutôt que supprimé, parce que d'autres documents
+l'avaient recopié et doivent pouvoir retrouver ce qui a été retiré.
 
 **Étape 3 — passer l'extrinsèque de production aux 16 coins.** Le fichier actuel
 est ajusté sur 4 centres, sans redondance. Les 16 coins donnent 26 degrés de
@@ -477,7 +502,7 @@ Ce qui limite réellement la boucle est ce qui n'est **pas** répétable :
 | bruit de la vision | sous la quantification | sans objet |
 | échelle de la vision | +0,005 % sur 100 mm | sans objet |
 | erreur de modèle du bras | ~15 mm | **oui**, absorbée |
-| justesse de l'extrinsèque | **~5 mm** | **oui** si l'objet est revu à chaque itération |
+| justesse de l'extrinsèque | **1,86 mm** | **oui** si l'objet est revu à chaque itération |
 | répétabilité du bras | ≥ 0,84 mm | non — plancher |
 | **biais de sens d'approche** | **5,9 mm** | **non** si la direction change |
 
