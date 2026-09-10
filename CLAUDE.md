@@ -143,6 +143,30 @@ de la texture : [`models/wood_table/README.md`](mycobot_description/models/wood_
 
 ---
 
+## Tri en simulation — deux pipelines, ne pas les confondre
+
+**`sim_sorting_grasp` est la référence** : saisie physique, pince réelle,
+contact par `gz_ros2_control`, prise vérifiée sur la pose Gazebo de l'objet.
+
+```bash
+# Terminal 1
+ros2 launch mycobot_gateway sim_grasp.launch.py
+# Terminal 2
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
+```
+
+`sorting_orchestrator` et `pick_and_place_node` **n'attrapent rien** : ils
+téléportent l'objet par le service Gazebo `set_pose`. Si un objet **saute** au
+lieu d'être saisi, c'est qu'on est sur ce pipeline-là — ce n'est pas une panne.
+Antérieurs à la pince modélisée, conservés pour la perception (HSV +
+rétroprojection).
+
+⚠ `real_table.launch.py demo:=true` appelle bien `sim_sorting_grasp`, mais
+**bridé à `only: red_cube`**. Pour les quatre objets, passer par les deux
+terminaux ci-dessus.
+
+---
+
 ## Précision — l'état du banc au 10/09/2026
 
 **La planche a bougé** : rotation **−1,750°**, translation **(18,8 · −6,5) mm**,

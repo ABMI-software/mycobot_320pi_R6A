@@ -29,6 +29,8 @@ import math
 import enum
 from typing import List, Optional, Tuple
 
+from pathlib import Path
+
 import numpy as np
 
 import rclpy
@@ -38,15 +40,27 @@ from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Float64, Float64MultiArray, String
 
 # Add dream module for IK/FK
-DREAM_DIR_ALT = '/home/genji/ros_jazzy/src/mycobot_R6A/training/dream'
-DREAM_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    '..', '..', '..', '..', 'training', 'dream'
-)
-DREAM_DIR = os.path.normpath(DREAM_DIR)
-for p in [DREAM_DIR, DREAM_DIR_ALT]:
-    if os.path.isdir(p) and p not in sys.path:
-        sys.path.insert(0, p)
+def _dossier_dream():
+    """Localise training/dream, qui n'est pas installe avec le paquet ROS.
+
+    On remonte les ancetres de ce fichier jusqu'a en trouver un qui contienne
+    training/dream/mycobot_ik.py. Chercher le FICHIER et non le dossier est
+    essentiel : un espace de travail perime peut tres bien avoir le dossier
+    sans le module, et l'ajouter au sys.path masque alors le bon.
+    """
+    ici = os.path.abspath(__file__)
+    for parent in Path(ici).parents:
+        for racine in (parent, parent / 'src' / 'mycobot_R6A'):
+            cible = racine / 'training' / 'dream'
+            if (cible / 'mycobot_ik.py').is_file():
+                return str(cible)
+    raise RuntimeError(
+        f'training/dream/mycobot_ik.py introuvable depuis {ici}. '
+        'Le module IK n\'est pas installe avec le paquet ROS : il est charge '
+        'depuis les sources, et aucun ancetre de ce fichier ne le contient.')
+
+
+sys.path.insert(0, _dossier_dream())
 
 from mycobot_ik import inverse_kinematics_position, fk_end_effector
 from mycobot_fk import KEYPOINT_NAMES

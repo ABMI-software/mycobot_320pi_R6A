@@ -21,6 +21,12 @@ Le −2,6 % mesuré sur leurs côtés est un biais de détection lié à l'obliq
 sont justes à −0,044 %. Une vraie erreur d'échelle frapperait les deux à
 l'identique.
 
+**Le tri de référence est celui à saisie physique.** `sim_sorting_grasp` ferme
+réellement la pince et vérifie chaque prise sur la pose Gazebo de l'objet.
+`sorting_orchestrator`, qui téléporte l'objet par `set_pose`, est rétrogradé —
+c'est lui qui fait « sauter » l'objet, et la documentation le présentait
+jusqu'ici comme le seul pipeline de tri.
+
 ### Décisions prises
 
 - **Ne pas recalibrer l'extrinsèque arducam.** La planche a bougé le 10/09

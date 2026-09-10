@@ -625,18 +625,58 @@ ros2 launch mycobot_gateway real_table.launch.py
 Guide complet : [docs/GAZEBO_REAL_TABLE.md](docs/GAZEBO_REAL_TABLE.md) ·
 provenance de la texture : [models/wood_table/README.md](mycobot_description/models/wood_table/README.md)
 
-### Les deux pipelines de tri
+### Tri des 4 objets — saisie physique *(la référence)*
 
-Deux pipelines complets de pick-and-place en simulation, utilisés pour démontrer la chaîne perception → IK → contrôle moteur :
+La pince se ferme réellement, `gz_ros2_control` simule le contact, et **chaque
+prise est vérifiée sur la pose Gazebo de l'objet** : il monte avec les doigts ou
+la prise est déclarée ratée. Deux terminaux :
 
-| Pipeline | Monde | Objets | Perception | Doc |
-|----------|-------|--------|------------|-----|
-| **Mono-objet** | `worlds/pick_and_place.sdf` | 1 cube rouge → zone verte | DREAM keypoints + PnP (optionnelle, fallback open-loop IK) | [pick_and_place_node.py](mycobot_gateway/mycobot_gateway/pick_and_place_node.py) |
-| **Multi-couleur sorting** | `worlds/pick_and_place_sorting.sdf` | 4 objets dynamiques (cube R, cube B, cylindre G, boîte Y) → 4 bacs colorés à parois | HSV top-down + back-projection pinhole + IK numérique | [sorting_orchestrator.py](mycobot_gateway/mycobot_gateway/sorting_orchestrator.py) |
+```bash
+# Terminal 1 — le banc (monde pick_and_place_sorting par défaut)
+conda deactivate && source /home/genji/Osama_ws/install/setup.bash
+ros2 launch mycobot_gateway sim_grasp.launch.py
 
-**Composants partagés** :
-- IK numérique : `training/dream/mycobot_ik.py` (scipy L-BFGS-B + FK chain, multi-restart, warm-start, < 0.01 mm précision)
-- Émulation grasp : appel au service Gazebo `/world/<world>/set_pose` pour téléporter l'objet sur l'EE pendant le portage et le déposer dans le bac à la couleur correspondante (le bras MyCobot 320 Pi physique n'a pas de gripper actuellement)
+# Terminal 2 — le tri des 4 objets, saisie réelle
+conda deactivate && source /home/genji/Osama_ws/install/setup.bash
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
+```
+
+Les quatre cibles et leurs paramètres de préhension sont dans
+[`sim_sorting_grasp.py`](mycobot_gateway/mycobot_gateway/sim_sorting_grasp.py) :
+
+| objet | largeur pincée | bac | particularité |
+|---|---|---|---|
+| `red_cube` | 40 mm | (−0,22 · −0,18) | — |
+| `blue_cube` | 50 mm | (−0,22 · −0,06) | — |
+| `green_cylinder` | 50 mm | (−0,22 · +0,06) | `squeeze_mm=6` — un cylindre ne touche les patins que sur une **ligne**, il faut serrer plus que sur une face plane sinon il file à la levée |
+| `yellow_box` | 30 mm | (−0,22 · +0,18) | `phi_deg=90` — la boîte fait 50×30×40, on pince les 30 mm, doigts sur l'axe Y |
+
+Options utiles : `-p only:=green_cylinder` pour n'en faire qu'un,
+`-p move_duration:=0` pour dimensionner la durée au trajet.
+
+**Le point outil est le centre des patins** — 166 mm de la bride sur +Z du
+link6, décalé de 7,8 mm en +Y — **et non le bout du doigt**. Les trois chiffres
+qui gouvernent le cycle sortent des meshes `pro_adaptive_gripper/*.dae` et ont
+été vérifiés en simulation.
+
+### Pipelines par téléportation *(antérieurs, conservés)*
+
+Ces deux-là **n'attrapent rien** : ils appellent le service Gazebo
+`/world/<world>/set_pose` pour coller l'objet à l'effecteur pendant le
+transport. Ce n'était pas un raccourci gratuit — ils datent d'avant la pince
+modélisée. C'est ce qui explique que l'objet **saute** au lieu d'être saisi.
+
+| Pipeline | Monde | Objets | Perception | Nœud |
+|----------|-------|--------|------------|------|
+| Mono-objet | `worlds/pick_and_place.sdf` | 1 cube rouge → zone verte | DREAM keypoints + PnP (fallback IK boucle ouverte) | [pick_and_place_node.py](mycobot_gateway/mycobot_gateway/pick_and_place_node.py) |
+| Multi-couleur | `worlds/pick_and_place_sorting.sdf` | 4 objets → 4 bacs | HSV top-down + rétroprojection sténopé | [sorting_orchestrator.py](mycobot_gateway/mycobot_gateway/sorting_orchestrator.py) |
+
+Ils gardent leur intérêt pour la partie **perception** — la détection HSV et la
+rétroprojection sont les mêmes — mais pour démontrer une préhension, utiliser
+`sim_sorting_grasp`.
+
+**Composant partagé** : IK numérique `training/dream/mycobot_ik.py`
+(scipy L-BFGS-B + chaîne FK, multi-restart, warm-start, < 0,01 mm).
 
 **Pipeline sorting (testé end-to-end le 23/04/2026)** :
 ```

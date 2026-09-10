@@ -49,6 +49,22 @@ commence par `conda deactivate` puis un `colcon build`** — sans le build,
 [le guide du plateau réel](../docs/GAZEBO_REAL_TABLE.md) pour la construction,
 les coordonnées et les hypothèses de placement.
 
+## Tri des 4 objets par saisie physique
+
+```bash
+# Terminal 1 — le banc
+ros2 launch mycobot_gateway sim_grasp.launch.py
+
+# Terminal 2 — le tri, pince réelle
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
+```
+
+C'est **la** simulation de tri de référence : la pince se ferme, le contact est
+simulé par `gz_ros2_control`, et chaque prise est vérifiée sur la pose Gazebo de
+l'objet. `sorting_orchestrator` fait le même parcours mais **téléporte** l'objet
+via `set_pose` — d'où l'objet qui saute. Il est antérieur à la pince modélisée
+et conservé pour sa partie perception.
+
 ## Visuels caméra (URDF Gazebo)
 
 Les 4 caméras embarquées dans le URDF (`mycobot_pro_320_pi_gazebo.urdf` —
