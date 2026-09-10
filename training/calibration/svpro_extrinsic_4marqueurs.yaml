@@ -1,0 +1,68 @@
+source: PnP sur les 16 coins des marqueurs [19, 23, 25, 26], positions 3D retro-projetees
+  depuis l ARDUCAM (extrinseque marqueurs validee). Coins moyennes sur 30 trames live.
+  Le 25 est devenu decodable apres inclinaison de la camera et verrouillage du focus
+  a 40 (svpro_verrou_focus.sh).
+camera: svpro
+intrinsics_stem: cam_2
+resolution:
+- 640
+- 480
+frame_id: base_link
+focus_absolute: 40
+markers_used:
+- 19
+- 23
+- 25
+- 26
+rms_reproj_px: 1.14
+detections_par_marqueur:
+  19: 30
+  23: 30
+  25: 30
+  26: 30
+nettete_laplacien: 371.0
+validation_croisee_un_marqueur_retire_px:
+  19: 2.21
+  23: 3.48
+  25: 2.83
+  26: 2.47
+remplace: "svpro_extrinsic_montage_0901.yaml (3 marqueurs, 12 coins) \u2014 NON modifie\
+  \ : le jeu real_montage_0901 a ete converti avec, et doit le rester"
+T_cam_world:
+- - -0.989893030803236
+  - 0.08939400950150678
+  - 0.11009313617309788
+  - 0.1665531873898352
+- - -0.005806507769098135
+  - 0.7501102907236307
+  - -0.6612872569602698
+  - 0.15311950436609645
+- - -0.1416971137134104
+  - -0.6552429036744732
+  - -0.7420098821104298
+  - 0.9475505901766609
+- - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+T_world_cam:
+- - -0.9898930308032358
+  - -0.005806507769098153
+  - -0.14169711371341034
+  - 0.3000241127724368
+- - 0.08939400950150675
+  - 0.7501102907236304
+  - -0.655242903674473
+  - 0.49113042693427184
+- - 0.11009313617309785
+  - -0.6612872569602697
+  - -0.7420098821104297
+  - 0.7860115160006516
+- - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+camera_position_base_m:
+- 0.3000241127724368
+- 0.49113042693427184
+- 0.7860115160006516

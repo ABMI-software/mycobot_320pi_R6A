@@ -70,6 +70,13 @@ REAL_CAMERA_INTRINSICS = np.array([
 # Real camera extrinsics (approximate — needs calibration for production)
 # cam0: front-facing camera looking at the robot from ~0.5m
 # For now we use a placeholder that will be refined via PnP during inference
+#
+# ⚠️ The real 3-cam rig (arducam/svpro/astra) extrinsics below are UNCALIBRATED
+# placeholders matching the rough observed viewpoints. They make the projection
+# well-formed but the projected_location (GT) is NOT pixel-accurate. On real data,
+# trust DETECTION RATE only, not pixel error, until a proper hand-eye calibration
+# (camera↔robot-base) exists. Intrinsics, by contrast, ARE calibrated — see
+# CALIBRATION_MAP below (astra excepted).
 REAL_CAMERA_TRANSFORMS = {
     "cam0": {
         "xyz": (0.5, 0.0, 0.3),
@@ -79,7 +86,26 @@ REAL_CAMERA_TRANSFORMS = {
         "xyz": (0.0, 0.5, 0.3),
         "rpy": (0.0, 0.2, -math.pi / 2),
     },
+    # --- real 3-cam rig (approximate, UNCALIBRATED extrinsics) ---
+    "arducam": {"xyz": (0.0, 0.0, 0.70), "rpy": (0.0, math.pi / 2, 0.0)},   # top-down
+    "svpro":   {"xyz": (0.45, 0.0, 0.30), "rpy": (0.0, 0.25, math.pi)},      # front-ish
+    "astra":   {"xyz": (0.0, 0.45, 0.30), "rpy": (0.0, 0.25, -math.pi / 2)}, # side-ish
 }
+
+# Calibrated intrinsics per real camera, from training/calibration/<stem>.npz
+# (key 'mtx'). astra is NOT calibrated → falls back to REAL_CAMERA_INTRINSICS.
+CALIBRATION_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration")
+CALIBRATION_MAP = {"arducam": "cam_0", "svpro": "cam_2"}
+
+
+def load_real_intrinsics(cam_name):
+    """Calibrated 3x3 K for a real camera, or the default if uncalibrated."""
+    stem = CALIBRATION_MAP.get(cam_name)
+    if stem:
+        npz_path = os.path.join(CALIBRATION_DIR, f"{stem}.npz")
+        if os.path.exists(npz_path):
+            return np.load(npz_path)["mtx"].astype(np.float64)
+    return REAL_CAMERA_INTRINSICS
 
 
 def _real_camera_transform(cam_name):
@@ -226,7 +252,7 @@ def convert_synthetic(input_dir, output_dir, cameras):
     return frame_idx
 
 
-def convert_real(input_dir, output_dir, cameras):
+def convert_real(input_dir, output_dir, cameras, max_frames=None):
     """Convert our real dataset to NDDS format.
 
     NOTE: Real camera extrinsics are approximate. The keypoint 2D projections
@@ -242,13 +268,28 @@ def convert_real(input_dir, output_dir, cameras):
 
     os.makedirs(output_dir, exist_ok=True)
 
-    # Use real camera intrinsics (approximate)
-    write_camera_settings(output_dir, REAL_CAMERA_INTRINSICS)
+    # Calibrated intrinsics per camera (astra falls back to default).
+    intrinsics = {c: load_real_intrinsics(c) for c in cameras}
+    for c in cameras:
+        K = intrinsics[c]
+        tag = "calibrée" if c in CALIBRATION_MAP else "NON calibrée (défaut)"
+        print(f"  {c}: intrinsèques {tag} — fx={K[0,0]:.1f} fy={K[1,1]:.1f} "
+              f"cx={K[0,2]:.1f} cy={K[1,2]:.1f}")
+
+    # One NDDS dir = one _camera_settings.json → use the primary camera's K.
+    write_camera_settings(output_dir, intrinsics[cameras[0]])
+    if len(cameras) > 1:
+        print(f"  ⚠️  {len(cameras)} caméras dans une seule sortie NDDS : "
+              f"_camera_settings.json prend {cameras[0]}. Pour des intrinsèques "
+              f"correctes, convertis UNE caméra par run (--cameras arducam).")
 
     frame_idx = 0
     n_skipped = 0
 
     for row in rows:
+        if max_frames is not None and frame_idx >= max_frames:
+            break
+
         cam_name = row["camera"]
         if cam_name not in cameras:
             continue
@@ -263,7 +304,7 @@ def convert_real(input_dir, output_dir, cameras):
             continue
 
         kp_cam = keypoints_in_camera_frame(joints, T_cam)
-        projs = project_keypoints(kp_cam, REAL_CAMERA_INTRINSICS)
+        projs = project_keypoints(kp_cam, intrinsics[cam_name])
 
         # For real data, we still copy the image even if projections are off
         img_path = os.path.join(input_dir, row["image_path"])
@@ -303,6 +344,10 @@ def main():
         default=None,
         help="Camera names to include (default: all)",
     )
+    parser.add_argument(
+        "--max-frames", "-n", type=int, default=None,
+        help="Max frames to write (real only). Default: all.",
+    )
     args = parser.parse_args()
 
     print(f"Converting {args.source} dataset: {args.input} → {args.output}")
@@ -314,7 +359,7 @@ def main():
     else:
         cameras = args.cameras or ["cam0", "cam3"]
         print(f"  Cameras: {cameras}")
-        convert_real(args.input, args.output, cameras)
+        convert_real(args.input, args.output, cameras, max_frames=args.max_frames)
 
     print("Done!")
 

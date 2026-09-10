@@ -1,0 +1,65 @@
+source: PnP sur les 12 coins des marqueurs 19, 23 et 26, dont les positions 3D sont
+  retro-projetees depuis l ARDUCAM (extrinseque marqueurs validee). Coins moyennes
+  sur 25 trames live, bras degage. Le 23 est devenu visible une fois le bras ecarte
+  ; il etait masque pendant toute la capture. Le 25 reste non decode par la SVPRO.
+camera: svpro
+intrinsics_stem: cam_2
+resolution:
+- 640
+- 480
+frame_id: base_link
+markers_used:
+- 19
+- 23
+- 26
+rms_reproj_px: 1.03
+validation_hors_ajustement:
+  marqueur: 25
+  methode: localise par contours sur 34 trames live
+  erreur_mediane_px: 3.5
+  erreur_centre_px: 2.9
+  ajustement_2_marqueurs_px: 4.7
+  ancienne_servo_px: 18.3
+validation_croisee_un_marqueur_retire_px:
+  19: 7.3
+  23: 3.3
+  26: 11.4
+remplace: svpro_extrinsic_servo.yaml (24/08, 21,5 px) — NON modifie
+T_cam_world:
+- - -0.9705573786193361
+  - 0.18082761909337605
+  - 0.15912179919980654
+  - 0.1094354820219878
+- - 0.02647001577579608
+  - 0.7366824798220465
+  - -0.6757205503668432
+  - 0.14285268703424453
+- - -0.23941117992356112
+  - -0.6516136095081665
+  - -0.7197791264209785
+  - 0.9752045534500765
+- - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+T_world_cam:
+- - -0.9705573786193361
+  - 0.02647001577579607
+  - -0.23941117992356115
+  - 0.3359069744881051
+- - 0.18082761909337605
+  - 0.7366824798220463
+  - -0.6516136095081665
+  - 0.5104305296904021
+- - 0.15912179919980654
+  - -0.6757205503668431
+  - -0.7197791264209786
+  - 0.781046807072582
+- - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+camera_position_base_m:
+- 0.3359069744881051
+- 0.5104305296904021
+- 0.781046807072582

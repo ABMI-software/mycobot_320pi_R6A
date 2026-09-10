@@ -57,9 +57,17 @@ setup(
             'dream_inference = mycobot_gateway.dream_inference_node:main',
             'pick_and_place = mycobot_gateway.pick_and_place_node:main',
 
+            # DREAM vs encoders real-time validation dashboard (PyQt)
+            'dream_validation_dashboard = mycobot_gateway.dream_validation_dashboard:main',
+
+            # Asservissement visuel en boucle fermée (pick-and-place adaptatif)
+            'object_pose_node = mycobot_gateway.visual_servo.object_pose_node:main',
+            'visual_servo_controller = mycobot_gateway.visual_servo.visual_servo_node:main',
+
             # Multi-object color sorting (Gazebo)
             'color_object_detector = mycobot_gateway.color_object_detector:main',
             'sorting_orchestrator = mycobot_gateway.sorting_orchestrator:main',
+            'sim_sorting_grasp = mycobot_gateway.sim_sorting_grasp:main',
 
             # Hand teleoperation (trajectory → JSON bridge for real robot)
             'trajectory_to_robot_bridge = mycobot_gateway.trajectory_to_robot_bridge:main',

@@ -7,7 +7,13 @@ Subscribes to Gazebo camera images, runs DREAM keypoint detection,
 solves PnP for robot pose estimation, and publishes results.
 
 Published Topics:
-    /dream/keypoints        (std_msgs/Float64MultiArray) — detected 2D keypoints [u0,v0,u1,v1,...]
+    /dream/keypoints        (std_msgs/Float64MultiArray) — [u0,v0,valid0,...,u6,v6,valid6,
+                                                             img_stamp_sec, img_stamp_nanosec,
+                                                             inference_ms] — 24 floats. The
+                                                             trailing 3 let a downstream
+                                                             consumer compute true image->angles
+                                                             latency instead of guessing from its
+                                                             own unrelated camera subscription.
     /dream/pose             (geometry_msgs/PoseStamped)  — estimated robot base pose
     /dream/belief_image     (sensor_msgs/Image)          — debug visualization
     /dream/status           (std_msgs/String)            — detection status
@@ -37,17 +43,22 @@ from PIL import Image as PILImage
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, JointState
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Float64MultiArray, String
 
+# colcon --symlink-install runs this module from a symlink under build/; resolve
+# it to the real source path first, or the three dirname()s below land in
+# build/ (which has no training/ dir) instead of the actual repo root.
+_REAL_FILE = os.path.realpath(__file__)
+
 # Add dream module path
-DREAM_DIR = os.path.dirname(os.path.abspath(__file__))
+DREAM_DIR = os.path.dirname(_REAL_FILE)
 sys.path.insert(0, DREAM_DIR)
 
 # Add training/dream directory for mycobot_fk imports
 _TRAINING_DREAM = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    os.path.dirname(os.path.dirname(os.path.dirname(_REAL_FILE))),
     'training', 'dream',
 )
 if os.path.isdir(_TRAINING_DREAM):
@@ -75,6 +86,16 @@ from mycobot_fk import (
     KEYPOINT_NAMES,
 )
 
+# /joint_states order → [j1..j6] (same convention as calibrate_hand_eye_node)
+JOINT_NAMES = [
+    "joint2_to_joint1",
+    "joint3_to_joint2",
+    "joint4_to_joint3",
+    "joint5_to_joint4",
+    "joint6_to_joint5",
+    "joint6output_to_joint6",
+]
+
 
 class DreamInferenceNode(Node):
     """ROS2 node for real-time DREAM keypoint inference."""
@@ -88,11 +109,16 @@ class DreamInferenceNode(Node):
         self.declare_parameter('publish_rate', 5.0)
         self.declare_parameter('visualize', True)
         self.declare_parameter('min_keypoints_pnp', 4)
+        # Préfixe des topics publiés — paramétrable pour lancer une instance
+        # par caméra sans collision (ex. /dream_svpro). Défaut = legacy /dream.
+        self.declare_parameter('output_prefix', '/dream')
 
         _model_name = self.get_parameter('model_name').value
-        _ckpt_dir = os.path.join(
-            _WORKSPACE_DREAM, 'checkpoints_dream', _model_name,
-        )
+        # Prefer the checkout this node actually runs from (symlink-install
+        # source tree); _WORKSPACE_DREAM is a fallback for a specific machine
+        # layout and can point at a stale checkout with different checkpoints.
+        _ckpt_root = _TRAINING_DREAM if os.path.isdir(_TRAINING_DREAM) else _WORKSPACE_DREAM
+        _ckpt_dir = os.path.join(_ckpt_root, 'checkpoints_dream', _model_name)
         self.model_path = os.path.join(_ckpt_dir, 'best_network.pth')
         self.config_path = os.path.join(_ckpt_dir, 'best_network.yaml')
         self.get_logger().info(f'🔧 Model name: {_model_name}')
@@ -101,6 +127,7 @@ class DreamInferenceNode(Node):
         self.publish_rate = self.get_parameter('publish_rate').value
         self.visualize = self.get_parameter('visualize').value
         self.min_kp_pnp = self.get_parameter('min_keypoints_pnp').value
+        prefix = self.get_parameter('output_prefix').value.rstrip('/')
 
         # ── Camera intrinsics (from Gazebo config) ──
         self.camera_K = GAZEBO_INTRINSICS.copy()
@@ -109,8 +136,9 @@ class DreamInferenceNode(Node):
         self.dream_network = None
         self._load_model()
 
-        # ── Canonical 3D keypoints (home pose FK) ──
-        self.canonical_kp_3d = self._get_canonical_keypoints()
+        # ── Live joint state → FK 3D keypoints for PnP ──
+        # DREAM needs FK at the ACTUAL joint config, not the home pose.
+        self.latest_joint_q = None
 
         # ── State ──
         self.last_inference_time = 0.0
@@ -121,14 +149,14 @@ class DreamInferenceNode(Node):
 
         # ── Publishers ──
         self.pub_keypoints = self.create_publisher(
-            Float64MultiArray, '/dream/keypoints', 10)
+            Float64MultiArray, f'{prefix}/keypoints', 10)
         self.pub_pose = self.create_publisher(
-            PoseStamped, '/dream/pose', 10)
+            PoseStamped, f'{prefix}/pose', 10)
         self.pub_status = self.create_publisher(
-            String, '/dream/status', 10)
+            String, f'{prefix}/status', 10)
         if self.visualize:
             self.pub_belief = self.create_publisher(
-                Image, '/dream/belief_image', 10)
+                Image, f'{prefix}/belief_image', 10)
 
         # ── Subscriber ──
         img_qos = QoSProfile(
@@ -138,6 +166,8 @@ class DreamInferenceNode(Node):
         )
         self.create_subscription(
             Image, self.camera_topic, self._image_callback, img_qos)
+        self.create_subscription(
+            JointState, '/joint_states', self._joint_callback, 10)
 
         # ── Inference timer ──
         self.create_timer(self.min_interval, self._inference_tick)
@@ -208,13 +238,22 @@ class DreamInferenceNode(Node):
             traceback.print_exc()
             self.dream_network = None
 
-    def _get_canonical_keypoints(self) -> np.ndarray:
-        """Get 3D keypoints at home pose (all joints = 0)."""
-        positions, _ = forward_kinematics([0.0] * 6)
-        kp3d = []
-        for name in KEYPOINT_NAMES:
-            kp3d.append(positions[name])
-        return np.array(kp3d, dtype=np.float64)
+    def _joint_callback(self, msg: JointState):
+        """Cache the current joint configuration (radians, [j1..j6])."""
+        name_to_pos = dict(zip(msg.name, msg.position))
+        try:
+            self.latest_joint_q = np.array(
+                [name_to_pos[j] for j in JOINT_NAMES], dtype=np.float64)
+        except KeyError:
+            pass  # partial /joint_states (e.g. gripper-only) — keep last good q
+
+    def _current_keypoints_3d(self) -> Optional[np.ndarray]:
+        """FK 3D keypoints at the CURRENT joint config, or None if unknown."""
+        if self.latest_joint_q is None:
+            return None
+        positions, _ = forward_kinematics(self.latest_joint_q)
+        return np.array([positions[name] for name in KEYPOINT_NAMES],
+                        dtype=np.float64)
 
     # ── Image callback ─────────────────────────────────────────
     def _image_callback(self, msg: Image):
@@ -264,22 +303,33 @@ class DreamInferenceNode(Node):
             # Convert to PIL for DREAM
             pil_image = PILImage.fromarray(image_rgb)
 
-            # Run DREAM inference (debug=True to get belief maps)
+            # Run DREAM inference (debug=True to get belief maps). Timed
+            # separately from the rest of _inference_tick (PnP, publishing,
+            # visualization) so a downstream consumer can tell the NN forward
+            # pass apart from the angle-solver step it runs afterward.
+            t_inf_start = time.time()
             result = self.dream_network.keypoints_from_image(
                 pil_image, debug=True
             )
+            inference_ms = (time.time() - t_inf_start) * 1000.0
             detected_kp = result["detected_keypoints"]
             belief_maps = result.get("belief_maps", None)
 
             self.inference_count += 1
 
-            # Parse keypoints
+            # Parse keypoints. DREAM's own "not detected" sentinel is
+            # [-999.999, -999.999] in net-output space (dream/network.py); by
+            # the time it's rescaled to raw image pixels it lands somewhere
+            # far outside the frame, but is never NaN — so an in-bounds check
+            # is required, not just a NaN check, or "not found" reads as a
+            # confident detection at (-4720, -4800).
+            img_h, img_w = image_rgb.shape[:2]
             kp_2d = []
             kp_valid = []
             for kp in detected_kp:
                 if kp is not None and len(kp) == 2:
                     u, v = float(kp[0]), float(kp[1])
-                    if not (np.isnan(u) or np.isnan(v)):
+                    if not (np.isnan(u) or np.isnan(v)) and 0 <= u < img_w and 0 <= v < img_h:
                         kp_2d.append([u, v])
                         kp_valid.append(True)
                         continue
@@ -288,21 +338,35 @@ class DreamInferenceNode(Node):
 
             n_detected = sum(kp_valid)
 
-            # Publish keypoints
+            # Publish keypoints, with the SOURCE image's own stamp + the
+            # measured inference time appended — msg.header.stamp is set by
+            # camera_publisher_tour from its own wall clock, same epoch as a
+            # downstream consumer's time.time() on the same host, so this is
+            # what lets that consumer compute true end-to-end latency instead
+            # of using the arrival time of whatever camera frame happens to
+            # be newest when it gets around to reading /dream/keypoints.
             kp_msg = Float64MultiArray()
             flat = []
             for uv, valid in zip(kp_2d, kp_valid):
                 flat.extend([uv[0], uv[1], 1.0 if valid else 0.0])
+            flat.extend([
+                float(msg.header.stamp.sec),
+                float(msg.header.stamp.nanosec),
+                inference_ms,
+            ])
             kp_msg.data = flat
             self.pub_keypoints.publish(kp_msg)
 
             # Status
             status_msg = String()
 
-            # Solve PnP if enough keypoints
-            if n_detected >= self.min_kp_pnp:
+            # Solve PnP if enough keypoints AND we know the joint config
+            kp_3d = self._current_keypoints_3d()
+            if kp_3d is None:
+                status_msg.data = f'NO_JOINTS|kp={n_detected}/7'
+            elif n_detected >= self.min_kp_pnp:
                 self.detection_count += 1
-                success, rvec, tvec = self._solve_pnp(kp_2d, kp_valid)
+                success, rvec, tvec = self._solve_pnp(kp_2d, kp_valid, kp_3d)
 
                 if success:
                     # Publish pose
@@ -342,14 +406,15 @@ class DreamInferenceNode(Node):
         self,
         kp_2d: List[List[float]],
         kp_valid: List[bool],
+        kp_3d: np.ndarray,
     ) -> Tuple[bool, Optional[np.ndarray], Optional[np.ndarray]]:
-        """Solve PnP with valid keypoints."""
+        """Solve PnP: DREAM 2D keypoints ↔ FK 3D keypoints (current joints)."""
         pts_2d = []
         pts_3d = []
         for i, (uv, valid) in enumerate(zip(kp_2d, kp_valid)):
             if valid:
                 pts_2d.append(uv)
-                pts_3d.append(self.canonical_kp_3d[i])
+                pts_3d.append(kp_3d[i])
 
         pts_2d = np.array(pts_2d, dtype=np.float64)
         pts_3d = np.array(pts_3d, dtype=np.float64)

@@ -39,6 +39,11 @@ mycobot_controller:
       stopped_velocity_tolerance: 0.01
       goal_time: 0.0
 
+    # Gains d'origine. Les monter a 2000-4000 a ete essaye le 28/08 et RETIRE :
+    # le suivi empire au lieu de s'ameliorer (J1 rate de 34 deg, J5 de 22 deg au
+    # lieu de 3 a 13). L'affaissement se compense en VISANT PLUS BAS, en boucle
+    # fermee sur la pointe reellement atteinte — la meme methode que sur le vrai
+    # bras, ou `BIAIS_Z_PRISE` joue ce role.
     gains:
       joint2_to_joint1:      {p: 100.0, i: 0.01, d: 1.0}
       joint3_to_joint2:      {p: 100.0, i: 0.01, d: 1.0}
@@ -49,15 +54,23 @@ mycobot_controller:
 
 gripper_position_controller:
   ros__parameters:
-    # Four joints driven explicitly. The caller must publish a 4-element
+    # Six joints driven explicitly. The caller must publish a 6-element
     # Float64MultiArray in exactly this order:
-    #   [servo_left, servo_right, tip_left, tip_right]
-    # Close:  [-0.7, +0.7, +0.7, -0.7]   |   Open: [0, 0, 0, 0]
+    #   [servo_left, servo_right, tip_left, tip_right, bar_left, bar_right]
+    # Close:  [-a, +a, +a, -a, -a, +a]   |   Open: six zeros
+    #
+    # Les deux dernieres sont les barres exterieures du parallelogramme. Elles
+    # etaient `fixed` dans l'URDF, donc immobiles pendant que le doigt tournait
+    # — les deux bras noirs a l'horizontale, la pince « cassee » sur les cotes.
+    # Le parallelogramme impose bar = servo du meme cote (mesure 31/08 : les
+    # deux bielles sont paralleles a 0.0 deg pres).
     joints:
       - gripper_controller
       - gripper_base_to_gripper_right3
       - gripper_left3_to_gripper_left1
       - gripper_right3_to_gripper_right1
+      - gripper_base_to_gripper_left2
+      - gripper_base_to_gripper_right2
     command_interfaces:
       - position
     state_interfaces:
@@ -69,3 +82,5 @@ gripper_position_controller:
       gripper_base_to_gripper_right3:     {p: 60.0, i: 0.005, d: 1.5, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
       gripper_left3_to_gripper_left1:     {p: 30.0, i: 0.005, d: 1.0, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
       gripper_right3_to_gripper_right1:   {p: 30.0, i: 0.005, d: 1.0, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_base_to_gripper_left2:      {p: 30.0, i: 0.005, d: 1.0, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_base_to_gripper_right2:     {p: 30.0, i: 0.005, d: 1.0, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}

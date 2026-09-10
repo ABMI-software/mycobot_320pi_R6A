@@ -1,15 +1,94 @@
 # 🤖 MyCobot 320 Pi - Résumé de Développement
 
-> **Date de dernière mise à jour:** 21 avril 2026
+> **Date de dernière mise à jour:** 24 août 2026
 > **Version:** 2.1.0
 > **Repository GitHub:** https://github.com/ABMI-software/mycobot_320pi_R6A
-> **Branche:** `feature/pose-training`
+> **Branche:** `feature/pick-and-place-osama`
 
 ---
 
 ## 📌 Point de Départ Rapide
 
 👉 **Pour démarrer une nouvelle session, consultez [`SESSION_RESUME.md`](SESSION_RESUME.md)**
+
+---
+
+## ⏱️ Cycle autonome fiabilisé et accéléré (24 août 2026)
+
+Trois défauts trouvés par la mesure, pas par la lecture du code.
+
+**1. Le cycle repartait au ramassage avec la balle en main.** `TRANSFERT`
+échouait → `ECHEC` → `ATTENTE` → `DEGAGEMENT`. Une garde unique dans
+`MachineEtats.pas()` l'interdit tant que la pince tient ; deux états neufs,
+`RECHERCHE_CARTON` (cherche en hauteur sans lâcher) et `ECHEC_PORTANT` (garde
+l'objet et s'arrête). Le carton est jugé **avant** la saisie.
+
+**2. Chaque mouvement coûtait 22,7 s d'attente.** L'arrivée était jugée sur
+l'atteinte de la consigne à 1,2°, or l'affaissement laisse ~1,9° d'écart
+permanent sur J2 : le test n'était jamais satisfait. Mesuré identique à vitesse
+25 et 50, donc le temps ne venait pas du robot. Arrivée détectée à l'immobilité :
+**22,7 s → 1,35 s par mouvement**, vitesse inchangée. Avec le roulis appris par
+bande d'allonge (16,7 s → 0,04 s), l'affaissement retenu sur disque et les
+pauses de stabilisation supprimées sur les transits.
+
+**3. La couleur ne sépare pas le carton de la planche** (carton H14 S171 V60,
+planche H15 S187 V84) : la planche entière était prise pour un carton.
+Remplacée par la recherche d'un creux sombre entouré de brun, plus un suivi à
+hystérésis. La portée utile réelle est **350 mm**, pas 335 — des balles
+atteignables étaient refusées.
+
+La SVPRO, recalibrée (16,5 → 1,57 mm), assiste désormais l'arducam : elle
+fournit la hauteur de la balle par triangulation (écartement des rayons 2,3 mm,
+correction XY 2,01 mm) et prend le relais quand le bras masque la vue de dessus.
+
+Détail complet et chiffres : [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) § 6 quater.
+
+---
+
+## 🎯 Asservissement visuel en boucle fermée (20 août 2026)
+
+Cycle pick-and-place complet validé sur le robot réel : localisation par vision,
+approche, descente par paliers, saisie confirmée par statut pince, transport,
+dépôt en bac vérifié par image. Code : `mycobot_gateway/mycobot_gateway/visual_servo/`
+(47 tests unitaires), lancement `ros2 launch mycobot_gateway visual_servo.launch.py`
+— **démarre désarmé**, attend un `start` explicite.
+
+### Ce que le matériel a imposé
+
+Ces quatre points ne viennent pas d'une relecture de code mais de mesures sur le
+robot. Ils sont contre-intuitifs et coûtent cher à redécouvrir.
+
+| Constat | Mesure | Conséquence |
+|---|---|---|
+| `send_coords` inutilisable | 247,8 mm d'erreur contre 18,2 mm via `send_angles`+IK, sur cible identique | Piloter en angles, IK maison sur matrice de rotation |
+| Orientation à tourner selon l'azimut | résidu IK 20,0 mm figée → **0,19 mm** avec `Rz(Δazimut)` | Ne jamais tenir une orientation fixe sur un azimut différent |
+| Branche IK coude bas sans marge | marge J2 **0°** sur toutes les poses historiques ; coude haut : 23–72° | Basculer sur `J3 < 0` avant toute boucle fermée |
+| Affaissement gravitaire | ~13 mm à vide, ~15 mm chargé, **reproductible** | Biais compensable : erreur verticale 13 mm → ~2 mm |
+
+`send_coords` et `send_angles` reçoivent tous deux `OK` du bridge : la méthode
+officielle **échoue en silence**. La cause est un blocage de cardan — toute la
+tâche se déroule entre RY = −78° et −83°, où RX et RZ sont dégénérés. Preuve
+directe : pendant une remontée purement verticale de 43 mm, RX est passé de 1,12°
+à 38,73° alors que l'orientation physique n'avait pas changé.
+
+### Précision obtenue
+
+- Placement final : **3,9 / 0,6 / 0,1 mm** en X/Y/Z
+- Répétabilité (6 aller-retours) : **0,67 mm** en approche unidirectionnelle par
+  le haut — la spec constructeur de 1 mm est tenue
+- **Mais 5,88 mm de biais directionnel** entre approche par le haut et par le
+  côté : ne jamais mélanger les directions entre l'apprentissage d'un point et sa
+  reprise. C'est aussi ce que garantit la descente verticale à XY figé.
+- Extrinsèque arducam stable à **0,8–1,7 mm** après deux jours (RMS 1,01 px,
+  leave-one-out 3,1–3,5 mm)
+
+### Pince Pro adaptative
+
+La pince **cale sur l'objet** à un angle différent de la consigne : 52 mesuré pour
+une commande de 20. Commander ensuite 12 ne la bouge pas — viser plus bas ne serre
+donc **pas** davantage, le seul levier est `set_pro_gripper_torque`. Le statut
+`get_pro_gripper_status` est la seule confirmation de prise valable, et il n'est
+disponible que via `scripts/gripper_bridge.py` (pas `bridge_pi_simple.py`).
 
 ---
 
@@ -58,7 +137,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │           │  MyCobot 320 Pi │                                              │
 │           └─────────────────┘                                              │
 │                                                                            │
-│                     RASPBERRY PI (10.10.0.223)                             │
+│                     RASPBERRY PI (10.10.0.221)                             │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,7 +150,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 ## 📁 Structure du Workspace Tour
 
 ```
-~/ros_jazzy/src/mycobot_R6A/
+~/Osama_ws/src/mycobot_R6A/
 ├── SESSION_RESUME.md               # Point de départ sessions dev
 ├── DEVELOPMENT_SUMMARY.md          # Ce fichier
 ├── CHANGELOG.md                    # Historique des versions
@@ -109,7 +188,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │   │   ├── sorting_orchestrator.py             # Pick-and-place multi-couleur (boucle 4 objets)
 │   │   ├── trajectory_to_robot_bridge.py       # JointTrajectory rad → JSON deg (téléop réel)
 │   │   ├── gripper_to_robot_bridge.py          # Bridge gripper (no-op tant que pas de pince)
-│   │   └── synthetic_data_collector_v2.py      # Collecte Gazebo + anti-collision FK
+│   │   └── synthetic_data_collector_v3.py      # Génération dataset 50k (filtre capsule, domain randomization)
 │   ├── scripts/
 │   │   ├── bridge_pi_simple.py     # Script Pi (serveur TCP robot)
 │   │   └── pi_camera_server.py     # Script Pi (serveur TCP caméras)
@@ -132,24 +211,25 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 │   ├── dataset.py                  # Legacy: datasets single/multi-view
 │   ├── train.py                    # Legacy: régression directe (abandonné)
 │   ├── predict.py                  # Legacy: inférence régression
-│   ├── capture_real.py             # Capture données réelles (FK safety)
+│   ├── capture_real_3cam.py        # Capture réelle 3 caméras synchronisées (ArduCam+SVPRO+Astra) → real_3cam
+│   ├── capture_session.sh          # Lanceur capture_real_3cam.py
 │   └── dream/                      # DREAM pipeline (actif)
 │       ├── mycobot_fk.py           # Forward Kinematics DH + projection
 │       ├── mycobot_ik.py           # Inverse Kinematics Jacobien
+│       ├── dream_angle_solver.py   # Récupère les angles articulaires depuis les keypoints 2D
 │       ├── convert_to_ndds.py      # Conversion → NDDS
-│       ├── merge_and_convert.py    # Fusion réel+synth → NDDS
-│       ├── train_dream.py          # Wrapper entraînement
-│       ├── train_dream_augmented.py# Entraînement + augmentation agressive
-│       ├── train_dream_weighted.py # Entraînement pondéré par keypoint
+│       ├── merge_ndds.py           # Fusion deux datasets déjà NDDS (synth + réel ×5 oversamplé)
+│       ├── train_dream_ultimate_v4.py       # 🎯 Entraînement 50k synthétique from scratch (record 99.4%)
+│       ├── train_dream_ultimate_v4_mix.py   # 🎯 Fine-tune mixte 50k synth + real_3cam ×5 (91.6% réel)
 │       ├── evaluate_dream.py       # Évaluation + filtre sentinel -999.99
 │       ├── infer_dream.py          # Inférence single-image + PnP
 │       ├── visualize_ndds.py       # Vérification visuelle annotations
-│       ├── finetune_real.py        # Fine-tuning expérimental (⚠️ ne fonctionne pas)
+│       ├── finetune_real.py        # Fine-tuning expérimental (⚠️ ne fonctionne pas — voir Leçons apprises)
 │       └── manip_configs/mycobot320.yaml
 │
 ├── datasets/                       # Données (Git LFS)
-│   ├── synthetic_dataset/          # 5000 poses × 4 vues = 20K images
-│   └── real_dataset/               # 2000 poses × 2 caméras = 4000 images
+│   ├── synthetic_dataset/          # v3 : 12.5K poses × 4 caméras = 50K images (record 99.4%)
+│   └── real_3cam/                  # 5 sessions × 500 = 2500 poses × 3 caméras = 7500 images (91.6% réel)
 │
 ├── scripts/
 │   ├── train_pipeline.sh           # Pipeline merge → NDDS → training
@@ -202,7 +282,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 ## 🌐 Communication TCP - Protocole
 
 ### Configuration réseau
-- **IP Raspberry Pi:** `10.10.0.223`
+- **IP Raspberry Pi:** `10.10.0.221`
 - **Port TCP robot:** `5005`
 - **Port TCP caméras:** `5006`
 - **Format commandes:** JSON avec terminaison `\n`
@@ -228,7 +308,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 # IMPORTANT: Désactiver Conda avant ROS2 (Python 3.13 vs 3.12)
 conda deactivate
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/Osama_ws/install/setup.bash
 ```
 
 ### 1. Visualisation standalone (sans robot)
@@ -238,9 +318,9 @@ ros2 launch mycobot_description display.launch.py
 
 ### 2. Communication avec le robot réel
 
-**Sur la Raspberry Pi (10.10.0.223) :**
+**Sur la Raspberry Pi (10.10.0.221) :**
 ```bash
-ssh er@10.10.0.223
+ssh er@10.10.0.221
 # Terminal 1 : bridge robot
 python3 bridge_pi_simple.py
 # Terminal 2 : serveur caméras
@@ -251,7 +331,7 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 ```bash
 conda deactivate
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/Osama_ws/install/setup.bash
 
 # Modes de contrôle disponibles :
 ros2 launch mycobot_gateway simple_gui.launch.py        # GUI graphique
@@ -304,7 +384,7 @@ Pipeline validé sur le robot physique le 22/04/2026 — voir [`docs/REAL_ROBOT_
 
 ### 3. Meshes Gazebo non trouvés
 **Cause:** `GZ_SIM_RESOURCE_PATH` non défini
-**Solution:** Ajouter dans le launch file ou `export GZ_SIM_RESOURCE_PATH=~/ros_jazzy/install/mycobot_description/share`
+**Solution:** Ajouter dans le launch file ou `export GZ_SIM_RESOURCE_PATH=~/Osama_ws/install/mycobot_description/share`
 
 ### 4. DREAM — Belief maps effondrées (all-zeros)
 **Cause:** Fine-tuning manuel avec MSE sur grille quasi-vide
@@ -316,7 +396,7 @@ Pipeline validé sur le robot physique le 22/04/2026 — voir [`docs/REAL_ROBOT_
 
 ---
 
-## 📝 Fichiers sur la Raspberry Pi (10.10.0.223)
+## 📝 Fichiers sur la Raspberry Pi (10.10.0.221)
 
 Les scripts standalone à copier sur la Pi :
 
@@ -342,10 +422,16 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 - [x] Domain Randomization v2 (6 lights, 12 clutter, 3 murs)
 - [x] Fine-tuning custom — tentatives v1/v2 échouées (belief map collapse, sigma mismatch)
 - [x] Entraînement mixte réel+synth via DREAM natif (18K frames, 50 epochs, terminé 16/04/2026)
+- [x] **Grid search weighted loss** (68 configs, 40h45) — w4=1.5, w5=1.5, w6=6.0 optimal (21/05/2026)
+- [x] **vgg_ultimate_v2_e50** — 97.7% overall, 92.6% link6, epoch 20/50 (21/05/2026)
 - [x] **Pick-and-place mono-objet** end-to-end (cube rouge → zone verte) — `pick_and_place.launch.py`
 - [x] **Pick-and-place sorting 4 couleurs** end-to-end (HSV + IK + bins) — `pick_and_place_sorting.launch.py`, validé 23/04/2026
 - [x] **Téléopération main → bras réel** validée sur le MyCobot 320 Pi physique (22/04/2026, gains 1.2/1.2/1.6/0.25, latence ~150–250 ms)
 - [x] Procédure de validation **sim-only** documentée — [`docs/TELEOP_SIM_TESTING.md`](docs/TELEOP_SIM_TESTING.md)
+- [x] **Dataset synthétique 50k (v3)** — 12.5K poses × 4 caméras, filtre anti-collision capsule, couverture 100% du réel, intrinsèques corrigées (02/07/2026)
+- [x] **vgg_ultimate_v4_e50** — **99.4% détection synth, 2.61px moyenne** (13920/14000), nouveau record, 06/07/2026 — voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](training/dream/VGG_ULTIMATE_V4_50K.md)
+- [x] **Évaluer le modèle mixte sur données réelles** — `vgg_ultimate_v4_mix_ft_e30` (50K synth + 6K réel real_3cam ×5 oversampling → ~80K), **91.6% détection réel** (9618/10500, 1500 frames jamais vues), sans régression synthétique — écart sim-to-real fermé (27% → 91.6%), 08/07/2026 — voir [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md)
+- [ ] Fermer l'écart **angulaire** J1-J6 (le gap de détection est fermé, pas l'angle : cible 0.5-0.9°, mesuré 10-20× ça — J6 structurellement non-observable, J5 faiblement observable)
 - [x] **Évaluation finale du modèle mixte** sur réel + synth + relaxed (28/04/2026) — voir [`CHANGELOG.md` § 1.12.0](CHANGELOG.md). Verdict : 47.3 % réel / 91.9 % synth, distal keypoints (link4-6) = bottleneck restant.
 - [x] **Test cheap d'ajout cam3** dans le mix (extrinsèques approximatives, 25 epochs) — voir [`CHANGELOG.md` § 1.13.0](CHANGELOG.md). Verdict : trade-off cam0↔cam3 sans gain net, calibration cam3 nécessaire.
 - [ ] **Calibrer cam0 + cam3** (chessboard OpenCV) puis retrain v3 — étape suivante
@@ -355,7 +441,8 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 ### Moyen terme
 - [x] Nœud ROS2 d'inférence DREAM (`dream_inference_node.py`)
 - [x] Pipeline pick-and-place simulation (`pick_and_place_node.py`)
-- [ ] **Bench test robot réel** une fois detection > 50%
+- [x] **Bench test détection réel** — 91.6% atteint, largement au-delà de l'objectif initial de 50%
+- [ ] **Pose estimation eye-to-hand + courbe d'écart par joint** (angles DREAM vs encodeurs) — outillage en place, calibration extrinsèque caméra fixe en cours
 - [ ] Intégration MoveIt2 pour planification de trajectoire
 
 ### Long terme
@@ -582,6 +669,13 @@ Epoch 7 : val_loss = 95.97    ← explosion massive
 
 ### Transfert Sim-to-Real
 
+> **Mise à jour 08/07/2026 — écart fermé.** Ce qui suit (jusqu'à "Pistes pour
+> réduire le domain gap") décrit l'état **avant** le fine-tune mixte
+> `vgg_ultimate_v4_mix_ft_e30`, conservé comme diagnostic historique.
+> Résultat final : **91.6% détection réel** (contre ~26-27% ici), voir
+> [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md)
+> et [`training/dream/README.md`](training/dream/README.md) pour les tableaux complets.
+
 | Métrique | Synthétique | Réel |
 |----------|-------------|------|
 | Taux de détection | 97% | ~26% |
@@ -596,6 +690,20 @@ Epoch 7 : val_loss = 95.97    ← explosion massive
 3. **Self-supervised labeling** : utiliser les angles lus du robot + FK + intrinsèques caméra pour générer les keypoints GT sur images réelles
 4. **Style transfer** (CycleGAN) entre images Gazebo et réelles
 
+**Ce qui a effectivement fermé l'écart (08/07/2026)** : ni la domain randomization
+avancée seule ni le style transfer, mais un **fine-tune mixte** — 50K synthétique
+(v4, intrinsèques corrigées) + 6K réel (`real_3cam`, 2000 poses × 3 caméras)
+oversamplé ×5 → 30K, fusionnés en ~80K frames, `scale_limit` élargi de 0.1 à 0.3
+(couvre l'écart de focale mesuré jusqu'à +23,5% pour l'astra), fine-tune 30 epochs
+depuis `vgg_ultimate_v4_e50/best_network.pth`. Évalué sur 1500 frames réelles
+jamais vues (500 poses × 3 caméras, split par pose pour éviter toute fuite) :
+**91.6% détection** (9618/10500), sans régression synthétique (toujours 99.4%).
+
+| Modèle | Dataset | Synthétique | Réel |
+|--------|---------|-------------|------|
+| vgg_ultimate_v4_e50 (06/07/2026) | 50K synth v3 | **99.4% det, 2.61px** | ≈27% det |
+| **vgg_ultimate_v4_mix_ft_e30 (08/07/2026)** | 50K synth + 6K réel ×5 → ~80K | 99.4% det (pas de régression) | **91.6% det, 2.91px médiane** |
+
 ### Fichiers du module DREAM
 
 | Fichier | Rôle |
@@ -609,6 +717,14 @@ Epoch 7 : val_loss = 95.97    ← explosion massive
 | `training/dream/infer_dream.py` | Inférence : détection keypoints + résolution PnP |
 | `training/dream/visualize_ndds.py` | Visualisation des annotations keypoints sur images |
 | `training/dream/manip_configs/mycobot320.yaml` | Configuration des 7 keypoints (noms, frames URDF) |
+| `training/dream/train_dream_grid_search.py` | Grid search 64 combinaisons de weights |
+| `training/dream/evaluate_grid.py` | Évaluation automatisée des runs grid search |
+| `training/dream/train_dream_ultimate_v2.py` | Training w=[1,1,1,1,1.5,1.5,6.0] sur 20K (97.7% synth, ancien record) |
+| `training/dream/train_dream_ultimate.py` | Training final w=[1,1,1,1,1.5,3.0,5.0] |
+| `training/dream/merge_ndds.py` | Fusion réel + synthétique déjà en NDDS |
+| `training/dream/train_dream_ultimate_v4.py` | 🎯 Training 50K synth v3 from scratch — **record actuel 99.4%** |
+| `training/dream/train_dream_ultimate_v4_mix.py` | 🎯 Fine-tune mixte 50K synth + real_3cam ×5 — **91.6% réel, écart fermé** |
+| `training/dream/dream_angle_solver.py` | Récupère les angles articulaires (rad) depuis les keypoints 2D détectés |
 
 ### Checkpoints DREAM (dans .gitignore)
 
@@ -619,6 +735,13 @@ Epoch 7 : val_loss = 95.97    ← explosion massive
 | `checkpoints_dream/vgg_augmented_e25/` | VGG augmenté (25 époques, meilleur E22, val=0.000667) |
 | `checkpoints_dream/vgg_weighted_50k_e50/` | VGG 50K synth (50 époques, 98.3% det synth, 13.2% réel) |
 | `checkpoints_dream/vgg_mixed_real_synth/` | VGG mixte 18K (10K réel×5 + 8K synth, terminé — à évaluer) |
+| `checkpoints_dream/vgg_ultimate_e30/` | VGG weighted [1,1,1,1,1.5,3.0,5.0] — 97.5% det synth, 28/30 |
+| `checkpoints_dream/vgg_ultimate_e50/` | VGG weighted [1,1,1,1,1.5,3.0,5.0] — 96.9% det synth, 35/50 |
+| `checkpoints_dream/vgg_ultimate_v2_e30/` | VGG weighted [1,1,1,1,1.5,1.5,6.0] — 97.5% det synth, 27/30 |
+| `checkpoints_dream/vgg_ultimate_v2_e50/` |  VGG weighted [1,1,1,1,1.5,1.5,6.0] — 97.7% det synth, 92.6% link6, 20/50 (ancien record) |
+| `checkpoints_dream/vgg_grid_*/` | 68 runs grid search (5 epochs chacun, 20K synth) |
+| `output/checkpoints_dream/vgg_ultimate_v4_e50/` | **50K synth v3, from scratch — 99.4% det synth, 2.61px, val_loss 0.000750 — record actuel** |
+| `output/checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/` | **Fine-tune mixte 50K synth + real_3cam ×5 — 91.6% det réel, val_loss 0.000942, best epoch 27/30 — modèle actif** |
 
 ### Tentatives de fine-tuning (❌ ÉCHOUÉES)
 
@@ -716,6 +839,12 @@ cd /tmp/DREAM && pip install -e . -r requirements.txt
 | Anti-collision FK collecteur synthétique | 15/04/2026 | ✅ OK |
 | Scripts train_pipeline.sh + monitor_collection.sh | 16/04/2026 | ✅ OK |
 | merge_and_convert.py | 16/04/2026 | ✅ OK |
+| DREAM — Grid search 68 configs weighted loss (20K synth) | 21/05/2026 | ✅ w4=1.5, w5=1.5, w6=6.0 optimal — 40h45 total |
+| DREAM — vgg_ultimate_v2_e50 (97.7% record) | 21/05/2026 | ✅ Nouveau record synth, epoch 20/50, 2h52 |
+| DREAM — Génération dataset synthétique 50k v3 (12.5K poses × 4 caméras) | 02/07/2026 | ✅ Couverture 100% du réel, filtre capsule |
+| DREAM — Training vgg_ultimate_v4_e50 (50K synth, from scratch) | 02–06/07/2026 | ✅ **99.4% det synth, 2.61px — nouveau record** |
+| DREAM — Recalage extrinsèques caméras réelles (arducam/svpro/astra) | 03/07/2026 | ✅ Débloque le fine-tune mixte |
+| DREAM — Fine-tune mixte vgg_ultimate_v4_mix_ft_e30 (50K synth + 6K réel ×5, 13.8h) | 03–08/07/2026 | ✅ **91.6% det réel — écart sim-to-real fermé (27%→91.6%)** |
 
 ---
 
@@ -723,7 +852,7 @@ cd /tmp/DREAM && pip install -e . -r requirements.txt
 
 ```bash
 # Compiler les packages
-cd ~/ros_jazzy/src/mycobot_R6A
+cd ~/Osama_ws/src/mycobot_R6A
 colcon build --symlink-install
 
 # Compiler un seul package
@@ -755,6 +884,7 @@ pkill -f bridge_pi
 - **Simulation Gazebo + données synthétiques:** 31 mars 2026
 - **Pipeline IA + capture réelle + diagnostic:** 1-2 avril 2026
 - **DREAM keypoint pose estimation:** 3 avril 2026
+- **Grid search weighted loss + nouveau record 97.7%:** 21 mai 2026
 
 ---
 

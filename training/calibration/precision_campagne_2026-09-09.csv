@@ -1,0 +1,107 @@
+CAMPAGNE DE PRECISION — MyCobot 320 Pi — 2026-09-09
+
+AVERTISSEMENTS DE METHODE
+,"La specification Elephant Robotics du myCobot 320 Pi (1 mm) est une REPEATED POSITIONING PRECISION — une REPETABILITE. Ce n'est PAS une precision absolue de positionnement cartesien."
+,Seuls les tests A et F-UNI partagent cette definition. Tous les autres ne sont comparables a aucun chiffre publie.
+,"BORNE INFERIEURE : la position vient de FK(angles RELUS). Elle est aveugle au jeu de reducteur, a la souplesse des bras et a la flexion de l'outil. Le constructeur mesure par un moyen EXTERNE. Nos chiffres de repetabilite peuvent donc SOUS-estimer la vraie dispersion, jamais la surestimer."
+,"Le test B est en boucle OUVERTE, sans la compensation d'affaissement de `converge` : il contient les ~13 mm d'affaissement documentes. Compense, l'ecart tombe a ~2 mm."
+,"TAILLE DU TAG : la POSITION du tag a ete posee a l'oeil, ce n'est pas une verite terrain. Seule sa TAILLE IMPRIMEE en est une. C'est pourquoi le test E porte sur l'echelle et non sur la position."
+
+"A — REPETABILITE DU BRAS (codeurs + FK), 10 retours PAR LE HAUT"
+essai,x_mm,y_mm,z_mm
+1,323.5631,25.3522,48.4796
+2,323.5631,25.3522,48.4796
+3,323.5631,25.3522,48.4796
+4,323.5631,25.3522,48.4796
+5,323.5631,25.3522,48.4796
+6,323.5631,25.3522,48.4796
+7,323.5229,25.8604,48.4796
+8,323.5229,25.8604,48.4796
+9,323.5229,25.8604,48.4796
+10,323.5229,25.8604,48.4796
+n,10
+ecart_max_mm,0.3059
+etendue_3d_mm,0.5098
+sigma_x_mm,0.0208
+sigma_y_mm,0.2624
+sigma_z_mm,0.0000
+spec_constructeur_repeatability_mm,0.5
+verdict,COHERENT — sous la spec
+
+"B — ERREUR DE CIBLE ABSOLUE ||FK(q_lu) - P_cible||, boucle OUVERTE"
+essai,erreur_3d_mm
+1,14.9213
+2,14.9213
+3,14.9213
+4,14.9213
+5,14.9213
+6,14.9213
+7,14.7263
+8,14.7263
+9,14.7263
+10,14.7263
+moyenne_mm,14.8433
+comparable_a_la_spec,NON — contient l affaissement ~13 mm
+
+C — PLANCHER DE BRUIT DE LA VISION (tag et camera immobiles)
+n_trames,60
+sigma_x_mm,0.0000
+sigma_y_mm,0.0000
+lecture,sortie du detecteur identique d une trame a l autre : bruit sous sa quantification
+
+D — BIAIS D APPROCHE LATERALE (5 retours par l arriere)
+essai,x_mm,y_mm,z_mm
+1,320.7005,27.0661,41.7864
+2,320.4053,26.8285,40.9489
+3,320.4053,26.8285,40.9489
+4,320.4053,26.8285,40.9489
+5,320.4053,26.8285,40.9489
+ecart_des_moyennes_vs_A_mm,8.0909
+
+E — ECHELLE DE LA VISION — TAILLE DU TAG EXPLICITE
+objet_mesure,taille_imprimee_mm,taille_mesuree_mm,taille_px,erreur_pct,base
+tag operateur,50.0,48.374,,-3.252,base courte
+tag operateur,100.0,100.005,46.17,+0.005,base courte
+marqueur de planche id 19,50.0,49.368,24.55,-1.265,base courte
+marqueur de planche id 25,50.0,48.595,21.80,-2.811,base courte
+marqueur de planche id 26,50.0,47.385,20.66,-5.230,base courte
+distance entre marqueurs,438.4,437.235,,-0.255,base longue
+distance entre marqueurs,575.9,574.650,,-0.209,base longue
+distance entre marqueurs,391.0,389.472,,-0.399,base longue
+
+CONCLUSION E,"ArUco tag 50 mm : -3,25 % — ArUco tag 100 mm : +0,005 %. Une vraie erreur d echelle serait IDENTIQUE aux deux tailles. Les 3 marqueurs de planche, tous de 50 mm, donnent -1,27 / -2,81 / -5,23 % selon leur obliquite. Il n y a donc AUCUNE erreur d echelle de la chaine : le -3,25 % est un artefact de mesure sur petit marqueur oblique."
+
+F — REPETABILITE SELON LE SENS D APPROCHE
+F-UNI — 6 retours TOUJOURS par le haut (comparable a la spec)
+essai,x_mm,y_mm,z_mm
+1,323.5631,25.3522,48.4796
+2,323.5631,25.3522,48.4796
+3,323.5631,25.3522,48.4796
+4,323.5631,25.3522,48.4796
+5,323.5631,25.3522,48.4796
+6,323.2603,25.6535,48.2025
+n,6
+ecart_max_mm,0.4244
+etendue_3d_mm,0.5092
+sigma_x_mm,0.1236
+sigma_y_mm,0.1230
+sigma_z_mm,0.1131
+verdict,"COHERENT — sous les 1 mm"
+
+"F-MULTI — 6 retours, 4 directions (NON comparable a la spec)"
+essai,sens_d_approche,x_mm,y_mm,z_mm
+1,haut,323.5631,25.3522,48.4796
+2,arriere,320.4053,26.8285,40.9489
+3,gauche,321.5786,27.8735,42.1442
+4,droite,322.0152,24.0628,41.8108
+5,arriere,319.9753,26.4822,39.7413
+6,haut,323.3527,29.3020,48.6003
+n,6
+ecart_max_mm,5.8473
+etendue_3d_mm,10.8997
+sigma_x_mm,1.4757
+sigma_y_mm,1.8422
+sigma_z_mm,3.9000
+degradation_vs_UNI,x21.4
+
+CORRECTION DU SOIR 09/09,"La fiche officielle du myCobot 320 Pi annonce Repeatability 1MM et Working Radius 350mm. Le +-0,5 mm employe plus tot dans la journee ne figure PAS sur cette fiche. Recalcules sur 1 mm, TOUS les verdicts de repetabilite passent. Les colonnes verdict ci-dessus qui disent AU-DESSUS se lisent desormais SOUS LA SPEC."

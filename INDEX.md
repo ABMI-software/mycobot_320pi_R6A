@@ -41,9 +41,26 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | [docs/TELEOP_SIM_TESTING.md](docs/TELEOP_SIM_TESTING.md) | **Validation en simulation seule** avant le bras réel : KPIs, scénarios guidés, use cases sim-only (téléop, pick mono, sorting, RoM) |
 | [docs/REAL_ROBOT_TEST_PROCEDURE.md](docs/REAL_ROBOT_TEST_PROCEDURE.md) | Protocole de calibration sécurisé sur robot physique (validé 22/04/2026) |
 
+### 🎯 Asservissement visuel en boucle fermée (robot réel)
+| Document | Description |
+|----------|-------------|
+| [docs/PICK_AND_PLACE_BOUCLE_FERMEE.md](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) | **Document de reprise.** Ce qui a été mesuré sur le robot réel : règles non négociables (`send_coords` écarté, branche coude haut, orientation tournée selon l'azimut), l'affaissement qui fait aussi *pivoter* l'outil, le coût en allonge de l'outil vertical, l'ordre correct de la descente, les pièges de calcul (auto-test IK, extrinsèque qui dérive en bloc, déport validé sur son propre point) et le biais latéral encore ouvert ; § 6 quater (24/08) : l'invariant « objet en main, jamais de retour au ramassage », la détection du carton par creux sombre, la portée réelle de 350 mm, l'appui SVPRO, et les 22,7 s d'attente par mouvement supprimées |
+| [mycobot_gateway/launch/visual_servo.launch.py](mycobot_gateway/launch/visual_servo.launch.py) | Lancement de la boucle — démarre **désarmé** (`dry_run:=true`), attend un `start` explicite. Prérequis et pièges dans le docstring |
+| [mycobot_gateway/mycobot_gateway/visual_servo/state_machine.py](mycobot_gateway/mycobot_gateway/visual_servo/state_machine.py) | Machine à états SEARCH→TRACK→APPROACH→FINE_SERVO→DESCEND→GRASP→LIFT→PLACE, testable sans matériel |
+| [mycobot_gateway/mycobot_gateway/visual_servo/safety.py](mycobot_gateway/mycobot_gateway/visual_servo/safety.py) | Superviseur : 9 conditions d'arrêt, dont l'incohérence commande/mouvement mesuré |
+| [training/calibration/calibrate_camera_base_extrinsic.py](training/calibration/calibrate_camera_base_extrinsic.py) | Extrinsèque caméra→base : 16 coins, RANSAC+LM, **validation leave-one-out** |
+| [scripts/diff_ik.py](scripts/diff_ik.py) | IK différentielle sur **matrice de rotation**. Son docstring explique pourquoi `send_coords` est écarté |
+
+> ⚠ **`send_coords` est inutilisable sur cette unité.** Mesuré le 20/08 sur cible
+> identique : 247,8 mm d'erreur contre 18,2 mm via `send_angles` + IK, les deux
+> avec un `OK` du bridge — la méthode constructeur échoue en silence (blocage de
+> cardan à RY ≈ −80°). Voir le CHANGELOG § Corrigé.
+
 ### 🎯 Pick-and-place / sorting (Gazebo)
 | Document | Description |
 |----------|-------------|
+| [docs/SIMULATION_GAZEBO_EXPLICATION.docx](docs/SIMULATION_GAZEBO_EXPLICATION.docx) | **Word, pour lecteur non-ROS.** À quoi sert la simulation, ce qui est simulé, comment les trois briques (Gazebo / ros2_control / nœud de tri) s'articulent, le cycle en 10 étapes, les quatre défauts que le banc a permis de trouver, et ce que la simulation ne dit **pas** du robot réel |
+| [docs/PICK_AND_PLACE_SIMULATION.md](docs/PICK_AND_PLACE_SIMULATION.md) | **Tri des quatre objets par saisie PHYSIQUE** (plus de téléportation) : résultat mesuré 4/4 en 115 s, tous à plat au fond de leur bac ; lancement, graphe ROS, géométrie de la pince en chiffres (point outil au centre des patins, ouverture et encombrement selon l'angle, les 6 valeurs du contrôleur), cycle en 10 étapes, et les trois contraintes non évidentes — bac vert par-dessus l'épaule, pointe plafonnée à ~140 mm, doigts qui entrent dans le bac mais ne peuvent pas s'y ouvrir |
 | [mycobot_description/README_GAZEBO.md](mycobot_description/README_GAZEBO.md) | Worlds disponibles : `pick_and_place.sdf` (mono) + `pick_and_place_sorting.sdf` (4 couleurs / 4 bacs) + visuels caméra |
 | [mycobot_gateway/README.md](mycobot_gateway/README.md) | Nœuds `pick_and_place_node`, `color_object_detector`, `sorting_orchestrator` + launches associés |
 | [README.md § Pick-and-place](README.md) | Section synthétique avec diagramme du pipeline sorting et résultats de validation 23/04/2026 |
@@ -52,7 +69,9 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | Document | Description |
 |----------|-------------|
 | [training/README.md](training/README.md) | Pipeline ML (régression directe legacy + DREAM actif) |
-| [training/dream/README.md](training/dream/README.md) | Module DREAM keypoint detection — VGG-19, weighted loss, training mixte (10K réel + 8K synth) |
+| [training/dream/README.md](training/dream/README.md) | Module DREAM keypoint detection — VGG-19, checkpoint `vgg_ultimate_v4_mix_ft_e30` : 99.4% synthétique (50K), 91.6% réel (fine-tune mixte 50K synth + real_3cam ×5) |
+| [docs/DREAM_VALIDATION_DASHBOARD.md](docs/DREAM_VALIDATION_DASHBOARD.md) | Dashboard PyQt de validation live **multi-caméras** (Arducam + SVPRO, fusion *solve-then-fuse* par joint) : ce qu'il affiche (vues empilées, courbes enc vs DREAM, tableau keypoint fusionné + détection globale), 3 filtres temporels au choix (aucun défaut), poids solveur, mode cohérence, acquisition CSV. Inclut le graphe ROS2 ![png](training/dream/rqt_dream_multicam.png) |
+| [docs/DREAM_VALIDATION_LAUNCH.md](docs/DREAM_VALIDATION_LAUNCH.md) | Lancement : **launch unique `dream_multicam.launch.py`** (auto-détecte 1 ou 2 caméras) ou les 5 nœuds à la main, graphe nœuds/topics + rqt, **table de diagnostic** (quel symptôme → quel nœud manquant) + piège `.venv` |
 | [docs/SYNTHETIC_DATA.md](docs/SYNTHETIC_DATA.md) | Pipeline données synthétiques Gazebo + domain randomization v2 |
 | [datasets/README.md](datasets/README.md) | Documentation des datasets (synthétique 50K + réel 4K via Git LFS) |
 
@@ -99,5 +118,8 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 
 ---
 
+**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.7.0 (legacy DREAM)
+**Mise à jour :** 20 août 2026 — asservissement visuel en boucle fermée, cycle
+pick-and-place complet validé sur robot réel (`feature/pick-and-place-osama`)
 **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3) · 1.14.0-pre (calibration cam0/cam3 mesurée — `feature/calibration-cam`)
 **Mise à jour :** 28 avril 2026 (soir) — calibration intrinsèque cam_0 + cam_3, finding fx=610 du dataset DREAM faux de ~14 % vs caméras physiques
