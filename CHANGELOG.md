@@ -1489,6 +1489,335 @@ est en cours pour combler l'écart — voir
 
 - [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) — historique modèles DREAM à jour (v4, mix fine-tune)
 - [`training/README.md`](../training/README.md), [`training/dream/README.md`](../training/dream/README.md) — tableaux de résultats à jour
+## [1.15.2-pre] - 2026-06-09 — branche `feature/pick-and-place`
+
+### Calibration main-œil robot réel — pipeline complet + nœuds caméra
+
+#### Ajouté
+
+- [`mycobot_gateway/calibrate_hand_eye_node.py`](mycobot_gateway/mycobot_gateway/calibrate_hand_eye_node.py) :
+  nœud interactif de calibration main-œil (eye-to-hand). Détecte le marqueur ID 20
+  via ArUco solvePnP, propose un balayage automatique de 30 poses (j4/j5/j6), résout
+  la transformation T_base←cam via OpenCV Tsai, sauvegarde en YAML.
+- [`mycobot_gateway/calibrate_extrinsic_node.py`](mycobot_gateway/mycobot_gateway/calibrate_extrinsic_node.py) :
+  nœud d'étalonnage extrinsèque caméra (PnP sur 4 marqueurs sol fixes).
+- [`mycobot_gateway/reach_target_aruco_node.py`](mycobot_gateway/mycobot_gateway/reach_target_aruco_node.py) :
+  nœud de déplacement du bras vers une cible ArUco localisée par `aruco_localizer_node`.
+- [`mycobot_gateway/orbbec_camera_publisher.py`](mycobot_gateway/mycobot_gateway/orbbec_camera_publisher.py) :
+  publisher dédié caméra Orbbec (OpenCV → `/camera/image_raw`).
+- [`mycobot_gateway/camera_live_view.py`](mycobot_gateway/mycobot_gateway/camera_live_view.py) :
+  visualiseur local (cv2.imshow) du flux `/camera/image_raw`.
+- [`mycobot_gateway/camera_web_view.py`](mycobot_gateway/mycobot_gateway/camera_web_view.py) :
+  serveur HTTP mjpeg du flux caméra (port 8080).
+- [`scripts/aruco_dictionary_probe.py`](scripts/aruco_dictionary_probe.py) :
+  outil diagnostic — détecte quel dictionnaire ArUco correspond au marqueur physique.
+- [`scripts/measure_aruco_workspace.py`](scripts/measure_aruco_workspace.py) :
+  mesure les positions X/Y/Z des marqueurs workspace depuis une image capturée.
+- [`training/calibration/camera_extrinsic.yaml`](training/calibration/camera_extrinsic.yaml) :
+  matrice extrinsèque caméra mesurée (T_base←cam).
+- [`training/calibration/workspace_markers.yaml`](training/calibration/workspace_markers.yaml) :
+  positions XY des marqueurs workspace (IDs 19/25/23/26) en repère base robot.
+
+#### Modifié
+
+- [`mycobot_gateway/aruco_localizer_node.py`](mycobot_gateway/mycobot_gateway/aruco_localizer_node.py) :
+  IDs workspace mis à jour (0-3 → 19/25/23/26), taille 50 mm → 25 mm, positions
+  chargées depuis `workspace_markers.yaml` au lieu d'être codées en dur.
+- [`mycobot_gateway/joint_sync.py`](mycobot_gateway/mycobot_gateway/joint_sync.py) :
+  parsing d'angles unifié — accepte `ANGLES:`, `angles:`, `angles_ok:` ;
+  ignore les réponses d'erreur `-1` (lecture série ratée).
+- [`mycobot_gateway/bridge_tour.py`](mycobot_gateway/mycobot_gateway/bridge_tour.py) :
+  IP par défaut `.225` → `.221` ; logs send/recv abaissés à `debug` (réduit le bruit).
+- [`setup.py`](mycobot_gateway/setup.py) : entry points ajoutés pour
+  `orbbec_camera_publisher`, `camera_live_view`, `camera_web_view`.
+
+---
+
+## [1.15.1-pre] - 2026-06-03 — branche `feature/pick-and-place`
+
+### Pick-and-place Gazebo — débug visuel (GUI + ArUco textures + HOME stable)
+
+#### Modifié
+
+- [`launch/pick_and_place_aruco.launch.py`](mycobot_gateway/launch/pick_and_place_aruco.launch.py) :
+  flag `-s` (server-only) retiré → Gazebo ouvre sa GUI graphique (`DISPLAY=:1` requis).
+
+- [`mycobot_description/worlds/precision_benchmark.sdf`](mycobot_description/worlds/precision_benchmark.sdf) :
+  - Marqueurs workspace (IDs 0-3) : cubes colorés → dalles 10×10 cm avec texture PBR
+    ArUco `DICT_4X4_1000` (albedo_map PNG 240×240 px, bordure blanche imprimée).
+  - Cube cible (ID 10) : corps rouge conservé + face supérieure avec texture ArUco ID 10.
+
+- [`mycobot_gateway/pick_and_place_aruco_node.py`](mycobot_gateway/mycobot_gateway/pick_and_place_aruco_node.py) :
+  - `HOME_ANGLES` : `[0,0,0,0,0,0]` → `[0,-0.8,1.4,-0.8,0,0]` rad — position stable
+    au-dessus du workspace, élimine le tremblement sous gravité.
+  - Ajout `_gripper_base_world()` : position de `gripper_base` en frame monde via FK
+    complète + transform fixe (`joint6output_to_gripper_base: xyz=[0,-0.007,0.056]`).
+  - `_do_grasp()` et SETTLING-carrying : `ee_pos + 0.02` → `gripper_base_world + 0.025`
+    (cube suit le point de saisie réel, ne flotte plus au-dessus du bras).
+
+- [`urdf/320_pi/mycobot_pro_320_pi_benchmark.urdf`](mycobot_description/urdf/320_pi/mycobot_pro_320_pi_benchmark.urdf) :
+  `initial_value` pour joints 2/3/4 mis à `[-0.8, 1.4, -0.8]` — correspond à
+  `HOME_ANGLES`, robot stable dès le spawn.
+
+#### Ajouté
+
+- `mycobot_description/worlds/textures/aruco_4x4_{0000..0003,0010}.png` — 5 PNG ArUco
+  générés via OpenCV (`DICT_4X4_1000`, 200 px + bordure 20 px).
+- `mycobot_description/materials/textures/` — même jeu de PNG (copie de référence).
+- `CMakeLists.txt` : `materials/` ajouté à la liste `install(DIRECTORY ...)`.
+
+#### Limitation connue
+
+L'IK (`inverse_kinematics_position`) optimise uniquement la position de link6, pas
+l'orientation de la pince. À la position de saisie, la pince pointe latéralement
+(~5 cm en Y), pas verticalement vers le bas. Correction future : IK avec contrainte
+d'orientation ou champ TCP configurable.
+
+---
+
+## [1.15.0-pre] - 2026-06-03 — branche `feature/pick-and-place`
+
+### Pick-and-place ArUco — pipeline complet sim + robot réel
+
+Orchestrateur unifié qui consomme `/aruco/object_pose` (fourni par
+`gz_sim_localizer` en Gazebo ou `aruco_localizer_node` sur robot réel) et
+exécute un cycle pick-place complet via IK numérique + `JointTrajectory`.
+
+#### Ajouté
+
+- [`mycobot_gateway/pick_and_place_aruco_node.py`](mycobot_gateway/mycobot_gateway/pick_and_place_aruco_node.py) —
+  orchestrateur FSM à 9 états (INIT → WAIT_POSE → IK_PLAN → MOVING →
+  SETTLING → GRASP → RELEASE → DONE). Paramètre `mode` :
+  - **`sim`** : grasp émulé par `gz service set_pose` (téléportation Gazebo),
+    l'objet suit l'EE via FK pendant le transport.
+  - **`real`** : commandes gripper JSON sur `/to_robot` (no-op si pas de pince
+    physique — câblé pour le futur).
+  Motion via `/mycobot_controller/joint_trajectory` (ros2_control en sim,
+  `trajectory_to_robot_bridge` sur robot réel) — interface identique.
+
+- [`launch/pick_and_place_aruco.launch.py`](mycobot_gateway/launch/pick_and_place_aruco.launch.py) —
+  pipeline complet Gazebo : `gz_sim` + `ros2_control` + `gz_sim_localizer` +
+  `fk_ee_pose` + `pick_and_place_aruco` (mode sim). Réutilise le monde
+  `precision_benchmark.sdf` (cube cible déjà présent).
+
+- [`launch/pick_and_place_aruco_real.launch.py`](mycobot_gateway/launch/pick_and_place_aruco_real.launch.py) —
+  pipeline robot réel : `bridge_tour` + `trajectory_to_robot_bridge` +
+  `fk_ee_pose` + `aruco_localizer` + `pick_and_place_aruco` (mode real).
+
+#### Architecture du pipeline (sim et réel)
+
+```
+[gz_sim_localizer]          [aruco_localizer]
+ (GT Gazebo)                 (cam_0 + ArUco)
+        ↓                          ↓
+        └──────┬────────────────────┘
+               ↓ /aruco/object_pose
+    [pick_and_place_aruco_node]
+               ↓ JointTrajectory
+    [mycobot_controller]     [trajectory_to_robot_bridge]
+     (ros2_control Gazebo)    (→ /to_robot → bridge_tour → Pi)
+```
+
+#### Commandes de lancement
+
+```bash
+# Simulation Gazebo
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
+
+# Robot réel (prérequis : bridge Pi actif + marqueurs posés)
+ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
+
+# Paramètres utiles
+ros2 launch mycobot_gateway pick_and_place_aruco.launch.py \
+    settle_time:=3.0 target_x:=0.25 target_y:=0.05 \
+    place_x:=0.20 place_y:=-0.18
+```
+
+#### Corrigé
+
+- `KeyError: 'angles'` dans l'état `MOVING` : l'index du plan était incrémenté
+  dans `_advance_plan()` **avant** la transition, donc `MOVING` lisait le
+  segment suivant (GRASP, sans clé `angles`). Fix : stocker le segment courant
+  dans `self._current_seg` au moment de la transition et le lire depuis là.
+
+#### État de validation
+
+- Pipeline compilé et import vérifié ✅
+- Validation end-to-end Gazebo : **validée le 3 juin 2026** ✅
+  - Cycle complet `home → approach_pick → grasp_pos → GRASP → lift →
+    approach_place → place_pos → RELEASE → retreat → home_end → DONE`
+  - IK : 6 waypoints, erreur 0.0 mm pour chaque solution
+  - Grasp sim : `gz service set_pose` opérationnel
+- Validation robot réel : **à faire** (prérequis : imprimer marqueurs ArUco)
+
+---
+
+## [1.14.0-pre] - 2026-04-28 (soir) — branche `feature/calibration-cam`
+
+### 🎯 Calibration intrinsèque mesurée — finding majeur sur le dataset DREAM
+
+Calibration ChArUco des deux Arducams Pi (cam_0, cam_3) avec un nouvel outil `training/calibration/calibrate_camera.py`. **Les K mesurés divergent de ~14 % du `fx=fy=610` codé en dur dans le `_camera_settings.json` du dataset DREAM `real_cam0`.** C'est très probablement la cause majeure du gap de détection link4-6 observé depuis 1.11.0.
+
+### Ajouté — `training/calibration/`
+
+- [`calibrate_camera.py`](../training/calibration/calibrate_camera.py) — calibrateur ChArUco unifié (UVC `--source v4l2` + Astra `--source astra` via OpenNI wrapper). Quality gating (markers / sharpness / coverage grid / diversité temporelle), rejet outliers per-view-error, **auto-save** quand `target_samples` atteint, fallback save-on-quit ≥ 12 vues, CLAHE optionnel pour capteurs bruités. Presets caméra auto-appliqués via `--name` (cam_* → arducam, astra* → astra_rgb).
+- [`generate_board.py`](../training/calibration/generate_board.py) — génère un PNG ChArUco à imprimer aux dimensions exactes (DPI configurable).
+- [`probe_charuco.py`](../training/calibration/probe_charuco.py) — probe single-frame (a servi à débusquer 2 régressions OpenCV 4.6 : `DetectorParameters()` et `CharucoBoard((sx,sy),…)` qui segfault sur access aux propriétés — fix par fallback legacy `_create()`).
+- [`probe_astra.py`](../training/calibration/probe_astra.py) — probe Astra 15 s, 4 modes (raw / CLAHE / swap-RB / swap-RB+CLAHE).
+
+### Mesuré
+
+| Caméra | Vues | RMS px | fx | fy | cx | cy |
+|--------|------|--------|----|----|----|----|
+| **cam_0** | 18 | **0.67** | 525.67 | 529.70 | 317.73 | 226.00 |
+| **cam_3** | 21 | **0.68** | 496.31 | 494.14 | 313.37 | 248.01 |
+
+### Comparaison avec dataset DREAM existant
+
+| Param | Dataset (`_camera_settings.json`) | cam_0 mesuré | Écart |
+|-------|-----------------------------------|--------------|-------|
+| fx | 610 | 525.67 | **−13.8 %** |
+| fy | 610 | 529.70 | **−13.2 %** |
+| cx | 320 | 317.73 | −0.7 % |
+| cy | 240 | 226.00 | **−5.8 %** |
+
+**Implication** : les `projected_location` GT du dataset ont été calculées avec un `fx=610` qui ne correspond à aucune caméra physique. Pour un point 3D à distance D, l'erreur sur le pixel projeté est ~14 % et **croît avec la distance au centre image**. Cohérent avec les link4-6 (loin du centre quand le bras est étendu) à 3-36 % de détection en 1.12.0. Le réseau a entraîné sur des GT erronés sur les distal — convergence impossible.
+
+### Différé — calibration Astra
+
+Tentatives infructueuses (cf. SESSION_RESUME.md) :
+- 640×480 standard : 5-6 markers détectés sur 27 → `interpolateCornersCharuco` retourne 0
+- 1280×720 RGB888 @30 fps : USB 2.0 saturé (663 Mbps > 480) → image corrompue
+- 1280×720 GRAY8 @30 fps : grabber freeze après quelques secondes
+- Chessboard pur (`findChessboardCorners` + `findChessboardCornersSB`) : 0 corners
+
+À refaire en session dédiée avec board fixé au mur + Astra sur trépied. Custom HD grabber compilé localement dans `/tmp/oni_grabber_hd.cpp` (non commit).
+
+### Prochaines actions
+
+1. **🔴 Régénérer les GT** du dataset `real_cam0` avec K cam_0 mesurés (`cv2.projectPoints(..., K, dist)`).
+2. **🔴 Ré-évaluer DREAM** sur dataset corrigé avec checkpoint mixed e50.
+3. **🟡 Si gap subsiste** : retrain mixte v2 sur GT corrigé.
+
+---
+
+## [1.13.0] - 2026-04-28 (après-midi)
+
+### 🧪 DREAM — test cheap d'ajout de cam3 dans le mix (extrinsèques approximatives)
+
+Hypothèse à valider : la 2ᵉ caméra réelle (`cam3`, vue latérale) — restée hors du mix v1 parce que ses extrinsèques n'étaient pas calibrées — pourrait débloquer les distal keypoints (link4–link6) en exposant le modèle à une vue où le foreshortening n'écrase pas le bras. Test "cheap" : on réutilise les extrinsèques approximatives existantes dans `convert_to_ndds.py` (sans calibration chessboard) et on retrain pour voir le signal.
+
+### Ajouté
+
+- `/tmp/dream_data/real_cam3` — 2000 frames NDDS générées via `convert_to_ndds.py --source real --cameras cam3` avec les extrinsèques approximatives (`xyz=(0, 0.5, 0.3)`, `rpy=(0, 0.2, -π/2)`) et fx=610 partagé avec cam0.
+- `/tmp/dream_data/mixed_v2_cam03` — mix par symlinks : 2K cam0 ×3 + 2K cam3 ×3 + 6K synth subset = 18K total (même taille que `mixed_real_synth` v1 pour comparaison directe).
+- `training/checkpoints_dream/vgg_mixed_v2_cam03/` — checkpoint après 25 epochs (2h35 sur RTX 4000 Ada). Train loss finale 0.000256, val loss 0.000356 (vs v1 e25 val=0.000334 — légèrement plus haut, cohérent avec annotations cam3 bruitées).
+
+### Mesuré (3 évaluations sur le même checkpoint v2)
+
+| Eval | v1 (`vgg_mixed_real_synth` e50) | **v2 (`vgg_mixed_v2_cam03` e25)** | Δ |
+|------|----------------------------------|------------------------------------|---|
+| cam0 strict (real_cam0 split=all) | 47.3 % det · 2.78 px med | **40.2 %** det · 2.77 px med | **-7.1 pts** ⚠️ |
+| cam3 strict (real_cam3 split=all) | 25.1 % det · 237 px med ❌ | **35.1 %** det · **2.75 px** med (proximaux) | **+10 pts det**, erreur OVERALL ÷22 ✅ |
+| synth val (synthetic split=val 1000f) | 91.9 % det · 2.72 px med | **93.1 %** det · 2.93 px med | +1.2 pts ✅ |
+
+#### Détail per-keypoint v2 sur cam0
+
+| Keypoint | v1 e50 | v2 e25 | Note |
+|----------|--------|--------|------|
+| base | 0 % | 0.8 % | non détecté |
+| link1 / link2 | 100 % @ 2.78 | 100 % @ 2.76 | identique |
+| link3 | 88.8 % @ 2.20 | 72 % @ 5.83 | **régression -16.8 pts** |
+| link4 | 35.6 % @ 81 | **3.0 % @ 112** | **effondrement** |
+| link5 | 3.8 % @ 7 | 5.0 % @ 254 | détection ↗, erreur ↗↗ |
+| link6 | 3.0 % @ 62 | 0.6 % @ 293 | régression nette |
+
+#### Détail per-keypoint v2 sur cam3
+
+| Keypoint | baseline (v1 sur cam3) | v2 e25 |
+|----------|------------------------|--------|
+| base | 2.2 % @ 249 | 0.4 % @ 312 |
+| link1 / link2 | 1.6–1.8 % @ 95 | **100 % @ 2.75** ✅ |
+| link3 | 20.4 % @ 167 | **41.2 % @ 5.68** ✅ |
+| link4 | 48.6 % @ 210 | 0.8 % @ 235 |
+| link5 | 50 % @ 240 | 2.6 % @ 243 |
+| link6 | 51 % @ 330 | 0.6 % @ 291 |
+
+Logs : `/tmp/eval_v2_cam0.log`, `/tmp/eval_v2_cam3.log`, `/tmp/eval_v2_synth.log`, `/tmp/eval_cam3_baseline.log` (eval croisée du v1 sur cam3, point de référence).
+
+### Verdict
+
+- ✅ **Le modèle PEUT apprendre cam3** : link1 et link2 passent de 1.6 % à 100 % détection avec une médiane 2.75 px (équivalent cam0). La preuve que les images cam3 contiennent l'info utile pour le pipeline DREAM.
+- ✅ **Le synth ne souffre pas** (+1.2 pts) — le doublement de la diversité réelle n'a pas écrasé les features synthétiques.
+- ⚠️ **Mais cam0 régresse de 7 pts** sur les distal (link3 -16.8, link4 -32.6, link5/link6 effondrés). Le modèle a appris du bruit dans les annotations cam3 et ce bruit s'est propagé sur les distal partout.
+- 🟰 **Bilan net** : on échange perf cam0 contre perf cam3 sans gain global. Le test cheap a délivré son signal : **les extrinsèques cam3 approximatives sont effectivement load-bearing**.
+
+### Décision pour la prochaine session
+
+**Calibrer cam3 proprement** (chessboard OpenCV pour intrinsèques + extrinsèques mesurées physiquement ou par PnP sur le checkpoint v1) **avant le retrain v3**. Sinon on plafonnera autour de 35–40 % per-cam avec des trade-offs cam0↔cam3 systématiques.
+
+Plan v3 (post-calibration) :
+
+1. Calibration chessboard cam0 + cam3 (5 min/cam, OpenCV).
+2. Mesure ou PnP des extrinsèques cam3 par rapport à la base du robot.
+3. Refactor `convert_to_ndds.py` : `REAL_CAMERA_INTRINSICS` devient par-cam (dict `{cam0: K0, cam3: K3}`), update `REAL_CAMERA_TRANSFORMS["cam3"]` avec les valeurs mesurées.
+4. Régénérer `real_cam0_v3` + `real_cam3_v3` avec les bonnes annotations.
+5. Build `mixed_v3` : même structure (2K cam0 ×3 + 2K cam3 ×3 + 6K synth = 18K).
+6. Retrain 50 epochs (au lieu de 25 — la val loss n'avait pas plateauté).
+7. Cible : ≥ 50 % cam0 + ≥ 50 % cam3 simultanément.
+
+### Inchangé
+
+- Aucune modification de code dans `mycobot_gateway` ni `mycobot_description`. Pipeline pick-and-place, sorting, téléop : intacts.
+- Le checkpoint `vgg_mixed_real_synth` (v1 e50, baseline 47.3 % cam0) reste celui à utiliser pour toute inférence en attendant v3.
+
+---
+
+## [1.12.0] - 2026-04-28
+
+### 🧪 DREAM — évaluation finale du modèle mixte sur tous les splits
+
+Reprise de l'évaluation après installation des dépendances (`pandas` ajouté à `venv_dream`). Trois passes sur `vgg_mixed_real_synth/best_network.pth` (= e50) couvrent désormais **(a) réel strict, (b) synthétique strict, (c) réel relaxed**, ce qui ferme le diagnostic ouvert depuis 1.11.0.
+
+### Mesuré (3 évaluations, 28/04/2026)
+
+| Eval | Dataset | Split | Frames | Det rate | OVERALL méd. | link6 det% / méd. |
+|------|---------|-------|--------|----------|--------------|--------------------|
+| (a) strict | `real_cam0` | all | 500/2000 | **47.3 %** | 2.78 px | 3.0 % / 61.6 px |
+| (b) strict | `synthetic` | val | 1000/4000 | **91.9 %** | 2.72 px | 73.2 % / 18.59 px |
+| (c) relaxed (peak=0.001) | `real_cam0` | all | 500/2000 | **48.0 %** | 2.78 px | 8.6 % / 170.7 px |
+
+Logs bruts : `/tmp/eval_a_real_strict.log`, `/tmp/eval_b_synth_val.log`, `/tmp/eval_c_real_relaxed.log`.
+
+### Verdict
+
+- **Le mix-training a fonctionné comme attendu** : gain massif sur réel (+21 pts vs synth-only `vgg_weighted_50k_e50` à 26 %) au prix d'une régression contrôlée sur synth (-6.4 pts vs synth-only à 98.3 %). Le modèle n'a *pas* oublié le synth.
+- **Le relaxed thresholding ne débloque rien** : +0.7 pt de détection sur réel, mais base passe à 28 % avec une médiane d'erreur de **328 px** (largeur image = 640) et link6 à 170 px. Les peaks à conf < 0.01 sont du bruit, pas des bonnes prédictions masquées. Hypothèse définitivement réfutée.
+- **Bottleneck identifié** : les *distal keypoints* (link4–link6) restent l'obstacle sur réel. Sur synth val, link6 est déjà à 73.2 % seulement (vs 100 % pour base/link1/link2) — le modèle peine sur les keypoints éloignés du repère même sur du synth, et sur réel cette difficulté s'effondre à 3 %.
+- Conclusion = ce qui était prescrit en 1.11.0 §"Prochaine session" : **enrichir le dataset réel avec des poses bras-étendu** pour exposer le modèle à plus de configurations distal.
+
+### Comparaison avec le baseline synth-only (`vgg_weighted_50k_e50`)
+
+| Métrique | synth-only e50 | **mixte e50** | Δ |
+|----------|----------------|---------------|---|
+| Détection synth val | 98.3 % | 91.9 % | -6.4 pts |
+| Détection réel all | 26.0 % | **47.3 %** | **+21.3 pts** |
+| link6 médiane réel | n/d (5.6 % det) | 61.6 px | gain net en détection mais erreur élevée |
+
+### Ajouté
+
+- `pandas` dans `venv_dream` (utilisé par `evaluate_dream.py` pour exporter les résultats par-keypoint).
+
+### Pas changé
+
+- Aucune modification de code ni de checkpoints. La doc `docs/TELEOP_SIM_TESTING.md`, le pipeline pick-and-place, le pipeline de téléop : intacts.
+
+### Prochaines actions (priorité)
+
+1. **🔴 Capturer 5–10 K poses réelles supplémentaires** biaisées vers bras-étendu (cf. CHANGELOG 1.11.0 §"Prochaine session" pour le plan détaillé). Adapter `training/capture_real.py` pour favoriser `|j2| < 30°` + `j3 ∈ [60°, 110°]` (configurations où link4-6 sont visibles et bien séparés).
+2. **🔴 Retrain mixte v2** sur le dataset enrichi (~30 K frames, 50 epochs natif DREAM).
+3. **🟡 Cible** : détection ≥ 70 % tous keypoints sur réel, link6 médiane ≤ 10 px — seuil minimum pour passer au pose-driven pick-and-place sur robot réel.
+4. **🟢 Optionnel** : tester l'inférence DREAM en sim Gazebo via `ros2 launch mycobot_gateway pick_and_place.launch.py` (le checkpoint mixte y sera meilleur que le synth-only pour les link4-6, à confirmer).
 
 ---
 
