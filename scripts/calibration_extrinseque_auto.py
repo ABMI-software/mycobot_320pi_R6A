@@ -8,6 +8,10 @@ script est un PROCESSUS separe et non une fonction — meme decoupage que
 
 Deux modes :
 
+    --controle    mesure, sans rien ecrire, de combien les marqueurs se sont
+                  ecartes de la reference. C'est ce chiffre qui dit s'il faut
+                  recalibrer.
+
     --reference   releve la position ACTUELLE des quatre marqueurs a travers
                   l'extrinseque de production, et l'ecrit dans
                   `planche_actuelle.yaml`. A faire pendant que l'extrinseque
@@ -209,6 +213,48 @@ def position_camera(T):
     return (-T[:3, :3].T @ T[:3, 3]) * 1000.0
 
 
+def controle(index, trames_n):
+    """De combien les marqueurs ont-ils bouge depuis la reference ?
+
+    Ne mesure PAS la justesse de l'extrinseque : un ecart ici veut dire que
+    les marqueurs ont bouge, ou que la camera a bouge, et rien dans cette
+    mesure ne distingue les deux. Le seul controle qui tranche est la
+    projection du squelette du robot sur son image (11/09).
+    """
+    total = 3
+    etape(1, total, 'lecture de la reference')
+    fichier = REFERENCE if REFERENCE.exists() else CALIB / 'workspace_markers.yaml'
+    ref = yaml.safe_load(fichier.read_text())
+    monde = {int(k): np.array(v, float) for k, v in ref['markers'].items()}
+    d = yaml.safe_load(EXTRINSEQUE.read_text())
+    T = np.array(d['T_cam_world'], float)
+    K, dist = registre.load_intrinsics(d['intrinsics_stem'])
+
+    trames, par_trame, utiles, reglage, luminance = acquiert(
+        index, sorted(monde), trames_n, 2, total)
+    if not utiles:
+        raise SystemExit('aucun marqueur vu — degager le bras, ecarter les cables')
+
+    etape(3, total, 'comparaison')
+    ecarts = {}
+    for i in utiles:
+        centre = np.mean([p[i] for p in par_trame], axis=0).mean(axis=0)
+        vu = base.vers_plan(centre, K, dist, T, 0.0)[:2] * 1000.0
+        ecarts[i] = float(np.linalg.norm(vu - monde[i][:2]))
+        dis('INFO', f'id {i} : {ecarts[i]:5.2f} mm de sa position de reference')
+    pire = max(ecarts.values())
+    moyen = float(np.mean(list(ecarts.values())))
+    dis('INFO', f'reference {fichier.name} — ecart moyen {moyen:.2f} mm, '
+                f'pire {pire:.2f} mm')
+    dis('RESULTAT', json.dumps({
+        'mode': 'controle', 'reference': fichier.name,
+        'ecart_moyen_mm': round(moyen, 2), 'ecart_max_mm': round(pire, 2),
+        'marqueurs_vus': [int(i) for i in utiles],
+        'par_marqueur': {str(i): round(ecarts[i], 2) for i in utiles},
+        'luminance': round(luminance, 1)}))
+    return 0
+
+
 def ecrit_reference(index, trames_n):
     total = 4
     etape(1, total, 'lecture de l\'extrinseque de production')
@@ -363,6 +409,8 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     a.add_argument('--reference', action='store_true',
                    help='relever la position actuelle de la planche')
+    a.add_argument('--controle', action='store_true',
+                   help='mesurer l ecart aux marqueurs sans rien ecrire')
     a.add_argument('--frames', type=int, default=5)
     a.add_argument('--force', action='store_true',
                    help='ecrire meme si la validation echoue (a eviter)')
@@ -372,7 +420,9 @@ def main():
     index = index_arducam()
     dis('INFO', f'arducam sur /dev/video{index}')
     code = 0
-    if args.reference:
+    if args.controle:
+        code = controle(index, args.frames)
+    elif args.reference:
         ecrit_reference(index, args.frames)
     else:
         code = recalibre(index, args.frames, args.force)
