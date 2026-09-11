@@ -144,7 +144,12 @@ HAUTEUR_CENTRE_BALLE = DIAMETRE_BALLE / 2.0
 # lequel se projette toute la geometrie des cartons, et entre Z=0 et Z=100 le
 # centre projete d'un carton se deplace de 50 mm.
 HAUTEUR_CARTON = 83.0     # rebord du carton, mesure
-HAUTEUR_OBJET = 12.0      # mi-hauteur d'un rouleau de scotch couche
+# Mi-hauteur du rouleau. Mesuree indirectement le 07/09 : a 12 mm la pince
+# tombait sur un QUART du rouleau et non au milieu. La camera regarde de biais
+# (tangente ~0,30 depuis la pose d'observation), donc chaque centimetre de
+# hauteur sous-estimee pousse le point projete de 3,1 mm vers l'exterieur.
+# A 24 mm le recentrage vaut 3,7 a 4,5 mm et la prise est centree.
+HAUTEUR_OBJET = 24.0
 # Demi-epaisseur des segments du bras PLUS l'ombre qu'ils portent sur la
 # planche. C'est cette ombre qui se faisait prendre pour l'ouverture du carton :
 # creux sombre, entoure de brun, elle passait tous les tests (mesure du 24/08,
@@ -406,9 +411,20 @@ DESTINATION = {'scotch': 'petit', 'balle': 'grand', 'robot': 'grand'}
 INVENTAIRE = {'scotch': 2, 'balle': 1, 'robot': 1}
 # Categories qu'on saisit par leur endroit le plus EPAIS et non par le centroide
 # de leur enveloppe. Le centroide suit les membres qui depassent : sur le petit
-# robot la pince se refermait sur un bras. Le scotch, lui, garde le centroide —
-# c'est le centre de son anneau.
-PRISE_PAR_EPAISSEUR = {'robot'}
+# robot la pince se refermait sur un bras.
+#
+# LE SCOTCH Y A ETE AJOUTE le 27/08. Il gardait le centroide, « centre de son
+# anneau » — c'est-a-dire le TROU. Mesure du jour sur le rouleau bleu : la prise
+# se fait (statut 2, angle 24, signature d'un rouleau tenu) puis l'objet GLISSE
+# a la remontee, et chaque essai rate le POUSSE — il a derive de 65 mm en sept
+# tentatives. Six decalages lateraux (16 et 22 mm dans les quatre directions) ont
+# echoue, et monter le couple a 250 aussi : ce n'est donc ni la visee ni la
+# force, ce sont les doigts qui ne prennent qu'un quart de rouleau.
+#
+# La transformee de distance donne le milieu de la BANDE, la ou il y a de la
+# matiere a serrer. Sur un rouleau vu sans son trou (blob compact), elle rend le
+# centre — donc rien ne change pour ce cas-la.
+PRISE_PAR_EPAISSEUR = {'robot', 'scotch'}
 COULEUR_CARTON = {'grand': (255, 150, 0), 'petit': (0, 165, 255)}
 COULEUR_OBJET = {'scotch': (0, 255, 0), 'robot': (255, 0, 255), 'balle': (0, 0, 255)}
 FENETRE_DETECTION = 1.2   # s — age maximal d'une detection reutilisable
@@ -602,6 +618,20 @@ ECART_TAILLE_DECISIF = 0.25
 # Si les boites changent, ces deux valeurs sont a re-mesurer : le banc
 # scratchpad/stabilite_cartons.py les sort en une commande.
 AIRE_CARTON_ATTENDUE = {'grand': 12600.0, 'petit': 7700.0}
+# Bornes d'AIRE au-dela desquelles une tache n'est plus une ouverture de carton,
+# quelles que soient ses proportions. Le gabarit par cotes (COTE_CARTON_MM) ne
+# suffit pas : porte a 260 mm pour laisser passer un carton vu de biais, il
+# accepte du meme coup un carre de 236 mm. Mesure du 27/08 sur le vrai banc,
+# marqueur 11 absent : une tache de 230 x 236 mm — 543 cm2, quatre fois le grand
+# carton — a ete nommee « petit » a 226 mm, c'est-a-dire SUR LA BALLE, et le
+# cycle est parti en boucle.
+#
+# La bande retenue couvre tout ce qu'on a reellement mesure : une boite PLEINE
+# tombe a 59 cm2 (0,47 fois son aire a vide) et le petit vu de biais monte a
+# 117 cm2 (1,5 fois). On garde 0,4 a 2,0 fois, soit 31 a 252 cm2 — 543 est
+# dehors sans discussion.
+AIRE_CARTON_MIN = 0.4 * min(AIRE_CARTON_ATTENDUE.values())
+AIRE_CARTON_MAX = 2.0 * max(AIRE_CARTON_ATTENDUE.values())
 # Bande morte autour de la moyenne geometrique des deux, en deca de laquelle un
 # carton seul n'est pas assez tranche pour se nommer par sa seule aire.
 BANDE_MORTE_AIRE = 0.15
@@ -705,6 +735,11 @@ class Vision:
         self.source = fichier.name
         self._plateau = None
         self._planche = None
+        # {classe: (ecart marqueur->ouverture dans le repere du marqueur,
+        #           polygone base centre, orientation apprise, hauteur)}
+        # Appris quand la boite est VIDE et son ouverture nette ; sert quand elle
+        # est pleine et n'en a plus. Jamais persiste : les boites bougent.
+        self._forme_carton = {}
 
     def vers_base(self, uv, z_mm):
         """Pixel -> point du plan horizontal Z=z_mm dans le repere base (mm)."""
@@ -798,8 +833,15 @@ class Vision:
         cote_px = float(np.mean([np.linalg.norm(quad[i] - quad[(i + 1) % 4])
                                  for i in range(4)]))
         centre = quad.mean(axis=0)
+        # ORIENTATION du marqueur dans le plan de la planche, prise sur son
+        # premier cote ramene en base. Elle permet de suivre une boite qu'on a
+        # non seulement deplacee mais TOURNEE : l'ecart marqueur -> ouverture est
+        # fixe dans le repere de la boite, pas dans celui du robot.
+        a = self.vers_base(quad[0], z)[:2]
+        b = self.vers_base(quad[1], z)[:2]
+        angle = float(np.arctan2(b[1] - a[1], b[0] - a[0]))
         return (self.vers_base(centre, z)[:2],
-                z if cote_px >= COTE_MARQUEUR_PX_MIN else None, cote_px)
+                z if cote_px >= COTE_MARQUEUR_PX_MIN else None, cote_px, angle)
 
     def cartons_marques(self, image, marqueurs):
         """{classe: (xy du marqueur, z du rebord)} vu par les marqueurs colles.
@@ -818,7 +860,7 @@ class Vision:
             if pose is not None:
                 xy, z = pose[:2]
                 rendus[classe] = (xy, z if z is not None and z >= REBORD_MARQUEUR_MIN
-                                  else None)
+                                  else None, pose[3])
         return rendus
 
     def quad_plateau(self):
@@ -1059,8 +1101,9 @@ class Vision:
             moments = cv2.moments(cv2.convexHull(contour))
             uv = (moments['m10'] / moments['m00'], moments['m01'] / moments['m00'])
             if classe in PRISE_PAR_EPAISSEUR:
-                # Le scotch garde le centroide : c'est le centre de son anneau,
-                # et la pince doit se refermer dessus, pas sur la bande.
+                # Le point le plus epais, c'est-a-dire la ou il y a de la matiere
+                # a serrer : le milieu du ventre pour le robot, le milieu de la
+                # BANDE pour le rouleau — et non son trou.
                 epais = self.point_le_plus_epais(plein)
                 if epais is not None:
                     uv = epais
@@ -1161,6 +1204,56 @@ class Vision:
                    in self._creux_candidats(image, angles)]
         return points
 
+    def _apprend_forme(self, classe, centre, marque, contour, hauteur):
+        """Retient l'ecart marqueur -> ouverture DANS LE REPERE DE LA BOITE.
+
+        En base il ne vaudrait que pour l'orientation courante : tourner la
+        boite de 90 deg le rendrait faux de deux fois sa longueur. Rapporte a
+        l'orientation du marqueur, il ne depend plus que de l'endroit ou le
+        marqueur est colle — c'est-a-dire de rien qui bouge.
+        """
+        xy_marque, _, angle = marque
+        if angle is None or contour is None:
+            return
+        ecart = np.asarray(centre, float) - np.asarray(xy_marque, float)
+        cos, sin = np.cos(-angle), np.sin(-angle)
+        self._forme_carton[classe] = (
+            np.array([cos * ecart[0] - sin * ecart[1],
+                      sin * ecart[0] + cos * ecart[1]]),
+            self.polygone_base(contour, hauteur) - np.asarray(centre, float),
+            angle, hauteur)
+
+    def _forme_depuis_marqueur(self, classe, marque, connu=None):
+        """(centre, contour PIXEL, hauteur) reconstruits du seul marqueur.
+
+        Elle sert a GARDER EN VIE une boite qu'on connait deja et qui vient de
+        perdre son ouverture — parce qu'on l'a remplie. Elle ne sert JAMAIS a
+        en placer une ailleurs : le 27/08 l'etiquette « petit » s'est retrouvee
+        sur le BRAS, a 210 mm, pendant qu'il portait la balle. Une boite qui a
+        vraiment bouge, elle, est VIDE, donc son ouverture se voit et
+        l'appariement normal la retrouve — la reconstruction n'a rien a y faire.
+        On exige donc que le resultat reste dans le voisinage de la derniere
+        position connue.
+        """
+        appris = self._forme_carton.get(classe)
+        xy_marque, _, angle = marque
+        if appris is None or angle is None or connu is None:
+            return None
+        ecart, forme, angle_appris, hauteur = appris
+        cos, sin = np.cos(angle), np.sin(angle)
+        rot = np.array([[cos, -sin], [sin, cos]])
+        centre = np.asarray(xy_marque, float) + rot @ ecart
+        if not plausible(centre):
+            return None
+        if float(np.linalg.norm(centre - np.asarray(connu, float))) > CONTINUITE_CARTON:
+            return None
+        tourne = np.array([[np.cos(angle - angle_appris), -np.sin(angle - angle_appris)],
+                           [np.sin(angle - angle_appris), np.cos(angle - angle_appris)]])
+        polygone = (tourne @ np.asarray(forme, float).T).T + centre
+        contour = np.array([self.vers_pixel([q[0], q[1], hauteur]) for q in polygone],
+                           np.int32).reshape(-1, 1, 2)
+        return centre, contour, hauteur
+
     def cartons(self, image, angles=None, objets=(), marqueurs=None,
                 connus=None):
         """Les cartons vus : [(classe, xy, contour, hauteur du rebord)].
@@ -1204,8 +1297,22 @@ class Vision:
         def porte_un_marqueur(xy):
             return any(np.linalg.norm(xy - m[0]) <= PORTE_MARQUEUR_CARTON
                        for m in marques.values())
+
+        # ... NI si l'ouverture est LA OU UNE BOITE EST DEJA SUIVIE. Une boite ne
+        # cesse pas d'etre une boite parce qu'on y a mis quelque chose : c'est
+        # meme le contraire, une boite qui se remplit ressemble de plus en plus a
+        # un objet. Mesure du 27/08, petit carton a (392, -133), marqueur 11
+        # invisible : son ouverture est trouvee sur 38 images sur 40 et VOLEE par
+        # le filtre des objets sur 33 — nommee « petit » 5 fois sur 40. Le
+        # marqueur exemptait deja ce cas, mais seulement quand on le voit.
+        def deja_suivie(xy):
+            return any(float(np.linalg.norm(xy - np.asarray(c, float)))
+                       <= RAYON_OBJET_CARTON
+                       for c in (connus or {}).values() if c is not None)
+
         vus = [v for v in self._creux_candidats(image, angles)
                if (porte_un_marqueur(v[1])
+                   or deja_suivie(v[1])
                    or all(np.linalg.norm(v[1] - centre) > RAYON_OBJET_CARTON
                           for centre in centres))
                and not sous_le_bras(v[1], angles)]
@@ -1235,12 +1342,31 @@ class Vision:
             # quand le marqueur est sur le rebord il donne la vraie, et on refait
             # la projection avec. Pose a plat sur la table, il ne dit que le nom.
             hauteur = HAUTEUR_CARTON if z is None else z
-            rendus.append((classe, self.vers_base(creux[4], hauteur)[:2],
-                           creux[2], hauteur))
+            centre = self.vers_base(creux[4], hauteur)[:2]
+            self._apprend_forme(classe, centre, marques[classe], creux[2], hauteur)
+            rendus.append((classe, centre, creux[2], hauteur))
         for j in sorted((j for _, j in paires), reverse=True):
             del restants[j]
         manquantes = [c for c in ('grand', 'petit')
                       if c not in {r[0] for r in rendus}]
+        # UNE BOITE PLEINE N'A PLUS D'OUVERTURE — son marqueur, si. Mesure du
+        # 25/08 : le grand carton avec la balle et un scotch dedans tombe a
+        # 59 cm2 contre 126 vide, sous le petit reste a 71. Ce qui disparait
+        # alors n'est pas seulement le NOM (la continuite le tient), c'est le
+        # POLYGONE dont le point de largage a besoin — et sans lui la machine
+        # part chercher un carton qu'elle a sous les yeux. Tant que le marqueur
+        # est vu, l'ecart marqueur -> ouverture appris quand la boite etait vide
+        # replace l'ouverture, tournee avec elle.
+        for classe in list(manquantes):
+            if classe not in marques:
+                continue
+            reconstruit = self._forme_depuis_marqueur(classe, marques[classe],
+                                                      (connus or {}).get(classe))
+            if reconstruit is None:
+                continue
+            centre, contour, hauteur = reconstruit
+            manquantes.remove(classe)
+            rendus.append((classe, centre, contour, hauteur))
         # UN CARTON DONT LE MARQUEUR EST VU NE SE NOMME PAS AUTREMENT. Si son
         # ouverture n'a pas ete appariee sur cette image, on ne rend rien pour
         # lui plutot que de laisser les heuristiques — continuite, aire, robe —
@@ -1437,6 +1563,10 @@ class Vision:
             if coeur is not None:
                 c, enveloppe = coeur, cv2.convexHull(coeur)
                 petit, grand = self._cotes_mm(enveloppe)
+            # L'aire se juge APRES le recentrage sur le coeur sombre, pas avant :
+            # l'enveloppe brute avale l'ombre de la paroi et deborde largement.
+            if not (AIRE_CARTON_MIN <= petit * grand <= AIRE_CARTON_MAX):
+                continue
             moments = cv2.moments(enveloppe)
             uv = (moments['m10'] / moments['m00'], moments['m01'] / moments['m00'])
             centre_base = self.vers_base(uv, HAUTEUR_CARTON)[:2]
@@ -1502,9 +1632,18 @@ class SuiviCarton:
         self._candidat = None
         self._confirmations = 0
         self.deplacements = 0          # incremente a chaque bascule reelle
+        self.marque_vue = False        # boite deja identifiee par son marqueur
 
     def _adopte(self, centre, taille, polygone, maintenant, rebord=None):
-        if self.centre is not None:
+        # Un DEPLACEMENT, c'est un changement de POSITION — pas une simple
+        # readoption. Le suivi readopte aussi quand la boite est perdue de vue
+        # plus de PEREMPTION_CARTON (le bras la masque) : compter cela comme un
+        # deplacement faisait reannoncer « point de largage a recalculer » sans
+        # arret, jusqu'a empecher le cycle d'aboutir (constate le 26/08, journal
+        # noye et quatre echecs d'affilee sur la recherche du carton).
+        if (self.centre is not None
+                and float(np.linalg.norm(np.asarray(centre, float) - self.centre))
+                > SAUT_CARTON):
             self.deplacements += 1
         self.centre, self.taille, self.polygone = centre, taille, polygone
         self.rebord = rebord if rebord is not None else self.rebord
@@ -1516,21 +1655,30 @@ class SuiviCarton:
         maintenant = time.time() if maintenant is None else maintenant
         if centre is None:
             return
+        self.marque_vue = self.marque_vue or marque
         perime = maintenant - self.vu_le > PEREMPTION_CARTON
-        if self.centre is None or perime:
+        # La PEREMPTION n'autorise pas a relocaliser une boite identifiee par son
+        # marqueur. Perdre la boite de vue est justement ce qui arrive quand le
+        # bras se place AU-DESSUS d'elle pour deposer : la detection se remplit
+        # alors de l'ombre et du bras, et sautait de 50 a 170 mm. Adoptee sans
+        # discuter, cette position d'occlusion devenait la position du carton —
+        # elle comptait un deplacement (« carton grand deplace » quatre fois
+        # d'affilee dans le journal du 26/08), perimait le point de largage en
+        # plein transfert, et le petit robot est parti a cote du petit carton.
+        # Une boite marquee ne se deplace desormais que sur des images
+        # CONCORDANTES, occlusion ou pas.
+        if self.centre is None or (perime and not self.marque_vue):
             self._adopte(centre, taille, polygone, maintenant, rebord)
             return
-        # UN MARQUEUR NE SE CONFIRME PAS : il prouve l'identite de la boite, donc
-        # un ecart franc n'est pas un doute a lever, c'est un DEPLACEMENT a
-        # suivre. Le lissage et les deux confirmations sont faits pour une ombre
-        # qui tremble ou pour le bras qui passe au-dessus — deux cas ou personne
-        # ne dit ou est la boite. Quand le marqueur, lui, le dit, attendre n'est
-        # plus de la prudence : le 26/08 les deux cartons ont ete intervertis et
-        # les deux etiquettes sont restees l'une sur l'autre a leur ancienne
-        # place, le suivi refusant le saut a chaque image.
-        if marque:
-            self._adopte(centre, taille, polygone, maintenant, rebord)
-            return
+        # UN MARQUEUR SUIT SA BOITE, MAIS SUR DEUX IMAGES CONCORDANTES. Le
+        # marqueur prouve l'IDENTITE de la boite, jamais que le contour trouve
+        # autour de lui est le bon : l'appariement accepte une ouverture jusqu'a
+        # PORTE_MARQUEUR_CARTON, et le bras qui masque la boite fabrique
+        # justement, dans ce rayon, un contour decale. Adopter ce contour sur une
+        # seule image, c'est croire l'occlusion (journal du 26/08). Deux images
+        # concordantes coutent ~0,2 s a 10 im/s — le suivi reste immediat a
+        # l'oeil quand tu interverties vraiment les cartons, et l'occlusion, elle,
+        # ne se repete pas au meme endroit.
         change_de_taille = (self.taille is not None and taille is not None
                             and abs(taille - self.taille) / self.taille > ECART_TAILLE_MAX)
         if float(np.linalg.norm(centre - self.centre)) <= SAUT_CARTON and not change_de_taille:
@@ -2131,9 +2279,18 @@ class Fenetre(QMainWindow):
                         releve = (appui[0] + decalage, appui[1] + decalage, appui[2])
                     with self._verrou:
                         if releve is not None:
+                            # « Marque » = CETTE position vient du marqueur, pas
+                            # « le marqueur est visible quelque part ». Une
+                            # position relayee par la SVPRO n'a pas cette
+                            # autorite : elle arrive corrigee d'un decalage
+                            # appris, a 14 mm sur le grand carton et 60 sur le
+                            # petit. L'arducam, elle, ne nomme jamais autrement
+                            # que par le marqueur une boite dont le marqueur est
+                            # vu — la voir dans `vus` suffit donc a le prouver.
                             suivi.maj(releve[0], releve[2], releve[1],
                                       rebord=releve[3] if len(releve) > 3 else None,
-                                      marque=classe in self._cartons_marques)
+                                      marque=(classe in vus
+                                              and classe in self._cartons_marques))
                 self._dessine_objets(affichee, objets)
                 self._dessine_cartons(affichee)
                 self._maj_carton(self._suivi_vise())
@@ -2282,15 +2439,20 @@ class Fenetre(QMainWindow):
                       f'({centre[0]:.0f}, {centre[1]:.0f}) mm')
 
     def _enregistre_designation(self, clic=False):
-        """Garde la designation d'une seance a l'autre.
+        """Designation valable pour LA SEANCE — jamais ecrite sur disque.
 
-        Sans elle, chaque relance du tableau de bord repart sur un tirage a pile
-        ou face tant que les deux cartons n'ont pas ete separes par un clic.
+        Elle etait persistee pour qu'une relance du tableau de bord reparte sur
+        des cartons deja separes. Mais les boites se deplacent entre deux
+        seances et une position ecrite sur disque survit a ce deplacement : le
+        26/08 « grand » valait encore (428, -97), du cote du PETIT, et la balle
+        est allee s'y poser sur la planche. Les marqueurs 10 et 11 rendent cette
+        persistance inutile — ils nomment les boites la ou elles sont, a chaque
+        image.
 
         Seul un CLIC cree la designation ; ensuite elle suit les cartons qui
-        bougent. Laisser le detecteur l'ecrire tout seul l'a remplie de
-        n'importe quoi des le premier essai : bras non connecte, donc pas
-        d'angles, donc pas de masque, et l'ombre du bras enregistree comme
+        bougent, en memoire vive. Laisser le detecteur l'ecrire tout seul l'a
+        remplie de n'importe quoi des le premier essai : bras non connecte, donc
+        pas d'angles, donc pas de masque, et l'ombre du bras enregistree comme
         "petit carton" a (54, -18) — au pied du robot.
         """
         if not (clic or self._designation_faite):
@@ -2310,9 +2472,11 @@ class Fenetre(QMainWindow):
         if not bouge:
             return
         self._designation = {c: np.asarray(xy, float) for c, xy in positions.items()}
-        DESIGNATION_CARTONS.write_text(json.dumps(positions))
 
     def _designation_memorisee(self):
+        # Rien n'est relu d'une seance a l'autre : les boites ont pu bouger
+        # entre-temps, et une position perimee envoie l'objet a cote (26/08).
+        return {}
         if not DESIGNATION_CARTONS.exists():
             return {}
         try:
@@ -2335,15 +2499,21 @@ class Fenetre(QMainWindow):
             bougeants = [c for c, n in bouges.items()
                          if n != self._deplacements_carton.get(c)]
             self._deplacements_carton = bouges
-            self.ctx.carton_resolu = None
+            # SEUL le carton VISE perime la dépose en cours. Le deplacement de
+            # l'AUTRE boite n'a aucun rapport avec elle : le 26/08 un « carton
+            # petit deplace » a annule un largage vise sur le grand, la machine
+            # est repartie en recherche et a lache la balle sur la planche, a
+            # 320 mm de la bonne boite. Le journal en etait noye par-dessus le
+            # marche.
             if self.ctx.carton_vise in bougeants:
                 # Le POINT DE LARGAGE deja choisi appartient a l'ancienne
                 # position : le garder affichait une croix hors du rectangle
                 # (constate le 24/08) et aurait fait lacher l'objet a cote.
+                self.ctx.carton_resolu = None
                 self.ctx.carton_xy = None
                 self.ctx.R_carton = None
-            self.ctx.note(f'carton {" et ".join(bougeants)} deplace — '
-                          f'point de largage a recalculer')
+                self.ctx.note(f'carton {self.ctx.carton_vise} deplace — '
+                              f'point de largage a recalculer')
         if suivi is None:
             self.champ_carton.setText('non vu')
             return
