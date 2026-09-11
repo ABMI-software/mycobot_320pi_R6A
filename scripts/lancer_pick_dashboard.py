@@ -6,7 +6,9 @@
 
 Ce que ca ajoute au dashboard, sans modifier une ligne de `pick_dashboard.py` :
 
-  1. une fenetre au lancement — « refaire la calibration extrinseque ? » ;
+  1. une fenetre au lancement — « refaire la calibration extrinseque ? »,
+     avec un controle qui mesure d'abord de combien les marqueurs ont bouge,
+     pour que la reponse repose sur un chiffre et pas sur une impression ;
   2. si oui, la calibration tourne avec un compte a rebours et une jauge, puis
      affiche ce qu'elle a trouve (RMS, pire point neuf, deplacement camera) ;
   3. la carte de correction vision -> realite (Shepard/IDW) est appliquee a la
@@ -179,6 +181,12 @@ class Dialogue(QDialog):
         self.horloge = QTimer(self)
         self.horloge.timeout.connect(self._tic)
 
+        self.controle = None
+        self.tampon_controle = ''
+        self.etat = etat
+        if REFERENCE.exists() and VENV.exists():
+            QTimer.singleShot(0, self._controle)
+
         if not REFERENCE.exists():
             self.bouton_oui.setEnabled(False)
             self.sous_titre.setText(
@@ -188,6 +196,50 @@ class Dialogue(QDialog):
                 f'pendant que l’extrinsèque est juste.')
 
     # ------------------------------------------------------------------ #
+
+    def _controle(self):
+        """Mesure l'ecart aux marqueurs avant que l'utilisateur ne decide.
+
+        Un ecart dit que les marqueurs ont bouge OU que la camera a bouge ;
+        il ne distingue pas les deux. Le seul controle qui tranche est la
+        projection du squelette du robot sur son image.
+        """
+        self.sous_titre.setText(f'En place : {self.etat}.\n'
+                                'Contrôle des marqueurs en cours…')
+        self.controle = QProcess(self)
+        self.controle.setProcessChannelMode(QProcess.MergedChannels)
+        self.controle.readyReadStandardOutput.connect(self._controle_sortie)
+        self.controle.finished.connect(self._controle_fini)
+        self.controle.start(str(VENV), [str(OUVRIER), '--controle', '--frames', '3'])
+
+    def _controle_sortie(self):
+        self.tampon_controle += bytes(
+            self.controle.readAllStandardOutput()).decode('utf-8', 'replace')
+
+    def _controle_fini(self, code, _statut):
+        mesure = None
+        for ligne in self.tampon_controle.splitlines():
+            if ligne.startswith('RESULTAT|'):
+                mesure = json.loads(ligne.split('|', 1)[1])
+        if code != 0 or mesure is None:
+            self.sous_titre.setText(
+                f'En place : {self.etat}.\n'
+                'Contrôle impossible — marqueurs non vus (bras devant, ou '
+                'câble noir contre une bordure).')
+            return
+        pire, moyen = mesure['ecart_max_mm'], mesure['ecart_moyen_mm']
+        detail = '  '.join(f'{i}:{e:.1f}' for i, e in
+                           sorted(mesure['par_marqueur'].items()))
+        verdict = ('rien à faire' if pire < 2.0 else
+                   'recalibration conseillée' if pire < 20.0 else
+                   'recalibration nécessaire')
+        self.sous_titre.setText(
+            f'En place : {self.etat}.\n'
+            f'Marqueurs à {moyen:.2f} mm de la référence en moyenne, '
+            f'{pire:.2f} mm au pire ({detail}) → {verdict}.\n'
+            f'Dure environ {self.attendu:.0f} s, le robot ne bouge pas.')
+        if pire >= 2.0:
+            self.bouton_oui.setStyleSheet('font-weight:bold;')
 
     def lance(self, arguments):
         if not VENV.exists():
