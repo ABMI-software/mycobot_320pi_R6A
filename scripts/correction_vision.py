@@ -158,6 +158,32 @@ class Carte:
         return np.array(erreurs), np.array(brutes)
 
 
+def branche(classe_vision, fichier: Path = FICHIER):
+    """Pose la carte sur `Vision.balle`, et sur rien d'autre.
+
+    La balle est la seule grandeur dont on ait des couples (vision, reel)
+    pour apprendre l'ecart : l'appliquer aux cartons ou aux marqueurs
+    reviendrait a leur imposer une carte apprise sur autre chose.
+
+    Rend la carte. Une carte vide ne touche a rien et le dit en le rendant :
+    `len(carte) == 0`.
+    """
+    carte = Carte(fichier)
+    if not len(carte):
+        return carte
+    origine = classe_vision.balle
+
+    def balle(self, image):
+        vu = origine(self, image)
+        if vu is None:
+            return None
+        xy, tache = vu
+        return carte.corrige(xy), tache
+
+    classe_vision.balle = balle
+    return carte
+
+
 def main():
     a = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
