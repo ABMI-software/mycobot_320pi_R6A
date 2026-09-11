@@ -34,6 +34,7 @@ OUVRIER = RACINE / 'scripts' / 'calibration_extrinseque_auto.py'
 EXTRINSEQUE = CALIB / 'arducam_extrinsic_pick.yaml'
 REFERENCE = CALIB / 'planche_actuelle.yaml'
 DUREE = RACINE / 'scripts' / 'calibration_duree.json'
+POSE_DEGAGEMENT = RACINE / 'scripts' / 'pose_degagement_calibration.json'
 DUREE_DEFAUT = 20.0
 
 BLEU = QColor(62, 110, 190)
@@ -43,6 +44,36 @@ GRIS = QColor(200, 205, 214)
 
 
 DUREE_DEFAUT_DEGAGEMENT = 12.0
+
+
+def pose_degagement():
+    """Les angles ou les quatre marqueurs sont visibles, ou None.
+
+    Pose apprise sur le banc, bras place a la main puis angles relus aux
+    codeurs. POSE_OBSERVATION du FSM ne convient pas : elle est faite pour
+    degager la vue de la BALLE, pas celle des marqueurs de planche.
+    """
+    try:
+        return np.array(json.loads(POSE_DEGAGEMENT.read_text())['angles_deg'],
+                        float)
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return None
+
+
+def memorise_pose_degagement(angles, marqueurs):
+    POSE_DEGAGEMENT.write_text(json.dumps({
+        'angles_deg': [round(float(a), 2) for a in angles],
+        'pourquoi': (
+            "Pose ou les QUATRE marqueurs de planche sont visibles de "
+            "l'arducam. Le bras s'y place avant toute calibration "
+            "extrinseque : plante devant le plateau il cache un marqueur, et "
+            "sans les quatre il n'y a pas de validation leave-one-out, donc "
+            "pas de calibration."),
+        'verifie_le': f'{datetime.now():%Y-%m-%d %H:%M}',
+        'verification': f'{len(marqueurs)}/4 marqueurs vus : {marqueurs}.',
+        'source': ("pose placee a la main par l'operateur, angles relus aux "
+                   "codeurs par le pont TCP."),
+    }, indent=2, ensure_ascii=False))
 
 
 def durees():
@@ -114,8 +145,15 @@ class Degagement(QThread):
             ctx.pont = pont
             self.avance.emit('relevage si le bras est en appui')
             fsm.degage_du_sol(ctx)
-            self.avance.emit('deplacement vers la pose d observation')
-            atteint = fsm.va_vers_par_etapes(ctx, fsm.POSE_OBSERVATION,
+            cible = pose_degagement()
+            if cible is None:
+                cible = fsm.POSE_OBSERVATION
+                self.avance.emit('aucune pose apprise — repli sur '
+                                 'POSE_OBSERVATION, qui degage la vue de la '
+                                 'balle et pas forcement celle des marqueurs')
+            self.avance.emit('deplacement vers ' +
+                             np.array2string(cible, precision=1))
+            atteint = fsm.va_vers_par_etapes(ctx, cible,
                                              nom='degagement calibration')
             for texte in ctx.journal[-6:]:
                 self.avance.emit(str(texte))
@@ -228,6 +266,13 @@ class Dialogue(QDialog):
         boutons.addWidget(self.bouton_oui)
         boutons.addWidget(self.bouton_non)
         boutons.addStretch(1)
+        self.bouton_pose = QPushButton('Apprendre la pose')
+        self.bouton_pose.setToolTip(
+            'Placer le bras à la main là où les quatre marqueurs sont '
+            'visibles, puis cliquer : les angles sont relus aux codeurs et '
+            'deviennent la pose de dégagement.')
+        self.bouton_pose.clicked.connect(self._apprend_pose)
+        boutons.addWidget(self.bouton_pose)
         boutons.addWidget(self.bouton_ref)
         v.addLayout(boutons)
 
@@ -277,6 +322,49 @@ class Dialogue(QDialog):
     def _controle_sortie(self):
         self.tampon_controle += bytes(
             self.controle.readAllStandardOutput()).decode('utf-8', 'replace')
+
+    def _apprend_pose(self):
+        """Enregistre la pose actuelle du bras comme pose de degagement.
+
+        On ne l'accepte que si les quatre marqueurs sortent VRAIMENT depuis
+        la, sinon on enregistrerait une pose qui ne degage rien.
+        """
+        self.journal.setVisible(True)
+        self.ecrit('vérification : les quatre marqueurs sont-ils visibles ?')
+        self.apprentissage = QProcess(self)
+        self.apprentissage.setProcessChannelMode(QProcess.MergedChannels)
+        self.tampon_apprentissage = ''
+        self.apprentissage.readyReadStandardOutput.connect(
+            lambda: setattr(self, 'tampon_apprentissage',
+                            self.tampon_apprentissage + bytes(
+                                self.apprentissage.readAllStandardOutput())
+                            .decode('utf-8', 'replace')))
+        self.apprentissage.finished.connect(self._apprend_pose_suite)
+        self.apprentissage.start(str(VENV),
+                                 [str(OUVRIER), '--controle', '--frames', '3'])
+
+    def _apprend_pose_suite(self, _code, _statut):
+        mesure = None
+        for ligne in self.tampon_apprentissage.splitlines():
+            if ligne.startswith('RESULTAT|'):
+                mesure = json.loads(ligne.split('|', 1)[1])
+        vus = (mesure or {}).get('marqueurs_vus', [])
+        if len(vus) < 4:
+            self.ecrit(f'{len(vus)}/4 marqueurs vus {vus} — pose NON '
+                       f'enregistrée. Écarter le bras davantage.', ROUGE)
+            return
+        try:
+            sys.path.insert(0, str(RACINE / 'scripts'))
+            import pick_fsm as fsm
+            pont = fsm.Pont()
+            angles = pont.angles()
+            pont.ferme()
+        except Exception as souci:
+            self.ecrit(f'angles illisibles : {souci}', ROUGE)
+            return
+        memorise_pose_degagement(angles, vus)
+        self.ecrit(f'pose enregistrée : {np.array2string(np.asarray(angles), precision=2)} '
+                   f'— 4/4 marqueurs {vus}', VERT)
 
     def _controle_trop_long(self):
         if self.controle is not None and self.controle.state() != QProcess.NotRunning:

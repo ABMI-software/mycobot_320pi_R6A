@@ -1,0 +1,8 @@
+{
+  "angles_deg": [-88.85, 3.6, -8.7, 20.21, -15.38, 45.7],
+  "pourquoi": "Pose ou les QUATRE marqueurs de planche sont visibles de l'arducam. Le bras s'y place avant toute calibration extrinseque : plante devant le plateau il cache le marqueur 19, et sans les quatre il n'y a pas de validation leave-one-out, donc pas de calibration.",
+  "verifie_le": "2026-09-11 12:56",
+  "verification": "4/4 marqueurs (19, 23, 25, 26) vus sur 5 trames consecutives des la premiere exposition (75, gain 0), luminance 74.",
+  "source": "pose placee a la main par l'operateur, angles relus aux codeurs par le pont TCP.",
+  "a_refaire_si": "le bras cache de nouveau un marqueur, ou la camera change de place. Bouton « Apprendre la pose » de la fenetre de calibration."
+}
