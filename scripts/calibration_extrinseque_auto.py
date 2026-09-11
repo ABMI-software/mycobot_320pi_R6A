@@ -358,6 +358,9 @@ def recalibre(index, trames_n, force):
     if refus and not force:
         dis('ERREUR', 'non ecrite — ' + ' ; '.join(refus) +
             '. L\'ancienne extrinseque est conservee.')
+        dis('ERREUR', 'Cause la plus frequente : les feuilles portant les '
+                      'marqueurs ont bouge depuis le releve de reference. '
+                      'Les fixer, refaire --reference, puis recommencer.')
         dis('RESULTAT', json.dumps({'mode': 'recalibration', 'ecrite': False,
                                     'rms_px': round(rms, 3),
                                     'pire_mm': round(pire, 2),
