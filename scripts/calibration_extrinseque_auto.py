@@ -111,6 +111,12 @@ def regle(index, exposition, gain):
 
 def capture(index, n):
     cap = cv2.VideoCapture(index)
+    if not cap.isOpened():
+        cap.release()
+        raise SystemExit(
+            f'/dev/video{index} ne s ouvre pas : la camera est occupee par un '
+            f'autre programme (le dashboard, ou un controle encore en cours). '
+            f'Fermer l autre programme et reessayer.')
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, LARGEUR)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HAUTEUR)
@@ -126,7 +132,8 @@ def capture(index, n):
             break
     cap.release()
     if not trames:
-        raise SystemExit(f'aucune image depuis /dev/video{index}')
+        raise SystemExit(f'/dev/video{index} s ouvre mais ne rend aucune image '
+                         f'— camera occupee, ou debranchee en cours de route.')
     return trames
 
 
@@ -420,15 +427,19 @@ def main():
     args = a.parse_args()
 
     debut = time.time()
-    index = index_arducam()
-    dis('INFO', f'arducam sur /dev/video{index}')
-    code = 0
-    if args.controle:
-        code = controle(index, args.frames)
-    elif args.reference:
-        ecrit_reference(index, args.frames)
-    else:
-        code = recalibre(index, args.frames, args.force)
+    try:
+        index = index_arducam()
+        dis('INFO', f'arducam sur /dev/video{index}')
+        if args.controle:
+            code = controle(index, args.frames)
+        elif args.reference:
+            ecrit_reference(index, args.frames)
+            code = 0
+        else:
+            code = recalibre(index, args.frames, args.force)
+    except SystemExit as arret:
+        dis('ERREUR', str(arret))
+        code = 3
     dis('DUREE', round(time.time() - debut, 1))
     return code
 
