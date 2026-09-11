@@ -17,6 +17,9 @@ sinon l'interface se fige et les cameras s'arretent.
 
 Prerequis : `gripper_bridge.py` tourne sur la Pi, et aucun autre client TCP n'est
 connecte (le pont est mono-client et bloquant).
+
+Au lancement, une fenetre propose de refaire la calibration extrinseque.
+`--sans-calibration` la saute.
 """
 from __future__ import annotations
 
@@ -45,6 +48,8 @@ sys.path.insert(0, str(RACINE / 'scripts'))
 sys.path.insert(0, str(RACINE / 'mycobot_gateway' / 'mycobot_gateway' / 'vision'))
 import pick_fsm as fsm                                                  # noqa: E402
 import camera_registry as registre                                      # noqa: E402
+import calibration_dialogue                                             # noqa: E402
+import correction_vision                                                # noqa: E402
 
 CALIB = RACINE / 'training' / 'calibration'
 SECOURS = {'arducam': 0, 'svpro': 2}   # si v4l2-ctl n'enumere rien
@@ -2876,6 +2881,10 @@ class Fenetre(QMainWindow):
 
 def main():
     application = QApplication(sys.argv)
+    # Avant Fenetre, et pas apres : l'extrinseque est lue dans son
+    # constructeur, une calibration faite ensuite ne serait pas vue.
+    calibration_dialogue.demande(sauter='--sans-calibration' in sys.argv)
+    correction_vision.branche(Vision)
     fenetre = Fenetre()
     fenetre.show()
     sys.exit(application.exec_())
