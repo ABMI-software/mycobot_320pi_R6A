@@ -167,11 +167,10 @@ class Dialogue(QDialog):
         self.horloge.timeout.connect(self._tic)
 
         self.controle = None
+        self.garde = QTimer(self)
         self.tampon_controle = ''
         self.etat = etat
         if REFERENCE.exists() and VENV.exists():
-            for b in (self.bouton_oui, self.bouton_ref):
-                b.setEnabled(False)
             QTimer.singleShot(0, self._controle)
 
         if not REFERENCE.exists():
@@ -193,25 +192,40 @@ class Dialogue(QDialog):
         """
         self.sous_titre.setText(f'En place : {self.etat}.\n'
                                 'Contrôle des marqueurs en cours…')
-        # La camera ne se partage pas : tant que le controle la tient, lancer
-        # une calibration la ferait echouer sur « can't open camera by index ».
-        for b in (self.bouton_oui, self.bouton_ref):
-            b.setEnabled(False)
-        self.bouton_oui.setText('Oui — calibrer  (contrôle en cours…)')
         self.controle = QProcess(self)
         self.controle.setProcessChannelMode(QProcess.MergedChannels)
         self.controle.readyReadStandardOutput.connect(self._controle_sortie)
         self.controle.finished.connect(self._controle_fini)
+        self.controle.errorOccurred.connect(self._controle_rate)
+        # Un controle qui ne rend jamais la main laisserait la fenetre en
+        # « en cours… » pour toujours. Il ne dure que cinq secondes quand tout
+        # va bien ; au-dela de trente, quelque chose le bloque.
+        self.garde = QTimer(self)
+        self.garde.setSingleShot(True)
+        self.garde.timeout.connect(self._controle_trop_long)
+        self.garde.start(30000)
         self.controle.start(str(VENV), [str(OUVRIER), '--controle', '--frames', '3'])
 
     def _controle_sortie(self):
         self.tampon_controle += bytes(
             self.controle.readAllStandardOutput()).decode('utf-8', 'replace')
 
+    def _controle_trop_long(self):
+        if self.controle is not None and self.controle.state() != QProcess.NotRunning:
+            self.controle.kill()
+        self.sous_titre.setText(
+            f'En place : {self.etat}.\n'
+            'Contrôle interrompu au bout de 30 s — la caméra ne répond pas. '
+            'Calibrer quand même est possible.')
+
+    def _controle_rate(self, _erreur):
+        self.garde.stop()
+        self.sous_titre.setText(
+            f'En place : {self.etat}.\n'
+            f'Contrôle impossible à lancer : {VENV} n’a pas démarré.')
+
     def _controle_fini(self, code, _statut):
-        self.bouton_oui.setText('Oui — calibrer')
-        self.bouton_oui.setEnabled(REFERENCE.exists())
-        self.bouton_ref.setEnabled(True)
+        self.garde.stop()
         mesure = None
         for ligne in self.tampon_controle.splitlines():
             if ligne.startswith('RESULTAT|'):
@@ -243,6 +257,13 @@ class Dialogue(QDialog):
         if not VENV.exists():
             self.ecrit('venv absent — ArUco indisponible', ROUGE)
             return
+        # La camera ne se partage pas. Si le controle tourne encore, on
+        # l'arrete plutot que de lancer un second processus qui echouerait
+        # sur « can't open camera by index ».
+        self.garde.stop()
+        if self.controle is not None and self.controle.state() != QProcess.NotRunning:
+            self.controle.kill()
+            self.controle.waitForFinished(3000)
         for b in (self.bouton_oui, self.bouton_non, self.bouton_ref):
             b.setEnabled(False)
         self.titre.setText('Calibration en cours — ne pas bouger la caméra')
