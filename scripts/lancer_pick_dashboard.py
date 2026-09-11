@@ -185,6 +185,8 @@ class Dialogue(QDialog):
         self.tampon_controle = ''
         self.etat = etat
         if REFERENCE.exists() and VENV.exists():
+            for b in (self.bouton_oui, self.bouton_ref):
+                b.setEnabled(False)
             QTimer.singleShot(0, self._controle)
 
         if not REFERENCE.exists():
@@ -206,6 +208,11 @@ class Dialogue(QDialog):
         """
         self.sous_titre.setText(f'En place : {self.etat}.\n'
                                 'Contrôle des marqueurs en cours…')
+        # La camera ne se partage pas : tant que le controle la tient, lancer
+        # une calibration la ferait echouer sur « can't open camera by index ».
+        for b in (self.bouton_oui, self.bouton_ref):
+            b.setEnabled(False)
+        self.bouton_oui.setText('Oui — calibrer  (contrôle en cours…)')
         self.controle = QProcess(self)
         self.controle.setProcessChannelMode(QProcess.MergedChannels)
         self.controle.readyReadStandardOutput.connect(self._controle_sortie)
@@ -217,15 +224,21 @@ class Dialogue(QDialog):
             self.controle.readAllStandardOutput()).decode('utf-8', 'replace')
 
     def _controle_fini(self, code, _statut):
+        self.bouton_oui.setText('Oui — calibrer')
+        self.bouton_oui.setEnabled(REFERENCE.exists())
+        self.bouton_ref.setEnabled(True)
         mesure = None
         for ligne in self.tampon_controle.splitlines():
             if ligne.startswith('RESULTAT|'):
                 mesure = json.loads(ligne.split('|', 1)[1])
         if code != 0 or mesure is None:
+            motifs = [l.split('|', 1)[1] for l in self.tampon_controle.splitlines()
+                      if l.startswith('ERREUR|')]
             self.sous_titre.setText(
                 f'En place : {self.etat}.\n'
-                'Contrôle impossible — marqueurs non vus (bras devant, ou '
-                'câble noir contre une bordure).')
+                'Contrôle impossible — '
+                + (motifs[-1] if motifs else 'marqueurs non vus (bras devant, '
+                   'ou câble noir contre une bordure).'))
             return
         pire, moyen = mesure['ecart_max_mm'], mesure['ecart_moyen_mm']
         detail = '  '.join(f'{i}:{e:.1f}' for i, e in
@@ -278,6 +291,10 @@ class Dialogue(QDialog):
             ligne = brute.rstrip()
             if not ligne:
                 continue
+            if (ligne.startswith(('[ WARN', '[WARN', '[ERROR', '[ INFO',
+                                  '[video4linux2'))
+                    or 'obsensor' in ligne):
+                continue        # bavardage d OpenCV pendant le sondage V4L2
             champs = ligne.split('|')
             canal = champs[0]
             if canal == 'ETAPE' and len(champs) >= 4:
@@ -309,9 +326,12 @@ class Dialogue(QDialog):
                 f'Calibrée — pire point neuf {r["pire_mm"]:.2f} mm, '
                 f'RMS {r["rms_px"]:.2f} px, caméra déplacée de '
                 f'{r["deplacement_mm"]:.0f} mm')
-        else:
+        elif r.get('mode') == 'recalibration' and r.get('ecrite') is False:
             self.jauge.pose(1.0, ROUGE)
             self.titre.setText('Calibration refusée — l’ancienne est conservée')
+        else:
+            self.jauge.pose(1.0, ROUGE)
+            self.titre.setText('Calibration non aboutie — rien n’a été écrit')
         self.bouton_non.setEnabled(True)
         self.bouton_non.setText('Ouvrir le dashboard')
         self.bouton_non.setDefault(True)
