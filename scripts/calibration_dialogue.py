@@ -16,12 +16,13 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
 import yaml
-from PyQt5.QtCore import QProcess, Qt, QTimer
+from PyQt5.QtCore import QProcess, Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QPainter, QPen
 from PyQt5.QtWidgets import (QDialog, QHBoxLayout, QLabel, QPushButton,
                              QTextEdit, QVBoxLayout, QWidget)
@@ -41,16 +42,34 @@ ROUGE = QColor(166, 43, 31)
 GRIS = QColor(200, 205, 214)
 
 
-def duree_attendue():
+DUREE_DEFAUT_DEGAGEMENT = 12.0
+
+
+def durees():
+    """{etape: secondes} mesurees au dernier passage, valeurs par defaut sinon.
+
+    Le compte a rebours part de ce qui a ETE mesure, pas d'une constante :
+    c'est la seule facon qu'il tombe juste. Tant que rien n'a tourne, il part
+    d'une estimation et se corrige au premier passage.
+    """
+    d = {'degagement': DUREE_DEFAUT_DEGAGEMENT, 'calibration': DUREE_DEFAUT}
     try:
-        return float(json.loads(DUREE.read_text())['secondes'])
-    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
-        return DUREE_DEFAUT
+        lu = json.loads(DUREE.read_text())
+    except (OSError, json.JSONDecodeError):
+        return d
+    if 'secondes' in lu:                      # ancien format, une seule valeur
+        d['calibration'] = float(lu['secondes'])
+    for cle in d:
+        if cle in lu:
+            d[cle] = float(lu[cle])
+    return d
 
 
-def memorise_duree(secondes):
-    DUREE.write_text(json.dumps({'secondes': round(float(secondes), 1),
-                                 'date': f'{datetime.now():%Y-%m-%d %H:%M}'}))
+def memorise_duree(etape, secondes):
+    d = durees()
+    d[etape] = round(float(secondes), 1)
+    d['date'] = f'{datetime.now():%Y-%m-%d %H:%M}'
+    DUREE.write_text(json.dumps(d))
 
 
 def etat_extrinseque():
@@ -66,6 +85,50 @@ def etat_extrinseque():
     return (f'caméra en ({cam[0]:.0f}, {cam[1]:.0f}, {cam[2]:.0f}) mm  ·  '
             f'RMS {d.get("reprojection_rms_px", "?")} px'
             + (f'  ·  {quand}' if quand else '')), cam
+
+
+class Degagement(QThread):
+    """Ecarte le bras pour degager la vue des quatre marqueurs.
+
+    Dans un fil : le mouvement dure une dizaine de secondes et l'interface se
+    figerait. Il passe par les fonctions du projet — `degage_du_sol` d'abord,
+    parce qu'un bras en appui refuse tout mouvement, puis
+    `va_vers_par_etapes` vers POSE_OBSERVATION, qui est justement la pose
+    faite pour rendre la vue de dessus.
+
+    La pince n'est jamais touchee.
+    """
+
+    avance = pyqtSignal(str)
+    fini = pyqtSignal(bool, float)
+
+    def run(self):
+        debut = time.time()
+        pont = None
+        try:
+            sys.path.insert(0, str(RACINE / 'scripts'))
+            import pick_fsm as fsm
+            self.avance.emit('ouverture du pont TCP')
+            ctx = fsm.Contexte()
+            pont = fsm.Pont()
+            ctx.pont = pont
+            self.avance.emit('relevage si le bras est en appui')
+            fsm.degage_du_sol(ctx)
+            self.avance.emit('deplacement vers la pose d observation')
+            atteint = fsm.va_vers_par_etapes(ctx, fsm.POSE_OBSERVATION,
+                                             nom='degagement calibration')
+            for texte in ctx.journal[-6:]:
+                self.avance.emit(str(texte))
+            self.fini.emit(atteint is not None, time.time() - debut)
+        except Exception as souci:                        # pont absent, refus…
+            self.avance.emit(f'degagement impossible : {souci}')
+            self.fini.emit(False, time.time() - debut)
+        finally:
+            if pont is not None:
+                try:
+                    pont.ferme()
+                except Exception:
+                    pass
 
 
 class Jauge(QWidget):
@@ -108,7 +171,10 @@ class Dialogue(QDialog):
         self.resultat = None
         self.proc = None
         self.restant = 0.0
-        self.attendu = duree_attendue()
+        self.ecoule = 0.0
+        self.duree = durees()
+        self.attendu = self.duree['degagement'] + self.duree['calibration']
+        self.degagement = None
 
         v = QVBoxLayout(self)
         self.titre = QLabel('Voulez-vous faire la calibration extrinsèque ?')
@@ -119,7 +185,9 @@ class Dialogue(QDialog):
         self.sous_titre = QLabel(
             f'En place : {etat}.\n'
             f'À faire si la caméra a bougé. Dure environ '
-            f'{self.attendu:.0f} s, le robot ne bouge pas.')
+            f'{self.attendu:.0f} s : le bras se dégage d’abord '
+            f'({self.duree["degagement"]:.0f} s), puis la caméra mesure '
+            f'({self.duree["calibration"]:.0f} s).')
         self.sous_titre.setStyleSheet('color:#555;')
         v.addWidget(self.sous_titre)
 
@@ -146,7 +214,7 @@ class Dialogue(QDialog):
         v.addWidget(self.journal)
 
         boutons = QHBoxLayout()
-        self.bouton_oui = QPushButton('Oui — calibrer')
+        self.bouton_oui = QPushButton('Oui — dégager le bras et calibrer')
         self.bouton_oui.setDefault(True)
         self.bouton_non = QPushButton('Non — ouvrir le dashboard')
         self.bouton_ref = QPushButton('Relever la planche')
@@ -249,7 +317,7 @@ class Dialogue(QDialog):
             f'En place : {self.etat}.\n'
             f'Marqueurs à {moyen:.2f} mm de la référence en moyenne, '
             f'{pire:.2f} mm au pire ({detail}) → {verdict}.\n'
-            f'Dure environ {self.attendu:.0f} s, le robot ne bouge pas.')
+            f'Dure environ {self.attendu:.0f} s, dégagement du bras compris.')
         if pire >= 2.0:
             self.bouton_oui.setStyleSheet('font-weight:bold;')
 
@@ -270,22 +338,45 @@ class Dialogue(QDialog):
         self.bloc_progression.setVisible(True)
         self.journal.setVisible(True)
         self.restant = self.attendu
+        self.ecoule = 0.0
         self.compteur.setText(f'{self.restant:.0f}')
+        self.compteur.setStyleSheet('')
         self.horloge.start(1000)
+        self.arguments = arguments
 
+        # Le bras se place AVANT que la camera ne regarde : plante devant le
+        # plateau il cache un marqueur, et sans les quatre il n'y a pas de
+        # validation possible — donc pas de calibration.
+        self.etape.setText('dégagement du bras')
+        self.jauge.pose(0.05)
+        self.degagement = Degagement()
+        self.degagement.avance.connect(self.ecrit)
+        self.degagement.fini.connect(self._degagement_fini)
+        self.degagement.start()
+
+    def _degagement_fini(self, atteint, secondes):
+        memorise_duree('degagement', secondes)
+        self.ecrit(f'dégagement {"terminé" if atteint else "non abouti"} '
+                   f'en {secondes:.1f} s', VERT if atteint else ROUGE)
+        if not atteint:
+            self.ecrit('on mesure quand même : les marqueurs sont peut-être '
+                       'déjà dégagés.', GRIS)
         self.proc = QProcess(self)
         self.proc.setProcessChannelMode(QProcess.MergedChannels)
         self.proc.readyReadStandardOutput.connect(self._sortie)
         self.proc.finished.connect(self._fini)
-        self.proc.start(str(VENV), [str(OUVRIER)] + arguments)
+        self.proc.start(str(VENV), [str(OUVRIER)] + self.arguments)
 
     def _tic(self):
         self.restant -= 1.0
+        self.ecoule += 1.0
         if self.restant > 0:
             self.compteur.setText(f'{self.restant:.0f}')
         else:
-            self.compteur.setText('…')
-            self.compteur.setStyleSheet('color:#888;')
+            # L'estimation vient du dernier passage : quand elle est depassee,
+            # mieux vaut montrer le temps reellement ecoule qu'un sablier.
+            self.compteur.setText(f'+{self.ecoule - self.attendu:.0f}')
+            self.compteur.setStyleSheet('color:#a8660d;')
 
     def ecrit(self, texte, couleur=None):
         teinte = couleur.name() if couleur is not None else '#222'
@@ -314,7 +405,7 @@ class Dialogue(QDialog):
             elif canal == 'RESULTAT':
                 self.resultat = json.loads(champs[1])
             elif canal == 'DUREE':
-                memorise_duree(float(champs[1]))
+                memorise_duree('calibration', float(champs[1]))
             else:
                 self.ecrit(ligne, QColor(120, 120, 120))
 
