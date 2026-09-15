@@ -9,6 +9,21 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — apercu des 4 marqueurs, arducam et SVPRO, avec controle de l'extrinseque (15/09)
+
+- **`.venv/bin/python scripts/apercu_marqueurs.py [--camera arducam|svpro|les-deux]`**
+  (defaut : les deux, cote a cote). Pour 19/23/25/26 : cadre colore selon la
+  distance au bord de l'image, croix a l'endroit ou l'extrinseque EN SERVICE
+  attend le marqueur, ecart en mm a la reference `planche_actuelle.yaml`
+  (mesuree au robot), meme verdict que la fenetre de calibration (< 2 mm rien a
+  faire, < 20 conseillee), luminance comparee aux calibrations acceptees (83-85).
+- `--image photo.png --camera ...` : meme controle sur une photo, apercu annote
+  ecrit a cote. Aucun mouvement du robot.
+- Remplace l'usage de `svpro_regler_4_marqueurs.py` (SVPRO seule, sans controle
+  de l'extrinseque). Sur les photos du 15/09 : SVPRO 1,6-4,6 mm ; arducam 8,5-9,5 mm
+  environ 20 min apres sa calibration de 15:03, ecart presque uniforme, donc
+  camera probablement effleuree avant le deplacement volontaire de 27 mm.
+
 ### Ajoute — classe `main` dans le jeu d'images YOLO, annotee par MediaPipe (15/09)
 
 - Premiere etape de la remise de balle dans la main. `yolo_capture.py` ajoute la
