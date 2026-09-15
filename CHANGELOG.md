@@ -9,6 +9,24 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — tri par taille des pieces noires, vision seule (15/09)
+
+- **`.venv/bin/python scripts/tri_taille.py [--image photo.png] [--ordre cube_50 cube_40 pave]`**
+  classe bacs et objets du dossier `pick_and_place_sorting.sdf` (bac 105 x 105 x 30,
+  cube 50, cube 40, pave 50 x 30 x 40), tous imprimes en noir. Aucun mouvement du
+  robot : classe, centre en mm, cotes, angle du grand cote, hauteur de prise et bac
+  vise (bacs numerotes de gauche a droite dans l'image arducam).
+- Chaine : boite YOLOE-26l (ou chercher) -> pixels plus sombres qu'un seuil mesure
+  sur le bois (ce qui est noir) -> rectangle d'aire minimale de la tache la plus
+  proche du centre -> passage en mm a la hauteur de chaque hypothese (dessus de la
+  piece), pave teste sur ses trois faces -> debord des contours mesure sur les bacs
+  (105 mm connus) et retire.
+- Pourquoi ce seuil : pieces a 13-23 en niveau de gris, bois a 45-50, Otsu a 38-42
+  prenait les ombres (bacs a 140 mm). Seuil = 5e centile + 0,35 x (mediane - 5e).
+- Resultat sur le banc (luminance 60) : 6/6 pieces classees comme l'operateur les
+  a posees. Pieces a espacer d'environ 2 cm (un pave colle a un bac se soudait a
+  lui) ; cube 50 / cube 40 / pave ne different que de 10 mm.
+
 ### Modifie — la fenetre de calibration ouvre l'apercu des marqueurs des deux cameras (15/09)
 
 - Au lancement de `lancer_pick_dashboard.py`, la question « Voulez-vous faire la
