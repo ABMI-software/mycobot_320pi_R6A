@@ -35,8 +35,13 @@ Détail de la méthode, essais refusés compris :
 
 1. [ROUGE] Refaire des saisies à plusieurs endroits de la planche, pour établir
    la répétabilité et pas seulement la cause.
-2. [ROUGE] Tourner la SVPRO pour que son marqueur 25 sorte du bord de l'image,
-   puis la recalibrer contre `planche_actuelle.yaml`.
+2. [FAIT 15:20] SVPRO inclinée puis recalibrée contre `planche_actuelle.yaml`,
+   validée par la balle (3,3 mm de l'arducam). À contrôler sur un 2e emplacement.
+   [FAIT 15:03] Arducam bougée volontairement, recalibrée, balle saisie du premier
+   coup.
+2b. [JAUNE] Remise de la balle dans la main : détecter la main (YOLOE « hand »,
+   confiance 0,26 sur une photo), trianguler sa hauteur avec les deux caméras,
+   survoler sans balle, puis ouvrir la pince sur ordre de l'opérateur.
 3. [JAUNE] Essayer `lancer_pick_dashboard.py --yolo` sur le robot avec la nouvelle
    extrinsèque.
 4. [JAUNE] Remonter `saisie_seule.py` et le script de lecture des codeurs dans

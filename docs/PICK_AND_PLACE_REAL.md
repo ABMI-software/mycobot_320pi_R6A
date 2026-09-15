@@ -302,11 +302,23 @@ RMS 0,42 px ; contrôle 0,22 mm. Ancienne extrinsèque :
 
 ### Limites connues
 
-- **SVPRO pas recalibrée.** Son marqueur 25 est collé au bord bas-gauche de
-  l'image et n'est pas détecté à chaque passe. Ajustement 0,4-1 mm sur 3
-  marqueurs, invalidable sans le 4e. Tourner la caméra, puis refaire la
-  calibration avec `calibrate_camera_base_extrinsic.py --camera svpro --markers
-  <référence>`.
+- **SVPRO recalibrée à 15:20, validée par la balle et non par le seul
+  leave-one-out.**
+  - **Cadrage :** caméra inclinée vers le bas, les marqueurs du bas passent de
+    5-8 px à 54-56 px du bord.
+  - **Commande :** `calibrate_camera_base_extrinsic.py --camera svpro --markers
+    <référence>`.
+  - **Leave-one-out :** 2,4 / 5,9 / 3,7 / 4,2 mm, au-dessus du seuil de 5 mm.
+  - **Contrôle par la balle,** en (287 ; −137) : 3,3 mm de l'arducam, rayons
+    écartés de 2,1 mm (fusion acceptée), centre triangulé à 29,8 mm pour 32
+    attendus. L'ancienne donnait 38 mm d'écart et 168 mm de hauteur.
+  - **Deuxième emplacement,** près du 19, en (176,6 ; 194,9) : 7,9 mm de
+    l'arducam, rayons écartés de 6,4 mm (fusion acceptée), centre à 26,6 mm.
+    Moins précis de ce côté, ce qui est cohérent avec le leave-one-out. L'XY
+    reste donné par l'arducam, la SVPRO ne corrige que la hauteur.
+- **Déplacement de caméra testé à 15:03.** Arducam bougée volontairement puis
+  recalibrée : 10,2 mm détectés, leave-one-out ≤ 1,2 mm. Balle saisie du premier
+  coup en (303,0 ; 46,5), roulis +30°, descente à 4,5 mm, statut 2 et angle 53.
 - **Mesure à la main sensible à J6.** Le bout des doigts est à 22 mm de l'axe J6
   dans le modèle. Au 23, J6 était tourné de 92° par rapport à la pose commandée.
 - Le script de lecture des codeurs est resté dans le répertoire de session, comme

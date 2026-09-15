@@ -190,8 +190,16 @@ planche vue par l'arducam, posée sur ces deux points. Le tout est écrit dans
   planche bouge**, remesurer le 19 et le 23 au robot.
 - **`workspace_markers.yaml` n'est pas la référence** : au robot, le 19 et le 23
   sont à 13-16 mm de ses valeurs.
-- **SVPRO (`svpro_extrinsic_servo.yaml`) pas encore recalibrée**, fausse de
-  62-97 mm : son marqueur 25 est au bord de l'image.
+- **SVPRO (`svpro_extrinsic_servo.yaml`) recalibrée contre la même référence**
+  le 15/09 à 15:20, après avoir incliné la caméra (ses marqueurs du bas étaient à
+  5-8 px du bord). Le leave-one-out donne 2,4-5,9 mm, au-dessus du seuil : elle
+  a été validée par la balle sur deux emplacements : à 3,3 et 7,9 mm de
+  l'arducam, rayons écartés de 2,1 et 6,4 mm, hauteur du centre triangulée à
+  29,8 et 26,6 mm pour 32 attendus. Avant, elle était
+  fausse de 62-97 mm et rejetait la balle hors de sa planche.
+- **Déplacement de caméra testé** : arducam bougée volontairement puis
+  recalibrée (10,2 mm détectés, leave-one-out ≤ 1,2 mm), balle saisie du premier
+  coup.
 
 Méthode, et essais refusés : [`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md)
 § « Calibration contre le robot ».
