@@ -1,5 +1,168 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (15 septembre 2026 — après-midi, calibration contre le robot)
+
+### Ce qui a été accompli aujourd'hui
+
+**La balle est saisie du premier coup après recalibration de l'arducam**, sans
+correctif de repère : vue en (279,8 ; 14,9), descente à 0,5 mm en XY, statut 2
+et angle 53.
+
+**Référence des marqueurs mesurée au robot**, et non plus à travers une caméra.
+Pince placée à la main sur le 19 puis le 23, codeurs lus : 19 = (87,1 ; 212,4),
+23 = (110,9 ; −163,0). Avant la recalibration, l'arducam les voyait à 99,5 et
+40,2 mm de là, la SVPRO à 62,4 et 97,0 mm, en sens opposés.
+`workspace_markers.yaml` est lui aussi à 13-16 mm.
+
+**YOLOE-26 branché dans pick_dashboard** (`--yolo`) et fenêtre de capture YOLO :
+voir le CHANGELOG. Pas encore essayé sur le robot avec le dashboard.
+
+Détail de la méthode, essais refusés compris :
+[`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md), section
+« Calibration contre le robot — 15/09/2026 ».
+
+### Décisions prises
+
+- **Vrais marqueurs = mesurés au robot**, jamais relevés par `--reference` à
+  travers une extrinsèque.
+- **Jamais de `--force`** : la calibration retenue passe la validation seule.
+- **Ne jamais relâcher les moteurs** (`power_off`) : la mise en place à la main se
+  fait moteurs actifs.
+- La forme de la planche au ruban (±1 cm) est moins fiable que celle vue par
+  l'arducam : ne pas s'en servir pour placer le 25 et le 26.
+
+### Prochaines actions
+
+1. [ROUGE] Refaire des saisies à plusieurs endroits de la planche, pour établir
+   la répétabilité et pas seulement la cause.
+2. [ROUGE] Tourner la SVPRO pour que son marqueur 25 sorte du bord de l'image,
+   puis la recalibrer contre `planche_actuelle.yaml`.
+3. [JAUNE] Essayer `lancer_pick_dashboard.py --yolo` sur le robot avec la nouvelle
+   extrinsèque.
+4. [JAUNE] Remonter `saisie_seule.py` et le script de lecture des codeurs dans
+   `scripts/`.
+5. [VERT] Limiter J4 à 135° dans le modèle.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/Osama_ws/src/mycobot_R6A
+.venv/bin/python scripts/calibration_extrinseque_auto.py --controle --frames 5
+```
+
+## État actuel (14 septembre 2026 — soir, saisie guidée arducam + SVPRO)
+
+### Ce qui a été accompli aujourd'hui
+
+**La cause des 5 à 9 cm d'écart après chaque calibration est trouvée.**
+`planche_actuelle.yaml` est décalé de **−7,46° et (+64,0 ; +17,6) mm** par rapport
+à `workspace_markers.yaml`. Le 11/09 on a cru que les feuilles de marqueurs
+avaient bougé ; c'était la table (avec planche et robot) qui avait bougé par
+rapport à la caméra. Dans le repère robot, les marqueurs sont restés aux positions
+de `workspace_markers.yaml`, et chaque recalibration recopie le décalage.
+
+**Deux saisies de balle réussies hors dashboard**, en visant la position arducam
+convertie dans le repère robot : (178,2 ; 48,6) au roulis 0°, statut 2 et angle 51 ;
+puis (307,0 ; 71,1) au roulis +30°, statut 2 et angle 53, soulevée et tenue.
+Chaque fermeture est précédée d'un contrôle des deux caméras : arducam pour
+« entre les mors », SVPRO pour la hauteur des doigts.
+
+**Méthodologie complète et prochaine étape YOLO** :
+[`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md), sections « Saisie
+guidée par deux caméras » et « Prochaine étape — détection YOLO ».
+
+Constats de la séance :
+- **J4 bute à 135° sur le vrai robot**, alors que le modèle croit pouvoir aller à
+  145°. Au roulis +60°, la descente s'est arrêtée à 112 mm sans erreur, puis la
+  pince s'est fermée à vide au-dessus de la balle.
+- **L'arducam a perdu sa liaison USB** (`UVC probe control -71`) après avoir été
+  touchée, jusqu'au rebranchement. La vue n'a pas bougé (≤ 0,3 px). Ouvrir les
+  deux caméras en même temps a ralenti les lectures sur ce bus.
+- La conclusion de l'entrée précédente (« correction Shepard à deux couches ») est
+  **dépassée pour ce problème-là** : une erreur de repère de 6 cm n'est pas un
+  résidu à interpoler. La carte reste utile pour les derniers millimètres, une
+  fois le repère corrigé.
+
+### Décisions prises
+
+- **Ne pas recalibrer contre `planche_actuelle.yaml`.** La référence redevient
+  `workspace_markers.yaml`, à vérifier depuis le robot avant usage.
+- **Toujours relire les angles après une descente** : « descente OK » ne prouve
+  pas que le bras est descendu.
+- **SVPRO utilisée dans l'image seulement** tant que son extrinsèque n'est pas
+  refaite.
+
+### Prochaines actions
+
+1. [ROUGE] Vérifier `workspace_markers.yaml` depuis le robot (pointe sur 19 et
+   23), puis recalibrer l'extrinsèque arducam contre ces positions. Le correctif
+   de repère provisoire disparaît.
+2. [ROUGE] Limiter J4 à 135° dans `diff_ik.PRACTICAL_JOINT_LIMITS_DEG`.
+3. [JAUNE] Remonter `saisie_seule.py` et `saisie_roulis.py` du répertoire de
+   session vers `scripts/`, pour rendre la méthode rejouable.
+4. [JAUNE] Jeu d'images YOLO : `balle`, `scotch`, `robot`, `mors`, arducam et
+   SVPRO.
+5. [VERT] Refaire l'extrinsèque SVPRO, puis trianguler.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/Osama_ws/src/mycobot_R6A
+python3 -c "import socket; s=socket.create_connection(('10.10.0.219',5005),timeout=4); \
+s.sendall(b'{\"action\": \"get_angles\"}\n'); print(s.recv(200).decode())"
+```
+
+## État actuel (14 septembre 2026 — carte de correction à deux couches)
+
+### Ce qui a été accompli aujourd'hui
+
+**La carte Shepard ne pouvait pas s'adapter, pour deux raisons.** Elle
+apprenait (cible, pointe) sur prise confirmée, alors que la descente asservie
+amène la pointe sur la cible et que la pince recentre la balle : l'erreur est
+effacée au moment où on la lit. Et ses échantillons n'étaient pas liés à
+l'extrinsèque : après un déplacement de caméra, elle appliquait les défauts de
+l'ancienne.
+
+`correction_vision.py` réécrit : couche caméra (4 paramètres par extrinsèque,
+remise à zéro à chaque recalibration) + couche robot (affine + IDW, gardée).
+Échantillons obtenus par le **test de saisie**, proposé par `pick_dashboard.py`
+juste après la question de calibration : on lance la boucle comme d'habitude,
+la première balle saisie est relâchée sur place et relue, l'écart réel − vision
+de cette extrinsèque entre dans la carte. La correction s'applique maintenant à
+la cible finale quelle que soit la caméra (la fusion arducam+SVPRO n'était pas
+corrigée) et aux autres objets. Tournée des 4 coins en option
+(`lancer_pick_dashboard.py --tournee`). `pick_dashboard.py` non touché.
+Non essayé sur le robot.
+
+### Décisions prises
+
+- Avec une seule position de caméra, le partage caméra/robot repose sur les a
+  priori (`SIGMA_CAMERA`, `SIGMA_ROBOT`). Mesuré en synthétique : quand les
+  décalages caméra dépassent l'a priori, la couche robot transférée fait
+  **pire** que rien (3,33 mm contre 1,17). `--valider` le mesure : le regarder
+  après la 2e position de caméra.
+- Les 13 échecs de `test_pick_fsm_depose.py` sont antérieurs (hauteurs de prise
+  décalées de +16,9 mm avec `tool_offset.json`), sans lien avec la carte.
+
+### Prochaines actions
+
+1. [ROUGE] Sur le robot : `pick_dashboard.py`, Oui au test, démarrer la
+   boucle ; puis `correction_vision.py --liste`.
+2. [JAUNE] Déplacer la caméra, recalibrer, refaire le test, relancer
+   `--valider` (transfert entre extrinsèques).
+3. [VERT] Marqueur sur cale de hauteur connue à la recalibration, pour réduire
+   la couche caméra à la source.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+/usr/bin/python3 scripts/pick_dashboard.py
+/usr/bin/python3 scripts/correction_vision.py --liste --valider
+```
+
 ## État actuel (10 septembre 2026 — après-midi, Gazebo réaliste et protocole d'essais)
 
 ### Ce qui a été accompli aujourd'hui

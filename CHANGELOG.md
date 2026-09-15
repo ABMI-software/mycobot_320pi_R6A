@@ -9,6 +9,161 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrige — extrinseque arducam calibree contre des marqueurs mesures AU ROBOT (15/09)
+
+- **Cause des 5 a 10 cm d'ecart pince-balle** : `planche_actuelle.yaml` avait ete
+  releve a travers une extrinseque deja fausse ; chaque recalibration recopiait
+  l'erreur et le controle (camera contre elle-meme) affichait 0,3 mm. Mesure au
+  robot : l'arducam voyait les marqueurs a 40-100 mm de leur place, la SVPRO a
+  62-97 mm, en sens opposes.
+- **`training/calibration/planche_actuelle.yaml`** : 19 et 23 mesures au robot
+  (pince placee a la main, codeurs lus sans ordre moteur), 25 et 26 deduits de la
+  forme vue par l'arducam posee sur ces deux points.
+- **`training/calibration/arducam_extrinsic_pick.yaml`** (desormais versionnee) :
+  recalibree sans `--force`, leave-one-out 1,4-2,7 mm, RMS 0,42 px, controle
+  0,22 mm.
+- **Balle saisie du premier coup** : descente a 0,5 mm en XY, statut 2 angle 53.
+  Un essai.
+- SVPRO non recalibree (marqueur 25 au bord de l'image). Methode et essais
+  refuses : `docs/PICK_AND_PLACE_REAL.md`, « Calibration contre le robot ».
+
+### Ajoute — YOLOE-26 dans pick_dashboard (15/09)
+
+- **`/usr/bin/python3 scripts/lancer_pick_dashboard.py --yolo [--inventaire robot=4 scotch=2]`.**
+  `pick_dashboard.py` n'est pas modifie : `scripts/yolo_dashboard.py` remplace
+  `Vision.objets` de l'ARDUCAM, `scripts/yolo_service.py` fait tourner YOLOE-26
+  dans le `.venv` (GPU) et recoit les images par un tube, comme `aruco_service.py`.
+- **Classes.** Cylindre (26l par le nom `tape roll`/`bottle cap`) -> `scotch`,
+  petit carton ; tout autre objet (26l sans consigne, image a 960 px) -> `robot`,
+  grand carton, avec les hauteurs de prise et le couple du robot. Le nom du mode
+  sans consigne ne suffit pas pour le cylindre (`adhesive tape` 3/5, puis
+  `beeper`, `opal`). La SVPRO garde les heuristiques (ses taches heritent du
+  nom arducam).
+- **Balle : le jaune d'abord, YOLO quand il ne la voit pas** (26s `tennis ball`,
+  cercle englobant de la silhouette, sur la planche, image de moins de 0,5 s).
+  Sur les 6 photos : YOLO la trouve 6/6, a 0,6-3,2 mm du centre jaune. Proche
+  mais pas identique : la carte de correction a appris sur le jaune et
+  `_detecte_balle` refuse des echantillons ecartes de plus de 3 mm, d'ou le jaune
+  en premier. Dans la pince, seul le jaune la voit. La balle YOLO n'entre jamais
+  dans la liste des objets.
+- **Jugement par les fonctions du dashboard** : planche (>= 50 %), marqueurs
+  DETECTES (>= 50 % hors carre ; le 19 sortait `keycard` 0,91 et passait le
+  masque de planche, projete par l'extrinseque decalee), dernier carre des
+  marqueurs de planche retenu quand une main les cache, silhouette du bras
+  depuis les angles (<= 40 %), jaune <= 60 % (balle 90 %, cylindre vert
+  13-32 % : le seuil 0,25 d'origine le jetait), grand cote <= 200 mm, rien a
+  moins de 130 mm d'un marqueur de carton (choisi, non mesure), doublons.
+- **YOLO en tache de fond** : 59-76 ms par image, plus que les 60 ms du
+  rafraichissement. `objets()` soumet l'image et juge le dernier resultat sur
+  sa propre image : 4-7 ms par appel, une image de retard. Service arrete ->
+  retour au detecteur couleur/forme, annonce une fois.
+- **Degagement puis « rien vu » : jamais sur une image d'avant.** Le cycle
+  degage deja le bras (balayage J1 a la pose d'observation) quand la vue de
+  dessus ne voit pas l'objet, et l'oublie s'il reste invisible partout. Or
+  `_detecte_objet` lit la liste de la derniere image traitee sans attendre :
+  avec une image de retard, un objet que le bras venait de decouvrir aurait ete
+  declare invisible, puis oublie. Depuis le fil du robot, `_detecte_objet`
+  attend donc un resultat YOLO pris apres son appel (210-245 ms mesures, 1 s au
+  plus), mais seulement pour CHOISIR une cible (degagement, aucune classe en
+  cours) : `cible_a_bouge` interroge aussi pendant l'approche, ou une image de
+  retard ne coute rien. Depuis le fil graphique, jamais.
+- **`--inventaire`** : sans lui une categorie est « finie » des le premier depot
+  (`robot` 1, `scotch` 2).
+- Sur les 6 photos arducam du 15/09, vraie `Vision` et vrais marqueurs :
+  cylindre 5/5, aucun faux objet (marqueur 19 ecarte, y compris cache par la
+  main). Tests : `tests/test_yolo_dashboard.py` 26/26, `test_correction_vision`
+  23/23. **Non teste sur le robot.**
+
+### Ajoute — jeu d'images YOLO du pick, pre-annote (15/09)
+
+- **`scripts/yolo_capture.py`.** `capture` prend l'arducam puis la SVPRO
+  (une camera ouverte a la fois) a chaque Entree, sans mouvement du robot ni
+  commande de pince, et ecrit images brutes, labels YOLO, apercus et
+  `data.yaml` sous `training/yolo/captures/`. `preannote DOSSIER` fait la meme
+  pre-annotation sur des images existantes. Classes : balle, scotch, robot,
+  mors.
+- **Pre-annotation a relire.** `balle` (seuil HSV du dashboard) est juste sur
+  les 14 vues SVPRO du 14/09. `mors` (zones sombres autour de la balle) ne
+  l'est pas : base du robot et cable pris pour des mors, mors loin de la balle
+  ignores. `scotch` et `robot` sont a annoter a la main.
+- **YOLO-World (`yolov8s-worldv2.pt`) ne remplace pas l'annotation** : balle a
+  0,67 degagee sur l'arducam, perdue sous la pince et sur la SVPRO, mors jamais
+  detectes.
+- **YOLO26 COCO non plus** (`yolo26s/m`) : balle 0,76 sur la SVPRO, absente
+  sur l'arducam. **YOLOE-26 par le nom** est le meilleur point de depart :
+  `tennis ball` 0,45 et `robot arm` 0,78 sur l'arducam, `tennis ball` 0,19 sur
+  la SVPRO, pince ratee. Une seule photo testee.
+- **YOLOE-26 branche dans la fenetre de capture** (`.venv/bin/python`,
+  detecteur par defaut ; `--detecteur hsv` sous `/usr/bin/python3` sans torch).
+  Classes : balle, cylindre, cube, mors. Deux modeles combines, un seuil par
+  objet : balle `tennis ball` sur 26s (seuil 0,10), cylindre `tape roll` /
+  `bottle cap` sur 26l (seuil 0,40), cube par la couche `objet` ci-dessous
+  (jamais trouve par son nom en direct). Sur les 12 photos du 15/09 : balle
+  12/12, cylindre 5/5 arducam et 2/2 SVPRO quand son dessus est visible, aucun
+  faux positif (la base du robot a 0,12 et la balle vue `bottle cap` a 0,33
+  sont sous le seuil). 14 ms par vue sur la RTX 4000 Ada.
+- Poids sous `weights/yoloe/` (yoloe-26s/26l-seg.pt, encodeur de texte
+  mobileclip2_b.ts, 360 Mo), non versionnes.
+- **Balle dans la pince : YOLOE a 0 de confiance** (26s comme 26l) sur 11 des
+  14 vues SVPRO des saisies du 14/09. Le seuil jaune du dashboard la complete
+  quand YOLOE ne la trouve pas (« balle couleur ») : 14/14.
+- Mors pre-annotes : boites d'objets detectes retirees (le dessus noir du
+  cylindre passait pour un mors) et deux zones exigees (une zone seule etait
+  toujours cable, pied d'ecran ou base), et silhouette du bras exigee dans la
+  zone (le cable au bord de la planche passait pour une paire, scene chargee du
+  15/09). Resultat : mors sur 11 des 12 vues pince autour de la balle (pas
+  `remontee`, pince deja remontee), sur aucune des 2 pince loin, aucun faux mors sur les 6
+  photos du 15/09.
+- **Classe `objet` : tout ce qui est pose sur la planche.** YOLOE-26l sans
+  consigne (`yoloe-26l-seg-pf.pt`, 4 585 noms) ; noms approximatifs (balle =
+  `opal`, cylindre = `adhesive tape`) mais boites justes, et il trouve le
+  cylindre vu de cote que le nom ratait (3/3). Filtres : point de contact
+  converti en mm par les marqueurs 19/23/25/26 (homographie a 4 marqueurs
+  gardee une fois obtenue, derniere transformation gardee si une main les
+  cache), dans la table (X -50..575, Y -212..246 mm), hors base (120 mm) et
+  hors marqueurs (45 mm), boite <= 5 % de l'image, confiance >= 0,35 (pince et
+  cable a 0,25-0,29), et hors silhouette du bras (`white robot arm` sur 26s,
+  0,79-0,98). Sur les 14 vues de saisie du 14/09 : plus aucun faux objet
+  (marqueur 23 cache et corps de pince souleve ecartes). Limite : un objet
+  inconnu tenu dans la pince est ecarte avec le bras. 43 ms par vue.
+
+### Modifie — la carte de correction survit a un deplacement de camera (14/09)
+
+- **`scripts/correction_vision.py` passe a deux couches.** L'ecart
+  vision -> reel est separe en une couche **camera** (4 parametres par
+  extrinseque : translation, rotation, hauteur) et une couche **robot**
+  (affine + Shepard sur le residu) commune a toutes les extrinseques. Chaque
+  echantillon porte l'empreinte de l'extrinseque sous laquelle il a ete vu.
+  Apres une recalibration la couche camera repart de zero, la couche robot est
+  gardee ; l'extrinseque est relue a chaque trame, la bascule est automatique.
+- **L'apprentissage sur prise confirmee est retire : il n'apprenait rien.** La
+  descente est asservie sur la cible et la pince adaptative recentre la balle
+  en se fermant : (cible, pointe) recopiait la correction deja appliquee.
+- **Test de saisie apres la calibration.** `pick_dashboard.py` pose, apres la
+  question de calibration, « Faire le test de saisie ? » (Oui par defaut apres
+  une extrinseque neuve). Rien ne demarre seul : une fois la boucle lancee
+  comme d'habitude, la premiere prise confirmee de **chaque objet** (balle,
+  scotch, robot) est **relachee sur place**, le bras se degage, l'arducam le
+  relit (8 vues, dispersion <= 3 mm), et l'ecart position reelle - vision de
+  cette extrinseque entre dans la carte. Ensuite le pick and place tourne
+  normalement avec la correction. Le cycle
+  s'arrete en mode pas a pas ; en automatique la boucle reprend la balle,
+  corrigee. Balle qui roule, extrinseque changee ou ecart hors borne : rien
+  n'est appris.
+- **La correction s'applique enfin a la cible reellement visee.** Elle ne
+  touchait que l'arducam seule : des que la SVPRO voyait aussi la balle, la
+  fusion repartait du pixel brut et le bras descendait sans correction. Elle
+  est desormais posee sur `Fenetre._detecte_balle` (toutes sources ; sans terme
+  de hauteur quand la fusion a mesure la hauteur), et sur les **autres objets**
+  vus par l'arducam (scotch, robot), toujours sans modifier `pick_dashboard.py`.
+- **Tournee des 4 coins** (`lancer_pick_dashboard.py --tournee`) : le meme
+  geste en quatre points fixes de la zone de prise — pas les marqueurs, 25 et
+  26 sont hors d'atteinte (643 et 609 mm) — dessines dans la vue arducam.
+- `--valider` ajoute la **validation par transfert** : chaque extrinseque
+  predite par les autres seules, soit la situation juste apres recalibration.
+- Tests : `tests/test_correction_vision.py` 23/23. **Pas encore essaye sur le
+  robot.**
+
 ### Modifié — le tri de reference est celui a saisie physique (10/09)
 
 - **`sim_sorting_grasp` devient le pipeline de tri documente.** La pince se
