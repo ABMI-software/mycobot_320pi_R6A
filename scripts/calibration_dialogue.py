@@ -24,13 +24,20 @@ import numpy as np
 import yaml
 from PyQt5.QtCore import QProcess, Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QPainter, QPen
-from PyQt5.QtWidgets import (QDialog, QHBoxLayout, QLabel, QPushButton,
+from PyQt5.QtWidgets import (QDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton,
                              QTextEdit, QVBoxLayout, QWidget)
 
 RACINE = Path(__file__).resolve().parents[1]
 CALIB = RACINE / 'training' / 'calibration'
 VENV = RACINE / '.venv' / 'bin' / 'python'
 OUVRIER = RACINE / 'scripts' / 'calibration_extrinseque_auto.py'
+# Apercu des 4 marqueurs sur les deux cameras, ouvert a cote de la question : il montre
+# les croix de l'extrinseque en service, donc s'il faut recalibrer. Il tient les cameras,
+# d'ou sa fermeture avant tout ce qui les lit (controle, calibration, dashboard).
+APERCU = RACINE / 'scripts' / 'apercu_marqueurs.py'
+# Une camera rouverte trop tot apres sa liberation s'ouvre sans delivrer d'image
+# (recette de pick_dashboard) : le dashboard restait « en attente de flux », 15/09.
+PAUSE_CAMERA_S = 1.5
 EXTRINSEQUE = CALIB / 'arducam_extrinsic_pick.yaml'
 REFERENCE = CALIB / 'planche_actuelle.yaml'
 DUREE = RACINE / 'scripts' / 'calibration_duree.json'
@@ -280,11 +287,16 @@ class Dialogue(QDialog):
         self.horloge.timeout.connect(self._tic)
 
         self.controle = None
+        self.apprentissage = None
+        self.apercu = None
+        self.terminee = False
         self.garde = QTimer(self)
         self.tampon_controle = ''
         self.etat = etat
         if REFERENCE.exists() and VENV.exists():
             QTimer.singleShot(0, self._controle)
+        else:
+            QTimer.singleShot(0, self.ouvre_apercu)
 
         if not REFERENCE.exists():
             self.bouton_oui.setEnabled(False)
@@ -323,6 +335,34 @@ class Dialogue(QDialog):
         self.tampon_controle += bytes(
             self.controle.readAllStandardOutput()).decode('utf-8', 'replace')
 
+    def ouvre_apercu(self):
+        """Apercu des marqueurs, seulement quand personne d'autre ne lit les cameras."""
+        if self.terminee or not VENV.exists() or not APERCU.exists():
+            return
+        occupes = [p for p in (self.apercu, self.controle, self.proc, self.apprentissage)
+                   if p is not None and p.state() != QProcess.NotRunning]
+        if occupes or (self.degagement is not None and self.degagement.isRunning()):
+            return
+        self.apercu = QProcess(self)
+        self.apercu.setProcessChannelMode(QProcess.MergedChannels)
+        self.apercu.start(str(VENV), [str(APERCU), '--camera', 'les-deux'])
+
+    def ferme_apercu(self):
+        if self.apercu is None or self.apercu.state() == QProcess.NotRunning:
+            return
+        self.apercu.terminate()
+        if not self.apercu.waitForFinished(3000):
+            self.apercu.kill()
+            self.apercu.waitForFinished(2000)
+        time.sleep(PAUSE_CAMERA_S)
+
+    def done(self, resultat):
+        # Toutes les sorties passent ici (dashboard, croix de la fenetre) : le dashboard
+        # ouvre les cameras juste apres, elles doivent etre liberees.
+        self.terminee = True
+        self.ferme_apercu()
+        super().done(resultat)
+
     def _apprend_pose(self):
         """Enregistre la pose actuelle du bras comme pose de degagement.
 
@@ -330,6 +370,7 @@ class Dialogue(QDialog):
         la, sinon on enregistrerait une pose qui ne degage rien.
         """
         self.journal.setVisible(True)
+        self.ferme_apercu()
         self.ecrit('vérification : les quatre marqueurs sont-ils visibles ?')
         self.apprentissage = QProcess(self)
         self.apprentissage.setProcessChannelMode(QProcess.MergedChannels)
@@ -344,6 +385,7 @@ class Dialogue(QDialog):
                                  [str(OUVRIER), '--controle', '--frames', '3'])
 
     def _apprend_pose_suite(self, _code, _statut):
+        QTimer.singleShot(int(PAUSE_CAMERA_S * 1000), self.ouvre_apercu)
         mesure = None
         for ligne in self.tampon_apprentissage.splitlines():
             if ligne.startswith('RESULTAT|'):
@@ -369,6 +411,8 @@ class Dialogue(QDialog):
     def _controle_trop_long(self):
         if self.controle is not None and self.controle.state() != QProcess.NotRunning:
             self.controle.kill()
+            self.controle.waitForFinished(2000)
+        QTimer.singleShot(int(PAUSE_CAMERA_S * 1000), self.ouvre_apercu)
         self.sous_titre.setText(
             f'En place : {self.etat}.\n'
             'Contrôle interrompu au bout de 30 s — la caméra ne répond pas. '
@@ -376,12 +420,14 @@ class Dialogue(QDialog):
 
     def _controle_rate(self, _erreur):
         self.garde.stop()
+        QTimer.singleShot(0, self.ouvre_apercu)
         self.sous_titre.setText(
             f'En place : {self.etat}.\n'
             f'Contrôle impossible à lancer : {VENV} n’a pas démarré.')
 
     def _controle_fini(self, code, _statut):
         self.garde.stop()
+        QTimer.singleShot(int(PAUSE_CAMERA_S * 1000), self.ouvre_apercu)
         mesure = None
         for ligne in self.tampon_controle.splitlines():
             if ligne.startswith('RESULTAT|'):
@@ -413,6 +459,7 @@ class Dialogue(QDialog):
         if not VENV.exists():
             self.ecrit('venv absent — ArUco indisponible', ROUGE)
             return
+        self.ferme_apercu()
         # La camera ne se partage pas. Si le controle tourne encore, on
         # l'arrete plutot que de lancer un second processus qui echouerait
         # sur « can't open camera by index ».
@@ -521,16 +568,44 @@ class Dialogue(QDialog):
         self.bouton_non.setText('Ouvrir le dashboard')
         self.bouton_non.setDefault(True)
         self.etape.setText('')
+        # L'apercu revient : ses croix doivent tomber au centre des marqueurs.
+        QTimer.singleShot(int(PAUSE_CAMERA_S * 1000), self.ouvre_apercu)
+
+
+# Reponse a « Faire le test de saisie ? », lue par `correction_vision.branche`.
+TEST_SAISIE = False
+
+
+def propose_test(recalibree):
+    """Oui par defaut juste apres une extrinseque neuve : c'est la que la
+    correction de l'ancienne ne vaut plus."""
+    reponse = QMessageBox.question(
+        None, 'Test de saisie',
+        ('Extrinsèque neuve.\n\n' if recalibree else '')
+        + 'Faire le test de saisie ?\n\n'
+        'Rien ne bouge seul : lancer le cycle comme d’habitude (« démarrer la '
+        'boucle »). Avant le pick and place, le bras saisit UNE fois chaque objet '
+        '— balle, scotch, robot —, le RELÂCHE sur place, se dégage et la caméra '
+        'le relit. L’écart entre la position réelle et la vision met à jour la '
+        'correction ; le pick and place l’applique ensuite.',
+        QMessageBox.Yes | QMessageBox.No,
+        QMessageBox.Yes if recalibree else QMessageBox.No)
+    return reponse == QMessageBox.Yes
 
 
 def demande(sauter=False):
     """Pose la question et rend le resultat, ou None si on a saute l etape.
 
+    Puis demande s'il faut faire le test de saisie (`TEST_SAISIE`).
+
     Exige qu'une QApplication existe deja : la fenetre du dashboard est
     construite apres, dans la meme application.
     """
+    global TEST_SAISIE
+    TEST_SAISIE = False
     if sauter or not VENV.exists():
         return None
     fenetre = Dialogue()
     fenetre.exec_()
+    TEST_SAISIE = propose_test(bool(fenetre.resultat and fenetre.resultat.get('ecrite')))
     return fenetre.resultat

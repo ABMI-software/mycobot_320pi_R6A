@@ -9,6 +9,20 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifie — la fenetre de calibration ouvre l'apercu des marqueurs des deux cameras (15/09)
+
+- Au lancement de `lancer_pick_dashboard.py`, la question « Voulez-vous faire la
+  calibration extrinseque ? » ouvre `apercu_marqueurs.py --camera les-deux` : les
+  croix de l'extrinseque en service et l'ecart en mm disent s'il faut calibrer.
+- L'apercu tient les cameras. Il s'ouvre apres le controle de depart et se ferme
+  avant tout ce qui les lit : « Oui » (calibration), « Relever la planche »,
+  « Apprendre la pose », puis « Ouvrir le dashboard » ou la croix de la fenetre.
+  Il revient apres la calibration pour verifier les croix.
+- Pause de 1,5 s apres chaque fermeture : une camera rouverte trop tot s'ouvre sans
+  image (dashboard « en attente de flux », 15/09).
+- Verifie hors camera : ouverture, refus pendant un controle, fermeture a la sortie,
+  aucune reouverture apres. `pick_dashboard.py` non modifie.
+
 ### Ajoute — apercu des 4 marqueurs, arducam et SVPRO, avec controle de l'extrinseque (15/09)
 
 - **`.venv/bin/python scripts/apercu_marqueurs.py [--camera arducam|svpro|les-deux]`**
