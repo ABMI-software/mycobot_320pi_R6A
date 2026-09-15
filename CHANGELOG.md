@@ -9,6 +9,21 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — classe `main` dans le jeu d'images YOLO, annotee par MediaPipe (15/09)
+
+- Premiere etape de la remise de balle dans la main. `yolo_capture.py` ajoute la
+  classe `main` (`hand` sur YOLOE-26l, seuil 0,15), en derniere position pour que
+  les etiquettes deja enregistrees gardent leurs numeros.
+- **`/usr/bin/python3 scripts/yolo_capture.py annote-mains`** reecrit les boites
+  `main` de tout le dossier avec MediaPipe Hands (reperes + marge de 10 %), garde
+  les autres classes, retire un `objet` pose sur la main et liste les images sans
+  main a verifier. MediaPipe sert seulement a annoter : le detecteur reste YOLO.
+- Mesure sur 5 prises : YOLOE `hand` 0/5 arducam et 1/5 SVPRO ; MediaPipe 3/5 et
+  5/5 (confiance 0,96-1,0). Il rate la main vue de profil depuis le dessus.
+- Fenetre de test hors depot : quand les deux cameras voient la main, la
+  triangulation donne des rayons a 1-13 mm et des hauteurs credibles (82-314 mm),
+  sur 28 positions.
+
 ### Corrige — extrinseque arducam calibree contre des marqueurs mesures AU ROBOT (15/09)
 
 - **Cause des 5 a 10 cm d'ecart pince-balle** : `planche_actuelle.yaml` avait ete

@@ -4,6 +4,7 @@
     .venv/bin/python scripts/yolo_capture.py capture
     .venv/bin/python scripts/yolo_capture.py preannote DOSSIER_IMAGES [--camera svpro]
     /usr/bin/python3 scripts/yolo_capture.py capture --detecteur hsv     # sans torch : balle seule
+    /usr/bin/python3 scripts/yolo_capture.py annote-mains                # boites `main` par MediaPipe
 
 `capture` ouvre une fenetre : les deux vues en direct avec les detections,
 Espace = prise, q ou Echap = quitter. Aucun mouvement du robot, aucune commande
@@ -17,7 +18,9 @@ saisies du 14/09 :
    - balle : `tennis ball` sur 26s, 0,12-0,70, aucun faux positif >= 0,08 ;
    - cylindre : `tape roll`/`bottle cap` sur 26l, 0,51-0,93 ; faux positifs a
      0,33 (la balle) et 0,12 (la base du robot), d'ou le seuil 0,40 ;
-   - cube : jamais detecte par le nom (15/09), gere par la couche 3.
+   - cube : jamais detecte par le nom (15/09), gere par la couche 3 ;
+   - main : `hand` sur 26l, 0,15-0,26, intermittent (15/09) ; photos a prendre
+     pour la remise de balle dans la main, main a plusieurs hauteurs.
 2. Balle dans la pince : YOLOE lui donne 0 de confiance (26s comme 26l). Le seuil
    jaune du dashboard la complete (« balle couleur ») : 14/14.
 3. TOUT le reste (`objet`) : YOLOE-26l sans consigne, vocabulaire de 4 585 noms.
@@ -53,10 +56,14 @@ sys.path.insert(0, str(RACINE / 'scripts'))
 
 import pick_dashboard as pd  # noqa: E402
 
-CLASSES = ('balle', 'cylindre', 'cube', 'mors', 'objet')
+# `main` en dernier : les etiquettes deja enregistrees gardent leurs numeros.
+CLASSES = ('balle', 'cylindre', 'cube', 'mors', 'objet', 'main')
 INVITES = {
     'balle': ('yoloe-26s-seg.pt', 0.10, ('tennis ball',)),
     'cylindre': ('yoloe-26l-seg.pt', 0.40, ('tape roll', 'bottle cap')),
+    # 15/09, fenetre main 3D : 0,15-0,26 et intermittent sur les deux vues. Seuil bas,
+    # pre-annotation a relire : c'est le jeu d'images qui doit rendre la main fiable.
+    'main': ('yoloe-26l-seg.pt', 0.15, ('hand',)),
 }
 MODELE_OBJETS = 'yoloe-26l-seg-pf.pt'
 SEUIL_OBJET = 0.35
@@ -81,6 +88,9 @@ SORTIE = RACINE / 'training' / 'yolo' / 'captures'
 AIRE_BALLE_MIN = 60
 AIRE_MORS_MIN = 40
 SEUIL_SOMBRE_V = 70
+SEUIL_MEDIAPIPE = 0.3
+# Les reperes s'arretent au bout des doigts et au poignet : la boite serree coupe la paume.
+MARGE_MAIN = 0.10
 FENETRE = 'yolo_capture'
 PERIODE_EXPOSITION_S = 4.0
 
@@ -255,7 +265,7 @@ def preannote(detecteur, image, camera):
 
 def dessine(image, boites):
     apercu = image.copy()
-    couleurs = {'mors': (255, 0, 255), 'objet': (0, 200, 255)}
+    couleurs = {'mors': (255, 0, 255), 'objet': (0, 200, 255), 'main': (0, 255, 0)}
     for c, (a, d, b, e), conf, nom in boites:
         classe = CLASSES[c]
         texte = (classe if classe == 'mors' else
@@ -377,6 +387,57 @@ def preannote_dossier(detecteur, dossier, camera, sortie):
         print(f'{chemin.name} : {enregistre(image, boites, sortie, camera, chemin.stem)}')
 
 
+def lit_etiquettes(fichier, w, h):
+    boites = []
+    for ligne in (fichier.read_text().splitlines() if fichier.exists() else []):
+        if not ligne.strip():
+            continue
+        c, cx, cy, bw, bh = ligne.split()
+        cx, cy, bw, bh = float(cx) * w, float(cy) * h, float(bw) * w, float(bh) * h
+        boites.append((int(c), (int(cx - bw / 2), int(cy - bh / 2), int(cx + bw / 2), int(cy + bh / 2)),
+                       0.0, ''))
+    return boites
+
+
+def annote_mains(sortie):
+    """Remplace les boites `main` par celles de MediaPipe Hands, sur tout le dossier.
+
+    MediaPipe ne sert qu'a ANNOTER : le detecteur final reste YOLO. Mesure du 15/09
+    sur 5 prises : YOLOE `hand` 0/5 arducam et 1/5 SVPRO, MediaPipe 3/5 et 5/5
+    (confiance 0,96-1,0). Python systeme : mediapipe n'est pas dans le .venv.
+    Relancable : les boites `main` sont reecrites, les autres classes gardees, sauf
+    un `objet` pose sur la main (le mode sans consigne la prend pour un objet).
+    """
+    import mediapipe as mp
+    detecteur = mp.solutions.hands.Hands(static_image_mode=True, max_num_hands=2,
+                                         min_detection_confidence=SEUIL_MEDIAPIPE)
+    main_c, objet_c = CLASSES.index('main'), CLASSES.index('objet')
+    ecrit_data_yaml(sortie)
+    for camera in ('arducam', 'svpro'):
+        images = sorted((sortie / 'images' / camera).glob('*.png'))
+        sans = []
+        for chemin in images:
+            image = cv2.imread(str(chemin))
+            h, w = image.shape[:2]
+            resultat = detecteur.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            mains = []
+            for reperes in resultat.multi_hand_landmarks or []:
+                pts = np.array([(p.x * w, p.y * h) for p in reperes.landmark])
+                (a, d), (b, e) = pts.min(axis=0), pts.max(axis=0)
+                mx, my = MARGE_MAIN * (b - a), MARGE_MAIN * (e - d)
+                mains.append((main_c, (int(max(0, a - mx)), int(max(0, d - my)),
+                                       int(min(w, b + mx)), int(min(h, e + my))), 0.0, 'mediapipe'))
+            gardees = [bt for bt in lit_etiquettes(sortie / 'labels' / camera / f'{chemin.stem}.txt', w, h)
+                       if bt[0] != main_c and not (bt[0] == objet_c and any(
+                           recouvrement(bt[1], m[1]) >= RECOUVREMENT_MAX for m in mains))]
+            enregistre(image, gardees + mains, sortie, camera, chemin.stem)
+            if not mains:
+                sans.append(chemin.stem)
+        print(f'{camera} : main annotee sur {len(images) - len(sans)}/{len(images)} images')
+        if sans:
+            print(f'  sans main, a verifier dans apercu/{camera} : {", ".join(sans)}')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--detecteur', choices=('yoloe', 'hsv'), default='yoloe')
@@ -386,7 +447,11 @@ def main():
     p = sous.add_parser('preannote')
     p.add_argument('dossier', type=Path)
     p.add_argument('--camera', choices=('arducam', 'svpro'), default='svpro')
+    sous.add_parser('annote-mains')
     args = ap.parse_args()
+    if args.mode == 'annote-mains':
+        annote_mains(args.sortie)
+        return
     detecteur = DetecteurYOLOE() if args.detecteur == 'yoloe' else DetecteurHSV()
     if args.mode == 'capture':
         capture(detecteur, args.sortie)
