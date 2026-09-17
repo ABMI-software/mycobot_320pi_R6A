@@ -1,0 +1,95 @@
+---
+controller_manager:
+  ros__parameters:
+    # Lowered from the team repo's 500 Hz for Gazebo_to_LeRobot_Pipeline specifically: under
+    # WSL2 virtualization jitter, 500 Hz (2ms budget) made controller
+    # activation fail with "Switch controller timed out after 5 seconds!"
+    # (a real-time scheduling sensitivity in ros2_control, not a memory/GPU
+    # issue -- confirmed after fixing both of those didn't help). 100 Hz
+    # gives enough slack for the VM's coarser scheduling. Local to this
+    # sandbox's copy; not a change to the source mycobot_320pi_R6A repo.
+    update_rate: 100
+    use_sim_time: true
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+      publish_rate: 150.0
+
+    mycobot_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+      publish_rate: 100.0
+
+    gripper_position_controller:
+      type: position_controllers/JointGroupPositionController
+      publish_rate: 80.0
+
+mycobot_controller:
+  ros__parameters:
+    joints:
+      - joint2_to_joint1
+      - joint3_to_joint2
+      - joint4_to_joint3
+      - joint5_to_joint4
+      - joint6_to_joint5
+      - joint6output_to_joint6
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 50.0
+    action_monitor_rate: 20.0
+
+    allow_partial_joints_goal: true
+    hardware_state_has_offset: true
+    deduce_states_from_derivatives: true
+
+    constraints:
+      stopped_velocity_tolerance: 0.01
+      goal_time: 0.0
+
+    # Gains d'origine. Les monter a 2000-4000 a ete essaye le 28/08 et RETIRE :
+    # le suivi empire au lieu de s'ameliorer (J1 rate de 34 deg, J5 de 22 deg au
+    # lieu de 3 a 13). L'affaissement se compense en VISANT PLUS BAS, en boucle
+    # fermee sur la pointe reellement atteinte — la meme methode que sur le vrai
+    # bras, ou `BIAIS_Z_PRISE` joue ce role.
+    gains:
+      joint2_to_joint1:      {p: 100.0, i: 0.01, d: 1.0}
+      joint3_to_joint2:      {p: 100.0, i: 0.01, d: 1.0}
+      joint4_to_joint3:      {p: 100.0, i: 0.01, d: 1.0}
+      joint5_to_joint4:      {p: 100.0, i: 0.01, d: 1.0}
+      joint6_to_joint5:      {p: 100.0, i: 0.01, d: 1.0}
+      joint6output_to_joint6: {p: 100.0, i: 0.01, d: 1.0}
+
+gripper_position_controller:
+  ros__parameters:
+    # Six joints driven explicitly. The caller must publish a 6-element
+    # Float64MultiArray in exactly this order:
+    #   [servo_left, servo_right, tip_left, tip_right, bar_left, bar_right]
+    # Close:  [-a, +a, +a, -a, -a, +a]   |   Open: six zeros
+    #
+    # Les deux dernieres sont les barres exterieures du parallelogramme. Elles
+    # etaient `fixed` dans l'URDF, donc immobiles pendant que le doigt tournait
+    # — les deux bras noirs a l'horizontale, la pince « cassee » sur les cotes.
+    # Le parallelogramme impose bar = servo du meme cote (mesure 31/08 : les
+    # deux bielles sont paralleles a 0.0 deg pres).
+    joints:
+      - gripper_controller
+      - gripper_base_to_gripper_right3
+      - gripper_left3_to_gripper_left1
+      - gripper_right3_to_gripper_right1
+      - gripper_base_to_gripper_left2
+      - gripper_base_to_gripper_right2
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 50.0
+    gains:
+      gripper_controller:                 {p: 60.0, i: 0.005, d: 1.5, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_base_to_gripper_right3:     {p: 60.0, i: 0.005, d: 1.5, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_left3_to_gripper_left1:     {p: 30.0, i: 0.005, d: 1.0, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_right3_to_gripper_right1:   {p: 30.0, i: 0.005, d: 1.0, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_base_to_gripper_left2:      {p: 30.0, i: 0.005, d: 1.0, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}
+      gripper_base_to_gripper_right2:     {p: 30.0, i: 0.005, d: 1.0, i_clamp_min: -0.15, i_clamp_max: 0.15, antiwindup: true}

@@ -1,0 +1,25 @@
+# Pinned rosetta package set for this workspace, mirroring
+# https://github.com/iblnkn/rosetta_ws/blob/main/repos/src.repos
+# (the "existing ROS2 workspace" install path, not the all-in-one rosetta_ws
+# installer, since we already have Jazzy + our own packages here).
+repositories:
+  action/lerobot_rosetta:
+    type: git
+    url: https://github.com/iblnkn/lerobot-rosetta.git
+    version: main
+  action/lerobot_teleoperator_rosetta:
+    type: git
+    url: https://github.com/iblnkn/lerobot-teleoperator-rosetta.git
+    version: main
+  action/lerobot_robot_rosetta:
+    type: git
+    url: https://github.com/iblnkn/lerobot-robot-rosetta.git
+    version: main
+  action/rosetta:
+    type: git
+    url: https://github.com/iblnkn/rosetta.git
+    version: main
+  action/rosetta_interfaces:
+    type: git
+    url: https://github.com/iblnkn/rosetta_interfaces.git
+    version: main
