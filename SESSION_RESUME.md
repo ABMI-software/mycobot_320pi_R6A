@@ -1,5 +1,65 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (18 septembre 2026 — yolo26 entraîné sur les pièces peintes)
+
+### Ce qui a été accompli aujourd'hui
+
+**Les 8 pièces du dossier sont peintes et détectées par un yolo26 entraîné**
+(`pieces_v3_yolo26s`, 17 images) : arducam **8/8 hors échantillon** (confiance
+moyenne 0,82, minimum 0,44), SVPRO passée de **6/8 à 8/8**. Il a fallu
+entraîner : yolo26 COCO ne voit **rien** sur la planche.
+
+**Le `pave_jaune` manquant sur la SVPRO est expliqué et corrigé** — il était
+rejeté à **trois unités de saturation** près (227 contre une porte à 230). La
+porte est descendue à 220, justifiée par mesure sur les deux caméras (bois
+arducam 218 au q99,9, pavé SVPRO 226). Vérifié par A/B à images identiques :
+que des gains, aucune perte.
+
+**Le contrôle dimensionnel ne vaut pas en vue rasante** : sur la SVPRO un cube
+de 50 est mesuré 79 × 48 mm. Remplacé par `range_par_aire()` — l'aire en pixels
+sépare le bac de son objet d'un facteur 2,2 à 4,9, sans aucune reconstruction
+métrique.
+
+**Résultat négatif, et c'est le plus important :** régler les augmentations ne
+sert à rien. Même recette, trois graines → écart **0,186** en moyenne, quand
+l'écart attribué à la recette valait **0,035**. Quatre entraînements ont
+comparé du bruit. Détail : [`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md),
+section « Détection yolo26 entraînée sur les pièces peintes ».
+
+### Décisions prises
+
+- **Exposition arducam 75, jamais changée** — toutes les mesures du banc y sont.
+  Elle est posée *après* l'ouverture, puis surveillée et réécrite seulement si
+  le driver l'a relâchée.
+- **Les indices de classes 0-7 sont figés** : les changer invalide en silence
+  tous les jeux étiquetés.
+- **Une pré-annotation se relit sur l'aperçu avant d'entraîner** — l'aperçu
+  trace donc désormais la boîte réellement écrite, et non le contour.
+- **Ne pas juger un run à sa mAP** (`train` et `val` pointent sur le même
+  dossier) : compter sur des trames hors échantillon.
+
+### Prochaines actions
+
+1. [ROUGE] **Varier les dispositions des pièces** et recapturer sur les deux
+   caméras — seul levier réel, aucun réglage ne le remplace. Physique.
+2. [JAUNE] Rapprocher les 4 bacs : ils sont à 419-426 mm pour une allonge de
+   390 mm, donc hors de portée du bras.
+3. [JAUNE] Décider du sort de `svpro_extrinsic_4marqueurs.yaml` (RMS 0,82 px,
+   validée, **non promue** dans `svpro_extrinsic_servo.yaml`).
+4. [VERT] Couvrir `runs/`, `*.pt` et `training/yolo/` dans `.gitignore` —
+   6 dossiers de run (~240 Mo de poids) sont sur le disque, non suivis.
+5. [VERT] Reformuler le bandeau « modèle entraîné sur arducam seulement » du
+   panneau SVPRO : faux depuis v3.
+
+### Commande rapide de reprise
+
+```bash
+.venv/bin/python scripts/yolo26_visualisation.py \
+    --modele runs/detect/training/yolo/runs/pieces_v3_yolo26s/weights/best.pt
+```
+
+---
+
 ## État actuel (15 septembre 2026 — après-midi, calibration contre le robot)
 
 ### Ce qui a été accompli aujourd'hui

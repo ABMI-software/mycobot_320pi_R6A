@@ -328,6 +328,11 @@ RMS 0,42 px ; contrôle 0,22 mm. Ancienne extrinsèque :
 
 ## Prochaine étape — détection YOLO
 
+> **Fait le 18/09/2026**, mais pas comme prévu ici : ni COCO ni YOLOE au
+> vocabulaire ouvert n'ont suffi, il a fallu **entraîner**. Voir
+> « Détection yolo26 entraînée sur les pièces peintes » plus bas. La présente
+> section est conservée pour le raisonnement qui y a mené.
+
 ### Pourquoi
 
 - La détection actuelle de la balle est un **seuil de couleur HSV** : elle ne
@@ -410,6 +415,151 @@ RMS 0,42 px ; contrôle 0,22 mm. Ancienne extrinsèque :
 Fichiers déjà en place, antérieurs à cette séance : `scripts/yolo_object_detect.py`
 (YOLOv8s COCO sur l'arducam → repère base) et
 `mycobot_gateway/vision/object_localizer.py` (pixel → base sur le plan de la table).
+
+---
+
+## Détection yolo26 entraînée sur les pièces peintes — 18/09/2026
+
+Les quatre bacs et les quatre objets du dossier de fabrication
+(`plans_cotes`, feuilles 2 à 5) ont été **peints**. La détection ne repose donc
+plus sur la forme ni sur le noir, mais sur la couleur — et sur un yolo26
+entraîné à nommer les huit pièces.
+
+### Pourquoi entraîner, et non régler un détecteur générique
+
+- **yolo26 COCO est aveugle à ces pièces.** Mesuré sur la scène réelle :
+  **3 détections en tout** (clavier ×2, ciseaux), **zéro sur la planche**. Un
+  cube de bois peint n'est pas une classe COCO.
+- **YOLOE nomme approximativement** (4 585 noms) : il voit les taches mais ne
+  sait pas dire laquelle est le bac jaune.
+
+D'où **8 classes portant les noms du dossier** : `bac_rouge` `bac_jaune`
+`bac_vert` `bac_bleu`, `cube_rouge` (40³), `pave_jaune` (50×30×40),
+`cylindre_vert` (Ø44×50), `cube_bleu` (50³). **L'ordre des indices 0-7 est
+figé** : les jeux étiquetés le portent, le changer les invalide en silence.
+
+### La teinte nomme, la saturation ne tranche que le jaune
+
+`scripts/tri_couleur.py` étiquette automatiquement, à partir de teintes
+**mesurées sur la peinture** — et non tirées du SDF, qui donne bleu 116 et
+vert 62 au lieu de 98 et 39, soit 17 et 22 d'écart :
+
+| | rouge | jaune | vert | bleu | bois |
+|---|---|---|---|---|---|
+| H (OpenCV 0-179) | 0 / 179,5 | 21 | 39 | 98 | **16** |
+
+Le bois tombe au plus près du jaune : c'est la seule couleur que sa teinte
+n'écarte pas, et la saturation doit la trancher. Mesure du 18/09 sur les
+**deux** caméras, 8 trames, 170 000 px de bois dans la bande jaune :
+
+| | bois q99,9 | pavé jaune | bac jaune |
+|---|---|---|---|
+| arducam | **218** | 254-255 | 243-244 |
+| SVPRO | 195 | **226-228** | 233-234 |
+
+La vue rasante de la SVPRO délave le bois (médiane 146 contre 180) mais délave
+le jaune avec. Posée à 230, la porte rejetait le pavé SVPRO **à trois unités
+près** — cause du `pave_jaune` absent de toutes les trames SVPRO, et de son
+contour rempli à 5 %. `SATURATION_JAUNE = 220` : six unités de marge sous le
+pavé, deux au-dessus du bois arducam, remplissage à 53 %. Le bois qui fuit ne
+forme aucun amas — l'ouverture 3×3 le balaie, jusqu'à 215.
+
+### Le contrôle dimensionnel ne vaut pas en vue rasante
+
+L'extrinsèque ne vaut que dans le plan Z = 0. Sur la SVPRO, le contour ramasse
+les **flancs** des pièces, hautes de 30 à 50 mm :
+
+```
+bleu  cube_50    79,1 x 48,2 mm  (plan  50 x  50)   ecart 29,1
+vert  cylindre   66,3 x 43,6 mm  (plan  44 x  44)   ecart 22,3
+vert  bac       110,2 x 76,1 mm  (plan 105 x 105)   ecart 29,4
+jaune bac        90,2 x 67,1 mm  (plan 105 x 105)   ecart 40,7
+```
+
+Un côté juste, l'autre faux de 30 à 60 % : ce n'est pas un biais qu'un débord
+scalaire corrige. D'où `range_par_aire()` (option `--par-aire`) : **l'aire en
+pixels** sépare le bac de son objet d'un facteur **2,2 à 4,9**, sans aucune
+reconstruction métrique et sans une seule inversion sur les 4 trames. Une
+couleur qui ne donne pas exactement deux taches sur la planche est abandonnée
+entière — on ne devine pas. La taille en mm reste **affichée**, jamais un motif
+de rejet.
+
+### Quelle boîte étiqueter dépend de l'obliquité
+
+| vue | boîte écrite | pourquoi |
+|---|---|---|
+| plongeante (arducam) | **contour** | la boîte YOLOE déborde de 10-20 mm ; le contour tient entre 85 et 130 % de son aire |
+| rasante (SVPRO) | **détecteur** | le contour devient erratique : 60 % de l'aire sur le bac jaune, 151 % sur le cylindre vert |
+
+**L'aperçu trace la boîte réellement écrite**, et non le contour : sans cela il
+montrerait autre chose que l'étiquette, et la relecture — seule garantie de
+cette chaîne — ne garantirait plus rien.
+
+### Résultat
+
+| | v2 (arducam seule) | v3 (+ 4 trames SVPRO) |
+|---|---|---|
+| arducam, 4 trames **hors échantillon** | 8/8 — conf. moy. 0,71 | 8/8 — **0,82**, minimum 0,44 |
+| SVPRO, 4 trames | **6/8** (manquent `bac_bleu`, `cube_rouge`) | **8/8** — 0,77 |
+
+⚠ Le 8/8 SVPRO est mesuré **sur les images d'entraînement** : il ne prouve
+aucune généralisation. `cylindre_vert` y tient à **0,12 pour un seuil à 0,10**,
+sur ses propres images d'apprentissage.
+
+### Ce qui NE marche pas : régler les augmentations
+
+Quatre recettes ont été comparées (saturation protégée, effacement coupé,
+mosaïque atténuée, obliquité ajoutée). Puis **la même recette a été relancée
+avec trois graines** :
+
+```
+                    1509       7      42    étendue
+  moyenne          0.851   0.665   0.721     0.186
+  minimum          0.670   0.107   0.559     0.563
+  cylindre_vert    0.817   0.107   0.580     0.710
+```
+
+**Le bruit de tirage (0,186) est cinq fois l'effet attribué à la recette
+(0,035).** Toutes les recettes sont indiscernables ; celle qui semblait gagner
+avait eu de la chance avec sa graine. Avec 17 images d'une scène figée, le
+modèle n'est pas déterminé par les données. **Aucun réglage n'est validable
+dans ces conditions** — le seul levier est un jeu d'images aux dispositions
+franchement variées, sur les deux caméras.
+
+L'ajout d'obliquité (`degrees`, `shear`, `perspective`) est même nettement
+nuisible ici (moyenne 0,559) : sur si peu d'images quasi identiques, elle
+ajoute du bruit au lieu de remplacer de vraies vues.
+
+### Quatre pièges, tous rencontrés
+
+- **Les poids ne sont pas où `project=` les demande.** Ultralytics préfixe
+  `runs/detect/` à un `project` relatif :
+  `runs/detect/training/yolo/runs/<nom>/weights/best.pt`.
+- **YOLO26 est sans NMS** : quasi-doublons à un pixel près, à dédoublonner par
+  recouvrement (> 0,5).
+- **La mAP du run ne veut rien dire** : `train` et `val` pointent sur le même
+  dossier.
+- **Son échelle de confiance n'est pas celle de YOLOE** : le seuil 0,20 de
+  `tri_taille` faisait disparaître le cube rouge, vu à 0,13 sur 6 trames sur 6.
+  D'où `SEUIL_MODELE_ENTRAINE = 0,10`.
+
+### Commandes
+
+```bash
+# vue en direct des deux cameras, avec les 8 pieces (exposition arducam 75 surveillee)
+.venv/bin/python scripts/yolo26_visualisation.py \
+    --modele runs/detect/training/yolo/runs/pieces_v3_yolo26s/weights/best.pt
+
+# etiqueter une trame SVPRO (vue rasante)
+.venv/bin/python scripts/tri_couleur.py --image trame.png \
+    --extrinseque svpro_extrinsic_4marqueurs --par-aire --etiquette training/yolo/pieces_v3
+
+# la chaine complete sur l'arducam, avec le modele entraine
+.venv/bin/python scripts/tri_couleur.py --modele runs/detect/.../best.pt
+```
+
+**Relire l'aperçu avant d'entraîner.** Une pré-annotation se relit ; celle des
+`mors`, le 15/09, était fausse.
 
 ---
 

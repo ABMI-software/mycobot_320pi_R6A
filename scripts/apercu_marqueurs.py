@@ -139,7 +139,13 @@ def en_direct(cameras):
                 for camera in caps:
                     pd.regle_exposition(specs[camera].v4l2_index, specs[camera].manual_exposure)
             touche = cv2.waitKey(1) & 0xFF
-            if touche in (ord('q'), 27) or cv2.getWindowProperty(fenetre, cv2.WND_PROP_VISIBLE) < 1:
+            try:
+                ouverte = cv2.getWindowProperty(fenetre, cv2.WND_PROP_VISIBLE) >= 1
+            except cv2.error:
+                # OpenCV 5.0 LEVE (« NULL guiReceiver ») au lieu de rendre 0 quand la
+                # fenetre a ete fermee a la croix : la sortie normale devenait une trace.
+                ouverte = False
+            if touche in (ord('q'), 27) or not ouverte:
                 break
     finally:
         for cap in caps.values():

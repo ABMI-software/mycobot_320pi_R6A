@@ -9,6 +9,53 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — yolo26 entraine sur les 8 pieces peintes, et vue deux cameras (18/09)
+
+- **`.venv/bin/python scripts/yolo26_visualisation.py [--camera arducam|svpro]
+  [--modele <best.pt>]`** — vue en direct des deux cameras avec les 8 pieces du
+  dossier nommees par yolo26, compte sur 8 et temps d'inference par camera.
+  Aucun mouvement du robot. L'exposition de l'arducam est **surveillee** (relue
+  toutes les 4 s, reecrite seulement si le driver l'a relachee) et son etat
+  affiche : `expo 75` en vert, `AUTO (157)` en rouge avec le nombre de remises.
+- **`scripts/tri_couleur.py`** — chaine couleur et taille, successeur de
+  `tri_taille.py` pour les pieces peintes. Nouvelles options `--extrinseque`
+  (travailler sur une autre camera que l'arducam) et `--par-aire` (vue rasante).
+- **8 classes aux noms du dossier de fabrication**, indices **figes** 0-7 :
+  `bac_rouge` `bac_jaune` `bac_vert` `bac_bleu` `cube_rouge` `pave_jaune`
+  `cylindre_vert` `cube_bleu`.
+- **Pourquoi entrainer** : yolo26 COCO est aveugle a ces pieces — 3 detections
+  sur toute la scene (clavier x2, ciseaux), **zero sur la planche**.
+- **Teintes MESUREES sur la peinture**, pas tirees du SDF (qui donne bleu 116 et
+  vert 62 au lieu de 98 et 39). La teinte nomme ; la saturation ne tranche que
+  le jaune, seule couleur dont le bois partage la teinte (bois H 16, jaune 21).
+- **`SATURATION_JAUNE` 230 -> 220**, mesure sur les deux cameras : bois arducam
+  218 au q99,9, pave jaune SVPRO 226. A 230 le pave SVPRO etait rejete a trois
+  unites pres — cause du `pave_jaune` absent de toutes les trames SVPRO.
+- **`range_par_aire()`** — en vue rasante le controle dimensionnel est faux (un
+  cube de 50 sort a 79 x 48 mm) ; l'aire en pixels separe le bac de son objet
+  d'un facteur 2,2 a 4,9. Une couleur qui ne donne pas exactement deux taches
+  sur la planche est abandonnee : on ne devine pas.
+- **La boite etiquetee suit l'obliquite** : contour en vue plongeante, boite du
+  detecteur en vue rasante (ou le contour vaut 60 a 151 % de celle-ci).
+  **L'apercu trace desormais la boite reellement ecrite**, sans quoi la
+  relecture ne garantit plus rien.
+- Resultat (`pieces_v3_yolo26s`, 17 images) : arducam **8/8 hors echantillon**
+  (conf. moy. 0,82, minimum 0,44), SVPRO **6/8 -> 8/8**.
+
+### Mesure — regler les augmentations de yolo26 ne sert a rien sur 17 images (18/09)
+
+- Quatre recettes comparees, puis **la meme recette relancee avec trois
+  graines** : l'ecart du seul tirage vaut **0,186** en moyenne quand l'ecart
+  attribue a la recette vaut **0,035**. Le bruit est cinq fois l'effet.
+- Consequence : **aucune recette n'est validable** sur ce jeu, et celle qui
+  semblait gagner avait eu de la chance avec sa graine. Le seul levier est un
+  jeu d'images aux dispositions variees, sur les deux cameras.
+- L'ajout d'obliquite (`degrees`, `shear`, `perspective`) est nuisible ici
+  (moyenne 0,559 contre 0,816) : sur des images quasi identiques elle ajoute du
+  bruit au lieu de remplacer de vraies vues.
+- **La mAP des runs ne veut rien dire** : `train` et `val` pointent sur le meme
+  dossier. Juger au comptage sur des trames hors echantillon.
+
 ### Ajoute — tri par taille des pieces noires, vision seule (15/09)
 
 - **`.venv/bin/python scripts/tri_taille.py [--image photo.png] [--ordre cube_50 cube_40 pave]`**

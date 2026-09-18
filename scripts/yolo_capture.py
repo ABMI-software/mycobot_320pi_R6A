@@ -303,12 +303,24 @@ def ouvre_camera(index, essais=5):
     """Valider par une LECTURE : une ouverture trop proche de la precedente
     s'ouvre sans delivrer d'image (meme recette que pick_dashboard)."""
     for _ in range(essais):
-        cap = cv2.VideoCapture(index)
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, pd.registre.CAPTURE_W)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, pd.registre.CAPTURE_H)
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        # Backend V4L2 impose, et RIEN impose tant que le mode par defaut convient :
+        # mesure du 18/09 sous OpenCV 5.0 — `VideoCapture(index)` sans backend tombe
+        # sur obsensor et n'ouvre pas l'arducam, et ecrire FOURCC ou la taille pendant
+        # le flux la rend muette (0 image sur 12 essais avec, 1 sur 1 sans). Son mode
+        # par defaut est deja le 640x480 de l'extrinseque ; la SVPRO, elle, arrive en
+        # 800x600 et doit donc etre reglee — la lecture de controle le dira.
+        cap = cv2.VideoCapture(index, cv2.CAP_V4L2)
         if cap.isOpened() and cap.read()[0]:
+            if (cap.get(cv2.CAP_PROP_FRAME_WIDTH) != pd.registre.CAPTURE_W
+                    or cap.get(cv2.CAP_PROP_FRAME_HEIGHT) != pd.registre.CAPTURE_H):
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, pd.registre.CAPTURE_W)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, pd.registre.CAPTURE_H)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                if not cap.read()[0]:
+                    cap.release()
+                    time.sleep(1.2)
+                    continue
             return cap
         cap.release()
         time.sleep(1.2)
