@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hand-authored MoveIt2 SRDF for the MyCobot 320 Pi, targeting
+  mycobot_description/urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf.
+
+  Self-collision checking is blanket-disabled for every link pair below.
+  This is a deliberate simplification for the Gazebo_to_LeRobot_Pipeline learning sandbox
+  (pipeline verification, not collision-aware planning) — it avoids the
+  classic "MoveIt thinks the start state is in collision" failure mode
+  that comes from a hand-guessed adjacency matrix on an unfamiliar URDF.
+-->
+<robot name="mycobot_320_pi">
+
+  <group name="arm">
+    <chain base_link="base" tip_link="link6"/>
+  </group>
+
+  <group_state name="home" group="arm">
+    <joint name="joint2_to_joint1" value="0"/>
+    <joint name="joint3_to_joint2" value="0"/>
+    <joint name="joint4_to_joint3" value="0"/>
+    <joint name="joint5_to_joint4" value="0"/>
+    <joint name="joint6_to_joint5" value="0"/>
+    <joint name="joint6output_to_joint6" value="0"/>
+  </group_state>
+
+  <end_effector name="arm_ee" parent_link="link6" group="arm"/>
+
+  <!-- No <virtual_joint>: the URDF already fixes "base" to "world" via the
+       real joint world_to_base, so the robot root is already anchored.
+       Adding an SRDF virtual joint on top of that would create a second
+       parent for "base" and break the kinematic model. -->
+
+  <disable_collisions link1="base" link2="link1" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="link2" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="link3" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="link4" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="link5" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="link6" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="gripper_base" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="gripper_left1" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="gripper_left2" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="gripper_left3" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="base" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="link2" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="link3" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="link4" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="link5" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="link6" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="gripper_base" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="gripper_left1" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="gripper_left2" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="gripper_left3" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="link3" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="link4" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="link5" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="link6" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="gripper_base" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="gripper_left1" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="gripper_left2" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="gripper_left3" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="link4" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="link5" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="link6" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="gripper_base" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="gripper_left1" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="gripper_left2" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="gripper_left3" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="link5" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="link6" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="gripper_base" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="gripper_left1" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="gripper_left2" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="gripper_left3" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="link6" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="gripper_base" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="gripper_left1" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="gripper_left2" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="gripper_left3" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="gripper_base" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="gripper_left1" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="gripper_left2" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="gripper_left3" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="gripper_left1" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="gripper_left2" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="gripper_left3" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left1" link2="gripper_left2" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left1" link2="gripper_left3" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left1" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left1" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left1" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left1" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left1" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left1" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left1" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left1" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left2" link2="gripper_left3" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left2" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left2" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left2" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left2" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left2" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left2" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left2" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left2" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left3" link2="gripper_right1" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left3" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left3" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left3" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left3" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left3" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left3" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left3" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right1" link2="gripper_right2" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right1" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right1" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right1" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right1" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right1" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right1" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right2" link2="gripper_right3" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right2" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right2" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right2" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right2" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right2" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right3" link2="world" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right3" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right3" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right3" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="gripper_right3" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="world" link2="camera_link" reason="Adjacent"/>
+  <disable_collisions link1="world" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="world" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="world" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="camera_link" link2="camera_link_right" reason="Adjacent"/>
+  <disable_collisions link1="camera_link" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="camera_link" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="camera_link_right" link2="camera_link_left" reason="Adjacent"/>
+  <disable_collisions link1="camera_link_right" link2="camera_link_top" reason="Adjacent"/>
+  <disable_collisions link1="camera_link_left" link2="camera_link_top" reason="Adjacent"/>
+
+</robot>

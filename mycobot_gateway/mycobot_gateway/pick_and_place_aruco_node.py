@@ -61,8 +61,8 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 # ── Import IK/FK depuis le module DREAM du dépôt ─────────────────────────────
 _DREAM_DIR_ALT = "/home/genji/ros_jazzy/src/mycobot_R6A/training/dream"
 _DREAM_DIR = os.path.normpath(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..", "..", "..", "..", "training", "dream",
+    os.path.dirname(os.path.realpath(__file__)),
+    "..", "..", "training", "dream",
 ))
 for _p in [_DREAM_DIR, _DREAM_DIR_ALT]:
     if os.path.isdir(_p) and _p not in sys.path:

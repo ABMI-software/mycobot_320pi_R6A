@@ -118,8 +118,6 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 
 ---
 
-**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.7.0 (legacy DREAM)
+**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (DREAM, calibration cam0/cam3 mesurée)
 **Mise à jour :** 20 août 2026 — asservissement visuel en boucle fermée, cycle
 pick-and-place complet validé sur robot réel (`feature/pick-and-place-osama`)
-**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.13.0 (test mixte cam0+cam3) · 1.14.0-pre (calibration cam0/cam3 mesurée — `feature/calibration-cam`)
-**Mise à jour :** 28 avril 2026 (soir) — calibration intrinsèque cam_0 + cam_3, finding fx=610 du dataset DREAM faux de ~14 % vs caméras physiques
