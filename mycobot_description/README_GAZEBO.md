@@ -41,6 +41,30 @@ sudo apt install ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
 | `worlds/pick_and_place.sdf` | Table 0.8×0.8 m + cube cible rouge + zone de dépose verte (mono-objet) |
 | `worlds/pick_and_place_sorting.sdf` | Table 1.0×0.6 m + 4 objets dynamiques (cube R, cube B, cylindre G, boîte Y) côté +X + 4 bacs colorés à parois côté −X (multi-objet par couleur) |
 | `worlds/precision_benchmark.sdf` | Robot + cube cible rouge + marqueurs ArUco workspace — utilisé par `precision_benchmark.launch.py` et `pick_and_place_aruco.launch.py` |
+| `worlds/real_table.sdf` | Plateau mesuré 622×449×8,5 mm + ArUco 19/23/25/26 de 50 mm + caméra de dessus + cube et bac |
+
+Pour le plateau réel : `ros2 launch mycobot_gateway real_table.launch.py`
+(`demo:=true` pour le cycle physique du cube rouge). **La séquence complète
+commence par `conda deactivate` puis un `colcon build`** — sans le build,
+`models/` n'est pas installé et la scène se lance sans bois ni marqueurs. Voir
+[le guide du plateau réel](../docs/GAZEBO_REAL_TABLE.md) pour la construction,
+les coordonnées et les hypothèses de placement.
+
+## Tri des 4 objets par saisie physique
+
+```bash
+# Terminal 1 — le banc
+ros2 launch mycobot_gateway sim_grasp.launch.py
+
+# Terminal 2 — le tri, pince réelle
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
+```
+
+C'est **la** simulation de tri de référence : la pince se ferme, le contact est
+simulé par `gz_ros2_control`, et chaque prise est vérifiée sur la pose Gazebo de
+l'objet. `sorting_orchestrator` fait le même parcours mais **téléporte** l'objet
+via `set_pose` — d'où l'objet qui saute. Il est antérieur à la pince modélisée
+et conservé pour sa partie perception.
 
 ## Visuels caméra (URDF Gazebo)
 

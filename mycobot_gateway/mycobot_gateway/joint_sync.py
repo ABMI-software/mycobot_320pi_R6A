@@ -92,8 +92,13 @@ class JointStateSynchronizer(Node):
           - "angles:[0.35, 0.0, ...]"      (ancien format)
           - "angles_ok:[...],s=20"         (après set_angles)
         Les réponses d'erreur ("ANGLES: -1", "-1") sont ignorées.
+
+        bridge_tour ne délimite pas ses trames : plusieurs réponses peuvent
+        arriver groupées dans un seul recv() TCP. On ne garde que la dernière
+        ligne non vide, sans quoi on lirait la plus ancienne des deux.
         """
-        data = msg.data.strip()
+        lignes = [l.strip() for l in msg.data.splitlines() if l.strip()]
+        data = lignes[-1] if lignes else msg.data.strip()
         low = data.lower()
 
         # Ignorer les réponses d'erreur du robot (lecture série ratée).

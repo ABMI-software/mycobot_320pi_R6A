@@ -288,6 +288,9 @@ La précision utile ne vient donc ni du constructeur ni du solveur, mais du
 | Éclairage à 55 de luminance (réf. 86) | l'extrinsèque du jour plafonne à 0,59 mm au lieu de 0,12 |
 | Une seule portée testée (332 mm) | l'affaissement n'a pas été mesuré à plusieurs allonges |
 | Retrait de **40 mm** au test G | à 50 mm, le départ « avant » tombe à J3 = −0,58° (bras tendu) et le résidu IK passe à 0,611 mm : on aurait mesuré une singularité, pas un sens d'approche |
+| Extrinsèques ajustées **uniquement à Z = 0** | validées dans le plan de la table (1,92 mm), **sans aucune validité en hauteur** — voir § 11 |
+| Détection ArUco sur **une seule trame** | jusqu'à 17,5 mm d'erreur par trame MJPEG corrompue — voir § 10 |
+| **Taille** d'un marqueur mesurée à l'image | biaisée jusqu'à **4 %** par l'obliquité ; la **position**, elle, reste juste à 0,4 mm — voir § 10 |
 
 ---
 
@@ -394,3 +397,305 @@ contrainte de conception : **si le dernier segment d'approche change de
 direction d'une itération à l'autre, on injecte 5,9 mm de bruit dans une boucle
 qui cherche à converger au millimètre.** Terminer toujours par le même vecteur
 d'approche.
+
+
+---
+
+## 9. Test 7 — la précision du système tel qu'il fonctionne
+
+**C'est le seul chiffre qui décrit la chaîne complète**, et il manquait. Les
+tests A à H mesuraient des morceaux : la répétabilité du bras, le bruit de la
+caméra, la justesse de l'extrinsèque. Aucun ne disait ce qui compte vraiment :
+*quand la caméra dit au robot d'aller quelque part, il arrive à combien ?*
+
+### Le protocole, en clair
+
+**20 essais.** Cible : un tag ArUco 50 mm posé au **centre** du plan de travail,
+à (260,49 · 21,66) mm, portée 261 mm. Caméra **arducam seule**.
+
+Chaque essai enchaîne :
+
+| étape | ce qui se passe |
+|---|---|
+| 1 | le bras s'écarte à la pose d'observation, il ne masque plus rien |
+| 2 | la caméra détecte le tag — **moyenne de 6 trames**, jamais une seule |
+| 3 | le bras y va **en une seule fois, sans correction** → **passe 0** |
+| 4 | on réinjecte l'écart articulaire consigne − mesure → **passe 1** |
+| 5 | on réinjecte de nouveau → **passe 2** |
+| 6 | retour, et la caméra revoit le tag pour **prouver qu'il n'a pas bougé** |
+
+Survol à **Z = 30 mm — aucun contact avec la table.** Pince fermée, parce que le
+déport d'outil désigne le bout des doigts fermés.
+
+### Les résultats
+
+| passe | ce que c'est | erreur moy. | biais | dispersion (RP ISO) | erreur Z | retard | < 2 mm | < 1 mm |
+|---|---|---|---|---|---|---|---|---|
+| **0** | **boucle ouverte, aucune correction** | **10,79 mm** | 10,79 | 0,671 mm | −9,78 mm | 2,07° | **0/20** | 0/20 |
+| **1** | après **une** réinjection | **1,29 mm** | 1,27 | 0,810 mm | −0,42 mm | 0,24° | **20/20** | 4/20 |
+| **2** | après **deux** | **0,63 mm** | 0,54 | 0,956 mm | **+0,06 mm** | 0,17° | 20/20 | **18/20** |
+
+### Ce qu'il faut lire dans ce tableau
+
+Regarde les deux colonnes du milieu, pas la première.
+
+**Le biais s'effondre de 10,79 à 0,54 mm — vingt fois moins. La dispersion, elle,
+ne bouge pas : 0,230 puis 0,291 puis 0,337 mm.**
+
+C'est la signature d'une erreur **purement systématique**. L'affaissement
+gravitaire tire toujours dans le même sens — **X −7,65 et Y −7,60 mm, jamais
+l'inverse sur 20 essais**. Ce n'est pas du hasard qu'on moyenne, c'est un décalage
+qu'on annule.
+
+> Un biais se rattrape par une correction. Une dispersion, non.
+> **C'est exactement la condition pour qu'un asservissement visuel fonctionne :
+> la boucle annule toute erreur de modèle constante.**
+
+En Z c'est plus net encore : **−9,78 mm** en boucle ouverte, **+0,06 mm** après
+deux passes. Les 10 mm d'affaissement sont intégralement repris.
+
+### Les contrôles qui rendent le chiffre crédible
+
+| contrôle | résultat | ce que ça écarte |
+|---|---|---|
+| le tag a-t-il bougé ? | **0,767 mm** max sur 20 vérifications | la cible n'a pas dérivé pendant la série |
+| résidu de la cinématique inverse | **0,021 mm** moyen, 0,024 max | l'IK n'est pour rien dans l'erreur |
+| régime de détection | moyenne de 6 trames | pas de trame corrompue (§ 10) |
+
+### La réserve, en toutes lettres
+
+**C'est une borne inférieure.** La position atteinte est reconstruite par
+`FK(q_lu)` depuis les codeurs : elle ignore l'écart codeur↔articulation, les
+erreurs du modèle cinématique, le jeu des réducteurs et la flexion. Le vrai
+chiffre physique est **plus grand**. Le mesurer exige un comparateur à cadran.
+
+---
+
+## 10. Le bruit de la vision — et un piège qui coûtait 17 mm
+
+Le test C concluait à une « absence de gigue » : la détection rendait exactement
+la même valeur d'une trame à l'autre. **C'était un artefact.** Le détecteur ArUco
+par défaut ne raffine pas ses coins au sous-pixel ; sur une scène immobile il
+retombe sur les mêmes pixels entiers.
+
+Refait avec `CORNER_REFINE_SUBPIX`, 60 détections, bras écarté, scène immobile :
+
+| méthode | n | l̄ | σ | RP ISO 9283 | max |
+|---|---|---|---|---|---|
+| détection brute, 1 trame | 60 | 0,610 mm | 2,220 | 7,270 mm | **17,46 mm** |
+| sous-pixel, 1 trame | 60 | 0,632 mm | 2,251 | 7,384 mm | 17,52 mm |
+| **sous-pixel + moyenne de 6 trames** | 55 | **0,141 mm** | 0,195 | **0,725 mm** | **0,80 mm** |
+
+**Le sous-pixel n'était pas le problème** — il ne change presque rien. Le vrai
+coupable, ce sont les **trames corrompues** : le flux MJPEG du pilote perd
+régulièrement des segments (`Corrupt JPEG data`), l'image arrive tronquée et le
+marqueur est détecté de travers, **jusqu'à 17,5 mm**. Rare, mais énorme.
+
+Moyenner six trames l'élimine : le maximum tombe de **17,5 mm à 0,80 mm**.
+
+> **Règle opérationnelle.** Ne jamais commander le robot sur une seule trame.
+> Une prise sur trame unique rate de temps en temps, de près de 2 cm, **sans que
+> rien ne le signale**.
+
+### Le tag de 50 mm fait bien 50 mm — correction du 10/09
+
+**Ce rapport a affirmé le contraire, et c'était faux.** Il concluait à une
+erreur d'impression de −3,38 % sur la foi de six mesures concordantes. Les six
+étaient biaisées **dans le même sens par la même cause** : ce n'étaient pas six
+confirmations indépendantes, c'était six fois la même erreur.
+
+#### La mesure qui tranche
+
+Cinq marqueurs, **12 acquisitions chacun**, extrinsèque fraîchement recalibrée
+(RMS 0,482 px, positions justes à 0,11–0,42 mm) :
+
+| marqueur | côté mesuré | obliquité | taille à l'image |
+|---|---|---|---|
+| 19 | **49,725 ± 0,019 mm** | 1,0096 | 24,9 px |
+| 25 | 49,154 ± 0,040 | 1,0197 | 22,3 px |
+| 23 | 48,472 ± 0,107 | 1,0181 | 22,9 px |
+| 1 (tag central) | 48,306 ± 0,131 | 1,0246 | 22,6 px |
+| 26 | 47,749 ± 0,242 | 1,0287 | 20,9 px |
+
+Ces marqueurs sont **physiquement identiques**, imprimés sur la même feuille.
+
+| | |
+|---|---|
+| répétabilité sur **un même** marqueur | **± 0,108 mm** |
+| étalement entre **marqueurs identiques** | **1,98 mm — 4,0 %** |
+
+**L'étalement est 18 fois plus grand que la répétabilité.** La mesure est donc
+*précise* mais pas *juste* : elle répète très bien une valeur fausse.
+
+#### D'où vient le biais
+
+| le côté mesuré est corrélé à… | r |
+|---|---|
+| **l'obliquité** | **−0,920** |
+| la taille à l'image | +0,844 |
+| la distance au centre de l'image | +0,676 |
+
+L'obliquité domine. Ajustement `côté = −97,96 × obliquité + 148,62`, résidus
+**0,27 mm RMS**. Extrapolé à une vue **parfaitement de face** (obliquité =
+1,000) :
+
+> ### **50,65 mm**
+
+#### La preuve indépendante : l'échelle longue est juste
+
+Si la caméra avait une erreur d'échelle, elle se verrait **à toutes les
+longueurs**. On compare donc les grandes distances entre centres de marqueurs
+aux valeurs du relevé :
+
+| paire | ruban | caméra | écart |
+|---|---|---|---|
+| 19–23 | 382,6 | 382,45 | −0,047 % |
+| 19–25 | 438,4 | 438,33 | −0,005 % |
+| 19–26 | 575,9 | 575,85 | −0,001 % |
+| 23–25 | 579,5 | 579,13 | −0,071 % |
+| 23–26 | 420,0 | 420,59 | +0,137 % |
+| 25–26 | 391,0 | 389,95 | −0,278 % |
+
+**Erreur d'échelle sur 383 à 580 mm : −0,044 %.** Contre **−2,6 %** sur les
+côtés de 50 mm. Une erreur d'échelle réelle frapperait les deux à l'identique.
+Elle ne frappe que les petites longueurs.
+
+#### Conclusion
+
+**La calibration est juste. C'est la détection des coins ArUco qui rétrécit les
+petits carrés vus de biais.** Les tags font 50 mm.
+
+#### Ce que ce biais affecte, et ce qu'il n'affecte pas
+
+| grandeur | état |
+|---|---|
+| **position** d'un marqueur (son centre) | **juste** — 0,11 à 0,42 mm |
+| distances entre marqueurs | **justes** — 0,044 % |
+| **taille** d'un petit marqueur vu de biais | **fausse jusqu'à 4 %** |
+
+C'est cohérent géométriquement : la détection tire les quatre coins vers
+l'intérieur de façon à peu près symétrique. Le carré rétrécit, **son centre ne
+bouge pas**. Une erreur de taille ne se propage donc **pas** en erreur de
+position.
+
+#### Le degré de certitude
+
+**Conclusion établie, à 0,7 mm près.** 50,65 mm mesurés, dont 0,27 mm de résidu d'ajustement et ~0,6 mm venant de la référence d'échelle (relevé au ruban, ±5 mm sur 400). Soit **50,7 ± 0,7 mm** : cela encadre 50 et **exclut 48,3**, à plus de trois écarts. `marker_size_mm` reste donc à **50.0** — c'était déjà sa valeur, elle n'a jamais été modifiée.
+
+Un artefact étalonné (pied à coulisse) resserrerait à 0,05 mm et satisferait VDI/VDE 2634-1, mais **ne changerait aucune décision** : l'argument ne repose pas sur la valeur absolue, il repose sur le fait qu'une erreur d'échelle serait identique à toutes les longueurs, or elle vaut −0,044 % sur 383–580 mm et −2,6 % sur 50 mm.
+
+---
+
+## 11. Les extrinsèques ne valent que dans le plan de la table
+
+C'est la découverte la plus lourde de la campagne, et elle a été trouvée en
+cherchant tout autre chose.
+
+### Le point de départ
+
+`tool_offset.json` porte une contradiction inscrite dans ses propres champs :
+deux définitions du bout des doigts distantes de **17,33 mm**, dont l'une est
+forcément fausse. Pour la trancher optiquement, la SVPRO a été recalibrée — elle
+avait dérivé de **21,3 mm** depuis le 24/08 et **6,6 mm** depuis le 02/09.
+Recalibrée sur la planche, elle retombe à **0,38–0,72 mm**.
+
+Son marqueur 25 reste indétectable : il est **physiquement présent**, mais son
+bord bas tombe **8,8 px sous le cadre**, et ArUco exige les quatre coins.
+Vérifié à toutes les résolutions du capteur (2592×1944 jusqu'à 640×480) — le
+champ est identique, ce n'est pas une question de définition. Le corriger
+demande de bouger la **caméra**, jamais la planche.
+
+### La validation croisée, sur un point que personne n'a utilisé
+
+Le tag posé au centre n'a servi à **aucun** des deux ajustements : l'arducam est
+ajustée sur 19/23/25/26, la SVPRO sur 19/23/26. Chacune le prédit indépendamment.
+
+| point | arducam (X,Y) | SVPRO (X,Y) | désaccord |
+|---|---|---|---|
+| **tag central — jamais utilisé** | 260,84 / 21,59 | 259,44 / 22,90 | **1,92 mm** |
+| marqueur 19 | 96,66 / 202,66 | 96,78 / 203,96 | 1,30 mm |
+| marqueur 26 | 529,43 / −175,68 | 529,93 / −175,61 | 0,50 mm |
+
+Ces **1,92 mm** bornent l'erreur des **deux chaînes réunies**. C'est le premier
+contrôle vraiment indépendant de la campagne : pas un résidu qui se mesure
+lui-même, mais deux intrinsèques, deux extrinsèques et deux angles de vue qui
+convergent sur un point neuf.
+
+### Et pourtant
+
+Les quatre marqueurs de planche sont **tous à Z = 0**. Douze coins coplanaires
+fixent très bien la pose **dans** le plan — d'où les 0,4 mm de résidu et les
+1,92 mm de recoupement — mais **contraignent mal la rotation hors plan**. C'est
+la dégénérescence classique de la cible plane, et **le résidu ne peut pas la
+voir**, puisqu'il est mesuré sur ce même plan.
+
+Contrôle direct, pince à **Z = 172 mm**, patins verts vus par les deux caméras :
+
+| patin | l'arducam dit | la SVPRO dit |
+|---|---|---|
+| arrière | (192 / +7) | (299 / +127) |
+| avant | (194 / −43) | (243 / +153) |
+
+Or **toute la pince tient entre Y = +92 mm** (le flasque) **et Y = −20 mm** (la
+pointe). La SVPRO les place *derrière* le flasque, là où il n'y a rien. La
+triangulation des deux rayons rend un point à **Z = −12 mm, sous la table** :
+physiquement impossible.
+
+### Ce que ça change
+
+| | |
+|---|---|
+| **Reste valide** | viser un objet **posé sur la table** — le pick-and-place, validé à 1,92 mm, et le test 7 du § 9 |
+| **N'est pas valide** | toute mesure **en hauteur** : pince en vol, hauteur d'un objet, obstacle |
+| **Pour lever la limite** | des marqueurs à **plusieurs hauteurs** — un tag collé sur une boîte de hauteur connue suffit |
+
+Deux ou trois niveaux rendent la rotation hors plan observable, et débloquent du
+même coup la mesure du déport d'outil.
+
+### Pourquoi le déport n'a pas pu être tranché
+
+Les deux candidats sont distants de 17,33 mm, mais **16,9 mm de cet écart est
+vertical** et 3,9 mm seulement latéral. Les deux caméras regardent d'en haut :
+
+| caméra | élévation | séparation des deux candidats dans l'image |
+|---|---|---|
+| arducam | ~85° | < 2 px |
+| SVPRO | 58° | **4,2 px** |
+
+**La mesure n'est pas dans l'image.** Ni la calibration ni l'algorithme n'y
+peuvent rien.
+
+À défaut de preuve, le faisceau : le déport actuel repose sur **7 mesures au
+réglet, 3 azimuts couvrant 59°, écart-type 1,0 mm**. Ce qui le contredit est
+**un seul** point enseigné du 18/08, à une pose qui n'est plus atteignable
+(J2 à −135,7°, au-delà de la butée −135°).
+
+### Une méthode écartée, et pourquoi elle l'a été
+
+La première approche était de **descendre jusqu'au contact** et de lire la
+hauteur. Elle a été rejetée, à raison : le bras a **1,0 à 2,1° de retard de
+suivi**, soit 6 à 10 mm en cartésien. Une détection de contact par écart de
+codeurs ne se déclenche donc qu'après plusieurs millimètres d'appui. **La
+résolution du protocole était pire que la grandeur cherchée** — et il abîmait le
+matériel.
+
+> Règle générale : avant de proposer un protocole, chiffrer sa résolution et la
+> comparer à la grandeur cherchée. Si elle n'est pas nettement meilleure, ne pas
+> le proposer, même s'il est simple.
+
+---
+
+## 12. Les sept types d'essai — état au 10 septembre 2026
+
+| # | essai | état | résultat |
+|---|---|---|---|
+| 1 | Répétabilité du bras | fait — borne inférieure | 0,00 à 0,84 mm, **6/6 sous la spec de 1 mm** |
+| 2 | Erreur cartésienne reconstruite | fait | 14,84 mm brut · ≈2 mm compensé |
+| 3 | **Précision physique absolue** | **non fait** | inaccessible sans comparateur (~60 €) |
+| 4 | Répétabilité de la vision | **refait le 10/09** | **0,725 mm** (6 trames) · 17,5 mm (1 trame) |
+| 5 | Précision métrique de la vision | **repris le 10/09** | échelle longue **−0,044 %** · le tag fait bien **50 mm** |
+| 6 | Calibration extrinsèque | fait — **et sa limite trouvée** | 1,86 mm en interpolation · **nulle hors du plan** |
+| 7 | **Précision globale vision + robot** | **fait le 10/09** | **10,79 mm** brut → **0,63 mm** après 2 corrections |
+
+Il reste **un seul** essai non fait, et c'est le seul qui exige d'acheter
+quelque chose.

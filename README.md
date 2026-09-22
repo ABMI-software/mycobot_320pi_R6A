@@ -96,7 +96,7 @@ Ce dépôt intègre :
 │                                                ┌─────────────────┐                   │
 │                                                │  MyCobot 320 Pi │                   │
 │                                                └─────────────────┘                   │
-│                          RASPBERRY PI (10.10.0.221)                                  │
+│                          RASPBERRY PI (10.10.0.224)                                  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -134,26 +134,55 @@ Ce dépôt intègre :
 - Ubuntu, pymycobot (`pip3 install pymycobot`)
 - Caméras USB Arducam (pour capture réelle)
 
+**Pour la simulation Gazebo** (scène `real_table`, pick-and-place) :
+```bash
+sudo apt install ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
+```
+Gazebo **Harmonic** — pas Gazebo Classic, les noms de paquets diffèrent.
+
 ### Installation
 
 ```bash
-# Cloner le repo (avec Git LFS pour les datasets)
+# 1. Sortir de conda — son Python 3.13 masque celui de ROS2 et tout échoue
+#    avec des erreurs d'extension C incompréhensibles. À faire en premier,
+#    dans CHAQUE terminal.
+conda deactivate
+
+# 2. Cloner
 cd ~/ros_jazzy/src
 git clone https://github.com/ABMI-software/mycobot_320pi_R6A.git
 cd mycobot_320pi_R6A
-git lfs pull   # Télécharge les images des datasets (~9.5 GB)
 
-# Compiler les packages ROS2
+# 3. Git LFS — UNIQUEMENT pour les datasets d'entraînement DREAM (~9,5 Go).
+#    Inutile pour la simulation, le pick-and-place ou le contrôle du robot :
+#    seul `datasets/**/*.png` passe par LFS, tout le reste est dans git.
+git lfs pull
+
+# 4. Compiler
 cd ~/ros_jazzy
 colcon build --packages-select mycobot_gateway mycobot_description --symlink-install
 source install/setup.bash
 ```
 
+> **`colcon build` se lance depuis `~/ros_jazzy`, jamais depuis `src/`.** Colcon
+> écrit `build/`, `install/` et `log/` dans son répertoire courant, et on les
+> veut à la racine de l'espace de travail.
+
+**Vérifier que tout est en place**, en une commande :
+
+```bash
+ros2 launch mycobot_gateway real_table.launch.py
+```
+
+Une fenêtre Gazebo doit s'ouvrir sur le plateau bois avec ses quatre marqueurs
+ArUco et le bras. Si le plateau apparaît **gris et sans marqueurs**, c'est que
+`models/` n'a pas été installé : refaire le `colcon build`.
+
 ### Démarrage du robot
 
 ```bash
 # Sur le Pi — Terminal 1 : bridge robot
-ssh er@10.10.0.221
+ssh er@10.10.0.224
 python3 bridge_pi_simple.py
 
 # Sur le Pi — Terminal 2 : serveur caméras
@@ -430,7 +459,7 @@ bash training/capture_session.sh
 # Commande directe (preview + 5 poses de test)
 python3 training/capture_real_3cam.py --preview --num-samples 5 \
   --output /tmp/dream_data/real_3cam_test \
-  --pi-host 10.10.0.221 \
+  --pi-host 10.10.0.224 \
   --arducam-index /dev/v4l/by-id/usb-Arducam_Technology_Co.__Ltd._Arducam_8mp_SN0001-video-index0 \
   --svpro-index   /dev/v4l/by-id/usb-5MP_USB_Camera_5MP_USB_Camera_01.00.00-video-index0 \
   --arducam-exposure 75 --svpro-focus 90 \
@@ -450,18 +479,63 @@ intrinsèques par caméra) : [`training/CAPTURE_3CAM.md`](training/CAPTURE_3CAM.
 
 ## 💾 Datasets
 
-> ⚠️ Les images sont stockées via **Git LFS**. Après `git clone`, exécutez `git lfs pull`.
+> ⚠️ Les images sont stockées via **Git LFS**. Après `git clone`, `git lfs pull`.
+> Nécessaire **uniquement** pour l'entraînement DREAM — inutile pour la
+> simulation, le pick-and-place ou le contrôle du robot.
 
 | Dataset | Poses | Caméras | Images | Taille |
-|---------|-------|---------|--------|--------|
-| **Synthétique** (`datasets/synthetic_dataset/`) | 5,000 | 4 (front, left, right, top) | 20,000 | ~8.3 GB |
-| **Réel** (`datasets/real_dataset/`) | 2,000 | 2 (cam0, cam3) | 4,000 | ~1.2 GB |
+|---|---|---|---|---|
+| **Synthétique** (`datasets/synthetic_dataset/`) | 5 000 | 4 (front, left, right, top) | 20 000 | 8,3 Go |
+| **Réel** (`datasets/real_dataset/`) | 2 000 | 2 (cam0, cam3) | 4 000 | 1,2 Go |
+| **Synthétique 50k** (`training/dream/dream_data/synthetic_50k/`) | 12 500 | 4 (front, left, right, top) | **50 000** | **7,2 Go** |
+| **Réel 3 caméras** (`training/dream/dream_data/real_3cam/`) | 2 500 | 3 (**arducam, svpro, astra**) | **7 500** | **2,7 Go** |
 
-Format `labels.csv` :
+Les deux premiers sont les jeux d'origine ; **les deux derniers sont ceux qu'on
+entraîne aujourd'hui**, et ils vivent sous `training/dream/dream_data/`, pas
+sous `datasets/`.
+
+Le réel 3 caméras est accumulé sur 5 sessions de 500 poses (index 0 → 2499),
+les trois caméras déclenchant sur la même pose.
+
+### Découpes et mélanges
+
+| Dossier | Contenu | Taille |
+|---|---|---|
+| `real_3cam_train/` | 6 000 lignes | 708 Ko |
+| `real_3cam_val/` | 1 500 lignes | 184 Ko |
+| `real_3cam_train_x5/` | 30 000 lignes — train suréchantillonné ×5 pour équilibrer le mélange | 3,5 Mo |
+| `real_3cam_train_x5_ndds/` | le même, converti au format NDDS | **11 Go** |
+| `mix_20k3_50k/` | 110 000 entrées — le mélange du point de contrôle courant | 867 Mo |
+
+Les découpes ne contiennent **aucune image** — seulement un `labels.csv`
+pointant vers `real_3cam/`. Ne pas supprimer le jeu source. La conversion NDDS,
+elle, duplique : 3,5 Mo → 11 Go.
+
+### Encombrement total
+
+| Emplacement | Taille |
+|---|---|
+| `training/dream/dream_data/` — tous les jeux, mélanges et conversions | **212 Go** |
+| `datasets/` — les jeux antérieurs | 9,5 Go |
+
+Les 212 Go accumulent une trentaine de variantes (bruts, NDDS, CLAHE, CycleGAN,
+mélanges). **Rien de tout cela n'est versionné** — seul `datasets/**/*.png`
+passe par Git LFS.
+
+### Format `labels.csv`
+
+Les angles sont donnés **en radians et en degrés**, une ligne par image :
+
 ```
-camera,image_path,j1,j2,j3,j4,j5,j6
-cam0,images/cam0/000000.png,-45.23,12.67,-30.45,5.12,-15.89,22.34
+index,j1_rad,...,j6_rad,j1_deg,...,j6_deg,camera,image_path
+0,-0.5245,...,-0.7255,-30.05,...,-41.57,arducam,images/arducam/000000.png
 ```
+
+⚠️ Les deux jeux d'origine suivent l'**ancien format** de `labels.csv`
+(`camera,image_path,j1..j6`, en degrés seulement).
+
+⚠️ Le lien `dream_data/` à la racine du dépôt est **mort** — passer par
+`training/dream/dream_data/`.
 
 Plus de détails : [`datasets/README.md`](datasets/README.md)
 
@@ -527,16 +601,89 @@ python3 performance_analyzer.py --guided
 
 ## 🎯 Pick-and-place (Gazebo)
 
-Deux pipelines complets de pick-and-place en simulation, utilisés pour démontrer la chaîne perception → IK → contrôle moteur :
+### Réplique du banc réel — `real_table`
 
-| Pipeline | Monde | Objets | Perception | Doc |
-|----------|-------|--------|------------|-----|
-| **Mono-objet** | `worlds/pick_and_place.sdf` | 1 cube rouge → zone verte | DREAM keypoints + PnP (optionnelle, fallback open-loop IK) | [pick_and_place_node.py](mycobot_gateway/mycobot_gateway/pick_and_place_node.py) |
-| **Multi-couleur sorting** | `worlds/pick_and_place_sorting.sdf` | 4 objets dynamiques (cube R, cube B, cylindre G, boîte Y) → 4 bacs colorés à parois | HSV top-down + back-projection pinhole + IK numérique | [sorting_orchestrator.py](mycobot_gateway/mycobot_gateway/sorting_orchestrator.py) |
+Monde qui reproduit le poste physique plutôt qu'une table générique : plateau
+**622 × 449 × 8,5 mm** aux dimensions mesurées le 09/09/2026, texture bois
+reconstruite depuis les photos du plan de travail, et les **quatre ArUco 19 /
+23 / 25 / 26 de 50 mm** aux positions relevées.
 
-**Composants partagés** :
-- IK numérique : `training/dream/mycobot_ik.py` (scipy L-BFGS-B + FK chain, multi-restart, warm-start, < 0.01 mm précision)
-- Émulation grasp : appel au service Gazebo `/world/<world>/set_pose` pour téléporter l'objet sur l'EE pendant le portage et le déposer dans le bac à la couleur correspondante (le bras MyCobot 320 Pi physique n'a pas de gripper actuellement)
+Depuis un clone neuf, faire d'abord [Installation](#installation). Ensuite :
+
+```bash
+conda deactivate
+cd ~/ros_jazzy
+colcon build --packages-select mycobot_description mycobot_gateway --symlink-install
+source install/setup.bash
+ros2 launch mycobot_gateway real_table.launch.py
+```
+
+> `conda deactivate` est obligatoire, et le `colcon build` aussi : sans lui
+> `models/` n'est pas installé et la scène apparaît **sans bois ni marqueurs**,
+> silencieusement.
+
+| argument | défaut | effet |
+|---|---|---|
+| `demo:=true` | `false` | exécute un cycle de préhension physique du cube rouge vers le bac |
+| `robot_appearance:=realistic` | `original` | base grise et coques blanc satiné — **visuel seulement**, la cinématique, les collisions et les inerties sont inchangées |
+| `headless:=true` | `false` | sans interface graphique |
+| `bridge_camera:=false` | `true` | ne publie pas les images de la caméra de dessus |
+
+Guide complet : [docs/GAZEBO_REAL_TABLE.md](docs/GAZEBO_REAL_TABLE.md) ·
+provenance de la texture : [models/wood_table/README.md](mycobot_description/models/wood_table/README.md)
+
+### Tri des 4 objets — saisie physique *(la référence)*
+
+La pince se ferme réellement, `gz_ros2_control` simule le contact, et **chaque
+prise est vérifiée sur la pose Gazebo de l'objet** : il monte avec les doigts ou
+la prise est déclarée ratée. Deux terminaux :
+
+```bash
+# Terminal 1 — le banc (monde pick_and_place_sorting par défaut)
+conda deactivate && source /home/genji/Osama_ws/install/setup.bash
+ros2 launch mycobot_gateway sim_grasp.launch.py
+
+# Terminal 2 — le tri des 4 objets, saisie réelle
+conda deactivate && source /home/genji/Osama_ws/install/setup.bash
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
+```
+
+Les quatre cibles et leurs paramètres de préhension sont dans
+[`sim_sorting_grasp.py`](mycobot_gateway/mycobot_gateway/sim_sorting_grasp.py) :
+
+| objet | largeur pincée | bac | particularité |
+|---|---|---|---|
+| `red_cube` | 40 mm | (−0,22 · −0,18) | — |
+| `blue_cube` | 50 mm | (−0,22 · −0,06) | — |
+| `green_cylinder` | 50 mm | (−0,22 · +0,06) | `squeeze_mm=6` — un cylindre ne touche les patins que sur une **ligne**, il faut serrer plus que sur une face plane sinon il file à la levée |
+| `yellow_box` | 30 mm | (−0,22 · +0,18) | `phi_deg=90` — la boîte fait 50×30×40, on pince les 30 mm, doigts sur l'axe Y |
+
+Options utiles : `-p only:=green_cylinder` pour n'en faire qu'un,
+`-p move_duration:=0` pour dimensionner la durée au trajet.
+
+**Le point outil est le centre des patins** — 166 mm de la bride sur +Z du
+link6, décalé de 7,8 mm en +Y — **et non le bout du doigt**. Les trois chiffres
+qui gouvernent le cycle sortent des meshes `pro_adaptive_gripper/*.dae` et ont
+été vérifiés en simulation.
+
+### Pipelines par téléportation *(antérieurs, conservés)*
+
+Ces deux-là **n'attrapent rien** : ils appellent le service Gazebo
+`/world/<world>/set_pose` pour coller l'objet à l'effecteur pendant le
+transport. Ce n'était pas un raccourci gratuit — ils datent d'avant la pince
+modélisée. C'est ce qui explique que l'objet **saute** au lieu d'être saisi.
+
+| Pipeline | Monde | Objets | Perception | Nœud |
+|----------|-------|--------|------------|------|
+| Mono-objet | `worlds/pick_and_place.sdf` | 1 cube rouge → zone verte | DREAM keypoints + PnP (fallback IK boucle ouverte) | [pick_and_place_node.py](mycobot_gateway/mycobot_gateway/pick_and_place_node.py) |
+| Multi-couleur | `worlds/pick_and_place_sorting.sdf` | 4 objets → 4 bacs | HSV top-down + rétroprojection sténopé | [sorting_orchestrator.py](mycobot_gateway/mycobot_gateway/sorting_orchestrator.py) |
+
+Ils gardent leur intérêt pour la partie **perception** — la détection HSV et la
+rétroprojection sont les mêmes — mais pour démontrer une préhension, utiliser
+`sim_sorting_grasp`.
+
+**Composant partagé** : IK numérique `training/dream/mycobot_ik.py`
+(scipy L-BFGS-B + chaîne FK, multi-restart, warm-start, < 0,01 mm).
 
 **Pipeline sorting (testé end-to-end le 23/04/2026)** :
 ```
@@ -653,7 +800,7 @@ mycobot_R6A/
 | Machine | IP | Ports |
 |---------|-----|-------|
 | PC Tour | 10.10.0.115 | — |
-| Raspberry Pi | 10.10.0.221 | 5005 (robot) + 5006 (caméras) |
+| Raspberry Pi | 10.10.0.224 | 5005 (robot) + 5006 (caméras) |
 
 ```bash
 ros2 launch mycobot_gateway simple_gui.launch.py pi_ip:=<VOTRE_IP_PI>
@@ -671,9 +818,9 @@ conda deactivate
 
 ### Connexion TCP échoue
 ```bash
-ping 10.10.0.221
-nc -zv 10.10.0.221 5005   # robot bridge
-nc -zv 10.10.0.221 5006   # camera server
+ping 10.10.0.224
+nc -zv 10.10.0.224 5005   # robot bridge
+nc -zv 10.10.0.224 5006   # camera server
 ```
 
 ### Git LFS — images manquantes après clone

@@ -86,6 +86,98 @@ réparé à sa cause.
   ⚠ **rosbridge lui-même reste bloqué** par un désalignement ABI `fastcdr` au
   niveau de `/opt/ros/jazzy` (`symbol lookup error`) : à corriger côté système
   (apt), indépendant de ce correctif de launch.
+### Modifié — le tri de reference est celui a saisie physique (10/09)
+
+- **`sim_sorting_grasp` devient le pipeline de tri documente.** La pince se
+  ferme reellement, le contact passe par `gz_ros2_control`, et **chaque prise
+  est verifiee sur la pose Gazebo de l'objet** : il monte avec les doigts, ou
+  la prise est declaree ratee.
+
+  ```bash
+  # Terminal 1 — le banc
+  ros2 launch mycobot_gateway sim_grasp.launch.py
+  # Terminal 2 — le tri des 4 objets
+  ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
+  ```
+
+- **`sorting_orchestrator` et `pick_and_place_node` sont retrogrades** au rang
+  de pipelines anterieurs. Ils **n'attrapent rien** : ils appellent le service
+  Gazebo `set_pose` pour coller l'objet a l'effecteur pendant le transport.
+  C'est ce qui fait **sauter** l'objet au lieu d'etre saisi — un symptome
+  regulierement pris pour une panne. Ils datent d'avant la pince modelisee et
+  restent utiles pour la perception (HSV + retroprojection).
+- La documentation disait l'inverse : le README presentait les deux pipelines a
+  teleportation comme les seuls, sans mentionner `sim_sorting_grasp`. README,
+  README_GAZEBO et CLAUDE.md donnent maintenant la commande de reference, les
+  quatre cibles avec leur largeur de prehension, et le piege des noms.
+- Signale aussi que `real_table.launch.py demo:=true` appelle bien
+  `sim_sorting_grasp` mais **bride a `only: red_cube`** : pour les quatre
+  objets il faut les deux terminaux.
+
+### Corrige — les noeuds de tri ne trouvaient plus le module IK (10/09)
+
+- `sorting_orchestrator.py` et `pick_and_place_node.py` cherchaient
+  `mycobot_ik` a deux chemins en dur, dont
+  `/home/genji/ros_jazzy/src/mycobot_R6A/training/dream`. Ce dossier **existe
+  encore** mais ne contient plus le module, et le garde-fou testait `isdir()`
+  au lieu du fichier : un chemin mort etait insere dans le `sys.path` et
+  l'import echouait par `ModuleNotFoundError`, tuant le noeud au demarrage.
+- Les deux remontent desormais leurs repertoires parents jusqu'a trouver
+  `training/dream/mycobot_ik.py`, **en verifiant le fichier**. Plus de chemin
+  en dur, et ca fonctionne depuis n'importe quel espace de travail.
+
+
+### Ajouté — réplique Gazebo du banc réel, plateau bois et apparence réaliste (10/09)
+
+- **`worlds/real_table.sdf`** — le monde ne reproduit plus une table générique
+  mais **le poste physique** : plateau **622 × 449 × 8,5 mm**, dimensions
+  mesurées le 09/09/2026, et les **quatre ArUco 19 / 23 / 25 / 26 de 50 mm**
+  aux positions relevées. Caméra de dessus, cube rouge et bac.
+  Lancement : `ros2 launch mycobot_gateway real_table.launch.py`.
+- **`models/wood_table/`** — mesh `tabletop.dae` à UV explicites et texture
+  albédo reconstruite depuis les photos du plan de travail (pin miel, veinage
+  longitudinal, nœuds, joints de planches, usure). Finition PBR métalness 0,
+  rugosité 0,65. La provenance et le prompt de génération sont conservés dans
+  `models/wood_table/README.md` — la texture est une **reconstruction
+  photographique**, les nœuds et rayures sont illustratifs et non mesurés.
+  L'épaisseur de collision garde les 8,5 mm mesurés.
+- **`models/aruco_19|23|25|26/`** — les quatre marqueurs de la planche, générés
+  par `scripts/generate_gazebo_aruco.py`.
+- **Apparence réaliste du robot**, optionnelle :
+  `robot_appearance:=realistic` donne base grise et coques blanc satiné.
+  **Visuel uniquement** — meshes, origines visuelles, articulations, collisions,
+  inerties et paramètres de contrôleur sont partagés inchangés. Le rendu
+  d'entraînement d'origine reste le défaut.
+- **Éclairage de `randomized.sdf` corrigé** : sans bloc `<scene>`, Gazebo
+  applique un ambiant très faible et tout ce que le soleil ne frappe pas
+  directement virait au gris sombre — le plastique blanc du robot rendait en
+  gris moyen. L'ambiant global est relevé pour se rapprocher des captures
+  réelles (bureau, fluorescent + lumière du jour, forte composante rebondie).
+- **`sim_grasp.launch.py`** accepte désormais `world_name` et
+  `robot_appearance` ; le monde n'est plus codé en dur.
+- **`sim_sorting_grasp.py`** attend les contrôleurs actifs et les `joint_states`
+  au lieu d'un délai fixe, ce qui le rend robuste à un démarrage lent de Gazebo,
+  et accepte les positions de bacs en paramètres (`bin_xy.<modèle>`).
+- **`mycobot_description/CMakeLists.txt`** installe `models/` — sans cette
+  ligne les `package://mycobot_description/models/...` de `real_table.sdf` ne
+  se résolvent pas et la scène apparaît sans bois ni marqueurs.
+- Documentation : `docs/GAZEBO_REAL_TABLE.md` (construction, coordonnées,
+  hypothèses de placement), entrée dans `README_GAZEBO.md`, section dans le
+  `README.md` et le tableau de `docs/ARCHITECTURE.md`.
+
+### Corrigé — adresse de la Pi et lecture des angles (10/09)
+
+- Adresse de la Pi unifiée à `10.10.0.224` dans `README.md`,
+  `docs/ARCHITECTURE.md` et le paramètre par défaut de `bridge_tour.py`, qui
+  annonçaient encore `.221` et `.225`. ⚠ **Cette adresse n'est pas fixe** :
+  elle a été observée en `.218` le 07/09 et en `.219` le 10/09. Toujours
+  identifier la Pi par un aller-retour TCP sur le port 5005, jamais par un
+  `ping` — `.224` répond au ping sans forcément servir le bridge.
+- `joint_sync.py` : `bridge_tour` peut regrouper plusieurs réponses dans un
+  seul `recv()` TCP, faute de délimitation de trame côté bridge. Le parseur ne
+  garde plus que la dernière ligne non vide, ce qui supprime les erreurs
+  `eval()` sur du multi-lignes, et reconnaît `ANGLES:` sans distinction de
+  casse — `bridge_pi_simple.py` répond en majuscules avec une espace.
 
 
 ### Ajouté — méthodologie des essais de précision et validation de l'extrinsèque (09/09, soir)
