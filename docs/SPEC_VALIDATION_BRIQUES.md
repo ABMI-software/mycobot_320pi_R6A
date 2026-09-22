@@ -79,7 +79,7 @@ flowchart LR
         GT["gz_sim_localizer<br/>verite terrain Gazebo<br/>(reference)"]
         AR["aruco_localizer<br/>PnP 4 ArUco<br/>(sortant)"]
         DR["dream_localizer<br/>T_cam-base par DREAM<br/>(candidat, a ecrire)"]
-        RP["pepp_localizer<br/>RoboPEPP<br/>(candidat, a ecrire)"]
+        RP["pepp_localizer<br/>RoboPEPP<br/>(evaluation en cours, hors depot)"]
     end
     SRC -->|"/aruco/object_pose<br/>/aruco/workspace_valid"| PP
 
@@ -240,16 +240,61 @@ Aucune ne peut être tranchée depuis le code seul.
 2. **Le nombre d'essais en UC4**, fixé avant de commencer.
 3. **Qui écrit `dream_localizer` et `pepp_localizer`**, et sur quelle branche —
    la règle de branchement impose un domaine par branche.
-4. **RoboPEPP est-il intégrable ?** Son coût d'intégration n'a pas été évalué
-   dans ce dépôt : licence, dépendances, format d'entrée, besoin de
-   ré-entraînement sur le MyCobot. À chiffrer avant de s'engager.
+4. **Ce que l'évaluation RoboPEPP en cours doit rapporter** — voir §11. Le
+   travail a commencé hors de ce dépôt ; ce qui manque n'est pas la décision
+   d'évaluer, mais l'accord sur les mesures à produire.
 5. **Le banc de référence.** Les données de campagne actuelles viennent de
    **Lyon** ; si Nanterre doit produire des mesures comparables, le protocole
    commun est un prérequis, pas une conséquence.
 
 ---
 
-## 10. Livrables
+## 10. RoboPEPP — évaluation en cours, hors de ce dépôt
+
+**État au 22/09/2026 :** RoboPEPP est en cours de test et de validation. Ce
+dépôt n'en porte **aucune trace** — ni branche, ni pull request, ni fichier. Le
+travail se déroule ailleurs.
+
+Ce n'est pas un problème en soi. Ce qui en est un : **une validation menée hors
+de ce cadre risque de produire des chiffres incomparables avec ceux de DREAM**,
+et il faudra tout refaire. Le projet a déjà payé cette erreur le 02/09, avec une
+démonstration invalidée le jour même faute d'avoir posé la bonne épreuve.
+
+### Ce que l'évaluation doit produire pour se brancher ici
+
+Sans ces cinq points, le résultat ne sera pas opposable à DREAM :
+
+1. **L'épreuve d'anti-circularité (§6.1)**, dans sa forme exacte : décaler
+   l'image de N pixels, vérifier que la détection suit de N pixels. Un bon
+   résidu de reprojection ne la remplace pas — c'est précisément ce qui avait
+   trompé le 02/09.
+2. **Un jeu de validation tenant un point de vue à l'écart (§6.2)**, pas
+   seulement des images. Un montage de caméra jamais vu à l'entraînement.
+3. **L'enveloppe d'observabilité déclarée (§6.3)** : quelles articulations la
+   méthode n'observe pas, mesuré et non supposé. DREAM déclare J6 inobservable
+   et J5 utilisable de 0° à −60° ; une comparaison sans cet équivalent est
+   bancale.
+4. **La latence mesurée**, pas estimée, sur le matériel visé.
+5. **Le coût d'intégration** : licence, dépendances, format d'entrée, et surtout
+   s'il faut ré-entraîner sur le MyCobot — auquel cas les données nécessaires et
+   leur volume.
+
+### Ce que ce dépôt fournit en retour
+
+- La scène `real_table.sdf`, réplique mesurée du banc, pour évaluer les deux
+  briques sur la même géométrie.
+- Le port enfichable (§2) : l'intégration se réduit à publier deux topics.
+- Le budget d'erreur du banc (§5), qui dit d'avance quelles différences seront
+  démontrables et lesquelles seront noyées dans le bruit.
+- La grille de 9 cibles de `precision_benchmark_node` et son rapport CSV.
+
+⚠ **À remonter dès que possible :** où vit ce travail, et sous quelle licence.
+Tant que ce document ne peut pas y renvoyer, l'équipe qui lira cette
+spécification ne saura pas que l'évaluation existe.
+
+---
+
+## 11. Livrables
 
 | Livrable | Nature |
 |---|---|

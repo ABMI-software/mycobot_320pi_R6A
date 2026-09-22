@@ -23,7 +23,13 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   résoudre, et trois épreuves obligatoires — anti-circularité, point de vue
   tenu à l'écart, observabilité déclarée.
 - Cinq décisions sont explicitement laissées à l'équipe, dont le seuil
-  d'acceptation et le coût d'intégration de RoboPEPP, non évalué ici.
+  d'acceptation et le nombre d'essais, fixé avant de commencer.
+- **RoboPEPP est en cours de test et de validation**, hors de ce dépôt — aucune
+  branche, aucune PR, aucun fichier n'en porte trace ici. La spécification
+  énonce donc les cinq mesures que cette évaluation doit produire pour être
+  **opposable** à DREAM, à commencer par l'épreuve d'anti-circularité. Menée
+  hors de ce cadre, elle risque de produire des chiffres incomparables et de
+  devoir être refaite.
 
 ### Corrigé — `aruco_localizer` envoyait un modèle 3D deux fois trop petit (22/09)
 
