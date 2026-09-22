@@ -218,6 +218,14 @@ ros2 launch mycobot_gateway sim_grasp.launch.py
 ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
 ```
 
+**État mesuré au 22/09 : 3 objets sur 4**, sur deux cycles complets aux
+résultats identiques. `green_cylinder` finit systématiquement hors du bac, à
+~10 cm, alors qu'il réussit quand il est trié **seul**. La différence est
+l'orientation du poignet — φ = 120° aux deux échecs, 105° à la réussite —
+héritée de l'objet précédent via `q_ref=q_lift` : le résultat dépend donc de
+l'ordre de tri, pas seulement de l'objet. Ne pas rechercher la cause du côté
+de la marge des doigts, qui laisse déjà 2,5 mm de jeu par côté.
+
 `sorting_orchestrator` et `pick_and_place_node` **n'attrapent rien** : ils
 téléportent l'objet par le service Gazebo `set_pose`. Si un objet **saute** au
 lieu d'être saisi, c'est qu'on est sur ce pipeline-là — ce n'est pas une panne.

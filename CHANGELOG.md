@@ -9,6 +9,48 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — `sim_grasp.launch.py` ne se lançait plus du tout (22/09)
+
+- **Le banc de préhension physique était injoignable depuis le 10/09.** Le
+  fichier levait `TypeError: Failed to normalize given item of type '<class
+  'list'>'` au chargement, avant même d'ouvrir Gazebo : la paramétrisation du
+  monde (`ed486171`) avait écrit
+  `PathJoinSubstitution([desc_pkg, 'worlds', [world_name, '.sdf']])`, or cette
+  substitution normalise **chacun** de ses éléments et rejette une liste
+  imbriquée — que `'<world_name>.sdf'` impose pourtant. Remplacé par une
+  concaténation à plat déballée au point d'usage.
+- Le défaut arrivait avec la branche d'Osama, donc **il n'a jamais atteint
+  `origin/main`** : il est corrigé avant d'être publié. Les 22 autres fichiers
+  de launch du paquet ont été chargés un à un pour vérifier qu'aucun ne porte
+  la même construction.
+
+### Mesuré — le dégagement des doigts ne sauve pas le cylindre (22/09)
+
+Premier passage réel du cycle de tri depuis le correctif `aeb39dfc`, en
+`headless`, sur `pick_and_place_sorting.sdf`. Deux cycles complets, résultats
+identiques : **3 objets sur 4**.
+
+| Objet | Cycle 1 | Cycle 2 | Écart au centre du bac |
+|-------|---------|---------|------------------------|
+| `red_cube` | ✔ | ✔ | −1/−2 · −0/−2 mm |
+| `blue_cube` | ✔ | ✔ | −11/+10 · −13/+11 mm |
+| `green_cylinder` | ✘ | ✘ | −81/−122 · −35/−102 mm |
+| `yellow_box` | ✔ | ✔ | +0/+0 · +3/+15 mm |
+
+- **La prédiction du correctif est confirmée, dans le mauvais sens** : les
+  2,3 mm par doigt gagnés sur le cylindre ne suffisent pas. Il finit à 10 cm du
+  bac, poussé vers −Y, une fois au sol (z = 0,025) une fois perché (z = 0,051).
+- **Le même cylindre, trié SEUL, réussit** (écart −11/−23 mm). La seule
+  différence entre les passages est l'orientation du poignet : **φ = 120° dans
+  les deux échecs, φ = 105° dans la réussite**. Ce φ est hérité de la pose de
+  l'objet précédent (`q_ref=q_lift`), donc le résultat dépend de l'ordre de tri
+  — ce n'est pas une propriété de l'objet seul.
+- Conséquence : le levier n'est ni la marge ni l'encombrement des doigts, qui
+  laissent déjà 2,5 mm de jeu par côté autour du cylindre à l'ouverture. Il est
+  dans la remontée `q_place → q_over_bin`, qui n'est pas verticale et balaie
+  latéralement à φ = 120°.
+
+
 ### Corrigé — le cylindre roulait hors du bac au relâcher (sim de tri, 22/09)
 
 - **`sim_sorting_grasp` écarte les doigts avant de remonter**, au lieu de

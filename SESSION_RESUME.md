@@ -42,6 +42,19 @@ fois la même modification. Résolu par fusion (pas de réécriture, pas de
 force-push) dont l'arbre a été obtenu en rejouant les **19 commits réellement
 nouveaux** sur `main` — apport net vérifié identique, 44 fichiers.
 
+**Le banc de préhension ne se lançait plus depuis le 10/09** :
+`sim_grasp.launch.py` échouait au chargement sur une `PathJoinSubstitution`
+contenant une liste imbriquée. Corrigé, puis les 22 autres fichiers de launch
+chargés un à un — aucun ne porte la même construction. Le défaut arrivait avec
+la branche d'Osama, il n'a donc jamais atteint `origin/main`.
+
+**Le cycle de tri a tourné pour de vrai, deux fois : 3 objets sur 4.** Le
+cylindre échoue aux deux passages, à ~10 cm du bac. Trié seul il réussit ; la
+seule différence est l'orientation du poignet (φ = 120° aux deux échecs,
+105° à la réussite), héritée de l'objet précédent. Le correctif `aeb39dfc` est
+donc insuffisant, et le levier n'est pas la marge des doigts mais la remontée
+`q_place → q_over_bin`, qui balaie latéralement. Chiffres dans le CHANGELOG.
+
 ### Décisions prises
 
 - **Les classeurs `.xlsx` deviennent commitables sur approbation explicite**,
@@ -57,24 +70,31 @@ nouveaux** sur `main` — apport net vérifié identique, 44 fichiers.
 
 ### Prochaines actions
 
-1. [ROUGE] **Pousser `main` puis la PR, dans cet ordre** — la branche de PR
-   contient les commits de `main`.
-2. [ROUGE] **Rejouer le tri en simulation** : le dégagement des doigts n'a été
-   chiffré que géométriquement, et le cylindre — le cas qui motive le
-   correctif — ne gagne que 2,3 mm par doigt.
-3. [FAIT] **Quel côté mérite le nom « droite »** — tranché le 22/09 en faveur
+1. [ROUGE] **Pousser `main`** — et rien d'autre : la tête de la PR d'Osama
+   (`28a859d7`) est déjà accessible depuis `main`, GitHub fermera donc la PR
+   comme *merged* sans qu'on pousse sa branche.
+2. [ROUGE] **Le cylindre sort du bac, 2 fois sur 2** — mesuré le 22/09. Piste
+   la plus probable : rendre la remontée `q_place → q_over_bin` verticale, ou
+   ouvrir la pince seulement après avoir dégagé la hauteur du rebord. La marge
+   des doigts n'est pas le levier : ils ont déjà 2,5 mm de jeu par côté.
+3. [FAIT] **Rejouer le tri en simulation** — fait le 22/09, deux cycles
+   complets, résultats identiques (3/4).
+4. [FAIT] **Quel côté mérite le nom « droite »** — tranché le 22/09 en faveur
    du point de vue de l'opérateur (debout en +X, regardant le robot) : +Y est à
    sa droite. Les noms de joints n'avaient pas à changer ; la convention est
    maintenant écrite dans le URDF et `README_GAZEBO.md`.
-4. [JAUNE] **Débloquer rosbridge côté système** (désalignement ABI `fastcdr`).
-5. [VERT] Reprendre les actions du 09/09, aucune n'a avancé : affaissement à
+5. [JAUNE] **Débloquer rosbridge côté système** (désalignement ABI `fastcdr`).
+6. [VERT] Reprendre les actions du 09/09, aucune n'a avancé : affaissement à
    3 portées, cas *outil couché* du scotch, éclairage à 86 de luminance.
 
 ### Commande rapide de reprise
 
 ```bash
 git push origin main
-git push origin feature/pick-and-place-osama
+
+# rejouer le tri (deux terminaux, conda desactive)
+ros2 launch mycobot_gateway sim_grasp.launch.py headless:=true
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
 ```
 
 ---

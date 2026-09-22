@@ -32,7 +32,7 @@ from launch.actions import (
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -47,8 +47,10 @@ def generate_launch_description():
     urdf_path = os.path.join(
         desc_pkg, 'urdf', '320_pi', 'mycobot_pro_320_pi_gazebo.urdf')
     world_name = LaunchConfiguration('world_name')
-    world_path = PathJoinSubstitution(
-        [desc_pkg, 'worlds', [world_name, '.sdf']])
+    # Concatenation a plat, deballee au point d'usage : PathJoinSubstitution
+    # normalise chacun de ses elements et rejette la liste imbriquee que
+    # '<world_name>.sdf' impose forcement.
+    world_path = [os.path.join(desc_pkg, 'worlds') + os.sep, world_name, '.sdf']
     controller_cfg = os.path.join(desc_pkg, 'config', 'controller.yaml')
 
     set_gz_resource = SetEnvironmentVariable(
@@ -85,14 +87,14 @@ def generate_launch_description():
     gz_gui = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(gz_pkg, 'launch', 'gz_sim.launch.py')),
-        launch_arguments={'gz_args': ['-r ', world_path],
+        launch_arguments={'gz_args': ['-r ', *world_path],
                           'on_exit_shutdown': 'true'}.items(),
         condition=UnlessCondition(headless),
     )
     gz_headless = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(gz_pkg, 'launch', 'gz_sim.launch.py')),
-        launch_arguments={'gz_args': ['-r -s --headless-rendering ', world_path],
+        launch_arguments={'gz_args': ['-r -s --headless-rendering ', *world_path],
                           'on_exit_shutdown': 'true'}.items(),
         condition=IfCondition(headless),
     )
