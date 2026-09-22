@@ -137,14 +137,14 @@ reader needs. Wrap at 72 chars.
 Additional paragraphs for unrelated-but-connected facts, artefacts
 created, or next-step pointers.
 
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 ```
 
 Type vocabulary in use: `feat` · `fix` · `docs` · `refactor` · `test` · `chore` · `perf`.
 
 Scope vocabulary: `teleop` · `dream` · `gazebo` · `sorting` · `bridge` · omit for cross-cutting changes.
 
-**Always** include the `Co-Authored-By` trailer when Claude drafted the commit.
+**Never** add an attribution trailer — no `Co-Authored-By`, no assistant mention.
+A commit here carries the name of its human author and nothing else.
 
 **Never** write commit messages that say "as requested" or "per user's instruction". Future readers don't care who requested it; they care what changed and why.
 
@@ -156,7 +156,6 @@ feat(dream): short summary
 
 Body.
 
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
 )"
 ```

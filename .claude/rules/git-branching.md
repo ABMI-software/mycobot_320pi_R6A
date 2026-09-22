@@ -30,7 +30,10 @@ feat(dream): ...
 docs: ...       # cross-cutting
 ```
 
-Include a `Co-Authored-By:` trailer when Claude helped write the code.
+N'ajouter **aucune ligne d'attribution** — ni `Co-Authored-By`, ni mention d'un
+assistant. Les commits de ce dépôt portent le seul nom de leur auteur humain.
+Le réglage `includeCoAuthoredBy: false` le garantit côté outil ; cette règle le
+garantit côté rédaction manuelle.
 
 ## Before pushing
 
