@@ -28,20 +28,49 @@ c'est un historique, pas l'état courant.
 Le cylindre finit à une dizaine de centimètres du bac, poussé vers −Y, une fois
 au sol (z = 0,025) une fois perché sur un rebord (z = 0,051).
 
-**Trié seul, il réussit** (−11/−23 mm). La seule différence entre les trois
-passages est l'orientation du poignet — **φ = 120° aux deux échecs, 105° à la
-réussite** — héritée de la pose de l'objet précédent via `q_ref=q_lift`. Le
-résultat dépend donc de **l'ordre de tri**, pas seulement de l'objet : un essai
-sur un objet isolé ne peut pas attraper ce défaut.
+### L'échec est non déterministe — mesuré sur 7 cycles
+
+C'est le fait dominant, et il change la lecture de tout le reste de cette page.
+
+Sept cycles complets ont été joués, dont six instrumentés. **Les six commandent
+une géométrie identique** — poignet à φ = 120° à la saisie comme au-dessus du
+bac, mêmes hauteurs, même serrage — et donnent **trois réussites puis trois
+échecs**. La divergence n'est pas dans la planification : elle est dans le
+solveur de contact.
+
+| | cycles 1-3 | cycles 4-6 |
+|---|---|---|
+| `green_cylinder` | ✔ +19/+7 · ✔ +19/+8 · ✔ +16/−7 | ✘ −424/−299 · ✘ −24/−197 · ✘ −161/−395 |
+
+- Les écarts d'échec vont de **24 mm à 1 132 mm**, l'objet finissant tantôt au
+  sol (z = 0,022) tantôt perché sur un rebord (z = 0,052). Une éjection
+  métrique est une signature de **pénétration de contact**, pas de roulement.
+- **`blue_cube` a échoué une fois** (+142/−89 mm) — sa garde latérale au dépôt
+  n'est que de 1,5 mm. Le cylindre n'est donc pas seul exposé.
+
+⚠ **Une explication a été avancée puis réfutée** : le poignet à φ = 120° aux
+échecs contre 105° à la réussite, d'où une prétendue dépendance à l'ordre de
+tri. Elle reposait sur trois échantillons. Les six cycles ci-dessus, tous à
+φ = 120°, la contredisent. Conservée ici parce que l'erreur est instructive :
+**trois cycles ne suffisent pas à départager deux versions de ce code.**
 
 La marge des doigts est hors de cause. Au dégagement introduit par `aeb39dfc`
 ils passent de 44 à 49,1 mm d'écartement, soit **2,5 mm de jeu par côté** autour
-du cylindre — ils ne le touchent plus. Ce qui le déplace est la remontée
-`q_place → q_over_bin`, qui n'est pas verticale et balaie latéralement.
+du cylindre — ils ne le touchent plus.
 
-**Ce qui a changé entre les deux relevés n'est pas établi.** `aeb39dfc` est
-intervenu sur cette séquence depuis le 31/08 ; l'A/B qui le confirmerait ou
-l'écarterait n'a pas été fait.
+### Piste testée et rejetée : la remontée verticale
+
+`move_to` interpole en **articulaire** : entre deux poses verticalement alignées
+la pointe décrit un arc. Mesuré sur la remontée du bac vert, 28 → 110 mm en un
+seul segment : **7,3 mm de flèche latérale**. Remplacer ce segment par un
+escalier de paliers de 20 mm ramène la flèche à **0,33 mm** — vérifié hors
+ligne, sans saut de branche. Les sept cycles ci-dessus ont été joués avec cet
+escalier : **il ne corrige pas l'échec**. Le code a été annulé.
+
+La descente `q_over_bin → q_place` porte la même flèche mais ne peut pas être en
+cause : elle culmine à z = 69 mm, au-dessus du rebord à 30 mm, et l'encombrement
+des doigts serrés sur l'objet (40,0 mm) plus la flèche donne 47,3 mm pour une
+paroi à 47,5 mm.
 
 ---
 
@@ -255,10 +284,10 @@ Bacs : 100 × 100 mm hors-tout, parois de 5 mm hautes de 30 mm, fond à z = 2 mm
 
 ## Limites
 
-- **Le résultat dépend de l'ordre de tri.** L'orientation du poignet est héritée
-  de l'objet précédent (`q_ref=q_lift`) : le cylindre échoue à φ = 120° en cycle
-  complet et réussit à φ = 105° trié seul. Un essai objet par objet ne prouve
-  donc rien sur le cycle.
+- **Le résultat n'est pas reproductible.** À géométrie commandée identique, le
+  cylindre réussit ou échoue selon le tirage du solveur de contact (3 sur 7).
+  Aucun chiffre de cette page ne doit être lu comme un état déterministe, et
+  comparer deux versions du code demande plusieurs cycles de chaque côté.
 - **Trois passages seulement** au 31/08, deux au 22/09, tous dans la même session
   et sur la même scène. Rien ne dit ce que donne un démarrage à froid.
 - **Le biais de `yellow_box` (−12 mm en X) n'est pas expliqué** — mesuré,

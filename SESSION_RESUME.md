@@ -48,12 +48,19 @@ contenant une liste imbriquée. Corrigé, puis les 22 autres fichiers de launch
 chargés un à un — aucun ne porte la même construction. Le défaut arrivait avec
 la branche d'Osama, il n'a donc jamais atteint `origin/main`.
 
-**Le cycle de tri a tourné pour de vrai, deux fois : 3 objets sur 4.** Le
-cylindre échoue aux deux passages, à ~10 cm du bac. Trié seul il réussit ; la
-seule différence est l'orientation du poignet (φ = 120° aux deux échecs,
-105° à la réussite), héritée de l'objet précédent. Le correctif `aeb39dfc` est
-donc insuffisant, et le levier n'est pas la marge des doigts mais la remontée
-`q_place → q_over_bin`, qui balaie latéralement. Chiffres dans le CHANGELOG.
+**Le cycle de tri a tourné pour de vrai — 9 cycles au total — et son issue
+n'est pas déterministe.** `green_cylinder` sort du bac 4 fois sur 7 avec la
+remontée verticale, 2 fois sur 2 sans, et `blue_cube` a échoué une fois. Les six
+cycles instrumentés commandent pourtant une géométrie **identique** (φ = 120°
+partout) : la divergence est dans le solveur de contact de Gazebo, pas dans la
+planification. Deux causes mesurées puis écartées : la marge des doigts
+(2,5 mm de jeu par côté) et la flèche latérale de la remontée (7,3 mm ramenée
+à 0,33 mm par un escalier de paliers — sans effet, code annulé).
+
+**J'avais d'abord conclu à une dépendance à l'ordre de tri** sur la foi de
+φ = 120° aux échecs contre 105° à la réussite. Trois échantillons, une
+coïncidence. C'est corrigé partout, et la leçon est consignée : sur ce banc,
+trois cycles ne départagent pas deux versions du code.
 
 ### Décisions prises
 
@@ -73,10 +80,11 @@ donc insuffisant, et le levier n'est pas la marge des doigts mais la remontée
 1. [ROUGE] **Pousser `main`** — et rien d'autre : la tête de la PR d'Osama
    (`28a859d7`) est déjà accessible depuis `main`, GitHub fermera donc la PR
    comme *merged* sans qu'on pousse sa branche.
-2. [ROUGE] **Le cylindre sort du bac, 2 fois sur 2** — mesuré le 22/09. Piste
-   la plus probable : rendre la remontée `q_place → q_over_bin` verticale, ou
-   ouvrir la pince seulement après avoir dégagé la hauteur du rebord. La marge
-   des doigts n'est pas le levier : ils ont déjà 2,5 mm de jeu par côté.
+2. [ROUGE] **Le cylindre sort du bac 4 fois sur 7, au hasard.** La géométrie
+   étant identique d'un cycle à l'autre, chercher du côté de la **physique** :
+   paramètres de contact du cylindre et des parois dans
+   `pick_and_place_sorting.sdf`, pas du côté de la trajectoire. Les éjections
+   métriques (jusqu'à 1 132 mm) sont une signature de pénétration.
 3. [FAIT] **Rejouer le tri en simulation** — fait le 22/09, deux cycles
    complets, résultats identiques (3/4).
 4. [FAIT] **Quel côté mérite le nom « droite »** — tranché le 22/09 en faveur

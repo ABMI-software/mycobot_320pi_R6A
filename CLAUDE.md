@@ -218,13 +218,19 @@ ros2 launch mycobot_gateway sim_grasp.launch.py
 ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
 ```
 
-**État mesuré au 22/09 : 3 objets sur 4**, sur deux cycles complets aux
-résultats identiques. `green_cylinder` finit systématiquement hors du bac, à
-~10 cm, alors qu'il réussit quand il est trié **seul**. La différence est
-l'orientation du poignet — φ = 120° aux deux échecs, 105° à la réussite —
-héritée de l'objet précédent via `q_ref=q_lift` : le résultat dépend donc de
-l'ordre de tri, pas seulement de l'objet. Ne pas rechercher la cause du côté
-de la marge des doigts, qui laisse déjà 2,5 mm de jeu par côté.
+**L'issue de ce banc n'est pas déterministe** (mesuré 22/09, 7 cycles).
+`green_cylinder` sort du bac **4 fois sur 7**, et `blue_cube` une fois — alors
+que les six cycles instrumentés commandent une géométrie **identique** (φ = 120°
+partout, mêmes hauteurs). La divergence est dans le solveur de contact, pas dans
+la planification : écarts d'échec de 24 mm à 1 132 mm, signature d'une
+pénétration de contact. Conséquences pratiques :
+
+- **Ne jamais conclure sur moins de plusieurs cycles par version.** Trois cycles
+  ont donné 3 réussites d'affilée sur une version qui échoue 4 fois sur 7.
+- Deux causes ont été mesurées puis **écartées** : la marge des doigts (2,5 mm
+  de jeu par côté, ils ne touchent plus l'objet) et la flèche latérale de la
+  remontée (7,3 mm, ramenée à 0,33 mm par un escalier de paliers — sans effet
+  sur l'échec ; code annulé). Détail dans `docs/PICK_AND_PLACE_SIMULATION.md`.
 
 `sorting_orchestrator` et `pick_and_place_node` **n'attrapent rien** : ils
 téléportent l'objet par le service Gazebo `set_pose`. Si un objet **saute** au

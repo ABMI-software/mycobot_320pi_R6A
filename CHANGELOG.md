@@ -9,6 +9,40 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Mesuré — la remontée verticale ne corrige pas le cylindre, qui échoue au hasard (22/09)
+
+Hypothèse testée puis **rejetée**, code annulé, rien n'est conservé dans l'arbre.
+
+`move_to` interpole en **articulaire** : entre deux poses verticalement
+alignées la pointe décrit un arc. Mesuré sur la remontée du bac vert, 28 → 110 mm
+en un seul segment : **7,3 mm de flèche latérale**, pour 2,5 mm de jeu seulement
+autour du cylindre au dégagement — le doigt revient donc le pousser. Remplacer ce
+segment unique par un escalier de paliers de 20 mm (`solve_column` sur les
+hauteurs intermédiaires, φ figé) ramène la flèche à **0,33 mm**, vérifié hors
+ligne, sans saut de branche, par bonds articulaires de 8 à 11°.
+
+**Sept cycles plus tard, le cylindre échoue toujours 4 fois sur 7.** Et les six
+cycles instrumentés commandent une géométrie **identique** — φ = 120° à la
+saisie comme au bac, mêmes hauteurs — pour trois réussites et trois échecs. La
+divergence n'est donc pas dans la planification.
+
+- Les écarts d'échec vont de **24 mm à 1 132 mm**, l'objet finissant tantôt au
+  sol (z = 0,022) tantôt perché sur un rebord (z = 0,052). Une éjection
+  métrique est une signature de pénétration de contact, pas de roulement.
+- **`blue_cube` a échoué lui aussi** une fois (+142/−89 mm), ce qui n'était
+  jamais arrivé. Sa garde latérale au dépôt n'est que de 1,5 mm.
+- La descente `q_over_bin → q_place` a bien la même flèche de 7,3 mm, mais elle
+  **ne peut pas être en cause** : elle culmine à z = 69 mm, au-dessus du rebord
+  à 30 mm, et l'encombrement des doigts serrés sur l'objet (40,0 mm) plus la
+  flèche donne 47,3 mm pour une paroi à 47,5.
+
+**Conséquence sur la lecture de tous les chiffres de ce banc** : les relevés
+« 4/4 » et « 12/12 » du 31/08 comme le « 3/4 » du 22/09 sont des tirages d'un
+processus bruité, pas des états déterministes. Toute comparaison entre deux
+versions du code demande plusieurs cycles de chaque côté — trois n'ont pas suffi
+ici, et auraient fait conclure à une réussite.
+
+
 ### Corrigé — `sim_grasp.launch.py` ne se lançait plus du tout (22/09)
 
 - **Le banc de préhension physique était injoignable depuis le 10/09.** Le
@@ -40,15 +74,14 @@ identiques : **3 objets sur 4**.
 - **La prédiction du correctif est confirmée, dans le mauvais sens** : les
   2,3 mm par doigt gagnés sur le cylindre ne suffisent pas. Il finit à 10 cm du
   bac, poussé vers −Y, une fois au sol (z = 0,025) une fois perché (z = 0,051).
-- **Le même cylindre, trié SEUL, réussit** (écart −11/−23 mm). La seule
-  différence entre les passages est l'orientation du poignet : **φ = 120° dans
-  les deux échecs, φ = 105° dans la réussite**. Ce φ est hérité de la pose de
-  l'objet précédent (`q_ref=q_lift`), donc le résultat dépend de l'ordre de tri
-  — ce n'est pas une propriété de l'objet seul.
-- Conséquence : le levier n'est ni la marge ni l'encombrement des doigts, qui
-  laissent déjà 2,5 mm de jeu par côté autour du cylindre à l'ouverture. Il est
-  dans la remontée `q_place → q_over_bin`, qui n'est pas verticale et balaie
-  latéralement à φ = 120°.
+- **Le même cylindre, trié SEUL, réussit** (écart −11/−23 mm). ⚠ L'explication
+  d'abord avancée — le poignet à φ = 120° aux échecs contre 105° à la réussite,
+  donc une dépendance à l'ordre de tri — **est réfutée plus bas** : sur six
+  cycles commandant tous φ = 120°, le cylindre réussit trois fois et échoue
+  trois fois. Trois échantillons avaient fait passer une coïncidence pour une
+  cause.
+- La marge et l'encombrement des doigts sont hors de cause : ils laissent déjà
+  2,5 mm de jeu par côté autour du cylindre à l'ouverture.
 
 
 ### Corrigé — le cylindre roulait hors du bac au relâcher (sim de tri, 22/09)

@@ -648,11 +648,11 @@ conda deactivate && source <votre_ws>/install/setup.bash
 ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
 ```
 
-⚠ **État mesuré au 22/09/2026 : 3 objets sur 4**, sur deux cycles complets aux
-résultats identiques. `green_cylinder` finit hors du bac, alors qu'il réussit
-quand on le trie **seul** (`-p only:=green_cylinder`) — l'orientation du poignet
-est héritée de l'objet précédent, donc le résultat dépend de l'ordre. Détail et
-chiffres : [docs/PICK_AND_PLACE_SIMULATION.md](docs/PICK_AND_PLACE_SIMULATION.md).
+⚠ **L'issue n'est pas déterministe** (mesuré 22/09/2026 sur 7 cycles) :
+`green_cylinder` sort du bac **4 fois sur 7**, `blue_cube` une fois, à géométrie
+commandée identique — la divergence vient du solveur de contact de Gazebo. Un
+essai unique ne prouve rien dans un sens ni dans l'autre. Détail et chiffres :
+[docs/PICK_AND_PLACE_SIMULATION.md](docs/PICK_AND_PLACE_SIMULATION.md).
 
 Les quatre cibles et leurs paramètres de préhension sont dans
 [`sim_sorting_grasp.py`](mycobot_gateway/mycobot_gateway/sim_sorting_grasp.py) :
