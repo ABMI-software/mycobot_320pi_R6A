@@ -1,0 +1,852 @@
+<!doctype html>
+<title>Rapport pick-and-place headless</title>
+<meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --paper: #E9ECEA;
+  --surface: #FFFFFF;
+  --surface-sunk: #DEE3E0;
+  --ink: #172422;
+  --ink-soft: #4B5B57;
+  --ink-faint: #7C8985;
+  --line: #C4CBC7;
+  --accent: #146356;
+  --accent-ink: #0E4A40;
+  --accent-soft: #DBEAE6;
+  --verify: #8A5A12;
+  --verify-soft: #F1E6D3;
+  --bug: #9C3B23;
+  --bug-soft: #F3E1DA;
+  --code-bg: #10201D;
+  --code-text: #D9EDE8;
+  --code-accent: #7FD9C4;
+  --code-comment: #7C978F;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #10181685cc;
+    --paper: #101615;
+    --surface: #171F1D;
+    --surface-sunk: #0C1312;
+    --ink: #E7EDEA;
+    --ink-soft: #9FB0AB;
+    --ink-faint: #6C7C77;
+    --line: #2A3532;
+    --accent: #57C4AE;
+    --accent-ink: #7FD9C4;
+    --accent-soft: #14322C;
+    --verify: #D6A44B;
+    --verify-soft: #33270F;
+    --bug: #E08468;
+    --bug-soft: #3A1D15;
+    --code-bg: #0A1513;
+    --code-text: #CFEAE3;
+    --code-accent: #7FD9C4;
+    --code-comment: #5D766F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #101615;
+  --surface: #171F1D;
+  --surface-sunk: #0C1312;
+  --ink: #E7EDEA;
+  --ink-soft: #9FB0AB;
+  --ink-faint: #6C7C77;
+  --line: #2A3532;
+  --accent: #57C4AE;
+  --accent-ink: #7FD9C4;
+  --accent-soft: #14322C;
+  --verify: #D6A44B;
+  --verify-soft: #33270F;
+  --bug: #E08468;
+  --bug-soft: #3A1D15;
+  --code-bg: #0A1513;
+  --code-text: #CFEAE3;
+  --code-accent: #7FD9C4;
+  --code-comment: #5D766F;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding-inline: 20px;
+}
+
+h1, h2, h3, h4 { font-family: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif; text-wrap: balance; color: var(--ink); }
+
+.shell {
+  max-width: 1180px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 40px;
+  padding-block: 32px 80px;
+}
+
+/* ---------------------------------------------------------------- rail */
+.rail {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.rail-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+}
+.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail a {
+  display: flex;
+  gap: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+  line-height: 1.35;
+}
+.rail a:hover, .rail a:focus-visible { background: var(--surface-sunk); color: var(--ink); outline: none; }
+.rail a .n { color: var(--accent); font-weight: 600; flex-shrink: 0; }
+.rail .rail-group-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 16px 0 4px 8px;
+}
+.rail .rail-group-label:first-child { margin-top: 0; }
+
+/* ------------------------------------------------------------- content */
+main { min-width: 0; }
+
+.cover {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 28px;
+  margin-bottom: 36px;
+}
+.cover .eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+.cover h1 { font-size: 2.55rem; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
+.cover .dek { font-family: "IBM Plex Serif", serif; font-style: italic; font-size: 1.1rem; color: var(--ink-soft); max-width: 62ch; margin: 0 0 20px; }
+.cover .meta {
+  display: flex; flex-wrap: wrap; gap: 22px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+.cover .meta b { color: var(--ink-soft); font-weight: 600; }
+
+section.block { margin-bottom: 44px; }
+section.block > h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  scroll-margin-top: 20px;
+}
+section.block > .block-dek {
+  color: var(--ink-soft);
+  max-width: 68ch;
+  margin: 0 0 20px;
+}
+p { max-width: 70ch; }
+.prose { max-width: 70ch; }
+
+code, .mono { font-family: "IBM Plex Mono", monospace; }
+p code, li code, td code { background: var(--surface-sunk); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.88em; color: var(--accent-ink); }
+
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 14px 0;
+}
+pre .c { color: var(--code-comment); }
+pre .k { color: var(--code-accent); }
+
+/* ------------------------------------------------------------ tables */
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; background: var(--surface); }
+thead th {
+  text-align: left;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--surface-sunk);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody td:first-child { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--accent-ink); white-space: nowrap; }
+
+/* --------------------------------------------------------------- step */
+.step {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 22px 24px 24px;
+  margin-bottom: 18px;
+}
+.step-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.step-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+.step-head h3 { margin: 0; font-size: 1.18rem; font-weight: 600; }
+.step-purpose { color: var(--ink-soft); margin: 2px 0 16px; font-size: 0.95rem; }
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) { .panels { grid-template-columns: 1fr; } }
+.panel { border-radius: var(--radius); padding: 14px 16px 16px; }
+.panel.procedure { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+.panel.verify { background: var(--verify-soft); border: 1px solid color-mix(in srgb, var(--verify) 35%, transparent); }
+.panel-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin: 0 0 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.panel.procedure .panel-tag { color: var(--accent-ink); }
+.panel.verify .panel-tag { color: var(--verify); }
+.panel p, .panel ul, .panel pre { margin-top: 8px; margin-bottom: 8px; }
+.panel p:first-of-type { margin-top: 0; }
+.panel ul { padding-left: 18px; margin: 8px 0; }
+.panel li { margin-bottom: 4px; font-size: 0.94rem; }
+.panel pre { font-size: 12px; }
+
+/* ---------------------------------------------------------- bug cards */
+.bugcard {
+  border: 1px solid color-mix(in srgb, var(--bug) 35%, var(--line));
+  background: var(--bug-soft);
+  border-radius: 12px;
+  padding: 20px 22px 22px;
+  margin-bottom: 18px;
+}
+.bugcard h4 { margin: 0 0 4px; font-size: 1.08rem; color: var(--ink); }
+.bugcard .repo {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--bug);
+  margin: 0 0 14px;
+}
+.bugcard dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.bugcard dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 3px;
+  white-space: nowrap;
+}
+.bugcard dd { margin: 0; max-width: 62ch; }
+.bugcard pre { margin-top: 4px; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 3px 9px; border-radius: 999px;
+  margin-left: 8px;
+}
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+  padding: 12px 18px;
+  margin: 16px 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.callout b { color: var(--ink); }
+.callout.warn { border-left-color: var(--verify); }
+.callout.bug { border-left-color: var(--bug); }
+
+.ladder { display: flex; flex-direction: column; gap: 0; margin: 18px 0; }
+.rung {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.rung:first-child { border-top: none; }
+.rung .level {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+.rung.reached .level { color: var(--accent-ink); font-weight: 600; }
+.rung.stopped .level { color: var(--verify); font-weight: 600; }
+.rung h5 { margin: 0 0 4px; font-size: 1rem; }
+.rung p { margin: 0 0 6px; color: var(--ink-soft); font-size: 0.94rem; }
+.rung .tag {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 999px;
+  margin-bottom: 6px;
+}
+.rung.reached .tag { background: var(--accent-soft); color: var(--accent-ink); }
+.rung.stopped .tag { background: var(--verify-soft); color: var(--verify); }
+
+.manifest-tree {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+.manifest-tree .c { color: var(--code-comment); }
+.manifest-tree .k { color: var(--code-accent); }
+
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+  padding-top: 18px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { position: static; max-height: none; }
+  .cover h1 { font-size: 1.9rem; }
+}
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <p class="rail-eyebrow">Sommaire</p>
+    <nav>
+      <a href="#overview"><span class="n">&sect;</span>Vue d'ensemble</a>
+      <a href="#comparison"><span class="n">&sect;</span>Spec vs. r&eacute;alis&eacute;</a>
+      <p class="rail-group-label">Impl&eacute;mentation</p>
+      <a href="#s1"><span class="n">01</span>SDF bloc &amp; assiette</a>
+      <a href="#s2"><span class="n">02</span>Spawn &amp; v&eacute;rification pose</a>
+      <a href="#s3"><span class="n">03</span>IK cart&eacute;sienne</a>
+      <a href="#s4"><span class="n">04</span>Pr&eacute;-calcul des points</a>
+      <a href="#s5"><span class="n">05</span>Script de la s&eacute;quence</a>
+      <a href="#s6"><span class="n">06</span>Prouver la prise</a>
+      <a href="#s7"><span class="n">07</span>O&ugrave; se pose le bloc</a>
+      <a href="#s8"><span class="n">08</span>Exp&eacute;rience de prise par friction</a>
+      <a href="#s9"><span class="n">09</span>Attache simul&eacute;e</a>
+      <a href="#s10"><span class="n">10</span>Enregistrer 20 &eacute;pisodes</a>
+      <a href="#s11"><span class="n">11</span>&Eacute;tat v&eacute;rit&eacute;-disque</a>
+      <a href="#s12"><span class="n">12</span>Conversion du jeu de donn&eacute;es</a>
+      <a href="#ladder"><span class="n">&sect;</span>&Eacute;chelle de v&eacute;rification</a>
+      <p class="rail-group-label">R&eacute;f&eacute;rence</p>
+      <a href="#bugs-env"><span class="n">&sect;</span>Bugs corrig&eacute;s &mdash; session</a>
+      <a href="#bugs-upstream"><span class="n">&sect;</span>Bugs &agrave; signaler</a>
+      <a href="#limits"><span class="n">&sect;</span>Ce que cela ne prouve pas</a>
+      <a href="#manual"><span class="n">&sect;</span>Ex&eacute;cution manuelle, de bout en bout</a>
+      <a href="#manifest"><span class="n">&sect;</span>Inventaire des fichiers</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="cover">
+      <p class="eyebrow">Headless_Task-Grounded_Pick-and-Place_in_Gazebo &mdash; rapport d'impl&eacute;mentation</p>
+      <h1>Pick-and-place ancr&eacute; sur une t&acirc;che, en headless, de la spec &agrave; vingt &eacute;pisodes enregistr&eacute;s</h1>
+      <p class="dek">Ce qui a &eacute;t&eacute; construit face &agrave; <code>doc/headless_pick_and_place_specification.md</code>, &eacute;tape par &eacute;tape, avec la v&eacute;rification utilis&eacute;e &agrave; chaque &eacute;tape, chaque bug trouv&eacute; en chemin, et l&agrave; o&ugrave; le m&eacute;canisme livr&eacute; s'&eacute;carte pr&eacute;cis&eacute;ment de ce que la sp&eacute;cification supposait &mdash; le point le plus important &eacute;tant que la prise est une attache simul&eacute;e, pas de la physique de contact rigide.</p>
+      <div class="meta">
+        <span><b>Sandbox</b> ~/tomislav/robotics/Headless_Task-Grounded_Pick-and-Place_in_Gazebo</span>
+        <span><b>H&ocirc;te</b> Ubuntu WSL2, ~4,9&nbsp;Go de RAM utilisable, CPU uniquement</span>
+        <span><b>Reproduit via</b> le conteneur Docker <code>gazebo_to_lerobot</code> (Ubuntu 24.04, ROS2 Jazzy, Gazebo Harmonic)</span>
+        <span><b>Commit</b> f944dbe sur <code>main</code></span>
+        <span><b>&Eacute;crit le</b> 22/09/2026</span>
+      </div>
+    </div>
+
+    <section class="block" id="overview">
+      <h2>Vue d'ensemble</h2>
+      <p class="block-dek">Ce document est le rapport d'impl&eacute;mentation de <code>headless_pick_and_place_specification.md</code> &mdash; le fichier situ&eacute; dans ce m&ecirc;me dossier, trait&eacute; comme une sp&eacute;cification contraignante des <em>objectifs</em> de conception et de v&eacute;rification, pas des d&eacute;tails d'impl&eacute;mentation. Selon l'instruction directrice sous laquelle ce travail a &eacute;t&eacute; men&eacute;, les choix de programmation pr&eacute;cis de ce document pouvaient librement &ecirc;tre remplac&eacute;s par de meilleures solutions ; chaque objectif devait &ecirc;tre soit atteint, soit explicitement signal&eacute; comme probl&egrave;me.</p>
+      <p class="prose">En bref&nbsp;: chaque &eacute;tape num&eacute;rot&eacute;e de la sp&eacute;cification (Parties 1&agrave;8) a &eacute;t&eacute; impl&eacute;ment&eacute;e et v&eacute;rifi&eacute;e, vingt &eacute;pisodes au format LeRobot ont &eacute;t&eacute; enregistr&eacute;s et r&eacute;partis en un jeu d'entra&icirc;nement de 15 &eacute;pisodes et un jeu de validation &agrave; cam&eacute;ra tenue &agrave; l'&eacute;cart de 5 &eacute;pisodes, et le pipeline est enti&egrave;rement auto-v&eacute;rifiant (un contr&ocirc;le r&eacute;ussite/&eacute;chec bas&eacute; sur un CSV tourne &agrave; la fin de chaque &eacute;pisode). La seule d&eacute;viation structurante se situe dans le m&eacute;canisme de prise lui-m&ecirc;me&nbsp;: apr&egrave;s qu'une exp&eacute;rience de physique d&eacute;lib&eacute;r&eacute;e et born&eacute;e n'a produit aucune tenue par friction, le bloc est port&eacute; par une soudure Gazebo <code>DetachableJoint</code>, d&eacute;clench&eacute;e &agrave; la fermeture de la pince et rel&acirc;ch&eacute;e &agrave; son ouverture &mdash; &eacute;tiquet&eacute;e <b>ATTACHE SIMUL&Eacute;E, PAS une prise physique</b> partout o&ugrave; elle appara&icirc;t, dans les commentaires de code, les lignes de journal, et les m&eacute;tadonn&eacute;es de chaque &eacute;pisode. Quatre bugs ont &eacute;t&eacute; corrig&eacute;s dans le chemin de s&eacute;quencement bras/pince, trois autres dans l'infrastructure du lot d'enregistrement, et deux sont signal&eacute;s comme m&eacute;ritant un rapport en amont.</p>
+      <p class="prose">Ce rapport suit la m&ecirc;me structure que les runbooks de <code>Gazebo_to_LeRobot_Pipeline/docs/</code> et <code>ROS2_to_RLDS_Conversion_OpenVLA/docs/</code>&nbsp;: un compte-rendu &eacute;tape par &eacute;tape associant ce qui a &eacute;t&eacute; fait au contr&ocirc;le concret qui le prouve, une section de r&eacute;f&eacute;rence pour les bugs et les limites, et un guide manuel, ex&eacute;cutable par un humain, en fin de document.</p>
+    </section>
+
+    <section class="block" id="comparison">
+      <h2>Spec vs. r&eacute;alis&eacute;, partie par partie</h2>
+      <p class="block-dek">Les num&eacute;ros de partie de la sp&eacute;cification elle-m&ecirc;me, ce que chacune demandait, et ce qui a &eacute;t&eacute; livr&eacute; en r&eacute;ponse. C'est la section &agrave; lire en premier si la seule question est&nbsp;: &laquo;&nbsp;a-t-on fait ce que le document demandait&nbsp;?&nbsp;&raquo;</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Partie de la spec</th><th>Demand&eacute;</th><th>Livr&eacute;</th></tr></thead>
+          <tbody>
+            <tr><td>Partie 1</td><td>Un <code>red_block.sdf</code> autonome&nbsp;: 0,05&nbsp;kg, cube de 4&nbsp;cm, inertie 1,333e-05, &mu;=1,5, contact <code>kp</code>=1e6/<code>kd</code>=1,0.</td><td>Impl&eacute;ment&eacute; verbatim, puis &eacute;tendu&nbsp;: <code>kp</code>/<code>kd</code> ont ensuite &eacute;t&eacute; adoucis &agrave; 5e4/50,0 lors de l'exp&eacute;rience de prise (&sect;8) et un plugin <code>DetachableJoint</code> a &eacute;t&eacute; ajout&eacute; au m&ecirc;me fichier (&sect;9). &mu;, masse, taille et inertie restent inchang&eacute;s par rapport &agrave; la spec.</td></tr>
+            <tr><td>Partie 2</td><td>Spawn &agrave; (0,25 ; 0,00 ; 0,05) via <code>ros_gz_sim create</code>&nbsp;; faire varier la position entre &eacute;pisodes (exemples&nbsp;: x&isin;[0,22 ; 0,28], un point &agrave; y=&minus;0,05).</td><td>La commande de spawn et la pose principale correspondent exactement. La variation de position a utilis&eacute; x&isin;[0,25 ; 0,31] et y&isin;[&minus;0,08 ; 0,08] au lieu de la plage de la spec &mdash; voir &sect;7&nbsp;: la branche IK coude-haut n'a aucune solution sous x&asymp;0,245 sur ce bras.</td></tr>
+            <tr><td>Partie 3</td><td>Deux contr&ocirc;les ind&eacute;pendants&nbsp;: pose num&eacute;rique via <code>gz model -p</code>, visuel via une image cam&eacute;ra sauvegard&eacute;e.</td><td>Les deux impl&eacute;ment&eacute;s&nbsp;; <code>grab_frame.py</code> est tr&egrave;s proche du script propos&eacute; par la spec. Utilis&eacute; tout au long du projet, pas une seule fois (&sect;2, &sect;6).</td></tr>
+            <tr><td>Partie 4</td><td>Une <code>plate.sdf</code> statique (r=0,06&nbsp;; long.=0,008), spawn&eacute;e &agrave; (0,20 ; &minus;0,15 ; 0,044), &agrave; l'&eacute;cart du bloc.</td><td>Impl&eacute;ment&eacute; verbatim, inchang&eacute; durant tout le projet.</td></tr>
+            <tr><td>Partie 5</td><td>Un module d'IK cart&eacute;sienne via <code>RobotState.set_from_ik</code> de <code>moveit_py</code>, rejetant la branche coude-bas, approchant depuis une direction constante.</td><td>Impl&eacute;ment&eacute;, avec deux corrections que le script de la spec n'anticipait pas&nbsp;: le lien cible est <code>gripper_base</code>, pas le nom g&eacute;n&eacute;rique du script de la spec (le choix na&iuml;f enfonce les vrais doigts dans le sol &mdash; &sect;3)&nbsp;; et <code>moveit_py</code> ne peut pas partager un processus avec un n&#339;ud <code>rclpy</code> ordinaire, imposant une s&eacute;paration hors-ligne/en-ligne non mentionn&eacute;e dans la spec (&sect;3&ndash;4).</td></tr>
+            <tr><td>Partie 6</td><td>Une s&eacute;quence script&eacute;e en 8 phases&nbsp;; constantes de timing fixes (200&nbsp;ms de d&eacute;lai de commande, 1,6&nbsp;s d'intervalle pince, ~6&nbsp;% de facteur temps r&eacute;el)&nbsp;; hauteur de prise &agrave; bloc<sub>z</sub>+0,01.</td><td>S&eacute;quence en 10 phases (ajoute une ouverture de pince explicite apr&egrave;s le home et un retour home final). Constantes de timing remplac&eacute;es&nbsp;: ce sont des chiffres du pont TCP mat&eacute;riel r&eacute;el, non applicables &agrave; une sim pilot&eacute;e par l'action MoveGroup&nbsp;; remplac&eacute;es par une attente du r&eacute;sultat r&eacute;el de l'action plus une correction en boucle ferm&eacute;e de l'erreur articulaire. Hauteur de prise remplac&eacute;e par un d&eacute;calage de bout de doigt mesur&eacute; empiriquement (&sect;7) car elle vise <code>gripper_base</code>, pas un repère de bout de doigt g&eacute;n&eacute;rique.</td></tr>
+            <tr><td>Partie 7</td><td>Un journal CSV de la pose bloc/effecteur&nbsp;; un test automatique <code>grasp_held()</code> sur la constance de <code>dz</code>&nbsp;; une image cam&eacute;ra au pic du lift.</td><td>Impl&eacute;ment&eacute; comme sp&eacute;cifi&eacute;, puis renforc&eacute;&nbsp;: le contr&ocirc;le de constance de <code>dz</code> de la spec passe trivialement quand le bloc ne bouge jamais du tout &mdash; ce qui est exactement ce qui s'est produit avant que les &sect;7&agrave;9 ne soient corrig&eacute;s. <code>grasp_held()</code> exige d&eacute;sormais aussi que le bloc s'&eacute;l&egrave;ve d'au moins 5&nbsp;cm &mdash; voir l'encart bug en &sect;6.</td></tr>
+            <tr><td>Partie 8</td><td>Enregistrer via l'enregistreur de <code>rosetta</code> avec l'instruction <i>&laquo;&nbsp;pick up the red block and place it on the plate&nbsp;&raquo;</i>&nbsp;; un premier lot de 20 &eacute;pisodes (5 fixes, 5 vari&eacute;s en x, 5 vari&eacute;s en y, 5 avec cam&eacute;ra d&eacute;plac&eacute;e, tenus &agrave; l'&eacute;cart).</td><td>Impl&eacute;ment&eacute;, avec une interface d'enregistrement r&eacute;elle tr&egrave;s diff&eacute;rente du script de la spec&nbsp;: <code>episode_recorder_node</code> est un n&#339;ud ROS2 &agrave; <b>cycle de vie</b> n&eacute;cessitant un <code>configure</code>&rarr;<code>activate</code> explicite avant que son serveur d'action n'existe &mdash; non mentionn&eacute; dans la spec, d&eacute;couvert &agrave; la dure (&sect;10, et le candidat de bug amont en &sect;bugs-upstream). La composition du lot correspond exactement, en structure, au tableau de la spec &sect;8.3&nbsp;; la plage de variation en x et la condition tenue &agrave; l'&eacute;cart (un second topic cam&eacute;ra litt&eacute;ral via un second contrat) sont des r&eacute;alisations concr&egrave;tes de ce que la spec laissait g&eacute;n&eacute;ral.</td></tr>
+            <tr><td>Partie 9</td><td>Relie le travail aux sous-&eacute;tudes du bon de travail (FDT).</td><td>Hors p&eacute;rim&egrave;tre pour ce rapport, par choix &mdash; la Partie 9 est un cadrage business, pas une &eacute;tape d'ing&eacute;nierie, et reste valable telle qu'&eacute;crite &agrave; l'origine.</td></tr>
+            <tr><td>Partie 10</td><td>&Eacute;nonce les limites&nbsp;: la prise simul&eacute;e n'est pas une vraie prise (contact rigide grossier)&nbsp;; &eacute;cart de domaine&nbsp;; le mouvement script&eacute; n'est pas une d&eacute;monstration de qualit&eacute;&nbsp;; 20 &eacute;pisodes n'est pas un jeu d'entra&icirc;nement.</td><td>D&eacute;pass&eacute;, au sens o&ugrave; le r&eacute;sultat final est <em>en dessous</em> m&ecirc;me de cette limite &eacute;nonc&eacute;e&nbsp;: la physique de contact rigide n'a pu produire aucune tenue apr&egrave;s une exp&eacute;rience born&eacute;e (&sect;8), donc ce qui est livr&eacute; est une attache simul&eacute;e, un niveau plus grossier que ce que la Partie&nbsp;10 supposait. Les trois autres r&eacute;serves (&eacute;cart de domaine, qualit&eacute; du mouvement script&eacute;, taille du jeu de donn&eacute;es) s'appliquent toujours inchang&eacute;es &mdash; reformul&eacute;es en int&eacute;gralit&eacute; en &sect;limits.</td></tr>
+            <tr><td>Annexe</td><td>Un ordre de travail en 8 &eacute;tapes, &laquo;&nbsp;environ une semaine&nbsp;&raquo;, signalant l'&eacute;tape&nbsp;5 (IK) comme la plus susceptible de d&eacute;raper.</td><td>L'&eacute;tape 5 a effectivement d&eacute;rap&eacute;, exactement comme signal&eacute; &mdash; bien que l'&eacute;chec pr&eacute;cis (le conflit de processus <code>moveit_py</code>/<code>rclpy</code>) ne soit pas celui anticip&eacute;. L'&eacute;tape 8 (enregistrement) a aussi d&eacute;rap&eacute;, pour des raisons que l'annexe n'anticipait pas&nbsp;: red&eacute;marrages de conteneur li&eacute;s &agrave; des mises en veille de l'h&ocirc;te, le bug de d&eacute;couverte du cycle de vie de l'enregistreur, et les courses au d&eacute;marrage &agrave; froid des contr&ocirc;leurs &mdash; tout cela de la friction d'environnement, pas des d&eacute;fauts de la logique d'enregistrement une fois corrig&eacute;e.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="callout"><b>La phrase qui compte le plus&nbsp;:</b> chaque &eacute;pisode enregistr&eacute; est un vrai mouvement de bras, une vraie fermeture de pince et un vrai flux cam&eacute;ra &mdash; mais le transport du bloc est une soudure script&eacute;e, pas de la friction. Quiconque utilise ce jeu de donn&eacute;es doit le savoir avant d'en tirer des conclusions sur la prise en elle-m&ecirc;me.</p>
+    </section>
+
+    <!-- ===================================================== IMPLEMENTATION ===================================================== -->
+    <section class="block" id="pipeline-head">
+      <h2>L'impl&eacute;mentation, &eacute;tape par &eacute;tape</h2>
+      <p class="block-dek">Douze &eacute;tapes, dans l'ordre o&ugrave; elles ont d&ucirc; se produire. Chacune associe ce qui a &eacute;t&eacute; fait au contr&ocirc;le qui le prouve, et signale l&agrave; o&ugrave; un bug a &eacute;t&eacute; trouv&eacute; et corrig&eacute; en chemin.</p>
+    </section>
+
+    <article class="step" id="s1">
+      <div class="step-head"><span class="step-num">01</span><h3>Cr&eacute;er le bloc et l'assiette</h3></div>
+      <p class="step-purpose">Deux mod&egrave;les SDF autonomes, spawn&eacute;s &agrave; l'ex&eacute;cution &mdash; rien ajout&eacute; au fichier monde, tout est r&eacute;versible.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>models/red_block.sdf</code> et <code>models/plate.sdf</code>, repris des Parties&nbsp;1 et 4 de la sp&eacute;cification pratiquement sans changement&nbsp;: bloc de 0,05&nbsp;kg, cube de 0,04&nbsp;m, inertie diagonale 1,333e-05, friction &mu;=&mu;2=1,5, contact <code>kp</code>=1e6/<code>kd</code>=1,0&nbsp;; assiette&nbsp;: cylindre statique de rayon 0,06&nbsp;m, &eacute;paisseur 0,008&nbsp;m.</p>
+          <p>La rigidit&eacute; de contact du bloc et un plugin <code>DetachableJoint</code> ont &eacute;t&eacute; ajout&eacute;s plus tard (&sect;8&ndash;9) &mdash; cette &eacute;tape est la base pure, conforme &agrave; la spec.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>gz sdf -k models/red_block.sdf
+gz sdf -k models/plate.sdf</pre>
+          <p>Les deux n'affichent rien (valide) &mdash; la d&eacute;finition de r&eacute;ussite de l'&eacute;tape&nbsp;1 de la spec elle-m&ecirc;me, atteinte exactement.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s2">
+      <div class="step-head"><span class="step-num">02</span><h3>Spawn en headless et v&eacute;rification de la pose</h3></div>
+      <p class="step-purpose">Deux contr&ocirc;les ind&eacute;pendants, selon la spec Partie&nbsp;3&nbsp;: pose num&eacute;rique et image cam&eacute;ra visuelle.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <pre>ros2 run ros_gz_sim create -world empty -file models/plate.sdf \
+  -name plate -x 0.20 -y -0.15 -z 0.044
+ros2 run ros_gz_sim create -world empty -file models/red_block.sdf \
+  -name red_block -x 0.25 -y 0.0 -z 0.05</pre>
+          <p><code>scripts/grab_frame.py</code> s'abonne &agrave; <code>/synth_camera/image/compressed</code>, d&eacute;code avec <code>cv2.imdecode</code>, sauvegarde avec <code>cv2.imwrite</code> &mdash; adapt&eacute; presque mot pour mot du script propos&eacute; par la spec.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>gz model --list
+gz model -m red_block -p</pre>
+          <p>Confirm&eacute; que le bloc se stabilise exactement &agrave; (0,250 ; 0,000 ; 0,020) dans une sim fra&icirc;che &mdash; coh&eacute;rent avec le cas &laquo;&nbsp;Z se stabilise l&eacute;g&egrave;rement sous la hauteur de spawn, c'est normal&nbsp;&raquo; de la spec (la moiti&eacute; du cube de 0,04&nbsp;m). Le PNG sauvegard&eacute; a confirm&eacute; le bloc r&eacute;ellement rouge et pos&eacute; sur, et non dans, le plan de sol.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s3">
+      <div class="step-head"><span class="step-num">03</span><h3>Module d'IK cart&eacute;sienne</h3></div>
+      <p class="step-purpose">Le seul morceau de code v&eacute;ritablement nouveau signal&eacute; par la spec &mdash; et l'&eacute;tape o&ugrave; deux corrections au-del&agrave; du script de la spec &eacute;taient n&eacute;cessaires.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>scripts/ik_helper.py</code> construit une instance <code>MoveItPy</code> et r&eacute;sout avec <code>RobotState.set_from_ik(&quot;arm&quot;, target, TARGET_LINK, timeout=1.0)</code>, rejetant toute solution avec <code>J3 &ge; 0</code> (coude-bas) et retentant avec une graine al&eacute;atoire, exactement selon la spec &sect;5.4. Le cha&icirc;nage de graines entre points de passage (chaque appel amorc&eacute; avec la solution pr&eacute;c&eacute;dente au lieu de la pose z&eacute;ro par d&eacute;faut) maintient toute une s&eacute;quence sur une branche coh&eacute;rente.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p><code>fk_check()</code> contre-v&eacute;rifie chaque solution IK en ex&eacute;cutant la cin&eacute;matique directe sur celle-ci&nbsp;: FK-de-IK reproduit la pose demand&eacute;e &agrave; &asymp;1e-7&nbsp;m.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Correction au-del&agrave; de la spec&nbsp;:</b> le lien cible du script est un nom d'emplacement pour le bout de doigt. La vraie cible ici est <code>gripper_base</code>, un repère TF dont le d&eacute;calage jusqu'au bout de doigt a d&ucirc; &ecirc;tre mesur&eacute; (&sect;7) &mdash; viser <code>link6</code> ou un nom de bout de doigt na&iuml;f enfonce les vrais doigts dans le sol. Le quaternion d'orientation vertical descendant est &eacute;galement sp&eacute;cifique au repère et a &eacute;t&eacute; d&eacute;riv&eacute; empiriquement en commandant une pose <code>link6</code> connue comme bonne et en lisant l'orientation r&eacute;sultante de <code>gripper_base</code> via TF, non copi&eacute; du <code>(1,0,0,0)</code> de la spec.</p>
+    </article>
+
+    <article class="step" id="s4">
+      <div class="step-head"><span class="step-num">04</span><h3>Pr&eacute;-calculer les points de passage hors-ligne</h3></div>
+      <p class="step-purpose">Une meilleure solution que ce que la spec anticipait&nbsp;: <code>moveit_py</code> et un n&#339;ud <code>rclpy</code> ordinaire ne peuvent pas coexister dans un processus sur cette pile, donc l'IK est r&eacute;solue une fois, hors-ligne, avant que la s&eacute;quence n'importe jamais <code>rclpy</code>.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <pre>python3 scripts/precompute_ik.py \
+  --block-x 0.25 --block-y 0.00 --block-z 0.02 \
+  --tip-offset 0.105 --tip-dx -0.036 --hover 0.08</pre>
+          <p>R&eacute;sout home/approche/descente/l&egrave;ve/transport/pose/retrait dans l'ordre, en cha&icirc;nant chaque solution comme graine suivante, et &eacute;crit <code>waypoints.json</code>. <code>--poses</code> r&eacute;sout par lot de nombreuses positions de bloc en un seul processus pour le lot d'enregistrement (&sect;10).</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p><code>J1</code>/<code>J3</code> affich&eacute;s par point de passage&nbsp;; une ex&eacute;cution par lot n'est accept&eacute;e que si le <code>J1</code> de chaque point reste dans &plusmn;1,2&nbsp;rad et <code>J3&lt;0</code> &mdash; la branche coude-haut orient&eacute;e vers l'avant utilis&eacute;e pour chaque &eacute;pisode enregistr&eacute;.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Absent de la spec, d&eacute;couvert &agrave; la dure&nbsp;:</b> construire <code>MoveItPy</code> dans le m&ecirc;me processus qu'un <code>rclpy.init()</code>+<code>Node</code> explicite faisait bloquer ind&eacute;finiment le constructeur de <code>MoveItPy</code> (reproductible &agrave; travers des red&eacute;marrages de conteneur, excluant un &eacute;tat DDS r&eacute;siduel)&nbsp;; et s&eacute;par&eacute;ment, laisser une instance <code>MoveItPy</code> &ecirc;tre ramass&eacute;e par le garbage collector d&eacute;truit silencieusement son contexte rclcpp interne et casse toute autre activit&eacute; <code>rclpy</code> dans ce processus. Voir le candidat de bug amont en &sect;bugs-upstream.</p>
+    </article>
+
+    <article class="step" id="s5">
+      <div class="step-head"><span class="step-num">05</span><h3>Scripter la s&eacute;quence de pick-and-place</h3></div>
+      <p class="step-purpose"><code>scripts/run_pick_and_place.py</code> &mdash; <code>rclpy</code> pur, sans import de <code>moveit_py</code>, consommant <code>waypoints.json</code>.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>Dix phases (home &rarr; ouverture &rarr; approche &rarr; descente &rarr; prise &rarr; l&egrave;ve &rarr; transport &rarr; pose &rarr; rel&acirc;chement &rarr; retrait &rarr; home). Chaque mouvement du bras passe par la vraie action <code>MoveGroup</code> et attend son r&eacute;sultat&nbsp;; <code>move_to_joints_closed_loop</code> r&eacute;-&eacute;met un mouvement correctif (jusqu'&agrave; 4 fois) si les articulations atteintes diff&egrave;rent de la cible de plus de 0,02&nbsp;rad. La commande de pince est republi&eacute;e toutes les 0,5&nbsp;s pendant l'attente sur <code>/joint_states</code>, et accepte soit d'atteindre la cible, soit de caler sous &minus;0,1&nbsp;rad pendant 2&nbsp;s (contact avec l'objet) comme r&eacute;ussite.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p>Chaque phase journalise &laquo;&nbsp;move OK&nbsp;&raquo;/&laquo;&nbsp;move FAILED&nbsp;&raquo; depuis le propre <code>error_code</code> de l'action, et une capture de pose (xyz bloc, xyz effecteur, <code>dz</code>) est &eacute;crite apr&egrave;s chaque phase &mdash; alimentant le CSV de preuve de prise en &sect;6.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Deux bugs suppl&eacute;mentaires corrig&eacute;s ici, aucun dans la spec&nbsp;:</b> (1) <code>trajectory_execution.allowed_start_tolerance</code> &agrave; sa valeur par d&eacute;faut (0,01) dans <code>mycobot_moveit_config/launch/move_group.launch.py</code> faisait &eacute;chouer chaque ex&eacute;cution apr&egrave;s la premi&egrave;re avec <code>CONTROL_FAILED</code>/&laquo;&nbsp;Apparently trajectory initialization failed&nbsp;&raquo; &mdash; relev&eacute; &agrave; 0,2, corrig&eacute; de fa&ccedil;on permanente dans <code>Gazebo_to_LeRobot_Pipeline</code>. (2) La commande de pince n'&eacute;tait publi&eacute;e qu'une fois &agrave; l'origine, ce qui est perdu par la classique course de d&eacute;couverte publieur/abonn&eacute; de ROS2&nbsp;; corrig&eacute; en republiant p&eacute;riodiquement.</p>
+    </article>
+
+    <article class="step" id="s6">
+      <div class="step-head"><span class="step-num">06</span><h3>Prouver la prise num&eacute;riquement</h3></div>
+      <p class="step-purpose">Partie&nbsp;7 de la spec, impl&eacute;ment&eacute;e comme sp&eacute;cifi&eacute;e &mdash; puis d&eacute;couverte avec une vraie faille et renforc&eacute;e.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>Une ligne CSV par capture de phase&nbsp;: <code>t, phase, bx, by, bz, ex, ey, ez, dz</code> (<code>dz = ee_z &minus; block_z</code>). Une image cam&eacute;ra au pic du lift est sauvegard&eacute;e via <code>grab_frame.py</code> pour corroboration visuelle, exactement selon la spec &sect;7.6.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>def grasp_held(rows, tol=0.008, min_rise=0.05):
+    lift = [r for r in rows if r["phase"] in ("lift", "transport")]
+    ref = lift[0]["dz"]
+    constant = all(abs(r["dz"] - ref) &lt; tol for r in lift)
+    rose = max(r["bz"] for r in lift) - descend["bz"] &gt; min_rise
+    return constant and rose</pre>
+        </div>
+      </div>
+      <p class="callout bug"><b>Faille trouv&eacute;e dans le contr&ocirc;le de la spec elle-m&ecirc;me&nbsp;:</b> le <code>grasp_held()</code> de la sp&eacute;cification (&sect;7.5) v&eacute;rifie seulement que <code>dz</code> reste constant. Un bloc qui ne bouge jamais a un <code>dz</code> trivialement constant &mdash; et c'est exactement ce que plusieurs premi&egrave;res ex&eacute;cutions ont produit (la pince se fermait sur de l'air vide &agrave; c&ocirc;t&eacute; du bloc). Le contr&ocirc;le exige d&eacute;sormais aussi que le bloc s'&eacute;l&egrave;ve d'au moins 5&nbsp;cm pendant le lift, ce qu'un bloc immobile ne peut pas satisfaire.</p>
+    </article>
+
+    <article class="step" id="s7">
+      <div class="step-head"><span class="step-num">07</span><h3>O&ugrave; le bloc se pose r&eacute;ellement</h3></div>
+      <p class="step-purpose">La d&eacute;couverte qui explique pourquoi les premi&egrave;res tentatives de prise se fermaient sur de l'air vide&nbsp;: les coordonn&eacute;es de spawn nominales de la spec ne sont pas l&agrave; o&ugrave; la pince doit se trouver.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>Mesur&eacute;, via TF et <code>gz model -p</code>, &agrave; une pose de survol connue comme bonne avec la pince ouverte&nbsp;: les origines des articulations de bout de doigt se situent &agrave; <b>&asymp;0,10&nbsp;m sous <code>gripper_base</code></b> en pointant vers le bas, et le point de rencontre de la paire de doigts en x est &agrave; <b>&asymp;0,036&nbsp;m en avant de <code>gripper_base</code></b>, asym&eacute;trique car <code>left1</code>/<code>right1</code> se situent &agrave; &minus;0,048/+0,080 par rapport &agrave; lui. Les valeurs par d&eacute;faut <code>--tip-offset 0.105 --tip-dx -0.036</code> de <code>precompute_ik.py</code> encodent directement ces deux mesures.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p>Avec la correction appliqu&eacute;e, les doigts de la pince en fermeture ont touch&eacute; le bloc pour la premi&egrave;re fois dans ce projet (calage &agrave; une position articulaire non nulle au lieu d'atteindre la fermeture compl&egrave;te) &mdash; la premi&egrave;re preuve que la g&eacute;om&eacute;trie, et non la friction, &eacute;tait le probl&egrave;me bloquant depuis le d&eacute;but.</p>
+        </div>
+      </div>
+      <p class="callout"><b>Cons&eacute;quence pratique pour la plage de variation de position du &sect;2&nbsp;:</b> la branche IK coude-haut n'a aucune solution sous x&asymp;0,245 une fois ce d&eacute;calage int&eacute;gr&eacute;, ce qui explique pourquoi les &eacute;pisodes enregistr&eacute;s font varier x sur [0,25 ; 0,31] plut&ocirc;t que la plage [0,22 ; 0,28] sugg&eacute;r&eacute;e par la spec.</p>
+    </article>
+
+    <article class="step" id="s8">
+      <div class="step-head"><span class="step-num">08</span><h3>Tenter une prise physique par friction &mdash; exp&eacute;rience born&eacute;e, r&eacute;sultat n&eacute;gatif</h3></div>
+      <p class="step-purpose">Une seule variable contr&ocirc;l&eacute;e, trois ex&eacute;cutions avec red&eacute;marrage propre, comme demand&eacute;, avant de conclure qu'une prise par friction n'&eacute;tait pas atteignable dans cette sim avec le temps disponible.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>Contact du bloc adouci de <code>kp</code>=1e6/<code>kd</code>=1,0 &agrave; <code>kp</code>=5e4/<code>kd</code>=50,0&nbsp;; cible de serrage de la pince test&eacute;e &agrave; &minus;0,40, &minus;0,55 et &minus;0,70 (sur une plage de fermeture compl&egrave;te de &minus;0,70). G&eacute;om&eacute;trie de prise maintenue fixe aux d&eacute;calages du &sect;7. Chaque ex&eacute;cution est partie d'un red&eacute;marrage complet de la sim et d'un spawn de bloc frais.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Ex&eacute;cution</th><th>Cible de serrage</th><th>Calage pince</th><th>Bloc tenu&nbsp;?</th></tr></thead>
+              <tbody>
+                <tr><td>A</td><td>&minus;0,40</td><td>&minus;0,334</td><td>Non &mdash; inchang&eacute; pendant le lift</td></tr>
+                <tr><td>B</td><td>&minus;0,55</td><td>&minus;0,375</td><td>Non &mdash; inchang&eacute; pendant le lift</td></tr>
+                <tr><td>C</td><td>&minus;0,70</td><td>&minus;0,201</td><td>Non &mdash; inchang&eacute; pendant le lift</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <p class="callout warn"><b>Signal&eacute; comme probl&egrave;me, selon l'instruction directrice&nbsp;:</b> adoucir le contact a supprim&eacute; le sympt&ocirc;me de perturbation observ&eacute; auparavant (le bloc qui sautait ou &eacute;tait projet&eacute; &agrave; la fermeture) mais n'a produit aucune tenue dans les trois ex&eacute;cutions. La position de calage ne suivait pas la cible de serrage de mani&egrave;re monotone entre les ex&eacute;cutions, ce qui argumente contre un r&eacute;glage suppl&eacute;mentaire dans cette m&ecirc;me enveloppe. C'est le seul objectif de la sp&eacute;cification &mdash; une prise physique par friction &mdash; qui n'a v&eacute;ritablement pas &eacute;t&eacute; atteint.</p>
+    </article>
+
+    <article class="step" id="s9">
+      <div class="step-head"><span class="step-num">09</span><h3>Attache simul&eacute;e &mdash; le m&eacute;canisme r&eacute;ellement utilis&eacute;</h3></div>
+      <p class="step-purpose">Puisqu'une prise par friction n'&eacute;tait pas atteignable dans le temps disponible, le bloc est port&eacute; par une soudure script&eacute;e explicite et clairement &eacute;tiquet&eacute;e.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>Un plugin <code>gz-sim-detachable-joint-system</code> dans <code>red_block.sdf</code>, soudant le bloc au <code>link6</code> du robot sur un message &agrave; <code>/htgpp/attach</code> (publi&eacute; juste apr&egrave;s la fermeture de la pince) et le rel&acirc;chant sur <code>/htgpp/detach</code> (&agrave; la pose de d&eacute;p&ocirc;t). Chaque appel est journalis&eacute; avec la cha&icirc;ne litt&eacute;rale <code>SIMULATED ATTACHMENT</code>, et <code>grasp_meta.json</code> porte <code>"simulated_attachment": true</code> pour chaque &eacute;pisode.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p>Z du bloc&nbsp;: 0,0200 &rarr; 0,099 (lift) &rarr; 0,152 (transport) &rarr; 0,068 (sur l'assiette), avec <code>dz</code> constant pendant le lift et le transport et l'exigence de mont&eacute;e &ge;5&nbsp;cm du &sect;6 satisfaite. La pose finale du bloc se situe &agrave; l'int&eacute;rieur du rayon de l'assiette et &agrave; la hauteur assiette-plus-demi-bloc.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Particularit&eacute; Gazebo d&eacute;couverte ici&nbsp;:</b> <code>gripper_base</code> n'est qu'un repère TF/URDF &mdash; la conversion URDF-vers-SDF le fusionne dans le lien Gazebo <code>link6</code>, donc il n'existe pas comme nom de lien de mod&egrave;le spawnable. Un <code>DetachableJoint</code> avec <code>child_link: gripper_base</code> accepte le message d'attache et ne fait silencieusement rien, sans aucune erreur ni avertissement. Voir le candidat de bug amont en &sect;bugs-upstream.</p>
+    </article>
+
+    <article class="step" id="s10">
+      <div class="step-head"><span class="step-num">10</span><h3>Enregistrer vingt &eacute;pisodes</h3></div>
+      <p class="step-purpose"><code>scripts/episode.sh</code>/<code>batch.sh</code>&nbsp;: un pilote &agrave; red&eacute;marrage propre par &eacute;pisode, correspondant au tableau de lot de la spec &sect;8.3.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>Par &eacute;pisode&nbsp;: tuer et relancer toute la pile de sim, spawn assiette et bloc, attendre que les trois contr&ocirc;leurs soient <code>active</code>, lancer <code>move_group</code>, configurer et activer <code>episode_recorder_node</code>, puis lancer la s&eacute;quence avec <code>--record</code>. Jusqu'&agrave; 3 tentatives par &eacute;pisode. Deux contrats&nbsp;: <code>mycobot_pick_place.yaml</code> (cam&eacute;ra avant) pour les &eacute;pisodes 1&agrave;15, <code>mycobot_pick_place_heldout.yaml</code> (<code>/synth_camera_right</code>) pour 16&agrave;20 &mdash; les deux ajoutent l'articulation de pince &agrave; <code>observation.state</code>/<code>action</code>, ce que le contrat source dans <code>Gazebo_to_LeRobot_Pipeline</code> ne fait pas.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p>20/20 &eacute;pisodes se sont termin&eacute;s avec <code>run_exit_code=0</code>, <code>placed_on_plate=true</code>, <code>grasp_held=true</code>, et un bag <code>.mcap</code> non vide &mdash; voir la sortie de <code>status.sh</code> du &sect;11.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Trois bugs d'infrastructure trouv&eacute;s et corrig&eacute;s pendant ce lot, aucun dans la spec&nbsp;:</b></p>
+      <ul style="max-width:70ch;color:var(--ink-soft)">
+        <li><b>Cycle de vie de l'enregistreur&nbsp;:</b> <code>episode_recorder_node</code> est un n&#339;ud &agrave; cycle de vie ROS2&nbsp;; son action <code>record_episode</code> n'existe pas avant un <code>configure</code> puis <code>activate</code> explicites. Le script de la spec (un simple <code>ros2 run</code> avec une action immédiatement utilisable) ne le mentionne pas.</li>
+        <li><b>D&eacute;couverte <code>ros2cli</code> p&eacute;rim&eacute;e&nbsp;:</b> les commandes simples <code>ros2 lifecycle set</code>/<code>ros2 action list</code> signalaient le n&#339;ud de l'enregistreur comme absent alors qu'il &eacute;tait manifestement en cours d'ex&eacute;cution et configur&eacute;&nbsp;; <code>--no-daemon --spin-time 15</code> force une d&eacute;couverte fra&icirc;che et a corrig&eacute; le probl&egrave;me &mdash; voir le candidat de bug amont.</li>
+        <li><b>Courses de contr&ocirc;leurs au d&eacute;marrage &agrave; froid&nbsp;:</b> les trois lanceurs <code>ros2_control</code> (<code>joint_state_broadcaster</code>, <code>mycobot_controller</code>, <code>gripper_position_controller</code>) lanc&eacute;s en parall&egrave;le expirent parfois tous en se disputant le verrou du gestionnaire de contr&ocirc;leurs. Corrig&eacute; avec un repli de relance s&eacute;quentielle, un contr&ocirc;leur &agrave; la fois, quand le lancement parall&egrave;le ne converge pas en 60&nbsp;s.</li>
+      </ul>
+    </article>
+
+    <article class="step" id="s11">
+      <div class="step-head"><span class="step-num">11</span><h3>&Eacute;tat v&eacute;rit&eacute;-disque du lot</h3></div>
+      <p class="step-purpose"><code>scripts/status.sh</code> &mdash; non demand&eacute; par la sp&eacute;cification, ajout&eacute; parce que le lot d'enregistrement s'est &eacute;tal&eacute; sur plusieurs red&eacute;marrages de conteneur (mises en veille de l'h&ocirc;te) et que la progression auto-rapport&eacute;e devait &ecirc;tre v&eacute;rifiable ind&eacute;pendamment depuis le disque.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>S'ex&eacute;cute depuis le shell h&ocirc;te ordinaire, sans session attach&eacute;e n&eacute;cessaire. Pour chacun des &eacute;pisodes 1&agrave;20, il lit les propres champs de verdict/code de sortie de <code>grasp_meta.json</code> et v&eacute;rifie la pr&eacute;sence d'un fichier bag <code>.mcap</code> non vide &mdash; jamais depuis la m&eacute;moire ni les notes d'une session pr&eacute;c&eacute;dente. Il compare aussi le temps &eacute;coul&eacute; en horloge murale depuis le d&eacute;marrage du conteneur au temps de fonctionnement monotone du PID&nbsp;1 (une horloge qui n'avance pas pendant une mise en veille de l'h&ocirc;te), de sorte qu'une mise en veille appara&icirc;t comme un &eacute;cart entre les deux.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>bash scripts/status.sh
+<span class="c">## PASSED=20  FAILED=0  IN-PROGRESS=0  MISSING=0  (somme=20 sur 20)</span></pre>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s12">
+      <div class="step-head"><span class="step-num">12</span><h3>Convertir en jeu de donn&eacute;es au format LeRobot, sans torch</h3></div>
+      <p class="step-purpose">Absent de la spec (la Partie 8 suppose une cha&icirc;ne d'outils <code>rosetta_port</code>/<code>lerobot</code> existante)&nbsp;; construit ici car cette cha&icirc;ne a besoin de <code>torch</code>, que cette machine n'a pas pu installer de fa&ccedil;on fiable.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>scripts/port_bag.py</code> lit chaque bag <code>.mcap</code> d'&eacute;pisode directement avec <code>rosbag2_py</code>, aligne (strat&eacute;gie &laquo;&nbsp;hold&nbsp;&raquo;) <code>/joint_states</code> sur l'horodatage de chaque image cam&eacute;ra, exactement selon le contrat, et &eacute;crit la disposition LeRobot v3.0 document&eacute;e avec <code>pyarrow</code> (parquet) et <code>ffmpeg</code> (mp4) &mdash; aucun import de <code>lerobot</code>/<code>torch</code> nulle part.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p><code>mycobot_pick_place_train</code> (&eacute;pisodes 1&agrave;15, cam&eacute;ra avant)&nbsp;: 2670 images. <code>mycobot_pick_place_heldout</code> (16&agrave;20, cam&eacute;ra droite)&nbsp;: 927 images. <code>ffprobe</code> sur un clip&nbsp;: 320&times;240, 174 images, 5,8&nbsp;s &mdash; correspond exactement au nombre d'images &agrave; 30&nbsp;fps.</p>
+        </div>
+      </div>
+      <p class="callout warn"><b>Report&eacute;, pas abandonn&eacute;&nbsp;:</b> ceci n'a pas &eacute;t&eacute; charg&eacute; via la vraie classe <code>LeRobotDataset</code> &mdash; ce contr&ocirc;le n&eacute;cessite <code>torch</code> et se fera sur la machine GPU. Voir <code>datasets/README.md</code> pour la m&ecirc;me remarque conserv&eacute;e avec les donn&eacute;es elles-m&ecirc;mes.</p>
+    </article>
+
+    <!-- ===================================================== LADDER ===================================================== -->
+    <section class="block" id="ladder">
+      <h2>&Eacute;chelle de v&eacute;rification</h2>
+      <p class="block-dek">Chaque barreau d&eacute;pend strictement de celui du dessous. Le pipeline atteint chaque barreau demand&eacute; par la sp&eacute;cification&nbsp;; celui qu'il n'atteint pas est la prise rigide grossi&egrave;re que la Partie&nbsp;10 elle-m&ecirc;me anticipait comme plafond.</p>
+      <div class="ladder">
+        <div class="rung reached">
+          <div class="level">Niveau&nbsp;0</div>
+          <div><span class="tag">R&eacute;ussi</span><h5>La sc&egrave;ne est physiquement valide</h5><p>Le bloc et l'assiette spawnent, se stabilisent, et sont visibles et correctement color&eacute;s dans une image cam&eacute;ra sauvegard&eacute;e (&sect;2).</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Niveau&nbsp;1</div>
+          <div><span class="tag">R&eacute;ussi</span><h5>Le bras atteint les points cart&eacute;siens command&eacute;s</h5><p>L'IK r&eacute;sout sur la branche coude-haut avec une erreur FK-de-IK &asymp;1e-7&nbsp;m&nbsp;; la vraie action <code>MoveGroup</code> rapporte un succ&egrave;s pour chaque phase de chaque &eacute;pisode enregistr&eacute; (&sect;3&ndash;5).</p></div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Niveau&nbsp;2</div>
+          <div><span class="tag">Arr&ecirc;t&eacute; ici</span><h5>Une prise physique par friction tient le bloc</h5><p>Non atteint apr&egrave;s une exp&eacute;rience born&eacute;e de trois ex&eacute;cutions faisant varier la rigidit&eacute; de contact et l'effort de serrage (&sect;8). C'est le seul objectif de la sp&eacute;cification v&eacute;ritablement non atteint.</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Niveau&nbsp;3</div>
+          <div><span class="tag">R&eacute;ussi, par substitution</span><h5>Le bloc est port&eacute; et pos&eacute;, de mani&egrave;re v&eacute;rifiable</h5><p>Via l'attache simul&eacute;e <code>DetachableJoint</code> (&sect;9), satisfaisant le crit&egrave;re du &sect;6 (<code>dz</code> constant, mont&eacute;e &ge;5&nbsp;cm) &mdash; mais c'est une attache script&eacute;e, pas de la physique, et c'est &eacute;tiquet&eacute; comme tel partout o&ugrave; cela appara&icirc;t.</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Niveau&nbsp;4</div>
+          <div><span class="tag">R&eacute;ussi</span><h5>20 &eacute;pisodes enregistr&eacute;s avec une instruction v&eacute;ridique</h5><p>Le bag de chaque &eacute;pisode existe, est non vide, et son propre <code>grasp_meta.json</code> confirme le succ&egrave;s &mdash; r&eacute;-v&eacute;rifiable ind&eacute;pendamment &agrave; tout moment via <code>status.sh</code> (&sect;10&ndash;11).</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Niveau&nbsp;5</div>
+          <div><span class="tag">R&eacute;ussi</span><h5>&Eacute;pisodes convertis dans la disposition de jeu de donn&eacute;es document&eacute;e</h5><p><code>port_bag.py</code>, sans <code>torch</code> (&sect;12).</p></div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Niveau&nbsp;6</div>
+          <div><span class="tag">Non tent&eacute; ici</span><h5>Charg&eacute; et valid&eacute; via la vraie classe <code>LeRobotDataset</code></h5><p>N&eacute;cessite <code>torch</code>&nbsp;; report&eacute; &agrave; la machine GPU par choix (&sect;12).</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== BUGS ===================================================== -->
+    <section class="block" id="bugs-env">
+      <h2>Bugs corrig&eacute;s &mdash; sp&eacute;cifiques &agrave; la session</h2>
+      <p class="block-dek">Des sympt&ocirc;mes de cet environnement exact (un portable CPU uniquement de 4,9&nbsp;Go sous WSL2 avec un conteneur longue dur&eacute;e), pas des d&eacute;fauts d'un projet amont. Recens&eacute;s pour qu'une nouvelle ex&eacute;cution se heurte moins longtemps au m&ecirc;me mur.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sympt&ocirc;me</th><th>Cause racine</th><th>Correction</th></tr></thead>
+          <tbody>
+            <tr><td>Chaque ex&eacute;cution <code>MoveGroup</code> apr&egrave;s la premi&egrave;re &eacute;choue avec <code>CONTROL_FAILED</code></td><td>Valeur par d&eacute;faut de <code>trajectory_execution.allowed_start_tolerance</code> (0,01) trop stricte pour le retard d'&eacute;tat de d&eacute;part de cet environnement</td><td>Relev&eacute;e &agrave; 0,2 dans <code>Gazebo_to_LeRobot_Pipeline/src/mycobot_moveit_config/launch/move_group.launch.py</code></td></tr>
+            <tr><td>La commande de pince n'a silencieusement aucun effet</td><td>Publication unique perdue par la course de d&eacute;couverte publieur/abonn&eacute;</td><td>Republier toutes les 0,5&nbsp;s pendant l'attente sur <code>/joint_states</code></td></tr>
+            <tr><td>La pince ne signale jamais &laquo;&nbsp;cible atteinte&nbsp;&raquo; alors qu'elle tient r&eacute;ellement un objet</td><td>Un objet tenu arr&ecirc;te les doigts avant la valeur de fermeture compl&egrave;te</td><td>Accepter un calage &ge;2&nbsp;s sous &minus;0,1&nbsp;rad comme succ&egrave;s, pas seulement atteindre la cible exactement</td></tr>
+            <tr><td>Les tentatives de prise se fermaient sur de l'air vide &agrave; c&ocirc;t&eacute; du bloc</td><td>Les coordonn&eacute;es de spawn nominales de la spec ne sont pas l&agrave; o&ugrave; les doigts se rencontrent (d&eacute;calages &asymp;0,10&nbsp;m/&asymp;0,036&nbsp;m du &sect;7)</td><td>D&eacute;calages mesur&eacute;s via TF et int&eacute;gr&eacute;s dans <code>precompute_ik.py</code></td></tr>
+            <tr><td>Le TF <code>base</code>&rarr;<code>gripper_base</code> dispara&icirc;t apr&egrave;s &asymp;1,5&nbsp;h de temps de fonctionnement de la sim</td><td>Non isol&eacute; &mdash; corr&eacute;l&eacute; avec la pression m&eacute;moire (3,4/4,9&nbsp;Go utilis&eacute;s)</td><td>Red&eacute;marrage complet de la pile avant chaque &eacute;pisode&nbsp;; ne jamais r&eacute;utiliser une sim de longue dur&eacute;e entre &eacute;pisodes</td></tr>
+            <tr><td>Le conteneur et ses processus meurent en cours d'ex&eacute;cution avec des &eacute;carts de plusieurs heures dans les horodatages des journaux ROS</td><td>Mise en veille/reprise de l'h&ocirc;te (WSL2 met en pause l'horloge de la VM&nbsp;; les horodatages d'horloge murale sautent &agrave; la reprise, les monotones non)</td><td>Chaque script de lot v&eacute;rifie la vivacit&eacute; avec un d&eacute;lai born&eacute;, jamais un seul fichier marqueur&nbsp;; <code>status.sh</code> rend une mise en veille visible apr&egrave;s coup</td></tr>
+            <tr><td><code>pip install lerobot==0.6.0</code> entra&icirc;ne toute une cha&icirc;ne de d&eacute;pendances CUDA/triton et est tu&eacute; &agrave; r&eacute;p&eacute;tition</td><td>Aucune restriction <code>--index-url</code> sur les d&eacute;pendances transitives de ce paquet, contrairement &agrave; l'&eacute;tape d'installation <code>torch</code> CPU uniquement</td><td>Installation de <code>lerobot</code>/<code>torch</code> abandonn&eacute;e enti&egrave;rement&nbsp;; le jeu de donn&eacute;es est &eacute;crit directement avec <code>pyarrow</code>+<code>ffmpeg</code> (&sect;12)</td></tr>
+            <tr><td>Trois lanceurs de contr&ocirc;leurs parall&egrave;les expirent par intermittence au d&eacute;marrage &agrave; froid</td><td>Contention pour le verrou/service interne du gestionnaire de contr&ocirc;leurs sous le facteur temps r&eacute;el lent de cette VM</td><td>Repli de relance s&eacute;quentielle, un &agrave; la fois, quand le lancement parall&egrave;le ne converge pas en 60&nbsp;s</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block" id="bugs-upstream">
+      <h2>Bugs &agrave; signaler en amont</h2>
+      <p class="block-dek">Trois d&eacute;fauts qui se reproduisent ind&eacute;pendamment de cette VM &mdash; de la vraie friction dans du code dont d'autres &eacute;quipes d&eacute;pendent. <b>Le d&eacute;p&ocirc;t effectif des tickets n'a pas &eacute;t&eacute; fait</b> et n&eacute;cessite un feu vert explicite s&eacute;par&eacute;.</p>
+
+      <div class="bugcard">
+        <h4><code>MoveItPy</code> ne peut pas partager un processus avec un n&#339;ud <code>rclpy</code> ordinaire<span class="status-pill">Pas encore d&eacute;pos&eacute;</span></h4>
+        <p class="repo">D&eacute;p&ocirc;t candidat&nbsp;: moveit/moveit2 (moveit_py)</p>
+        <dl>
+          <dt>Sympt&ocirc;me</dt>
+          <dd>Construire <code>moveit.planning.MoveItPy</code> dans un processus o&ugrave; <code>rclpy.init()</code> a d&eacute;j&agrave; &eacute;t&eacute; appel&eacute; (pour aussi ex&eacute;cuter un <code>Node</code> ordinaire) fait bloquer ind&eacute;finiment le constructeur de <code>MoveItPy</code>, avec un CPU quasi nul, bloqu&eacute; &agrave; la m&ecirc;me ligne de journal interne chaque fois &mdash; reproductible sur plusieurs tentatives et un red&eacute;marrage complet de conteneur, ce qui exclut un &eacute;tat DDS r&eacute;siduel. S&eacute;par&eacute;ment, m&ecirc;me quand <code>MoveItPy</code> est construit en premier&nbsp;: si l'appelant laisse l'instance <code>MoveItPy</code> &ecirc;tre ramass&eacute;e par le garbage collector (par ex. une fonction utilitaire qui ne retourne que <code>.get_robot_model()</code>), son destructeur journalise &laquo;&nbsp;Deleting MoveItCpp&nbsp;&raquo; et d&eacute;truit un ex&eacute;cuteur/contexte rclcpp interne dont un n&#339;ud <code>rclpy</code> <em>cr&eacute;&eacute; s&eacute;par&eacute;ment</em> dans le m&ecirc;me processus d&eacute;pendait &mdash; ce n&#339;ud arr&ecirc;te alors de recevoir tout autre message, silencieusement.</dd>
+          <dt>Correction utilis&eacute;e ici</dt>
+          <dd>S&eacute;paration architecturale&nbsp;: <code>precompute_ik.py</code> n'importe que <code>moveit_py</code>, r&eacute;sout chaque point de passage n&eacute;cessaire, et se termine&nbsp;; <code>run_pick_and_place.py</code> n'importe que <code>rclpy</code> et consomme le JSON r&eacute;sultant. Les deux processus ne coexistent jamais.</dd>
+          <dt>Pourquoi c'est important</dt>
+          <dd>Rien dans l'API publique de <code>moveit_py</code> ne documente qu'il ne peut pas coexister avec une activit&eacute; <code>rclpy</code> ind&eacute;pendante dans le m&ecirc;me processus, ni que garder l'objet en vie est structurant pour autre chose que son propre usage. Les deux modes d'&eacute;chec sont silencieux &mdash; un blocage sans erreur, et un script fonctionnel qui arr&ecirc;te tranquillement de recevoir des messages.</dd>
+        </dl>
+      </div>
+
+      <div class="bugcard">
+        <h4>Les CLI <code>ros2 lifecycle</code>/<code>ros2 action</code> signalent un n&#339;ud en cours d'ex&eacute;cution et configur&eacute; comme absent<span class="status-pill">Pas encore d&eacute;pos&eacute;</span></h4>
+        <p class="repo">D&eacute;p&ocirc;t candidat&nbsp;: ros2/ros2cli</p>
+        <dl>
+          <dt>Sympt&ocirc;me</dt>
+          <dd><code>ros2 lifecycle set /episode_recorder configure</code> et <code>ros2 action list</code> signalaient tous les deux le n&#339;ud/l'action comme introuvable, immédiatement apr&egrave;s que le propre journal du n&#339;ud a confirm&eacute; son d&eacute;marrage (&laquo;&nbsp;Node created (unconfigured)&nbsp;&raquo;) et alors que <code>ros2 node list</code> dans le m&ecirc;me shell le montrait pr&eacute;sent. La d&eacute;couverte par d&eacute;faut, adoss&eacute;e au d&eacute;mon, semble servir un cache p&eacute;rim&eacute; dans cet environnement.</dd>
+          <dt>Correction utilis&eacute;e ici</dt>
+          <dd><code>ros2 lifecycle set --no-daemon --spin-time 15 /episode_recorder configure</code> (et pareil pour <code>activate</code>) &mdash; forcer une d&eacute;couverte fra&icirc;che au lieu de d&eacute;pendre du cache du d&eacute;mon en arri&egrave;re-plan a r&eacute;solu le probl&egrave;me chaque fois.</dd>
+          <dt>Pourquoi c'est important</dt>
+          <dd>Cela a produit un &eacute;chec net et inexpliqu&eacute; (<code>FATAL: RECORDER_CONFIGURE_FAILED</code>) sur un n&#339;ud manifestement sain, et a co&ucirc;t&eacute; un vrai temps de d&eacute;bogage avant que l'explication du cache p&eacute;rim&eacute; ne soit trouv&eacute;e. Un cache de d&eacute;couverte p&eacute;rim&eacute; sans indicateur visible de p&eacute;remption est un point de friction aigu pour tout flux de travail sur n&#339;ud &agrave; cycle de vie pilot&eacute; par la CLI.</dd>
+        </dl>
+      </div>
+
+      <div class="bugcard">
+        <h4><code>gz-sim-detachable-joint-system</code> ne fait silencieusement rien sur un <code>child_link</code> qui n'est pas un lien de mod&egrave;le<span class="status-pill">Pas encore d&eacute;pos&eacute;</span></h4>
+        <p class="repo">D&eacute;p&ocirc;t candidat&nbsp;: gazebosim/gz-sim</p>
+        <dl>
+          <dt>Sympt&ocirc;me</dt>
+          <dd>D&eacute;finir <code>&lt;child_link&gt;gripper_base&lt;/child_link&gt;</code> sur un plugin <code>DetachableJoint</code> &mdash; un nom qui est un repère TF valide mais qui, apr&egrave;s conversion URDF-vers-SDF, est fusionn&eacute; dans le lien Gazebo <code>link6</code> et n'existe pas comme son propre lien de mod&egrave;le spawnable &mdash; ne produit aucune erreur ni avertissement. Le topic d'attache accepte le message&nbsp;; rien ne s'attache&nbsp;; le bloc ne bouge simplement pas au lift, indiscernable au niveau du journal d'un v&eacute;ritable &eacute;chec physique.</dd>
+          <dt>Correction utilis&eacute;e ici</dt>
+          <dd>Cible de <code>child_link</code> red&eacute;finie vers <code>link6</code>, le vrai lien Gazebo, trouv&eacute; en listant les vrais liens du mod&egrave;le avec <code>gz model -m mycobot_320 --link</code>.</dd>
+          <dt>Pourquoi c'est important</dt>
+          <dd>Cela a co&ucirc;t&eacute; un cycle de d&eacute;bogage complet identique en apparence &agrave; l'&eacute;chec pr&eacute;c&eacute;dent et authentique de la prise par friction (&sect;8) &mdash; les deux se pr&eacute;sentant comme &laquo;&nbsp;le bloc n'a pas bouge&nbsp;&raquo;. Une erreur de validation du nom de lien au chargement du plugin (la m&ecirc;me information que <code>gz model --link</code> affiche d&eacute;j&agrave;) aurait permis de le d&eacute;tecter immédiatement.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="block" id="limits">
+      <h2>Ce que cela ne prouve pas</h2>
+      <p class="block-dek">La Partie&nbsp;10 de la spec reformul&eacute;e en int&eacute;gralit&eacute;, avec ce qui a chang&eacute;.</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)">
+        <li><b>Le bloc port&eacute; n'est une prise physique d'aucune sorte.</b> Ceci est plus fort que la propre r&eacute;serve de la spec (contact rigide grossier) &mdash; m&ecirc;me le contact rigide n'a pu &ecirc;tre amen&eacute; &agrave; tenir dans le temps disponible (&sect;8). Tout mod&egrave;le entra&icirc;n&eacute; sur ces donn&eacute;es apprend &laquo;&nbsp;approcher, fermer pr&egrave;s du bloc, le porter, ouvrir&nbsp;&raquo;, pas la physique de la prise.</li>
+        <li><b>Les donn&eacute;es entra&icirc;n&eacute;es en simulation portent un &eacute;cart de domaine visuel</b>, inchang&eacute; par rapport &agrave; la spec&nbsp;: le rendu de Gazebo diff&egrave;re d'une vraie cam&eacute;ra, et le propre r&eacute;sultat DREAM de ce projet (10,9&nbsp;%&rarr;91,6&nbsp;% de d&eacute;tection r&eacute;elle seulement apr&egrave;s m&eacute;lange de donn&eacute;es r&eacute;elles) est une preuve directe qu'un entra&icirc;nement purement synth&eacute;tique se d&eacute;grade nettement sur des images r&eacute;elles.</li>
+        <li><b>Un mouvement script&eacute; n'est pas une d&eacute;monstration de qualit&eacute;</b>, inchang&eacute; par rapport &agrave; la spec&nbsp;: un t&eacute;l&eacute;op&eacute;rateur humain produit des corrections et h&eacute;sitations naturelles&nbsp;; ce script produit la m&ecirc;me forme de trajectoire chaque fois, ne variant que la position cible.</li>
+        <li><b>Vingt &eacute;pisodes n'est pas un jeu d'entra&icirc;nement</b>, inchang&eacute; par rapport &agrave; la spec&nbsp;: le chiffre communautaire pour le fine-tuning est de 100&agrave;500 par t&acirc;che. Ceci est un test de fum&eacute;e avec une v&eacute;ritable s&eacute;mantique, pas un jeu de donn&eacute;es pr&ecirc;t pour l'entra&icirc;nement.</li>
+        <li><b>Pas encore charg&eacute; via la vraie classe <code>LeRobotDataset</code></b> (nouveau, &sect;12) &mdash; la disposition sur disque est &eacute;crite selon la sp&eacute;cification document&eacute;e mais non prouv&eacute;e comme chargeable avant que ce contr&ocirc;le ne s'ex&eacute;cute sur une machine dot&eacute;e de <code>torch</code>.</li>
+      </ul>
+      <p class="prose"><b>Ce que cela prouve, pr&eacute;cis&eacute;ment&nbsp;:</b> le pipeline peut produire des &eacute;pisodes structurellement solides, auto-v&eacute;rifiants, ancr&eacute;s sur une t&acirc;che, avec une instruction v&eacute;ridique, enti&egrave;rement en headless, sur du mat&eacute;riel sans GPU du tout &mdash; et il met en &eacute;vidence, honn&ecirc;tement, que la prise elle-m&ecirc;me n'est pas encore physique. Cela valait la peine d'&ecirc;tre &eacute;tabli avant de planifier une quelconque session d'enregistrement sur robot r&eacute;el.</p>
+    </section>
+
+    <!-- ===================================================== MANUAL ===================================================== -->
+    <section class="block" id="manual">
+      <h2>Ex&eacute;cution manuelle, de bout en bout</h2>
+      <p class="block-dek">Chaque commande qu'une personne tapperait, dans l'ordre, pour reproduire un &eacute;pisode enregistr&eacute; &agrave; la main &mdash; regroupant les encarts Proc&eacute;dure ci-dessus en un seul parcours. Tout ceci s'ex&eacute;cute dans le conteneur <code>gazebo_to_lerobot</code> (<code>docker exec -it gazebo_to_lerobot bash</code>), avec <code>source /opt/ros/jazzy/setup.bash; source /workspace/install/setup.bash</code> en premier dans chaque nouveau shell.</p>
+      <pre><span class="c"># 1. D&eacute;marrer la pile de sim et attendre les contr&ocirc;leurs</span>
+ros2 launch gazebo_to_lerobot_bringup sim_full.launch.py &amp;
+until ros2 control list_controllers | grep -q "mycobot_controller.*active"; do sleep 5; done
+
+<span class="c"># 2. Spawn de la sc&egrave;ne</span>
+ros2 run ros_gz_sim create -world empty -file models/plate.sdf -name plate -x 0.20 -y -0.15 -z 0.044
+ros2 run ros_gz_sim create -world empty -file models/red_block.sdf -name red_block -x 0.25 -y 0.0 -z 0.0205
+sleep 20   <span class="c"># laisser se stabiliser</span>
+gz model -m red_block -p   <span class="c"># confirmer qu'il s'est stabilis&eacute; pr&egrave;s de (0,25 ; 0,00 ; 0,02)</span>
+
+<span class="c"># 3. R&eacute;soudre l'IK hors-ligne (moveit_py seul, sans rclpy)</span>
+python3 scripts/precompute_ik.py --block-x 0.25 --block-y 0.00
+
+<span class="c"># 4. D&eacute;marrer move_group de MoveIt2 et attendre qu'il soit pr&ecirc;t</span>
+ros2 launch mycobot_moveit_config move_group.launch.py &amp;
+<span class="c"># attendre "You can start planning now!" dans son journal</span>
+
+<span class="c"># 5. D&eacute;marrer l'enregistreur et l'amener &agrave; l'&eacute;tat de cycle de vie actif</span>
+ros2 run rosetta episode_recorder_node --ros-args \
+  -p contract_path:=contracts/mycobot_pick_place.yaml \
+  -p bag_base_dir:=/tmp/my_episode/bag &amp;
+ros2 lifecycle set --no-daemon --spin-time 15 /episode_recorder configure
+ros2 lifecycle set --no-daemon --spin-time 15 /episode_recorder activate
+
+<span class="c"># 6. Lancer la s&eacute;quence (rclpy pur, sans moveit_py)</span>
+python3 scripts/run_pick_and_place.py --record \
+  --prompt "pick up the red block and place it on the plate" \
+  --log /tmp/my_episode/grasp_log.csv --meta /tmp/my_episode/grasp_meta.json
+
+<span class="c"># 7. Lire le verdict</span>
+cat /tmp/my_episode/grasp_meta.json   <span class="c"># placed_on_plate, grasp_held, simulated_attachment</span></pre>
+      <p class="callout"><b>Pour le lot complet de 20 &eacute;pisodes plut&ocirc;t qu'un seul&nbsp;:</b> <code>bash scripts/batch.sh 1 20</code> fait tout ce qui pr&eacute;c&egrave;de par &eacute;pisode, depuis un red&eacute;marrage propre de la sim, avec jusqu'&agrave; 3 nouvelles tentatives chacun&nbsp;; <code>bash scripts/status.sh</code> (ex&eacute;cut&eacute; depuis le shell h&ocirc;te ordinaire) rapporte la v&eacute;rit&eacute; terrain sur la progression.</p>
+      <p class="callout"><b>Pour convertir les bags enregistr&eacute;s en jeu de donn&eacute;es&nbsp;:</b> <code>python3 scripts/port_bag.py --out &lt;chemin&gt; --indices "1 2 3 ... 15"</code>, lisant directement le bag de chaque &eacute;pisode, sans besoin du paquet <code>lerobot</code>.</p>
+    </section>
+
+    <section class="block" id="manifest">
+      <h2>Inventaire des fichiers</h2>
+      <p class="block-dek">Ce qui est effectivement suivi par git sous ce dossier, et &agrave; quoi sert chaque pi&egrave;ce.</p>
+      <div class="manifest-tree">Headless_Task-Grounded_Pick-and-Place_in_Gazebo/<br>
+&#9500;&#9472;&#9472; doc/<span class="c">                                    # ce rapport et la sp&eacute;cification source</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; headless_pick_and_place_specification.md<span class="c">  # spec contraignante (renomm&eacute;e depuis *_workflow.md)</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; PICK_AND_PLACE_REPORT.{html,docx} / _FR.{html,docx}<span class="c">  # ce document, EN/FR</span><br>
+&#9500;&#9472;&#9472; MEASUREMENTS.md<span class="c">                        # le journal de mesures brutes &agrave; l'origine de ce rapport</span><br>
+&#9500;&#9472;&#9472; models/<br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; red_block.sdf<span class="c">                     # &sect;1, &sect;8, &sect;9 (param&egrave;tres de contact + DetachableJoint)</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; plate.sdf<span class="c">                         # &sect;1, inchang&eacute; par rapport &agrave; la spec</span><br>
+&#9500;&#9472;&#9472; scripts/<br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; grab_frame.py<span class="c">                     # &sect;2, &sect;6 v&eacute;rification par image cam&eacute;ra</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; ik_helper.py, precompute_ik.py<span class="c">   # &sect;3&ndash;4, processus moveit_py seul</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; run_pick_and_place.py<span class="c">            # &sect;5&ndash;6, &sect;9, processus rclpy pur</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; episode.sh, batch.sh<span class="c">             # &sect;10, le pilote d'enregistrement par &eacute;pisode</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; status.sh<span class="c">                        # &sect;11, &eacute;tat du lot v&eacute;rit&eacute;-disque</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; port_bag.py<span class="c">                      # &sect;12, conversion du jeu de donn&eacute;es sans torch</span><br>
+&#9500;&#9472;&#9472; contracts/<span class="c">                          # &sect;10, contrats rosetta cam&eacute;ra avant et cam&eacute;ra tenue &agrave; l'&eacute;cart</span><br>
+&#9500;&#9472;&#9472; datasets/<span class="c">                           # &sect;12, meta/README suivis&nbsp;; charge utile parquet/mp4 dans .gitignore</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; mycobot_pick_place_train/<br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; mycobot_pick_place_heldout/<br>
+&#9492;&#9472;&#9472; .gitignore</div>
+      <p class="prose">Les bags enregistr&eacute;s eux-m&ecirc;mes (&asymp;1,7&nbsp;Go pour 20 &eacute;pisodes) ne vivent que dans le conteneur <code>gazebo_to_lerobot</code>, sous <code>/workspace/htgpp/episodes/</code>, ni dans ce d&eacute;p&ocirc;t ni dans les dossiers de jeux de donn&eacute;es ci-dessus &mdash; r&eacute;g&eacute;n&eacute;rables via <code>batch.sh</code>, pas quelque chose &agrave; versionner.</p>
+    </section>
+
+    <footer>Rapport Headless_Task-Grounded_Pick-and-Place_in_Gazebo &middot; &eacute;crit le 22/09/2026 &middot; commit f944dbe sur main &middot; Tomislav Ilic</footer>
+  </main>
+</div>

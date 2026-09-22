@@ -1,0 +1,5 @@
+# Regenerable via: python3 scripts/port_bag.py --out <this dir> --indices "..."
+# Keep meta/, README.md and port_manifest.json (small, textual, worth reviewing);
+# the actual parquet/mp4 payload is binary and reproducible from the bags.
+*/data/
+*/videos/
