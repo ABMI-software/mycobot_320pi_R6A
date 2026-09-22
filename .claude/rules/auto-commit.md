@@ -105,11 +105,19 @@ If the branch check is ambiguous (e.g. a file that genuinely spans domains like 
 
 - `*.bak`, `*.bak2`, `*.orig`, `*.log`, `*.pyc`, `__pycache__/`
 - `results/`, `build/`, `install/`, `log/` (ROS2 build tree)
-- `*.xlsx` reports (user-local analyses — belong elsewhere)
 - Training checkpoints (`*.pth`) — too heavy, project already avoids tracking them
 - `.env`, `credentials.json`, private keys, SSH keys
 - Files ending in `.session`, `.sessionlock`, `.lock`
 - Anything the user introduced earlier in the session that they didn't mark as done
+
+### Stage only with explicit approval
+
+- **`*.xlsx` analysis workbooks.** These used to be barred outright. They are now
+  committable, but never automatically: ask the user first, in the same breath as
+  the commit, and stage the workbook only on a clear yes. The reason for asking is
+  not size — it is that a workbook is opaque to review and to `git diff`, so
+  whoever commits it has to vouch that its contents are meant to be shared. A
+  refusal, or silence, means leave it out.
 
 If in doubt, **don't stage it** — a missed file gets picked up in the next commit; a wrongly-committed secret does not get un-committed cleanly.
 

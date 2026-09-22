@@ -107,9 +107,9 @@ def generate_launch_description():
         name='gz_image_bridge', output='screen',
         arguments=[
             '/synth_camera/image',
-            '/synth_camera_1/image',
-            '/synth_camera_2/image',
-            '/synth_camera_3/image',
+            '/synth_camera_right/image',
+            '/synth_camera_left/image',
+            '/synth_camera_top/image',
         ],
     )
 

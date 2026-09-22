@@ -9,6 +9,61 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — cinq fichiers de launch pontaient des topics caméra inexistants (22/09)
+
+- **Les 3 caméras secondaires du URDF sont renommées `camera_link_right` /
+  `_left` / `_top`, et leurs topics `/synth_camera_right|left|top/image`.**
+  Le dépôt vivait avec deux conventions : le URDF publiait `synth_camera_1/2/3`
+  quand `pick_and_place.launch.py`, `pick_and_place_sorting.launch.py`,
+  `synthetic_data_v2.launch.py`, `synthetic_data_v3.launch.py`,
+  `color_object_detector.py` et `synthetic_data_collector_v2.py` s'abonnaient
+  déjà à `right/left/top` — **sur rien**, aucun world `.sdf` ne définissant de
+  caméra. Les noms de joints (`world_to_camera_right/left/top`) et
+  `README_GAZEBO.md` étaient eux aussi du côté `right/left/top` : c'est le
+  `_1/2/3` qui était l'exception, tranchée ici en sa défaveur.
+  Le correctif du 10/09 avait aligné les liens sur `_1/2/3`, c'est-à-dire du
+  mauvais côté — il réparait le parsing URDF sans voir la scission.
+- **Recâblés en conséquence** : `synthetic_data.launch.py`,
+  `synthetic_data_preview.launch.py` et `synthetic_data_collector.py` (chemin
+  v1), seuls utilisateurs de l'ancienne convention.
+- ⚠ **Le câblage physique de `synthetic_data_collector.py` est inchangé** :
+  `cam_1` reste la caméra du côté +Y, `cam_2` celle du côté −Y, `cam_3` la
+  zénithale. Seuls les noms de topics changent. Le commentaire qui appelait
+  `cam_1` « left » contredisait le nom du joint (`world_to_camera_right`) et
+  le collecteur v2 ; il est remplacé par la position géométrique (+Y / −Y /
+  zénith), factuelle et sans convention implicite. **Quel côté mérite le nom
+  « droite » reste à trancher** : vu depuis la caméra frontale, +Y est à
+  droite ; vu depuis le robot tourné vers +X, +Y est à sa gauche.
+
+### Corrigé — trois régressions d'intégration de la PR #9 (10/09)
+
+Aucune mesure dans cette séance : trois lancements cassés par le merge, chacun
+réparé à sa cause.
+
+- **7 nœuds ne trouvaient plus `training/dream`.** Ils remontaient 4 niveaux
+  depuis `os.path.abspath(__file__)`, ce qui pointe **hors du dépôt**, et sans
+  `realpath` ne suivaient pas le symlink de `colcon --symlink-install` —
+  `ModuleNotFoundError` (`mycobot_ik`, `mycobot_fk`) au lancement de
+  `sorting_orchestrator`, `pick_and_place_aruco`, `precision_benchmark`,
+  `calibrate_hand_eye`, `fk_ee_pose`, `pick_and_place`, `reach_target_aruco`.
+  Alignés sur le motif déjà correct de `dream_inference_node.py` :
+  `os.path.realpath(__file__)` + remontée de 2 niveaux.
+- **Le robot ne se chargeait plus dans Gazebo.** Les joints
+  `world_to_camera_right/left/top` de `mycobot_pro_320_pi_gazebo.urdf`
+  référençaient des liens `camera_link_right/left/top` **inexistants** (les
+  liens définis sont `camera_link_1/2/3`) : `robot_state_publisher` échouait au
+  parsing (« child link [camera_link_left] not found »). Résidu de la
+  résolution de conflit de la PR #9, où la version des joints a été gardée sans
+  aligner les noms de liens.
+- **Toute la stack sim tombait au lancement.** `bc5ddbe6` avait ré-écrasé
+  l'include rosbridge de `mycobot_teleop.launch.py` avec
+  `PythonLaunchDescriptionSource`, qui ne sait pas parser un `.xml`
+  (« invalid syntax (rosbridge_websocket_launch.xml, line 1) »).
+  `AnyLaunchDescriptionSource` restauré (correctif d'origine `2e57bb18`) pour
+  rosbridge, `PythonLaunchDescriptionSource` gardé pour `gz_sim.launch.py`.
+  ⚠ **rosbridge lui-même reste bloqué** par un désalignement ABI `fastcdr` au
+  niveau de `/opt/ros/jazzy` (`symbol lookup error`) : à corriger côté système
+  (apt), indépendant de ce correctif de launch.
 ### Modifié — le tri de reference est celui a saisie physique (10/09)
 
 - **`sim_sorting_grasp` devient le pipeline de tri documente.** La pince se
