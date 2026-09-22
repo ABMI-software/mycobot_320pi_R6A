@@ -361,6 +361,7 @@ is [`INDEX.md`](INDEX.md) (FR).
 | Pick-and-place | [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) · [`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md) (FR) · [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) |
 | Deployment and diagnosis | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (FR) · [`docs/DEBUG_CONNECTION_GUIDE.md`](docs/DEBUG_CONNECTION_GUIDE.md) (FR) · [`docs/BRIDGE_PI_UPGRADE_GUIDE.md`](docs/BRIDGE_PI_UPGRADE_GUIDE.md) (FR) |
 | VLA data pipelines | [`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/MEASUREMENTS.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/MEASUREMENTS.md) — what was measured, with per-item confidence · [`.../doc/headless_pick_and_place_specification.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/doc/headless_pick_and_place_specification.md) · [`.../datasets/README.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/datasets/README.md) — the two LeRobot datasets and why the split holds out a camera. Each of `Gazebo_to_LeRobot_Pipeline/` and `ROS2_to_RLDS_Conversion_OpenVLA/` carries its own `docs/PIPELINE.html` |
+| Evaluating a candidate technology | [`docs/SPEC_VALIDATION_BRIQUES.md`](docs/SPEC_VALIDATION_BRIQUES.md) (FR) — how two interchangeable components are compared: the pluggable pose port, the four use cases, the error budget the bench can resolve, and the anti-circularity test that already invalidated one demonstration |
 | Where work stands | [`SESSION_RESUME.md`](SESSION_RESUME.md) (FR) |
 
 ## Roadmap
@@ -373,7 +374,11 @@ is [`INDEX.md`](INDEX.md) (FR).
 4. Automated collection, replay and analysis of test campaigns, so that
    cross-site campaigns stay comparable.
 5. External metrological reference, independent of encoders and vision.
-6. Migration of the simulation path to NVIDIA Isaac Sim, on its own branch until
+6. Marker-free pose estimation on the pick path itself — today the pick uses
+   the ArUco extrinsic, and only the dashboard consumes the model. The
+   comparison protocol is specified in
+   [`docs/SPEC_VALIDATION_BRIQUES.md`](docs/SPEC_VALIDATION_BRIQUES.md) (FR).
+7. Migration of the simulation path to NVIDIA Isaac Sim, on its own branch until
    parity with the current twin is demonstrated.
 
 ## Contributing

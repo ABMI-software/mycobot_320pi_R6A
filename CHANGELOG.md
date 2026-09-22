@@ -9,6 +9,33 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — spécification d'évaluation des briques interchangeables (22/09)
+
+- [`docs/SPEC_VALIDATION_BRIQUES.md`](docs/SPEC_VALIDATION_BRIQUES.md) définit
+  **comment on tranche entre deux technologies concurrentes**, DREAM contre
+  RoboPEPP pour la première. Point d'appui : `pick_and_place_aruco_node` ne
+  connaît pas sa source de pose — `/aruco/object_pose` + `/aruco/workspace_valid`
+  est **déjà un port enfichable**, avec deux fournisseurs interchangeables en
+  service. Une brique candidate s'y branche sans qu'un seul élément en aval
+  change, ce qui est la condition d'une comparaison honnête.
+- Quatre cas d'usage dont **deux témoins** (simulation sur vérité terrain,
+  banc réel sur ArUco), le budget d'erreur que le banc de Lyon peut réellement
+  résoudre, et trois épreuves obligatoires — anti-circularité, point de vue
+  tenu à l'écart, observabilité déclarée.
+- Cinq décisions sont explicitement laissées à l'équipe, dont le seuil
+  d'acceptation et le coût d'intégration de RoboPEPP, non évalué ici.
+
+### Corrigé — `aruco_localizer` envoyait un modèle 3D deux fois trop petit (22/09)
+
+- `workspace_markers.yaml` écrit `marker_size_mm: 50.0` ; le chargeur ne lisait
+  que la clé `marker_size_m`, absente, et se repliait **silencieusement** sur le
+  défaut du nœud, **0,025 m**. Les coins envoyés à `solvePnP` faisaient donc
+  ±12,5 mm pour des marqueurs de 50 mm, alors que les centres étaient justes —
+  un système géométriquement incohérent.
+- Le chargeur accepte désormais les deux clés, `marker_size_mm` étant converti.
+- **Toute mesure de localisation ArUco antérieure est suspecte** et doit être
+  reprise. Trouvé en instrumentant la spécification ci-dessus, pas par un essai.
+
 ### Ajouté — trois briques VLA, mergées sans jamais passer par ce fichier (22/09)
 
 Les PR #12 et #13 ont ajouté **trois répertoires de premier niveau** et leur

@@ -92,6 +92,12 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | [training/calibration/cam_0.npz](training/calibration/cam_0.npz) · [.meta.json](training/calibration/cam_0.meta.json) | **K mesuré cam_0** : fx=525.67 fy=529.70 cx=317.73 cy=226.00 (RMS 0.67 px, 18 vues) |
 | [training/calibration/cam_3.npz](training/calibration/cam_3.npz) · [.meta.json](training/calibration/cam_3.meta.json) | **K mesuré cam_3** : fx=496.31 fy=494.14 cx=313.37 cy=248.01 (RMS 0.68 px, 21 vues) |
 
+### 🧪 Valider une brique candidate
+
+| Document | Description |
+|----------|-------------|
+| [docs/SPEC_VALIDATION_BRIQUES.md](docs/SPEC_VALIDATION_BRIQUES.md) | **Comment on tranche entre deux technologies** (DREAM contre RoboPEPP en première instance) : le port de pose déjà enfichable dans l'architecture, les 4 cas d'usage dont 2 témoins, le budget d'erreur que le banc peut résoudre, et l'épreuve d'anti-circularité qui a déjà invalidé une démonstration |
+
 ### 📏 Précision et métrologie
 
 | Document | Description |
