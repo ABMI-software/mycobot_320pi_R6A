@@ -386,6 +386,9 @@ footer {
       <a href="#s10"><span class="n">10</span>Record 20 episodes</a>
       <a href="#s11"><span class="n">11</span>Ground-truth status</a>
       <a href="#s12"><span class="n">12</span>Dataset conversion</a>
+      <a href="#s13"><span class="n">13</span>IK robustness for any position</a>
+      <a href="#s14"><span class="n">14</span>The demo orchestrator</a>
+      <a href="#s15"><span class="n">15</span>Two launch files</a>
       <a href="#ladder"><span class="n">&sect;</span>Verification ladder</a>
       <p class="rail-group-label">Reference</p>
       <a href="#bugs-env"><span class="n">&sect;</span>Bugs fixed &mdash; session</a>
@@ -405,7 +408,7 @@ footer {
         <span><b>Sandbox</b> ~/tomislav/robotics/Headless_Task-Grounded_Pick-and-Place_in_Gazebo</span>
         <span><b>Host</b> Ubuntu WSL2, ~4.9&nbsp;GB usable RAM, CPU-only</span>
         <span><b>Reproduced via</b> the <code>gazebo_to_lerobot</code> Docker container (Ubuntu 24.04, ROS2 Jazzy, Gazebo Harmonic)</span>
-        <span><b>Commit</b> f944dbe on <code>main</code></span>
+        <span><b>Commit</b> 5c92a565 on <code>main</code></span>
         <span><b>Written</b> 2026-09-22</span>
       </div>
     </div>
@@ -413,7 +416,8 @@ footer {
     <section class="block" id="overview">
       <h2>Overview</h2>
       <p class="block-dek">This document is the implementation report for <code>headless_pick_and_place_specification.md</code> &mdash; the file in this same directory that was treated as a binding specification of design and verification <em>goals</em>, not of implementation details. Per the governing instruction under which this work was done, specific programming choices in that document were free to be replaced with better solutions; every goal had to be either achieved or explicitly reported as a problem.</p>
-      <p class="prose">The short version: every numbered step in the specification (Parts 1&ndash;8) was implemented and verified, twenty LeRobot-format episodes were recorded and split into a 15-episode training set and a 5-episode held-out-camera validation set, and the pipeline is fully self-verifying (a CSV-based pass/fail check runs at the end of every episode). The one load-bearing deviation is in the grasp mechanism itself: after a deliberate, bounded physics experiment produced no friction hold, the block is carried by a Gazebo <code>DetachableJoint</code> weld triggered on gripper-close and released on gripper-open &mdash; labelled <b>SIMULATED ATTACHMENT, NOT a physical grasp</b> everywhere it appears, in code comments, log lines, and every episode's own metadata. Four bugs were fixed in the arm-and-gripper sequencing path, three more in the recording-batch infrastructure, and two are flagged as worth reporting upstream.</p>
+      <p class="prose">The short version: every numbered step in the specification (Parts 1&ndash;8) was implemented and verified, twenty LeRobot-format episodes were recorded and split into a 15-episode training set and a 5-episode held-out-camera validation set, and the pipeline is fully self-verifying (a CSV-based pass/fail check runs at the end of every episode). The one load-bearing deviation is in the grasp mechanism itself: after a deliberate, bounded physics experiment produced no friction hold, the block is carried by a Gazebo <code>DetachableJoint</code> weld triggered on gripper-close and released on gripper-open &mdash; labelled <b>SIMULATED ATTACHMENT, NOT a physical grasp</b> everywhere it appears, in code comments, log lines, and every episode's own metadata. Four bugs were fixed in the arm-and-gripper sequencing path, three more in the recording-batch infrastructure, three more in the demo-launch orchestrator added on 2026-09-22 (&sect;13&ndash;15), and four are flagged as worth reporting upstream.</p>
+      <p class="prose"><b>Addendum, 2026-09-22 (&sect;13&ndash;15):</b> a manager asked for a single <code>ros2 launch</code> entry point to actually run and watch this demo, rather than the 7-step manual walkthrough (&sect;manual) that was the only way to run it before. Two launch files now wrap one orchestrator script, with <code>gui</code>, <code>record</code>, <code>block_x</code>/<code>block_y</code> and <code>attach_mode</code> exposed as ordinary, documented <code>ros2 launch</code> arguments &mdash; <code>attach_mode</code> deliberately, so the simulated-attachment limitation is visible at the point of use, not only in this document.</p>
       <p class="prose">This report follows the same structure as the runbooks in <code>Gazebo_to_LeRobot_Pipeline/docs/</code> and <code>ROS2_to_RLDS_Conversion_OpenVLA/docs/</code>: a step-by-step account pairing what was done with the concrete check that proves it, a reference section for bugs and limitations, and a manual, human-runnable walkthrough at the end.</p>
     </section>
 
@@ -668,10 +672,84 @@ gz model -m red_block -p</pre>
       <p class="callout warn"><b>Deferred, not skipped:</b> this has not been loaded through the real <code>LeRobotDataset</code> class &mdash; that check needs <code>torch</code> and happens on the GPU machine. See <code>datasets/README.md</code> for the same note kept alongside the data itself.</p>
     </article>
 
+    <!-- ===================================================== ADDENDUM 2026-09-22 ===================================================== -->
+    <section class="block" id="addendum-head">
+      <h2>Addendum, 2026-09-22: a testable launch file</h2>
+      <p class="block-dek">Not from the specification &mdash; a direct request from the project manager, quoted in full because it states its own reasoning: <i>&laquo;&nbsp;Ce qui serait int&eacute;ressant est de mettre en place aussi un launch pour qu'on puisse le tester. Si j'ai bien compris tout est fait et valid&eacute; en backstage automatis&eacute;, sans v&eacute;rification 3D sur gazebo, vu que ta machine ne te le permet pas. Peux-tu t'assurer que le pipeline de lancement sur mon PC soit pr&ecirc;t et que cela fonctionne comme pr&eacute;vu&nbsp;?&nbsp;&raquo;</i> Legitimate, and genuinely not there before &sect;15: this project had <code>sim_full.launch.py</code> and <code>move_group.launch.py</code>, but the demo itself was orchestrated by <code>episode.sh</code>/<code>batch.sh</code> plus the 7-step manual walkthrough in &sect;manual, with <code>&amp;</code> backgrounding and <code>until &hellip; sleep</code> polling. No single entry point existed.</p>
+    </section>
+
+    <article class="step" id="s13">
+      <div class="step-head"><span class="step-num">13</span><h3>IK robustness for a manager-chosen block position</h3></div>
+      <p class="step-purpose">The recording batch (&sect;10) only ever needed 9 pre-vetted block positions. A launch-file argument lets a reviewer choose <em>any</em> reachable position and re-run &mdash; which meant the single-pose IK path needed the same protection the batch path already had.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>The branch-consistency retry (seed from a known-good configuration, retry up to 6 times, reject any solution outside the forward-facing elbow-up branch used by every recorded episode) previously lived only in <code>precompute_ik.py</code>'s <code>--poses</code> batch path. Extracted into <code>solve_waypoints_robust()</code> and now shared by the single-pose path too.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>Explicit-position test at (0.25, 0.00): <code>approach J1=+0.367 descend J3=-2.420 branch_ok=True</code> &mdash; the same branch every recorded episode used. Live-detection test (no <code>--block-x</code>/<code>--block-y</code>, reading the block's actual settled Gazebo pose instead): identical result, once the timeout bug below was fixed.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Bug found and fixed:</b> <code>live_block_xyz()</code> raised <code>RuntimeError: could not read live pose of red_block: ''</code> &mdash; not the already-documented "prints then hangs" partial output, genuinely empty. It runs right after <code>MoveItPy</code>'s own ~90&nbsp;s build; this machine's CPU load at that exact moment was apparently enough to starve the <code>gz model</code> subprocess past its 10&nbsp;s timeout before it printed anything at all. Fixed by retrying (5&times;, 25&nbsp;s each) instead of trusting one short timeout.</p>
+    </article>
+
+    <article class="step" id="s14">
+      <div class="step-head"><span class="step-num">14</span><h3><code>run_demo.py</code> &mdash; one orchestrator behind both launch files</h3></div>
+      <p class="step-purpose">Ports <code>scripts/episode.sh</code>'s proven bring-up sequence to Python, generalised for an arbitrary block position and an optional recorder, with clean process teardown.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>Bring up <code>sim_full.launch.py</code> (GUI or headless per argument) &rarr; poll the three controllers <code>active</code>, with the same sequential-respawn fallback <code>episode.sh</code> uses for the cold-start spawner race &rarr; spawn plate and block at the requested position &rarr; wait, then read the block's <em>settled</em> pose &rarr; solve IK against that settled pose, not the commanded one (&sect;13) &rarr; bring up <code>move_group</code> &rarr; if <code>record:=true</code>, start and lifecycle-activate the rosetta recorder &rarr; run <code>run_pick_and_place.py</code> &rarr; print the verdict from <code>grasp_meta.json</code>. <code>record:=false</code> (the default) skips the recorder step entirely &mdash; no <code>rosetta</code> install needed for the common case.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>Two independent full end-to-end runs (block at (0.25, 0.00), headless), each printing <code>RESULT: motions_ok=True placed_on_plate=True grasp_held=True</code>. Invalid <code>attach_mode</code> tested separately: rejected immediately with exit code 2 and the reason spelled out, before anything is launched.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Three bugs found and fixed here, all specific to running this as a launch-file child rather than a bash script</b> (none of these existed in <code>episode.sh</code>, because it was never invoked this way):</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)">
+        <li><b>Self-inflicted kill:</b> the stale-process cleanup's <code>"ros2 launch"</code> pattern (copied from <code>episode.sh</code>) matched <code>run_demo.py</code>'s own parent &mdash; because it is now itself launched <em>by</em> a <code>ros2 launch</code> process (the launch file's <code>ExecuteProcess</code>), unlike <code>episode.sh</code>, which was always invoked directly from bash. It killed its own parent within the first second of every run. Narrowed the pattern to the two specific inner launch files that actually need cleaning up (<code>sim_full.launch.py</code>, <code>move_group.launch.py</code>).</li>
+        <li><b>Timeout crashed instead of retrying:</b> the <code>sh()</code> helper let <code>subprocess.run</code>'s <code>TimeoutExpired</code> propagate and crash the whole script on the very first controller poll &mdash; which is <em>expected</em> to time out repeatedly before the sim has even started. bash's own <code>timeout</code> command (used throughout <code>episode.sh</code>) returns gracefully instead; <code>sh()</code> now does too.</li>
+        <li><b>Cleanup didn't actually clean up:</b> sending SIGINT/SIGTERM to the outer <code>ros2 launch sim_full.launch.py</code> subprocess handle does not reliably cascade to Gazebo/<code>move_group</code> &mdash; confirmed directly: a first "successful" cleanup left both fully alive. <code>ros2 launch</code>'s own signal handling appears to be what tears down its managed processes, and an externally-delivered signal to the wrapper itself doesn't trigger that. Backstopped with the same <code>pkill</code> patterns <code>pkill_stale()</code> already uses at the <em>start</em> of a run, now also run at the <em>end</em>. See the candidate upstream report in &sect;bugs-upstream.</li>
+      </ul>
+    </article>
+
+    <article class="step" id="s15">
+      <div class="step-head"><span class="step-num">15</span><h3>Two launch files: a single entry point</h3></div>
+      <p class="step-purpose">One for the manager, with the Gazebo GUI; one for this machine, headless, exiting with a pass/fail code.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>ros2 launch pick_and_place_demo.launch.py            <span class="c"># with Gazebo GUI</span>
+ros2 launch pick_and_place_no_gui_demo.launch.py      <span class="c"># headless, exits pass/fail</span></pre>
+          <p>Both wrap &sect;14's orchestrator; the launch file itself only declares arguments and starts one <code>ExecuteProcess</code>.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>ros2 launch pick_and_place_no_gui_demo.launch.py --show-args</pre>
+          <p>Prints all declared arguments with their descriptions &mdash; including <code>attach_mode</code>'s, which states the limitation directly rather than only in this document.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Argument</th><th>Default</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><code>gui</code></td><td><code>true</code> (demo) / fixed <code>false</code> (no-gui)</td><td>The entire point of the GUI variant is seeing it; the entire point of the no-GUI variant is not needing to.</td></tr>
+            <tr><td><code>record</code></td><td><code>false</code></td><td>Watching, not data collection &mdash; with <code>record:=false</code>, no <code>rosetta</code> install is needed at all.</td></tr>
+            <tr><td><code>block_x</code>, <code>block_y</code></td><td>0.25 / 0.00</td><td>Move the object and re-run (&sect;13 made this safe for any reachable point).</td></tr>
+            <tr><td><code>attach_mode</code></td><td><code>simulated</code></td><td>Makes the weld visible in the command itself, and validated: any other value is a hard error naming &sect;8&ndash;9.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="callout"><b><code>gui:=true</code> stays open on purpose:</b> after printing the verdict, the GUI variant does not tear anything down &mdash; Gazebo and <code>move_group</code> keep running so the final scene stays on screen. Ctrl+C the launch to shut everything down; that does reach <code>run_demo.py</code>'s own signal handler, which runs the same cleanup as &sect;14.</p>
+      <p class="callout warn"><b>Not visually verified:</b> GUI rendering itself was not checked &mdash; this machine has no display (same limitation as &sect;1's real-time-factor note). The no-GUI variant was verified twice end to end; the GUI variant shares the identical orchestrator and was checked for correct argument-passing and startup only.</p>
+    </article>
+
     <!-- ===================================================== LADDER ===================================================== -->
     <section class="block" id="ladder">
       <h2>Verification ladder</h2>
-      <p class="block-dek">Each rung strictly depends on the one below it. The pipeline reaches every rung the specification asked for; the one it does not reach is the crude rigid-body grasp Part&nbsp;10 itself anticipated as the ceiling.</p>
+      <p class="block-dek">Each rung strictly depends on the one below it. The pipeline reaches every rung the specification asked for; the one it does not reach is the crude rigid-body grasp Part&nbsp;10 itself anticipated as the ceiling. Level&nbsp;7 is a later addition (&sect;13&ndash;15) the specification never asked for: a single testable entry point.</p>
       <div class="ladder">
         <div class="rung reached">
           <div class="level">Level&nbsp;0</div>
@@ -701,6 +779,10 @@ gz model -m red_block -p</pre>
           <div class="level">Level&nbsp;6</div>
           <div><span class="tag">Not attempted here</span><h5>Loaded and validated through the real <code>LeRobotDataset</code> class</h5><p>Needs <code>torch</code>; deferred to the GPU machine by design (&sect;12).</p></div>
         </div>
+        <div class="rung reached">
+          <div class="level">Level&nbsp;7</div>
+          <div><span class="tag">Passed</span><h5>Single <code>ros2 launch</code> entry point, any reachable block position</h5><p>Verified twice end to end via <code>pick_and_place_no_gui_demo.launch.py</code> (&sect;13&ndash;15): <code>RESULT: motions_ok=True placed_on_plate=True grasp_held=True</code> both times, with clean process teardown. The GUI variant shares the same orchestrator, but its rendering was not visually checked (no display on this machine).</p></div>
+        </div>
       </div>
     </section>
 
@@ -720,6 +802,9 @@ gz model -m red_block -p</pre>
             <tr><td>Container and its processes die mid-run with multi-hour gaps in ROS log timestamps</td><td>Host suspend/resume (WSL2 pauses the VM's clock; wall-clock timestamps jump on resume, monotonic ones don't)</td><td>Every batch script checks liveness with a bounded timeout, never a marker file alone; <code>status.sh</code> makes a suspend visible after the fact</td></tr>
             <tr><td><code>pip install lerobot==0.6.0</code> pulls a full CUDA/triton dependency tree and is repeatedly killed</td><td>No <code>--index-url</code> restriction on that package's transitive deps, unlike the CPU-only <code>torch</code> install step</td><td>Abandoned the <code>lerobot</code>/<code>torch</code> install entirely; wrote the dataset directly with <code>pyarrow</code>+<code>ffmpeg</code> (&sect;12)</td></tr>
             <tr><td>Three parallel controller spawners intermittently time out on cold start</td><td>Contention for the controller manager's internal lock/service under this VM's slow real-time factor</td><td>Sequential one-at-a-time respawn fallback when the parallel launch doesn't converge in 60&nbsp;s</td></tr>
+            <tr><td>Demo orchestrator (&sect;14) killed its own parent within the first second of every run</td><td>Stale-process cleanup's <code>"ros2 launch"</code> pattern matched its own parent, now that it runs as a launch-file child</td><td>Narrowed to the specific inner launch files needing cleanup (<code>sim_full.launch.py</code>, <code>move_group.launch.py</code>)</td></tr>
+            <tr><td>Demo orchestrator crashed on the very first, expected-to-time-out controller poll</td><td><code>subprocess.run</code>'s <code>TimeoutExpired</code> was left to propagate instead of returning gracefully like bash's own <code>timeout</code></td><td><code>sh()</code> helper now catches it and returns a failed result, exactly like <code>timeout</code> would</td></tr>
+            <tr><td><code>live_block_xyz()</code> (&sect;13) failed with genuinely empty <code>gz model</code> output</td><td>10&nbsp;s timeout too tight immediately after <code>MoveItPy</code>'s ~90&nbsp;s build under this machine's CPU load</td><td>Retry up to 5&times; at 25&nbsp;s each</td></tr>
           </tbody>
         </table>
       </div>
@@ -727,7 +812,7 @@ gz model -m red_block -p</pre>
 
     <section class="block" id="bugs-upstream">
       <h2>Bugs worth reporting upstream</h2>
-      <p class="block-dek">Three defects that reproduce independent of this VM &mdash; real friction in code other teams depend on. <b>Filing the actual issues has not been done</b> and needs a separate explicit go-ahead.</p>
+      <p class="block-dek">Four defects that reproduce independent of this VM &mdash; real friction in code other teams depend on. <b>Filing the actual issues has not been done</b> and needs a separate explicit go-ahead.</p>
 
       <div class="bugcard">
         <h4><code>MoveItPy</code> cannot share a process with a plain <code>rclpy</code> node<span class="status-pill">Not yet filed</span></h4>
@@ -765,6 +850,19 @@ gz model -m red_block -p</pre>
           <dd>Retargeted <code>child_link</code> to <code>link6</code>, the real Gazebo link, found by listing the model's actual links with <code>gz model -m mycobot_320 --link</code>.</dd>
           <dt>Why it matters</dt>
           <dd>This cost a full debugging cycle that looked identical to the earlier, genuine friction-grasp failure (&sect;8) &mdash; both present as "the block didn't move." A link-name validation error at plugin load time (the same information <code>gz model --link</code> already prints) would have caught this immediately instead.</dd>
+        </dl>
+      </div>
+
+      <div class="bugcard">
+        <h4>An externally-delivered signal to a <code>ros2 launch</code> process does not reliably shut down what it manages<span class="status-pill">Not yet filed</span></h4>
+        <p class="repo">Candidate repo: ros2/launch or ros2/launch_ros</p>
+        <dl>
+          <dt>Symptom</dt>
+          <dd>Sending SIGINT, then on timeout SIGTERM/SIGKILL, to a <code>Popen</code> handle for <code>ros2 launch gazebo_to_lerobot_bringup sim_full.launch.py</code> (started as a subprocess of &sect;14's orchestrator, itself running as a <em>different</em> launch file's <code>ExecuteProcess</code>) reported the process as exited cleanly &mdash; but Gazebo and <code>move_group</code>, the processes that inner launch file was managing, were still fully alive afterward, confirmed directly via <code>pgrep</code>. Interactive Ctrl+C on a foreground <code>ros2 launch</code> tears everything down correctly; a signal delivered programmatically to the process object apparently does not reach the same internal shutdown path.</dd>
+          <dt>Fix used here</dt>
+          <dd>Backstopped with an explicit <code>pkill</code> against the specific process patterns (<code>gz sim</code>, <code>move_group</code>, the inner launch files) after the signal-based attempt, rather than relying on <code>ros2 launch</code>'s own cascade.</dd>
+          <dt>Why it matters</dt>
+          <dd>Any orchestration that nests a <code>ros2 launch</code> invocation inside another script or launch file &mdash; not an exotic pattern, and exactly &sect;14's design &mdash; can leak Gazebo/node processes silently unless the caller independently tracks and kills what it started.</dd>
         </dl>
       </div>
     </section>
@@ -819,6 +917,47 @@ python3 scripts/run_pick_and_place.py --record \
 cat /tmp/my_episode/grasp_meta.json   <span class="c"># placed_on_plate, grasp_held, simulated_attachment</span></pre>
       <p class="callout"><b>For the full 20-episode batch instead of one episode:</b> <code>bash scripts/batch.sh 1 20</code> does all of the above per episode, from a clean sim restart, with up to 3 retries each; <code>bash scripts/status.sh</code> (run from the plain host shell) reports ground truth on how far it got.</p>
       <p class="callout"><b>To convert recorded bags into the dataset:</b> <code>python3 scripts/port_bag.py --out &lt;path&gt; --indices "1 2 3 ... 15"</code>, reading directly from each episode's bag, no <code>lerobot</code> package needed.</p>
+
+      <h3 style="margin-top:28px;font-size:1.15rem">Running the launch files instead, by hand</h3>
+      <p class="prose">Everything above (steps 1&ndash;7) is what &sect;14's <code>run_demo.py</code> now does automatically. To run it via the launch files instead:</p>
+      <pre><span class="c"># Copy the new files into the container if you haven't already (same convention as every other script here)</span>
+docker cp scripts/run_demo.py gazebo_to_lerobot:/workspace/htgpp/run_demo.py
+docker cp scripts/precompute_ik.py gazebo_to_lerobot:/workspace/htgpp/precompute_ik.py
+docker cp launch gazebo_to_lerobot:/workspace/htgpp/launch
+
+<span class="c"># Headless, exits with a pass/fail code -- run this one to just check it still works</span>
+docker exec -it gazebo_to_lerobot bash -c '
+  source /opt/ros/jazzy/setup.bash; source /workspace/install/setup.bash
+  ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py
+  echo "exit code: $?"'
+
+<span class="c"># With the GUI (needs an X/Wayland display reachable from the container -- not this machine)</span>
+docker exec -it gazebo_to_lerobot bash -c '
+  source /opt/ros/jazzy/setup.bash; source /workspace/install/setup.bash
+  ros2 launch /workspace/htgpp/launch/pick_and_place_demo.launch.py'
+
+<span class="c"># Try a different block position</span>
+ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py block_x:=0.28 block_y:=0.05
+
+<span class="c"># See every argument and its description</span>
+ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py --show-args</pre>
+
+      <p class="prose"><b>How to read the result.</b> The launch prints a boxed <code>RESULT</code> line near the end:</p>
+      <pre>[demo 14:19:10] ============================================================
+[demo 14:19:10] RESULT: motions_ok=True placed_on_plate=True grasp_held=True
+[demo 14:19:10] carry mechanism: SIMULATED ATTACHMENT (gz DetachableJoint), NOT a physical grasp
+[demo 14:19:10] ============================================================</pre>
+      <p class="prose">All three of <code>motions_ok</code>, <code>placed_on_plate</code> and <code>grasp_held</code> must be <code>True</code> for a pass. The same fields are also written to <code>demo/grasp_meta.json</code> under the project root, so a script can check the result without parsing log text:</p>
+      <pre>cat /workspace/htgpp/demo/grasp_meta.json
+<span class="c"># { "placed_on_plate": true, "grasp_held": true, "simulated_attachment": true, ... }</span></pre>
+      <p class="prose"><b>Checking <code>attach_mode</code> validation.</b> Any value other than <code>simulated</code> must fail immediately, before anything is launched:</p>
+      <pre>ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py attach_mode:=friction
+<span class="c"># -&gt; "attach_mode: only 'simulated' is currently supported. ..." exit code 2, nothing started</span></pre>
+      <p class="prose"><b>Confirming a clean teardown.</b> After the launch exits (or after Ctrl+C on the GUI variant), no simulation processes should remain:</p>
+      <pre>docker exec gazebo_to_lerobot bash -c 'pgrep -af "gz sim|move_group|sim_full"'
+<span class="c"># nothing printed = clean. Entries tagged &lt;defunct&gt; are already-dead zombie</span>
+<span class="c"># processes waiting to be reaped -- harmless, hold no resources, safe to ignore.</span></pre>
+      <p class="callout warn"><b>Running this for the first time on a fresh container?</b> &sect;10's pre-solved <code>waypoints/</code> directory isn't needed here: &sect;13's live-detection path solves IK for wherever the block actually lands, every time, for any position you pass.</p>
     </section>
 
     <section class="block" id="manifest">
@@ -832,13 +971,17 @@ cat /tmp/my_episode/grasp_meta.json   <span class="c"># placed_on_plate, grasp_h
 &#9500;&#9472;&#9472; models/<br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; red_block.sdf<span class="c">                     # &sect;1, &sect;8, &sect;9 (contact params + DetachableJoint)</span><br>
 &#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; plate.sdf<span class="c">                         # &sect;1, unchanged from spec</span><br>
+&#9500;&#9472;&#9472; launch/<span class="c">                             # &sect;15, the single ros2 launch entry point</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; pick_and_place_demo.launch.py<span class="c">     # gui:=true default, for the manager</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; pick_and_place_no_gui_demo.launch.py<span class="c">  # always headless, pass/fail exit code</span><br>
 &#9500;&#9472;&#9472; scripts/<br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; grab_frame.py<span class="c">                     # &sect;2, &sect;6 camera-frame verification</span><br>
-&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; ik_helper.py, precompute_ik.py<span class="c">   # &sect;3&ndash;4, moveit_py-only process</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; ik_helper.py, precompute_ik.py<span class="c">   # &sect;3&ndash;4, &sect;13, moveit_py-only process</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; run_pick_and_place.py<span class="c">            # &sect;5&ndash;6, &sect;9, plain-rclpy process</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; episode.sh, batch.sh<span class="c">             # &sect;10, the per-episode recording driver</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; status.sh<span class="c">                        # &sect;11, disk-ground-truth batch status</span><br>
-&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; port_bag.py<span class="c">                      # &sect;12, dataset conversion without torch</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; port_bag.py<span class="c">                      # &sect;12, dataset conversion without torch</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; run_demo.py<span class="c">                      # &sect;14, orchestrator behind both launch files</span><br>
 &#9500;&#9472;&#9472; contracts/<span class="c">                          # &sect;10, front-camera and held-out-camera rosetta contracts</span><br>
 &#9500;&#9472;&#9472; datasets/<span class="c">                           # &sect;12, meta/README tracked; parquet/mp4 payload gitignored</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; mycobot_pick_place_train/<br>
@@ -847,6 +990,6 @@ cat /tmp/my_episode/grasp_meta.json   <span class="c"># placed_on_plate, grasp_h
       <p class="prose">The recorded bags themselves (&asymp;1.7&nbsp;GB across 20 episodes) live only in the <code>gazebo_to_lerobot</code> container under <code>/workspace/htgpp/episodes/</code>, not in this repository and not in the dataset directories above &mdash; regenerable via <code>batch.sh</code>, not something to version-control.</p>
     </section>
 
-    <footer>Headless_Task-Grounded_Pick-and-Place_in_Gazebo report &middot; written 2026-09-22 &middot; commit f944dbe on main &middot; Tomislav Ilic</footer>
+    <footer>Headless_Task-Grounded_Pick-and-Place_in_Gazebo report &middot; written 2026-09-22 &middot; commit 5c92a565 on main &middot; Tomislav Ilic</footer>
   </main>
 </div>
