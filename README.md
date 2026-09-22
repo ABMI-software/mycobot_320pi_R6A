@@ -172,6 +172,8 @@ Topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (FR) (FR).
 | **Validated** | Real-time ROS 2 dashboard comparing inference against encoders |
 | **Validated** | Vision-guided pick-and-place, validated in simulation then replayed closed-loop on the physical bench — see [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) |
 | **Validated** | Structured metrology campaign, repeatability assessed against ISO 9283 |
+| **Validated** | Hand teleoperation — Orbbec Astra → Wilor → rosbridge → joint trajectory → robot, validated on the physical arm on 2026-04-22 — see [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) (FR) |
+| **In progress** | Teleoperation is currently **blocked on the system side**: a `fastcdr` ABI mismatch in the installed ROS 2 prevents rosbridge from starting |
 | **In progress** | Extrinsic recalibration exists as a node and a script ([`scripts/calibration_extrinseque_auto.py`](scripts/calibration_extrinseque_auto.py)) with leave-one-out self-check, but is not yet wired as an automatic startup step in any launch file |
 | **In progress** | Learned object detection: a YOLOv8 detector ([`scripts/yolo_object_detect.py`](scripts/yolo_object_detect.py)) is used by the live pick pipeline, but the ROS 2 node in the graph is still HSV-based |
 | **In progress** | Physical-grasp sorting in simulation: outcome is **not deterministic** at identical commanded geometry — see [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) |
@@ -268,9 +270,15 @@ ros2 launch mycobot_gateway synthetic_data_v3.launch.py
 # Precision benchmark — 9-target grid, CSV report
 ros2 launch mycobot_gateway precision_benchmark.launch.py
 
+# Hand teleoperation (simulation target; four terminals in all)
+ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim
+
 # Before any physical session
 bash scripts/real_robot_preflight.sh
 ```
+
+Teleoperation needs its own conda environment and three further terminals —
+the full sequence is in [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) (FR).
 
 The robot's board address is **not fixed**. Confirm it with a TCP round-trip on
 port 5005 before running anything that commands motion — a successful `ping`
@@ -333,6 +341,23 @@ Two cautions when reading any of it. An extrinsic's fit residual is **not** an
 accuracy — leave-one-out on a held-out marker is the honest figure. And a
 repeatability figure is not an absolute accuracy: they answer different
 questions and are routinely confused.
+
+## Documentation
+
+The repository carries 42 documents. The entry points, by domain — the full map
+is [`INDEX.md`](INDEX.md) (FR).
+
+| Domain | Start here |
+|---|---|
+| System topology | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (FR) |
+| Hand teleoperation | [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) (FR) — pipeline and status · [`docs/TELEOP_ARCHITECTURE_VIZ.md`](docs/TELEOP_ARCHITECTURE_VIZ.md) (FR) — detection to motion, step by step · [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) (FR) · [`docs/TELEOP_TUNING.md`](docs/TELEOP_TUNING.md) (FR) · [`docs/TELEOP_SIM_TESTING.md`](docs/TELEOP_SIM_TESTING.md) (FR) |
+| Physical robot | [`docs/REAL_ROBOT_TEST_PROCEDURE.md`](docs/REAL_ROBOT_TEST_PROCEDURE.md) (FR) — preflight, validated gains |
+| Pose estimation | [`training/dream/README.md`](training/dream/README.md) — training and evaluation · [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md) (FR) · [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md) (FR) · [`docs/DREAM_DIAGNOSTIC_BIAIS.md`](docs/DREAM_DIAGNOSTIC_BIAIS.md) (FR) |
+| Calibration and metrology | [`training/calibration/PROTOCOLE_ESSAIS_PRECISION.md`](training/calibration/PROTOCOLE_ESSAIS_PRECISION.md) (FR) · [`training/calibration/METHODOLOGIE_PRECISION.md`](training/calibration/METHODOLOGIE_PRECISION.md) (FR) · [`docs/CAMERA_CALIBRATION.md`](docs/CAMERA_CALIBRATION.md) (FR) |
+| Simulation and data | [`docs/SYNTHETIC_DATA.md`](docs/SYNTHETIC_DATA.md) (FR) · [`docs/GAZEBO_REAL_TABLE.md`](docs/GAZEBO_REAL_TABLE.md) (FR) · [`mycobot_description/README.md`](mycobot_description/README.md) (FR) |
+| Pick-and-place | [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) · [`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md) (FR) · [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) |
+| Deployment and diagnosis | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (FR) · [`docs/DEBUG_CONNECTION_GUIDE.md`](docs/DEBUG_CONNECTION_GUIDE.md) (FR) · [`docs/BRIDGE_PI_UPGRADE_GUIDE.md`](docs/BRIDGE_PI_UPGRADE_GUIDE.md) (FR) |
+| Where work stands | [`SESSION_RESUME.md`](SESSION_RESUME.md) (FR) |
 
 ## Roadmap
 

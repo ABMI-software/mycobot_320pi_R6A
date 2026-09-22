@@ -29,7 +29,8 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | Guide de démarrage rapide |
 | [docs/ROBOT_QUICKSTART.md](docs/ROBOT_QUICKSTART.md) | Démarrage côté robot physique |
 | [mycobot_gateway/README.md](mycobot_gateway/README.md) | README du package gateway (nœuds, launches, topics) |
-| [mycobot_description/README_GAZEBO.md](mycobot_description/README_GAZEBO.md) | README du package description (URDF, worlds Gazebo, caméras) |
+| [mycobot_description/README.md](mycobot_description/README.md) | README du package description — contenu, mondes, build |
+| [mycobot_description/README_GAZEBO.md](mycobot_description/README_GAZEBO.md) | Détail Gazebo : caméras du URDF, conventions droite/gauche, apparence réaliste |
 
 ### 🖐️ Téléopération par la main
 | Document | Description |
@@ -60,7 +61,7 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | Document | Description |
 |----------|-------------|
 | [docs/SIMULATION_GAZEBO_EXPLICATION.docx](docs/SIMULATION_GAZEBO_EXPLICATION.docx) | **Word, pour lecteur non-ROS.** À quoi sert la simulation, ce qui est simulé, comment les trois briques (Gazebo / ros2_control / nœud de tri) s'articulent, le cycle en 10 étapes, les quatre défauts que le banc a permis de trouver, et ce que la simulation ne dit **pas** du robot réel |
-| [docs/PICK_AND_PLACE_SIMULATION.md](docs/PICK_AND_PLACE_SIMULATION.md) | **Tri des quatre objets par saisie PHYSIQUE** (plus de téléportation) : résultat mesuré 4/4 en 115 s, tous à plat au fond de leur bac ; lancement, graphe ROS, géométrie de la pince en chiffres (point outil au centre des patins, ouverture et encombrement selon l'angle, les 6 valeurs du contrôleur), cycle en 10 étapes, et les trois contraintes non évidentes — bac vert par-dessus l'épaule, pointe plafonnée à ~140 mm, doigts qui entrent dans le bac mais ne peuvent pas s'y ouvrir |
+| [docs/PICK_AND_PLACE_SIMULATION.md](docs/PICK_AND_PLACE_SIMULATION.md) | **Tri des quatre objets par saisie PHYSIQUE** (plus de téléportation). ⚠ **L'issue n'est pas déterministe** (mesuré 22/09 sur 7 cycles : le cylindre sort du bac 4 fois sur 7 à géométrie commandée identique) — le 4/4 du 31/08 est un tirage, pas un état ; lancement, graphe ROS, géométrie de la pince en chiffres (point outil au centre des patins, ouverture et encombrement selon l'angle, les 6 valeurs du contrôleur), cycle en 10 étapes, et les trois contraintes non évidentes — bac vert par-dessus l'épaule, pointe plafonnée à ~140 mm, doigts qui entrent dans le bac mais ne peuvent pas s'y ouvrir |
 | [mycobot_description/README_GAZEBO.md](mycobot_description/README_GAZEBO.md) | Worlds disponibles : `pick_and_place.sdf` (mono) + `pick_and_place_sorting.sdf` (4 couleurs / 4 bacs) + visuels caméra |
 | [mycobot_gateway/README.md](mycobot_gateway/README.md) | Nœuds `pick_and_place_node`, `color_object_detector`, `sorting_orchestrator` + launches associés |
 | [README.md § Pick-and-place](README.md) | Section synthétique avec diagramme du pipeline sorting et résultats de validation 23/04/2026 |
@@ -69,10 +70,15 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | Document | Description |
 |----------|-------------|
 | [training/README.md](training/README.md) | Pipeline ML (régression directe legacy + DREAM actif) |
-| [training/dream/README.md](training/dream/README.md) | Module DREAM keypoint detection — VGG-19, checkpoint `vgg_ultimate_v4_mix_ft_e30` : 99.4% synthétique (50K), 91.6% réel (fine-tune mixte 50K synth + real_3cam ×5) |
+| [training/dream/README.md](training/dream/README.md) | Module DREAM keypoint detection — VGG-19, checkpoint courant `vgg_montage0901_ft_e30` (médiane 1,81 px, détection 100 % sur 800 images tenues à l'écart) ; le précédent `vgg_ultimate_v4_mix_ft_e30` reste la base du fine-tune |
 | [docs/DREAM_VALIDATION_DASHBOARD.md](docs/DREAM_VALIDATION_DASHBOARD.md) | Dashboard PyQt de validation live **multi-caméras** (Arducam + SVPRO, fusion *solve-then-fuse* par joint) : ce qu'il affiche (vues empilées, courbes enc vs DREAM, tableau keypoint fusionné + détection globale), 3 filtres temporels au choix (aucun défaut), poids solveur, mode cohérence, acquisition CSV. Inclut le graphe ROS2 ![png](training/dream/rqt_dream_multicam.png) |
 | [docs/DREAM_VALIDATION_LAUNCH.md](docs/DREAM_VALIDATION_LAUNCH.md) | Lancement : **launch unique `dream_multicam.launch.py`** (auto-détecte 1 ou 2 caméras) ou les 5 nœuds à la main, graphe nœuds/topics + rqt, **table de diagnostic** (quel symptôme → quel nœud manquant) + piège `.venv` |
 | [docs/SYNTHETIC_DATA.md](docs/SYNTHETIC_DATA.md) | Pipeline données synthétiques Gazebo + domain randomization v2 |
+| [docs/METHODOLOGIE_CAPTURE_FINETUNE.md](docs/METHODOLOGIE_CAPTURE_FINETUNE.md) | Méthode de capture des images réelles pour le fine-tune |
+| [docs/DREAM_DIAGNOSTIC_BIAIS.md](docs/DREAM_DIAGNOSTIC_BIAIS.md) | Diagnostic du biais systématique sur le banc de saisie |
+| [training/dream/FUSION_ANGLE_CALCUL.md](training/dream/FUSION_ANGLE_CALCUL.md) | Calcul des angles par fusion multi-vues |
+| [training/dream/VGG_ULTIMATE_V4_50K.md](training/dream/VGG_ULTIMATE_V4_50K.md) | Entraînement du checkpoint v4 sur 50K images |
+| [docs/GAZEBO_REAL_TABLE.md](docs/GAZEBO_REAL_TABLE.md) | Réplique Gazebo du plateau réel : dimensions, texture, marqueurs |
 | [datasets/README.md](datasets/README.md) | Documentation des datasets (synthétique 50K + réel 4K via Git LFS) |
 
 ### 📷 Calibration intrinsèque caméras (`feature/calibration-cam`)
@@ -85,6 +91,16 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | [training/calibration/probe_astra.py](training/calibration/probe_astra.py) | Probe Astra 15s (4 modes : raw / CLAHE / swap-RB / swap-RB+CLAHE) |
 | [training/calibration/cam_0.npz](training/calibration/cam_0.npz) · [.meta.json](training/calibration/cam_0.meta.json) | **K mesuré cam_0** : fx=525.67 fy=529.70 cx=317.73 cy=226.00 (RMS 0.67 px, 18 vues) |
 | [training/calibration/cam_3.npz](training/calibration/cam_3.npz) · [.meta.json](training/calibration/cam_3.meta.json) | **K mesuré cam_3** : fx=496.31 fy=494.14 cx=313.37 cy=248.01 (RMS 0.68 px, 21 vues) |
+
+### 📏 Précision et métrologie
+
+| Document | Description |
+|----------|-------------|
+| [training/calibration/PROTOCOLE_ESSAIS_PRECISION.md](training/calibration/PROTOCOLE_ESSAIS_PRECISION.md) | **Les treize essais**, chacun avec sa norme, son mode opératoire, son résultat et ses supports |
+| [training/calibration/METHODOLOGIE_PRECISION.md](training/calibration/METHODOLOGIE_PRECISION.md) | La méthode derrière les chiffres — ce que mesure une répétabilité ISO 9283, et ce qu'elle ne mesure pas |
+| [training/calibration/PRECISION_MYCOBOT_320PI.md](training/calibration/PRECISION_MYCOBOT_320PI.md) | Relevés de précision sur le bras |
+| [training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md](training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md) | Extrinsèque de l'Astra |
+| `training/calibration/*_2026-09-09.csv` | Données brutes de la campagne, **banc de Lyon** |
 
 ### 🏗️ Architecture
 | Document | Description |
@@ -99,6 +115,9 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | [docs/REAL_ROBOT_TEST_PROCEDURE.md](docs/REAL_ROBOT_TEST_PROCEDURE.md) | Protocole sur robot physique |
 | [docs/TEST_COMPLET.md](docs/TEST_COMPLET.md) | Procédure de test complète (legacy) |
 | [docs/TEST_ROBOT_PROCEDURE.md](docs/TEST_ROBOT_PROCEDURE.md) | Procédure détaillée robot (legacy) |
+| [docs/SESSION_TEST.md](docs/SESSION_TEST.md) | Session de test du bridge, configuration réseau |
+| [docs/PICK_AND_PLACE_REAL.md](docs/PICK_AND_PLACE_REAL.md) | Pick-and-place sur le robot physique |
+| [docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md](docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md) · [04](docs/PICK_AND_PLACE_HANDOFF_2026-06-04.md) | Comptes rendus datés, conservés tels quels |
 | [scripts/real_robot_preflight.sh](scripts/real_robot_preflight.sh) | Preflight 5 étapes avant toute session physique |
 
 ### 🐛 Débogage
@@ -117,6 +136,7 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 
 ---
 
-**Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (DREAM, calibration cam0/cam3 mesurée)
-**Mise à jour :** 20 août 2026 — asservissement visuel en boucle fermée, cycle
-pick-and-place complet validé sur robot réel (`feature/pick-and-place-osama`)
+**Version :** `v1.17.0` (premier tag du dépôt, 22/09/2026)
+**Mise à jour :** 22 septembre 2026 — section métrologie ajoutée, 17 documents
+qui manquaient à cet index recensés, et deux affirmations périmées corrigées
+(le tri 4/4 et le checkpoint DREAM).
