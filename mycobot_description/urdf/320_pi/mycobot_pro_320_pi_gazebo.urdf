@@ -586,6 +586,11 @@
       <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
     </inertial>
   </link>
+  <!-- « droite » et « gauche » sont celles de l'operateur, debout du cote de
+       la camera frontale (+X) et regardant le robot : +Y est alors a sa
+       droite, -Y a sa gauche. Ce sont donc les cotes opposes a ceux du robot
+       lui-meme, tourne vers +X. Ecrit ici parce que les deux lectures sont
+       defendables et que le collecteur v1 avait pris l'autre. -->
   <!-- ===== CAMERA 1 (front) — cam_0 intrinsics ===== -->
   <joint name="world_to_camera" type="fixed">
     <parent link="world"/>

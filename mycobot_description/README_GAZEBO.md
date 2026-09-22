@@ -76,6 +76,12 @@ Cette forme « caméra de surveillance » les rend visuellement distinctes des
 objets colorés à trier — important pour le pipeline `color_object_detector`
 qui segmente la scène par couleur.
 
+**Droite et gauche sont celles de l'opérateur**, debout du côté de la caméra
+frontale (+X) et regardant le robot : `camera_link_right` est en **+Y**,
+`camera_link_left` en **−Y**. Ce sont les côtés opposés à ceux du robot,
+tourné vers +X — les deux lectures étant défendables, c'est celle de
+l'opérateur qui fait foi dans ce dépôt.
+
 ## Gripper adaptatif
 
 Le gripper `pro_adaptive_gripper` d'Elephant Robotics est intégré au URDF Gazebo.

@@ -53,9 +53,13 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   zénithale. Seuls les noms de topics changent. Le commentaire qui appelait
   `cam_1` « left » contredisait le nom du joint (`world_to_camera_right`) et
   le collecteur v2 ; il est remplacé par la position géométrique (+Y / −Y /
-  zénith), factuelle et sans convention implicite. **Quel côté mérite le nom
-  « droite » reste à trancher** : vu depuis la caméra frontale, +Y est à
-  droite ; vu depuis le robot tourné vers +X, +Y est à sa gauche.
+  zénith). **Convention tranchée le 22/09 : droite et gauche sont celles de
+  l'opérateur**, debout du côté de la caméra frontale (+X) et regardant le
+  robot — +Y est donc à sa droite, soit les côtés opposés à ceux du robot,
+  tourné vers +X. Les noms de joints existants étaient déjà les bons ; c'est
+  le commentaire du collecteur v1 qui avait pris l'autre lecture. La
+  convention est désormais écrite dans le URDF, à côté des joints, et dans
+  `README_GAZEBO.md`.
 
 ### Corrigé — trois régressions d'intégration de la PR #9 (10/09)
 

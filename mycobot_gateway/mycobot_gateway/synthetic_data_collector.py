@@ -69,9 +69,9 @@ _CAM3_K = dict(
 # Virtual camera name → (ROS topic, camera settings dict)
 CAMERAS: Dict[str, tuple] = {
     'cam_0': ('/synth_camera/image',   _CAM0_K),   # front,  cam_0 intrinsics
-    'cam_1': ('/synth_camera_right/image', _CAM3_K),   # +Y side, cam_3 intrinsics
-    'cam_2': ('/synth_camera_left/image', _CAM0_K),    # -Y side, cam_0 intrinsics
-    'cam_3': ('/synth_camera_top/image', _CAM3_K),     # zenith,  cam_3 intrinsics
+    'cam_1': ('/synth_camera_right/image', _CAM3_K),   # +Y, operateur droite, cam_3
+    'cam_2': ('/synth_camera_left/image', _CAM0_K),    # -Y, operateur gauche, cam_0
+    'cam_3': ('/synth_camera_top/image', _CAM3_K),     # zenith, cam_3
 }
 
 

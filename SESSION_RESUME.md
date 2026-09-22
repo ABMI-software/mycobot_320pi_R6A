@@ -62,9 +62,10 @@ nouveaux** sur `main` — apport net vérifié identique, 44 fichiers.
 2. [ROUGE] **Rejouer le tri en simulation** : le dégagement des doigts n'a été
    chiffré que géométriquement, et le cylindre — le cas qui motive le
    correctif — ne gagne que 2,3 mm par doigt.
-3. [JAUNE] **Trancher quel côté mérite le nom « droite »** : +Y est à droite vu
-   depuis la caméra frontale, à gauche vu du robot tourné vers +X. Le collecteur
-   v1 et le nom du joint se contredisaient.
+3. [FAIT] **Quel côté mérite le nom « droite »** — tranché le 22/09 en faveur
+   du point de vue de l'opérateur (debout en +X, regardant le robot) : +Y est à
+   sa droite. Les noms de joints n'avaient pas à changer ; la convention est
+   maintenant écrite dans le URDF et `README_GAZEBO.md`.
 4. [JAUNE] **Débloquer rosbridge côté système** (désalignement ABI `fastcdr`).
 5. [VERT] Reprendre les actions du 09/09, aucune n'a avancé : affaissement à
    3 portées, cas *outil couché* du scotch, éclairage à 86 de luminance.
