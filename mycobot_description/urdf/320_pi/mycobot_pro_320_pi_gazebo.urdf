@@ -537,7 +537,7 @@
   </gazebo>
 
   <!-- cam_1: left view, cam_3 intrinsics -->
-  <link name="camera_link_1">
+  <link name="camera_link_right">
     <visual>
       <geometry><box size="0.03 0.03 0.03"/></geometry>
       <material name="cam1_green"><color rgba="0.2 0.8 0.2 1.0"/></material>
@@ -550,11 +550,11 @@
 
   <joint name="world_to_camera_right" type="fixed">
     <parent link="world"/>
-    <child link="camera_link_1"/>
+    <child link="camera_link_right"/>
     <origin xyz="0.0 1.1 0.4" rpy="0 0.3 -1.5708"/>
   </joint>
-  <gazebo reference="camera_link_1">
-    <sensor name="synth_camera_1" type="camera">
+  <gazebo reference="camera_link_right">
+    <sensor name="synth_camera_right" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
       <visualize>true</visualize>
@@ -568,13 +568,13 @@
           <s>0</s>
         </intrinsics>
       </camera>
-      <topic>synth_camera_1/image</topic>
+      <topic>synth_camera_right/image</topic>
     </sensor>
   </gazebo>
 
   <!-- cam_2: back view, cam_0 intrinsics -->
   <!-- Steeper pitch (0.50 rad) because distance is 0.7 m vs 0.8 m for front cam   -->
-  <link name="camera_link_2">
+  <link name="camera_link_left">
     <visual>
       <geometry><box size="0.03 0.03 0.03"/></geometry>
       <material name="cam2_red"><color rgba="0.8 0.2 0.2 1.0"/></material>
@@ -587,11 +587,11 @@
 
   <joint name="world_to_camera_left" type="fixed">
     <parent link="world"/>
-    <child link="camera_link_2"/>
+    <child link="camera_link_left"/>
     <origin xyz="0.0 -1.1 0.4" rpy="0 0.3 1.5708"/>
   </joint>
-  <gazebo reference="camera_link_2">
-    <sensor name="synth_camera_2" type="camera">
+  <gazebo reference="camera_link_left">
+    <sensor name="synth_camera_left" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
       <visualize>true</visualize>
@@ -605,12 +605,12 @@
           <s>0</s>
         </intrinsics>
       </camera>
-      <topic>synth_camera_2/image</topic>
+      <topic>synth_camera_left/image</topic>
     </sensor>
   </gazebo>
 
   <!-- cam_3: right view, cam_3 intrinsics -->
-  <link name="camera_link_3">
+  <link name="camera_link_top">
     <visual>
       <geometry><box size="0.03 0.03 0.03"/></geometry>
       <material name="cam3_yellow"><color rgba="0.8 0.8 0.2 1.0"/></material>
@@ -623,11 +623,11 @@
 
   <joint name="world_to_camera_top" type="fixed">
     <parent link="world"/>
-    <child link="camera_link_3"/>
+    <child link="camera_link_top"/>
     <origin xyz="0.0 0.0 1.0" rpy="0 1.5708 0"/>
   </joint>
-  <gazebo reference="camera_link_3">
-    <sensor name="synth_camera_3" type="camera">
+  <gazebo reference="camera_link_top">
+    <sensor name="synth_camera_top" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
       <visualize>true</visualize>
@@ -641,7 +641,7 @@
           <s>0</s>
         </intrinsics>
       </camera>
-      <topic>synth_camera_3/image</topic>
+      <topic>synth_camera_top/image</topic>
     </sensor>
   </gazebo>
 
