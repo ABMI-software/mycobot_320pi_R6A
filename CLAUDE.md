@@ -24,7 +24,7 @@ The full policy — when to trigger, which files to update, branch discipline, c
 **Hard boundaries:**
 - Branch must match the work's domain (see [`.claude/rules/git-branching.md`](.claude/rules/git-branching.md)). Mismatch → stop and ask.
 - Pushing is **never** automatic — only on explicit user instruction.
-- Skip backup files (`*.bak*`), local reports (`*.xlsx` in `teleop/`), build outputs, training checkpoints, runtime locks.
+- Skip backup files (`*.bak*`), build outputs, training checkpoints, runtime locks. `*.xlsx` workbooks are committable **on explicit approval only** — ask, never assume.
 
 For explicit mid-session invocation, use [`/finish-session`](.claude/commands/finish-session.md).
 

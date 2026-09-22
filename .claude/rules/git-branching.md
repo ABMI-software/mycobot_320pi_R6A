@@ -34,7 +34,7 @@ Include a `Co-Authored-By:` trailer when Claude helped write the code.
 
 ## Before pushing
 
-- `git status` — no stray files (`*.bak*`, `*.xlsx` reports, `__pycache__`)
+- `git status` — no stray files (`*.bak*`, `__pycache__`); an `*.xlsx` workbook only if the user approved it
 - Check `.gitignore` covers `results/`, `build/`, `install/`, `log/`
 - If you pushed *then* realize you forgot a file — make a new commit, not `--amend` + `--force`
 
