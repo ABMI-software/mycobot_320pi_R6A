@@ -1,0 +1,852 @@
+<!doctype html>
+<title>Headless Pick-and-Place Report</title>
+<meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --paper: #E9ECEA;
+  --surface: #FFFFFF;
+  --surface-sunk: #DEE3E0;
+  --ink: #172422;
+  --ink-soft: #4B5B57;
+  --ink-faint: #7C8985;
+  --line: #C4CBC7;
+  --accent: #146356;
+  --accent-ink: #0E4A40;
+  --accent-soft: #DBEAE6;
+  --verify: #8A5A12;
+  --verify-soft: #F1E6D3;
+  --bug: #9C3B23;
+  --bug-soft: #F3E1DA;
+  --code-bg: #10201D;
+  --code-text: #D9EDE8;
+  --code-accent: #7FD9C4;
+  --code-comment: #7C978F;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #10181685cc;
+    --paper: #101615;
+    --surface: #171F1D;
+    --surface-sunk: #0C1312;
+    --ink: #E7EDEA;
+    --ink-soft: #9FB0AB;
+    --ink-faint: #6C7C77;
+    --line: #2A3532;
+    --accent: #57C4AE;
+    --accent-ink: #7FD9C4;
+    --accent-soft: #14322C;
+    --verify: #D6A44B;
+    --verify-soft: #33270F;
+    --bug: #E08468;
+    --bug-soft: #3A1D15;
+    --code-bg: #0A1513;
+    --code-text: #CFEAE3;
+    --code-accent: #7FD9C4;
+    --code-comment: #5D766F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #101615;
+  --surface: #171F1D;
+  --surface-sunk: #0C1312;
+  --ink: #E7EDEA;
+  --ink-soft: #9FB0AB;
+  --ink-faint: #6C7C77;
+  --line: #2A3532;
+  --accent: #57C4AE;
+  --accent-ink: #7FD9C4;
+  --accent-soft: #14322C;
+  --verify: #D6A44B;
+  --verify-soft: #33270F;
+  --bug: #E08468;
+  --bug-soft: #3A1D15;
+  --code-bg: #0A1513;
+  --code-text: #CFEAE3;
+  --code-accent: #7FD9C4;
+  --code-comment: #5D766F;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding-inline: 20px;
+}
+
+h1, h2, h3, h4 { font-family: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif; text-wrap: balance; color: var(--ink); }
+
+.shell {
+  max-width: 1180px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 40px;
+  padding-block: 32px 80px;
+}
+
+/* ---------------------------------------------------------------- rail */
+.rail {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.rail-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+}
+.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail a {
+  display: flex;
+  gap: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+  line-height: 1.35;
+}
+.rail a:hover, .rail a:focus-visible { background: var(--surface-sunk); color: var(--ink); outline: none; }
+.rail a .n { color: var(--accent); font-weight: 600; flex-shrink: 0; }
+.rail .rail-group-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 16px 0 4px 8px;
+}
+.rail .rail-group-label:first-child { margin-top: 0; }
+
+/* ------------------------------------------------------------- content */
+main { min-width: 0; }
+
+.cover {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 28px;
+  margin-bottom: 36px;
+}
+.cover .eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+.cover h1 { font-size: 2.55rem; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
+.cover .dek { font-family: "IBM Plex Serif", serif; font-style: italic; font-size: 1.1rem; color: var(--ink-soft); max-width: 62ch; margin: 0 0 20px; }
+.cover .meta {
+  display: flex; flex-wrap: wrap; gap: 22px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+.cover .meta b { color: var(--ink-soft); font-weight: 600; }
+
+section.block { margin-bottom: 44px; }
+section.block > h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  scroll-margin-top: 20px;
+}
+section.block > .block-dek {
+  color: var(--ink-soft);
+  max-width: 68ch;
+  margin: 0 0 20px;
+}
+p { max-width: 70ch; }
+.prose { max-width: 70ch; }
+
+code, .mono { font-family: "IBM Plex Mono", monospace; }
+p code, li code, td code { background: var(--surface-sunk); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.88em; color: var(--accent-ink); }
+
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 14px 0;
+}
+pre .c { color: var(--code-comment); }
+pre .k { color: var(--code-accent); }
+
+/* ------------------------------------------------------------ tables */
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; background: var(--surface); }
+thead th {
+  text-align: left;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--surface-sunk);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody td:first-child { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--accent-ink); white-space: nowrap; }
+
+/* --------------------------------------------------------------- step */
+.step {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 22px 24px 24px;
+  margin-bottom: 18px;
+}
+.step-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.step-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+.step-head h3 { margin: 0; font-size: 1.18rem; font-weight: 600; }
+.step-purpose { color: var(--ink-soft); margin: 2px 0 16px; font-size: 0.95rem; }
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) { .panels { grid-template-columns: 1fr; } }
+.panel { border-radius: var(--radius); padding: 14px 16px 16px; }
+.panel.procedure { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+.panel.verify { background: var(--verify-soft); border: 1px solid color-mix(in srgb, var(--verify) 35%, transparent); }
+.panel-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin: 0 0 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.panel.procedure .panel-tag { color: var(--accent-ink); }
+.panel.verify .panel-tag { color: var(--verify); }
+.panel p, .panel ul, .panel pre { margin-top: 8px; margin-bottom: 8px; }
+.panel p:first-of-type { margin-top: 0; }
+.panel ul { padding-left: 18px; margin: 8px 0; }
+.panel li { margin-bottom: 4px; font-size: 0.94rem; }
+.panel pre { font-size: 12px; }
+
+/* ---------------------------------------------------------- bug cards */
+.bugcard {
+  border: 1px solid color-mix(in srgb, var(--bug) 35%, var(--line));
+  background: var(--bug-soft);
+  border-radius: 12px;
+  padding: 20px 22px 22px;
+  margin-bottom: 18px;
+}
+.bugcard h4 { margin: 0 0 4px; font-size: 1.08rem; color: var(--ink); }
+.bugcard .repo {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--bug);
+  margin: 0 0 14px;
+}
+.bugcard dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.bugcard dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 3px;
+  white-space: nowrap;
+}
+.bugcard dd { margin: 0; max-width: 62ch; }
+.bugcard pre { margin-top: 4px; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 3px 9px; border-radius: 999px;
+  margin-left: 8px;
+}
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+  padding: 12px 18px;
+  margin: 16px 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.callout b { color: var(--ink); }
+.callout.warn { border-left-color: var(--verify); }
+.callout.bug { border-left-color: var(--bug); }
+
+.ladder { display: flex; flex-direction: column; gap: 0; margin: 18px 0; }
+.rung {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.rung:first-child { border-top: none; }
+.rung .level {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+.rung.reached .level { color: var(--accent-ink); font-weight: 600; }
+.rung.stopped .level { color: var(--verify); font-weight: 600; }
+.rung h5 { margin: 0 0 4px; font-size: 1rem; }
+.rung p { margin: 0 0 6px; color: var(--ink-soft); font-size: 0.94rem; }
+.rung .tag {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 999px;
+  margin-bottom: 6px;
+}
+.rung.reached .tag { background: var(--accent-soft); color: var(--accent-ink); }
+.rung.stopped .tag { background: var(--verify-soft); color: var(--verify); }
+
+.manifest-tree {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+.manifest-tree .c { color: var(--code-comment); }
+.manifest-tree .k { color: var(--code-accent); }
+
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+  padding-top: 18px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { position: static; max-height: none; }
+  .cover h1 { font-size: 1.9rem; }
+}
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <p class="rail-eyebrow">Contents</p>
+    <nav>
+      <a href="#overview"><span class="n">&sect;</span>Overview</a>
+      <a href="#comparison"><span class="n">&sect;</span>Spec vs. implemented</a>
+      <p class="rail-group-label">Implementation</p>
+      <a href="#s1"><span class="n">01</span>Block &amp; plate SDF</a>
+      <a href="#s2"><span class="n">02</span>Spawn &amp; verify pose</a>
+      <a href="#s3"><span class="n">03</span>Cartesian IK helper</a>
+      <a href="#s4"><span class="n">04</span>Precompute waypoints</a>
+      <a href="#s5"><span class="n">05</span>Script the sequence</a>
+      <a href="#s6"><span class="n">06</span>Prove the grasp</a>
+      <a href="#s7"><span class="n">07</span>Where the block settles</a>
+      <a href="#s8"><span class="n">08</span>Friction-grasp experiment</a>
+      <a href="#s9"><span class="n">09</span>Simulated attachment</a>
+      <a href="#s10"><span class="n">10</span>Record 20 episodes</a>
+      <a href="#s11"><span class="n">11</span>Ground-truth status</a>
+      <a href="#s12"><span class="n">12</span>Dataset conversion</a>
+      <a href="#ladder"><span class="n">&sect;</span>Verification ladder</a>
+      <p class="rail-group-label">Reference</p>
+      <a href="#bugs-env"><span class="n">&sect;</span>Bugs fixed &mdash; session</a>
+      <a href="#bugs-upstream"><span class="n">&sect;</span>Bugs worth reporting</a>
+      <a href="#limits"><span class="n">&sect;</span>What this does not prove</a>
+      <a href="#manual"><span class="n">&sect;</span>Manual execution, start to finish</a>
+      <a href="#manifest"><span class="n">&sect;</span>File manifest</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="cover">
+      <p class="eyebrow">Headless_Task-Grounded_Pick-and-Place_in_Gazebo &mdash; implementation report</p>
+      <h1>Task-grounded pick-and-place, headless, from spec to twenty recorded episodes</h1>
+      <p class="dek">What was built against <code>doc/headless_pick_and_place_specification.md</code>, step by step, with the verification used for each step, every bug found along the way, and exactly where the delivered mechanism deviates from what the specification assumed &mdash; most importantly, that the grasp is a simulated attachment, not rigid-body contact physics.</p>
+      <div class="meta">
+        <span><b>Sandbox</b> ~/tomislav/robotics/Headless_Task-Grounded_Pick-and-Place_in_Gazebo</span>
+        <span><b>Host</b> Ubuntu WSL2, ~4.9&nbsp;GB usable RAM, CPU-only</span>
+        <span><b>Reproduced via</b> the <code>gazebo_to_lerobot</code> Docker container (Ubuntu 24.04, ROS2 Jazzy, Gazebo Harmonic)</span>
+        <span><b>Commit</b> f944dbe on <code>main</code></span>
+        <span><b>Written</b> 2026-09-22</span>
+      </div>
+    </div>
+
+    <section class="block" id="overview">
+      <h2>Overview</h2>
+      <p class="block-dek">This document is the implementation report for <code>headless_pick_and_place_specification.md</code> &mdash; the file in this same directory that was treated as a binding specification of design and verification <em>goals</em>, not of implementation details. Per the governing instruction under which this work was done, specific programming choices in that document were free to be replaced with better solutions; every goal had to be either achieved or explicitly reported as a problem.</p>
+      <p class="prose">The short version: every numbered step in the specification (Parts 1&ndash;8) was implemented and verified, twenty LeRobot-format episodes were recorded and split into a 15-episode training set and a 5-episode held-out-camera validation set, and the pipeline is fully self-verifying (a CSV-based pass/fail check runs at the end of every episode). The one load-bearing deviation is in the grasp mechanism itself: after a deliberate, bounded physics experiment produced no friction hold, the block is carried by a Gazebo <code>DetachableJoint</code> weld triggered on gripper-close and released on gripper-open &mdash; labelled <b>SIMULATED ATTACHMENT, NOT a physical grasp</b> everywhere it appears, in code comments, log lines, and every episode's own metadata. Four bugs were fixed in the arm-and-gripper sequencing path, three more in the recording-batch infrastructure, and two are flagged as worth reporting upstream.</p>
+      <p class="prose">This report follows the same structure as the runbooks in <code>Gazebo_to_LeRobot_Pipeline/docs/</code> and <code>ROS2_to_RLDS_Conversion_OpenVLA/docs/</code>: a step-by-step account pairing what was done with the concrete check that proves it, a reference section for bugs and limitations, and a manual, human-runnable walkthrough at the end.</p>
+    </section>
+
+    <section class="block" id="comparison">
+      <h2>Spec vs. implemented, part by part</h2>
+      <p class="block-dek">The specification's own part numbers, what each asked for, and exactly what was delivered against it. This is the section to read first if the only question is "did it do what the document said."</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Spec part</th><th>Asked for</th><th>Delivered</th></tr></thead>
+          <tbody>
+            <tr><td>Part 1</td><td>A standalone <code>red_block.sdf</code>: 0.05&nbsp;kg, 4&nbsp;cm cube, inertia 1.333e-05, &mu;=1.5, contact <code>kp</code>=1e6/<code>kd</code>=1.0.</td><td>Implemented verbatim, then extended: <code>kp</code>/<code>kd</code> were later softened to 5e4/50.0 during the grasp experiment (&sect;8) and a <code>DetachableJoint</code> plugin was added to the same file (&sect;9). &mu;, mass, size and inertia are unchanged from spec.</td></tr>
+            <tr><td>Part 2</td><td>Spawn at (0.25, 0.00, 0.05) via <code>ros_gz_sim create</code>; vary position across episodes (worked examples: x&isin;[0.22,0.28], one point at y=&minus;0.05).</td><td>Spawn command and primary pose match exactly. Position variation used x&isin;[0.25,0.31] and y&isin;[&minus;0.08,0.08] instead of the spec's range &mdash; see &sect;7, the elbow-up IK branch has no solution below x&asymp;0.245 on this arm.</td></tr>
+            <tr><td>Part 3</td><td>Two independent checks: numeric pose via <code>gz model -p</code>, visual via a saved camera frame.</td><td>Both implemented; <code>grab_frame.py</code> is close to the spec's own sketch. Used throughout, not just once (see &sect;2, &sect;6).</td></tr>
+            <tr><td>Part 4</td><td>A static <code>plate.sdf</code> (r=0.06, len=0.008), spawned at (0.20, &minus;0.15, 0.044), away from the block.</td><td>Implemented verbatim, unchanged throughout the project.</td></tr>
+            <tr><td>Part 5</td><td>A Cartesian IK helper via <code>moveit_py</code>'s <code>RobotState.set_from_ik</code>, rejecting the elbow-down branch, approaching from one consistent direction.</td><td>Implemented, with two corrections the spec's sketch didn't anticipate: the target link is <code>gripper_base</code>, not the spec's generic tip-link name (the naive choice drives the real fingertips underground &mdash; &sect;3); and <code>moveit_py</code> cannot share a process with a plain <code>rclpy</code> node, forcing an offline/online split not mentioned in the spec (&sect;3&ndash;4).</td></tr>
+            <tr><td>Part 6</td><td>An 8-phase scripted sequence; fixed timing constants (200&nbsp;ms command cooldown, 1.6&nbsp;s gripper interval, ~6% real-time factor); grasp height at block<sub>z</sub>+0.01.</td><td>10-phase sequence (adds an explicit gripper-open after home and a final home). Timing constants replaced: those are real-hardware TCP-bridge numbers, not applicable to a sim driven by the MoveGroup action; replaced with blocking on the actual action result plus closed-loop joint-error correction. Grasp height replaced with an empirically measured fingertip offset (&sect;7) because it targets <code>gripper_base</code>, not a generic fingertip frame.</td></tr>
+            <tr><td>Part 7</td><td>A CSV logger of block/end-effector pose; an automatic <code>grasp_held()</code> pass/fail on <code>dz</code> constancy; a lift-peak camera frame.</td><td>Implemented as specified, then hardened: the spec's own <code>dz</code>-constancy check trivially passes when the block never moves at all, which is exactly what happened before &sect;7&ndash;9 were fixed. <code>grasp_held()</code> now also requires the block to rise &ge;5&nbsp;cm &mdash; see the bugcard in &sect;6.</td></tr>
+            <tr><td>Part 8</td><td>Record via <code>rosetta</code>'s recorder with the instruction <i>"pick up the red block and place it on the plate"</i>; a first batch of 20 episodes (5 fixed, 5 x-varied, 5 y-varied, 5 with the camera moved, held out).</td><td>Implemented, with the concrete recorder interface differing sharply from the spec's sketch: <code>episode_recorder_node</code> is a ROS2 <b>lifecycle</b> node needing explicit <code>configure</code>&rarr;<code>activate</code> before its action server exists &mdash; not mentioned in the spec, found the hard way (&sect;10, and the upstream-bug candidate in &sect;bugs-upstream). The batch composition matches spec &sect;8.3's table exactly in structure; the x-variation range and the held-out condition (a literal second camera topic via a second contract) are concrete realizations of what the spec left general.</td></tr>
+            <tr><td>Part 9</td><td>Maps the work to the FDT work-order sub-studies.</td><td>Out of scope for this report by design &mdash; Part 9 is a business-case framing, not an engineering step, and stands as originally written.</td></tr>
+            <tr><td>Part 10</td><td>States the limits: simulated grasping is not real grasping (crude rigid-body contact); domain gap; scripted motion is not demonstration quality; 20 episodes is not a training set.</td><td>Exceeded, in the sense of ending up <em>below</em> even that stated limit: rigid-body contact physics could not produce a hold at all after a bounded experiment (&sect;8), so what ships is a simulated attachment, one level cruder than what Part&nbsp;10 assumed. The other three caveats (domain gap, scripted-motion quality, dataset size) still apply unchanged &mdash; restated in full in &sect;limits.</td></tr>
+            <tr><td>Appendix</td><td>An 8-step order of work, "roughly one week," flagging step&nbsp;5 (IK) as the most likely to overrun.</td><td>Step 5 did overrun, exactly as flagged &mdash; though the specific failure (the <code>moveit_py</code>/<code>rclpy</code> process conflict) wasn't the one anticipated. Step 8 (recording) also overran, for reasons the appendix didn't anticipate: container restarts across host suspends, the recorder lifecycle discovery bug, and cold-start controller races &mdash; all environment friction, not defects in the recording logic once fixed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="callout"><b>The one sentence that matters most:</b> every recorded episode is real arm motion, a real gripper close, and a real camera stream &mdash; but the block's carry is a scripted weld, not friction. Anyone using this dataset needs to know that before drawing conclusions about grasping.</p>
+    </section>
+
+    <!-- ===================================================== IMPLEMENTATION ===================================================== -->
+    <section class="block" id="pipeline-head">
+      <h2>The implementation, step by step</h2>
+      <p class="block-dek">Twelve steps, in the order they had to happen. Each pairs what was done with the check that proves it, and calls out where a bug was found and fixed along the way.</p>
+    </section>
+
+    <article class="step" id="s1">
+      <div class="step-head"><span class="step-num">01</span><h3>Author the block and the plate</h3></div>
+      <p class="step-purpose">Two standalone SDF models, spawned at runtime &mdash; nothing added to the world file, everything reversible.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>models/red_block.sdf</code> and <code>models/plate.sdf</code>, copied from the specification's own Parts&nbsp;1 and 4 essentially unchanged: block mass 0.05&nbsp;kg, 0.04&nbsp;m cube, diagonal inertia 1.333e-05, friction &mu;=&mu;2=1.5, contact <code>kp</code>=1e6/<code>kd</code>=1.0; plate a static 0.06&nbsp;m-radius, 0.008&nbsp;m-thick cylinder.</p>
+          <p>The block's contact stiffness and a <code>DetachableJoint</code> plugin were added later (&sect;8&ndash;9) &mdash; this step is the pure-spec baseline.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>gz sdf -k models/red_block.sdf
+gz sdf -k models/plate.sdf</pre>
+          <p>Both print nothing (valid) &mdash; the spec's own definition of done for step&nbsp;1, met exactly.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s2">
+      <div class="step-head"><span class="step-num">02</span><h3>Spawn headless and verify the pose</h3></div>
+      <p class="step-purpose">Two independent checks, per spec Part&nbsp;3: numeric pose and a visual camera frame.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>ros2 run ros_gz_sim create -world empty -file models/plate.sdf \
+  -name plate -x 0.20 -y -0.15 -z 0.044
+ros2 run ros_gz_sim create -world empty -file models/red_block.sdf \
+  -name red_block -x 0.25 -y 0.0 -z 0.05</pre>
+          <p><code>scripts/grab_frame.py</code> subscribes to <code>/synth_camera/image/compressed</code>, decodes with <code>cv2.imdecode</code>, saves with <code>cv2.imwrite</code> &mdash; adapted almost verbatim from the spec's own sketch.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>gz model --list
+gz model -m red_block -p</pre>
+          <p>Confirmed the block settles at exactly (0.250, 0.000, 0.020) in a fresh sim &mdash; consistent with the spec's own "Z settles slightly below spawn height is normal" case (half the 0.04&nbsp;m cube). The saved PNG confirmed the block genuinely red and resting on, not inside, the ground plane.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s3">
+      <div class="step-head"><span class="step-num">03</span><h3>Cartesian IK helper</h3></div>
+      <p class="step-purpose">The one piece of genuinely new code the spec flagged &mdash; and the step where two corrections beyond the spec's sketch were required.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>scripts/ik_helper.py</code> builds a <code>MoveItPy</code> instance and solves with <code>RobotState.set_from_ik(&quot;arm&quot;, target, TARGET_LINK, timeout=1.0)</code>, rejecting any solution with <code>J3 &ge; 0</code> (elbow-down) and retrying with a random seed, exactly per spec &sect;5.4. Seed chaining across waypoints (each call seeded with the previous solution instead of the default zero pose) keeps a whole sequence on one consistent branch.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p><code>fk_check()</code> cross-checks every IK solution by running forward kinematics on it: FK-of-IK reproduces the requested pose to &asymp;1e-7&nbsp;m.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Correction beyond the spec:</b> the sketch's target link is a placeholder name at the fingertip. The real target here is <code>gripper_base</code>, a TF frame whose fingertip offset had to be measured (&sect;7) &mdash; targeting <code>link6</code> or a naive fingertip name drives the real fingers underground. The top-down orientation quaternion is also frame-specific and was derived empirically by commanding a known-good <code>link6</code> pose and reading <code>gripper_base</code>'s resulting orientation via TF, not copied from the spec's <code>(1,0,0,0)</code>.</p>
+    </article>
+
+    <article class="step" id="s4">
+      <div class="step-head"><span class="step-num">04</span><h3>Precompute the waypoints offline</h3></div>
+      <p class="step-purpose">A better solution than the spec anticipated: <code>moveit_py</code> and a plain <code>rclpy</code> node cannot coexist in one process on this stack, so IK is solved once, offline, before the sequence ever imports <code>rclpy</code>.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>python3 scripts/precompute_ik.py \
+  --block-x 0.25 --block-y 0.00 --block-z 0.02 \
+  --tip-offset 0.105 --tip-dx -0.036 --hover 0.08</pre>
+          <p>Solves home/approach/descend/lift/transport/place/retreat in order, chaining each solution as the next seed, and writes <code>waypoints.json</code>. <code>--poses</code> batch-solves many block positions in one process for the recording batch (&sect;10).</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>Printed <code>J1</code>/<code>J3</code> per waypoint; a batch run is only accepted if every waypoint's <code>J1</code> stays within &plusmn;1.2&nbsp;rad and <code>J3&lt;0</code> &mdash; the elbow-up, forward-facing branch used for every recorded episode.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Not in the spec, discovered the hard way:</b> constructing <code>MoveItPy</code> in the same process as an explicit <code>rclpy.init()</code>+<code>Node</code> made the <code>MoveItPy</code> constructor hang indefinitely (reproducible across container restarts, ruling out stale DDS state); and separately, letting a <code>MoveItPy</code> instance be garbage-collected tears down its internal rclcpp context and silently breaks any other <code>rclpy</code> activity in that process. See the upstream-bug candidate in &sect;bugs-upstream.</p>
+    </article>
+
+    <article class="step" id="s5">
+      <div class="step-head"><span class="step-num">05</span><h3>Script the pick-and-place sequence</h3></div>
+      <p class="step-purpose"><code>scripts/run_pick_and_place.py</code> &mdash; plain <code>rclpy</code>, no <code>moveit_py</code> import, consuming <code>waypoints.json</code>.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>Ten phases (home &rarr; open &rarr; approach &rarr; descend &rarr; grasp &rarr; lift &rarr; transport &rarr; place &rarr; release &rarr; retreat &rarr; home). Each arm move goes through the real <code>MoveGroup</code> action and blocks on its result; <code>move_to_joints_closed_loop</code> re-issues a corrective move (up to 4 times) if the achieved joints differ from target by more than 0.02&nbsp;rad. The gripper command is republished every 0.5&nbsp;s while polling <code>/joint_states</code>, and accepts either reaching the target or stalling below &minus;0.1&nbsp;rad for 2&nbsp;s (object contact) as success.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>Every phase logs "move OK"/"move FAILED" from the action's own <code>error_code</code>, and a pose snapshot (block xyz, end-effector xyz, <code>dz</code>) is written after every phase &mdash; feeding the grasp-proof CSV in &sect;6.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Two more bugs fixed here, neither in the spec:</b> (1) <code>trajectory_execution.allowed_start_tolerance</code> at its default 0.01 in <code>mycobot_moveit_config/launch/move_group.launch.py</code> caused every execution after the first to fail with <code>CONTROL_FAILED</code>/"Apparently trajectory initialization failed" &mdash; raised to 0.2, fixed permanently in <code>Gazebo_to_LeRobot_Pipeline</code>. (2) The gripper command was originally published once, which is dropped by the classic ROS2 publisher/subscriber discovery race; fixed by republishing periodically.</p>
+    </article>
+
+    <article class="step" id="s6">
+      <div class="step-head"><span class="step-num">06</span><h3>Prove the grasp numerically</h3></div>
+      <p class="step-purpose">Spec Part&nbsp;7, implemented as specified &mdash; then found to have a real loophole and hardened.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>A CSV row per phase snapshot: <code>t, phase, bx, by, bz, ex, ey, ez, dz</code> (<code>dz = ee_z &minus; block_z</code>). A lift-peak camera frame is saved via <code>grab_frame.py</code> for visual corroboration, exactly per spec &sect;7.6.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>def grasp_held(rows, tol=0.008, min_rise=0.05):
+    lift = [r for r in rows if r["phase"] in ("lift", "transport")]
+    ref = lift[0]["dz"]
+    constant = all(abs(r["dz"] - ref) &lt; tol for r in lift)
+    rose = max(r["bz"] for r in lift) - descend["bz"] &gt; min_rise
+    return constant and rose</pre>
+        </div>
+      </div>
+      <p class="callout bug"><b>Loophole found in the spec's own check:</b> the specification's <code>grasp_held()</code> (&sect;7.5) checks only that <code>dz</code> stays constant. A block that never moves at all has a trivially constant <code>dz</code> &mdash; and that is exactly what several early runs produced (the gripper closed on empty air beside the block). The check now also requires the block to rise &ge;5&nbsp;cm during lift, which a stationary block cannot satisfy.</p>
+    </article>
+
+    <article class="step" id="s7">
+      <div class="step-head"><span class="step-num">07</span><h3>Where the block actually settles</h3></div>
+      <p class="step-purpose">The finding that explained why early grasp attempts closed on empty air: the spec's nominal spawn coordinates are not where the gripper needs to be.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>Measured, via TF and <code>gz model -p</code>, at a known-good hover pose with the gripper open: fingertip joint origins sit <b>&asymp;0.10&nbsp;m below <code>gripper_base</code></b> when pointing down, and the finger pair's meeting point in x is <b>&asymp;0.036&nbsp;m ahead of <code>gripper_base</code></b>, asymmetric because <code>left1</code>/<code>right1</code> sit at &minus;0.048/+0.080 relative to it. <code>precompute_ik.py</code>'s <code>--tip-offset 0.105 --tip-dx -0.036</code> defaults encode these two measurements directly.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>With the correction applied, the gripper's closing fingers made contact with the block for the first time in this project (stalling at a non-zero joint position instead of reaching fully closed) &mdash; the first evidence that geometry, not friction, had been the blocking issue all along.</p>
+        </div>
+      </div>
+      <p class="callout"><b>Practical consequence for &sect;2's position-variation range:</b> the elbow-up IK branch has no solution below x&asymp;0.245 once this offset is folded in, which is why the recorded episodes vary x over [0.25, 0.31] rather than the spec's suggested [0.22, 0.28].</p>
+    </article>
+
+    <article class="step" id="s8">
+      <div class="step-head"><span class="step-num">08</span><h3>Attempt a physical friction grasp &mdash; bounded experiment, negative result</h3></div>
+      <p class="step-purpose">One controlled variable, three clean-restart runs, as instructed, before concluding a friction grasp was not achievable in this sim in the time available.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>Block contact softened from <code>kp</code>=1e6/<code>kd</code>=1.0 to <code>kp</code>=5e4/<code>kd</code>=50.0; gripper squeeze target tested at &minus;0.40, &minus;0.55 and &minus;0.70 (of a &minus;0.70 fully-closed range). Grasp geometry held fixed at the &sect;7 offsets. Every run started from a full sim restart and a fresh block spawn.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Run</th><th>Squeeze target</th><th>Gripper stall</th><th>Block held?</th></tr></thead>
+              <tbody>
+                <tr><td>A</td><td>&minus;0.40</td><td>&minus;0.334</td><td>No &mdash; unchanged through lift</td></tr>
+                <tr><td>B</td><td>&minus;0.55</td><td>&minus;0.375</td><td>No &mdash; unchanged through lift</td></tr>
+                <tr><td>C</td><td>&minus;0.70</td><td>&minus;0.201</td><td>No &mdash; unchanged through lift</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <p class="callout warn"><b>Reported as a problem, per the governing instruction:</b> softening the contact removed the disturbance symptom seen earlier (the block popping or being punted on closure) but did not produce a hold in any of the three runs. The stall position did not track the squeeze target monotonically across runs, which argues against tuning further inside this same envelope. This is the one specification goal &mdash; a rigid-body friction grasp &mdash; not achieved.</p>
+    </article>
+
+    <article class="step" id="s9">
+      <div class="step-head"><span class="step-num">09</span><h3>Simulated attachment &mdash; the mechanism actually used</h3></div>
+      <p class="step-purpose">Since a friction grasp was not achievable in the time available, the block is carried by an explicit, clearly-labelled scripted weld instead.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>A <code>gz-sim-detachable-joint-system</code> plugin in <code>red_block.sdf</code>, welding the block to the robot's <code>link6</code> on a message to <code>/htgpp/attach</code> (published right after the gripper closes) and releasing on <code>/htgpp/detach</code> (at the place pose). Every call is logged with the literal string <code>SIMULATED ATTACHMENT</code>, and <code>grasp_meta.json</code> carries <code>"simulated_attachment": true</code> for every episode.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>Block z: 0.0200 &rarr; 0.099 (lift) &rarr; 0.152 (transport) &rarr; 0.068 (on the plate), with <code>dz</code> constant through lift and transport and the &ge;5&nbsp;cm rise requirement from &sect;6 satisfied. Final block pose landed inside the plate's radius and at plate-top-plus-half-block height.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Gazebo quirk found here:</b> <code>gripper_base</code> is a TF/URDF frame only &mdash; the URDF-to-SDF conversion lumps it into the <code>link6</code> Gazebo link, so it does not exist as a spawnable-model link name. A <code>DetachableJoint</code> with <code>child_link: gripper_base</code> accepts the attach message and silently does nothing, with no error or warning of any kind. See the upstream-bug candidate in &sect;bugs-upstream.</p>
+    </article>
+
+    <article class="step" id="s10">
+      <div class="step-head"><span class="step-num">10</span><h3>Record twenty episodes</h3></div>
+      <p class="step-purpose"><code>scripts/episode.sh</code>/<code>batch.sh</code>: a per-episode clean-restart driver, matching spec &sect;8.3's batch table.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>Per episode: kill and relaunch the whole sim stack, spawn plate and block, wait for all three controllers <code>active</code>, launch <code>move_group</code>, configure and activate <code>episode_recorder_node</code>, then run the sequence with <code>--record</code>. Up to 3 attempts per episode. Two contracts: <code>mycobot_pick_place.yaml</code> (front camera) for episodes 1&ndash;15, <code>mycobot_pick_place_heldout.yaml</code> (<code>/synth_camera_right</code>) for 16&ndash;20 &mdash; both add the gripper joint to <code>observation.state</code>/<code>action</code>, which the source contract in <code>Gazebo_to_LeRobot_Pipeline</code> does not.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>20/20 episodes ended with <code>run_exit_code=0</code>, <code>placed_on_plate=true</code>, <code>grasp_held=true</code>, and a non-empty <code>.mcap</code> bag &mdash; see &sect;11's <code>status.sh</code> output.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Three infrastructure bugs found and fixed during this batch, none in the spec:</b></p>
+      <ul style="max-width:70ch;color:var(--ink-soft)">
+        <li><b>Recorder lifecycle:</b> <code>episode_recorder_node</code> is a ROS2 lifecycle node; its <code>record_episode</code> action does not exist until it is explicitly <code>configure</code>d and <code>activate</code>d. The spec's sketch (a plain <code>ros2 run</code> with an immediately-usable action) does not mention this.</li>
+        <li><b>Stale <code>ros2cli</code> discovery:</b> the plain <code>ros2 lifecycle set</code>/<code>ros2 action list</code> commands reported the recorder node as absent even while it was demonstrably running and configured; <code>--no-daemon --spin-time 15</code> forces fresh discovery and fixed it &mdash; see the upstream-bug candidate.</li>
+        <li><b>Cold-start controller races:</b> the three <code>ros2_control</code> spawners (<code>joint_state_broadcaster</code>, <code>mycobot_controller</code>, <code>gripper_position_controller</code>) launched in parallel sometimes all time out fighting over the controller manager's lock. Fixed with a sequential-respawn fallback, one controller at a time, when the parallel launch doesn't converge within 60&nbsp;s.</li>
+      </ul>
+    </article>
+
+    <article class="step" id="s11">
+      <div class="step-head"><span class="step-num">11</span><h3>Ground-truth batch status</h3></div>
+      <p class="step-purpose"><code>scripts/status.sh</code> &mdash; not requested by the specification, added because the recording batch spanned multiple container restarts (host suspends) and self-reported progress had to be independently checkable from disk.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>Runs from the plain host shell, no attached session needed. For each of episodes 1&ndash;20 it reads <code>grasp_meta.json</code>'s own exit-code/verdict fields and checks for a non-empty <code>.mcap</code> bag file &mdash; never from memory or from a previous session's notes. It also compares wall-clock time elapsed since the container started against PID&nbsp;1's monotonic uptime (a clock that does not advance during a host suspend), so a suspend shows up as a gap between the two.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>bash scripts/status.sh
+<span class="c">## PASSED=20  FAILED=0  IN-PROGRESS=0  MISSING=0  (sum=20 of 20)</span></pre>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s12">
+      <div class="step-head"><span class="step-num">12</span><h3>Convert to a LeRobot-layout dataset, without torch</h3></div>
+      <p class="step-purpose">Not in the spec at all (Part 8 assumes an existing <code>rosetta_port</code>/<code>lerobot</code> toolchain); built here because that toolchain needs <code>torch</code>, which this machine could not install reliably.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>scripts/port_bag.py</code> reads each episode's <code>.mcap</code> bag directly with <code>rosbag2_py</code>, hold-aligns <code>/joint_states</code> to each camera frame's timestamp (matching the contract's own <code>align.strategy: hold</code>), and writes the documented LeRobot v3.0 layout with <code>pyarrow</code> (parquet) and <code>ffmpeg</code> (mp4) &mdash; no <code>lerobot</code>/<code>torch</code> import anywhere.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p><code>mycobot_pick_place_train</code> (episodes 1&ndash;15, front camera): 2670 frames. <code>mycobot_pick_place_heldout</code> (16&ndash;20, right camera): 927 frames. <code>ffprobe</code> on one clip: 320&times;240, 174 frames, 5.8&nbsp;s &mdash; matches the frame count at 30&nbsp;fps exactly.</p>
+        </div>
+      </div>
+      <p class="callout warn"><b>Deferred, not skipped:</b> this has not been loaded through the real <code>LeRobotDataset</code> class &mdash; that check needs <code>torch</code> and happens on the GPU machine. See <code>datasets/README.md</code> for the same note kept alongside the data itself.</p>
+    </article>
+
+    <!-- ===================================================== LADDER ===================================================== -->
+    <section class="block" id="ladder">
+      <h2>Verification ladder</h2>
+      <p class="block-dek">Each rung strictly depends on the one below it. The pipeline reaches every rung the specification asked for; the one it does not reach is the crude rigid-body grasp Part&nbsp;10 itself anticipated as the ceiling.</p>
+      <div class="ladder">
+        <div class="rung reached">
+          <div class="level">Level&nbsp;0</div>
+          <div><span class="tag">Passed</span><h5>Scene is physically valid</h5><p>Block and plate spawn, settle, and are visible and correctly coloured in a saved camera frame (&sect;2).</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Level&nbsp;1</div>
+          <div><span class="tag">Passed</span><h5>Arm reaches commanded Cartesian points</h5><p>IK solves on the elbow-up branch with FK-of-IK error &asymp;1e-7&nbsp;m; the real <code>MoveGroup</code> action reports success for every phase of every recorded episode (&sect;3&ndash;5).</p></div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Level&nbsp;2</div>
+          <div><span class="tag">Stopped here</span><h5>Rigid-body friction grasp holds the block</h5><p>Not achieved after a bounded, three-run experiment varying contact stiffness and squeeze effort (&sect;8). This is the one specification goal genuinely not met.</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Level&nbsp;3</div>
+          <div><span class="tag">Passed, by substitution</span><h5>The block is carried and placed, verifiably</h5><p>Via the simulated <code>DetachableJoint</code> attachment (&sect;9), satisfying the &sect;6 pass/fail (constant <code>dz</code>, &ge;5&nbsp;cm rise) &mdash; but this is scripted attachment, not physics, and is labelled as such everywhere it appears.</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Level&nbsp;4</div>
+          <div><span class="tag">Passed</span><h5>20 episodes recorded with a truthful instruction</h5><p>Every episode's bag exists, is non-empty, and its own <code>grasp_meta.json</code> confirms success &mdash; independently re-checkable at any time via <code>status.sh</code> (&sect;10&ndash;11).</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Level&nbsp;5</div>
+          <div><span class="tag">Passed</span><h5>Episodes converted to the documented dataset layout</h5><p><code>port_bag.py</code>, without <code>torch</code> (&sect;12).</p></div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Level&nbsp;6</div>
+          <div><span class="tag">Not attempted here</span><h5>Loaded and validated through the real <code>LeRobotDataset</code> class</h5><p>Needs <code>torch</code>; deferred to the GPU machine by design (&sect;12).</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== BUGS ===================================================== -->
+    <section class="block" id="bugs-env">
+      <h2>Bugs fixed &mdash; session-specific</h2>
+      <p class="block-dek">Symptoms of this exact environment (a 4.9&nbsp;GB CPU-only WSL2 laptop running one long-lived container), not defects in any upstream project. Listed so a re-run hits the same wall for a shorter time.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Symptom</th><th>Root cause</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td>Every <code>MoveGroup</code> execution after the first fails with <code>CONTROL_FAILED</code></td><td><code>trajectory_execution.allowed_start_tolerance</code> default (0.01) too tight for this environment's start-state lag</td><td>Raised to 0.2 in <code>Gazebo_to_LeRobot_Pipeline/src/mycobot_moveit_config/launch/move_group.launch.py</code></td></tr>
+            <tr><td>Gripper command silently has no effect</td><td>One-shot publish dropped by the publisher/subscriber discovery race</td><td>Republish every 0.5&nbsp;s while polling <code>/joint_states</code></td></tr>
+            <tr><td>Gripper never reports "reached target" while genuinely holding an object</td><td>A held object stops the fingers short of the fully-closed value</td><td>Accept a &ge;2&nbsp;s stall below &minus;0.1&nbsp;rad as success, not just reaching the target exactly</td></tr>
+            <tr><td>Grasp attempts closed on empty air next to the block</td><td>The spec's nominal spawn coordinates are not where the fingers meet (&sect;7's &asymp;0.10&nbsp;m/&asymp;0.036&nbsp;m offsets)</td><td>Measured the offsets via TF and folded them into <code>precompute_ik.py</code></td></tr>
+            <tr><td><code>base</code>&rarr;<code>gripper_base</code> TF disappears after &asymp;1.5&nbsp;h of sim uptime</td><td>Not isolated &mdash; correlates with memory pressure (3.4/4.9&nbsp;GB in use)</td><td>Full stack restart before every episode; never reuse a long-lived sim across episodes</td></tr>
+            <tr><td>Container and its processes die mid-run with multi-hour gaps in ROS log timestamps</td><td>Host suspend/resume (WSL2 pauses the VM's clock; wall-clock timestamps jump on resume, monotonic ones don't)</td><td>Every batch script checks liveness with a bounded timeout, never a marker file alone; <code>status.sh</code> makes a suspend visible after the fact</td></tr>
+            <tr><td><code>pip install lerobot==0.6.0</code> pulls a full CUDA/triton dependency tree and is repeatedly killed</td><td>No <code>--index-url</code> restriction on that package's transitive deps, unlike the CPU-only <code>torch</code> install step</td><td>Abandoned the <code>lerobot</code>/<code>torch</code> install entirely; wrote the dataset directly with <code>pyarrow</code>+<code>ffmpeg</code> (&sect;12)</td></tr>
+            <tr><td>Three parallel controller spawners intermittently time out on cold start</td><td>Contention for the controller manager's internal lock/service under this VM's slow real-time factor</td><td>Sequential one-at-a-time respawn fallback when the parallel launch doesn't converge in 60&nbsp;s</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block" id="bugs-upstream">
+      <h2>Bugs worth reporting upstream</h2>
+      <p class="block-dek">Three defects that reproduce independent of this VM &mdash; real friction in code other teams depend on. <b>Filing the actual issues has not been done</b> and needs a separate explicit go-ahead.</p>
+
+      <div class="bugcard">
+        <h4><code>MoveItPy</code> cannot share a process with a plain <code>rclpy</code> node<span class="status-pill">Not yet filed</span></h4>
+        <p class="repo">Candidate repo: moveit/moveit2 (moveit_py)</p>
+        <dl>
+          <dt>Symptom</dt>
+          <dd>Constructing <code>moveit.planning.MoveItPy</code> in a process where <code>rclpy.init()</code> has already been called (to also run a plain <code>Node</code>) makes the <code>MoveItPy</code> constructor hang indefinitely, with near-zero CPU, stuck at the same internal log line every time &mdash; reproducible across multiple attempts and a full container restart, which rules out stale DDS state. Separately, even when <code>MoveItPy</code> is constructed first: if the caller lets the <code>MoveItPy</code> instance be garbage-collected (e.g. a helper function that returns only <code>.get_robot_model()</code>), its destructor logs "Deleting MoveItCpp" and tears down an internal rclcpp executor/context that a <em>separately created</em> <code>rclpy</code> Node in the same process was depending on &mdash; that Node then stops receiving any further messages, silently.</dd>
+          <dt>Fix used here</dt>
+          <dd>Architectural split: <code>precompute_ik.py</code> imports only <code>moveit_py</code>, solves every waypoint needed, and exits; <code>run_pick_and_place.py</code> imports only <code>rclpy</code> and consumes the resulting JSON. The two processes never coexist.</dd>
+          <dt>Why it matters</dt>
+          <dd>Nothing in <code>moveit_py</code>'s public API documents that it cannot coexist with independent <code>rclpy</code> activity in the same process, or that keeping the object alive is load-bearing for anything beyond its own use. Both failure modes are silent &mdash; a hang with no error, and a working script that quietly stops receiving messages.</dd>
+        </dl>
+      </div>
+
+      <div class="bugcard">
+        <h4><code>ros2 lifecycle</code>/<code>ros2 action</code> CLI report a running, configured node as absent<span class="status-pill">Not yet filed</span></h4>
+        <p class="repo">Candidate repo: ros2/ros2cli</p>
+        <dl>
+          <dt>Symptom</dt>
+          <dd><code>ros2 lifecycle set /episode_recorder configure</code> and <code>ros2 action list</code> both reported the node/action as not found, immediately after the node's own log confirmed it had started ("Node created (unconfigured)") and while <code>ros2 node list</code> in the same shell showed it present. The daemon-backed default discovery appears to serve a stale cache in this environment.</dd>
+          <dt>Fix used here</dt>
+          <dd><code>ros2 lifecycle set --no-daemon --spin-time 15 /episode_recorder configure</code> (and the same for <code>activate</code>) &mdash; forcing fresh discovery instead of relying on the background daemon's cache resolved it every time.</dd>
+          <dt>Why it matters</dt>
+          <dd>This produced a hard, unexplained failure (<code>FATAL: RECORDER_CONFIGURE_FAILED</code>) on a node that was demonstrably healthy, and cost real debugging time before the daemon-cache explanation was found. A stale discovery cache with no visible staleness indicator is a sharp edge for any lifecycle-node workflow driven by the CLI.</dd>
+        </dl>
+      </div>
+
+      <div class="bugcard">
+        <h4><code>gz-sim-detachable-joint-system</code> silently no-ops on a non-model <code>child_link</code><span class="status-pill">Not yet filed</span></h4>
+        <p class="repo">Candidate repo: gazebosim/gz-sim</p>
+        <dl>
+          <dt>Symptom</dt>
+          <dd>Setting <code>&lt;child_link&gt;gripper_base&lt;/child_link&gt;</code> on a <code>DetachableJoint</code> plugin &mdash; a name that is a valid TF frame but, after URDF-to-SDF conversion, is lumped into the <code>link6</code> Gazebo link and does not exist as its own spawnable model link &mdash; produces no error and no warning. The attach topic accepts the message; nothing attaches; the block simply does not move on lift, indistinguishable at the log level from a genuine physics failure.</dd>
+          <dt>Fix used here</dt>
+          <dd>Retargeted <code>child_link</code> to <code>link6</code>, the real Gazebo link, found by listing the model's actual links with <code>gz model -m mycobot_320 --link</code>.</dd>
+          <dt>Why it matters</dt>
+          <dd>This cost a full debugging cycle that looked identical to the earlier, genuine friction-grasp failure (&sect;8) &mdash; both present as "the block didn't move." A link-name validation error at plugin load time (the same information <code>gz model --link</code> already prints) would have caught this immediately instead.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="block" id="limits">
+      <h2>What this does not prove</h2>
+      <p class="block-dek">Restating spec Part&nbsp;10 in full, and adding what changed.</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)">
+        <li><b>The carried block is not a physical grasp of any kind.</b> This is stronger than the spec's own caveat (crude rigid-body contact) &mdash; even rigid-body contact could not be made to hold in the time available (&sect;8). Any model trained on this data learns "approach, close near the block, carry it, open," not the physics of grasping.</li>
+        <li><b>Sim-trained data carries a visual domain gap</b>, unchanged from the spec: Gazebo's renderer differs from a real camera, and this project's own DREAM result (10.9%&rarr;91.6% real detection only after mixing in real data) is direct evidence that synthetic-only training degrades badly on real images.</li>
+        <li><b>Scripted motion is not demonstration quality</b>, unchanged from the spec: a human teleoperator produces natural correction and hesitation; this script produces the same trajectory shape every time, varying only the target position.</li>
+        <li><b>Twenty episodes is not a training set</b>, unchanged from the spec: the community figure for fine-tuning is 100&ndash;500 per task. This is a smoke test with real semantics, not a dataset ready for training.</li>
+        <li><b>Not yet loaded through the real <code>LeRobotDataset</code> class</b> (new, &sect;12) &mdash; the on-disk layout is written to the documented spec but not proven to load until that check runs on a machine with <code>torch</code>.</li>
+      </ul>
+      <p class="prose"><b>What this does prove, precisely:</b> the pipeline can produce structurally sound, self-verifying, task-grounded episodes with a truthful instruction, entirely headless, on hardware with no GPU at all &mdash; and it surfaces, honestly, that the grasp itself is not yet physical. That was worth establishing before any real-robot recording session is planned.</p>
+    </section>
+
+    <!-- ===================================================== MANUAL ===================================================== -->
+    <section class="block" id="manual">
+      <h2>Manual execution, start to finish</h2>
+      <p class="block-dek">Every command a person would type, in order, to reproduce one recorded episode by hand &mdash; consolidating the Procedure panels above into a single walkthrough. All of it runs inside the <code>gazebo_to_lerobot</code> container (<code>docker exec -it gazebo_to_lerobot bash</code>), with <code>source /opt/ros/jazzy/setup.bash; source /workspace/install/setup.bash</code> first in every new shell.</p>
+      <pre><span class="c"># 1. Bring up the sim stack and wait for controllers</span>
+ros2 launch gazebo_to_lerobot_bringup sim_full.launch.py &amp;
+until ros2 control list_controllers | grep -q "mycobot_controller.*active"; do sleep 5; done
+
+<span class="c"># 2. Spawn the scene</span>
+ros2 run ros_gz_sim create -world empty -file models/plate.sdf -name plate -x 0.20 -y -0.15 -z 0.044
+ros2 run ros_gz_sim create -world empty -file models/red_block.sdf -name red_block -x 0.25 -y 0.0 -z 0.0205
+sleep 20   <span class="c"># let it settle</span>
+gz model -m red_block -p   <span class="c"># confirm it settled near (0.25, 0.00, 0.02)</span>
+
+<span class="c"># 3. Solve IK offline (moveit_py only, no rclpy)</span>
+python3 scripts/precompute_ik.py --block-x 0.25 --block-y 0.00
+
+<span class="c"># 4. Bring up MoveIt2's move_group and wait for it to be ready</span>
+ros2 launch mycobot_moveit_config move_group.launch.py &amp;
+<span class="c"># wait for "You can start planning now!" in its log</span>
+
+<span class="c"># 5. Start the recorder and bring it to the active lifecycle state</span>
+ros2 run rosetta episode_recorder_node --ros-args \
+  -p contract_path:=contracts/mycobot_pick_place.yaml \
+  -p bag_base_dir:=/tmp/my_episode/bag &amp;
+ros2 lifecycle set --no-daemon --spin-time 15 /episode_recorder configure
+ros2 lifecycle set --no-daemon --spin-time 15 /episode_recorder activate
+
+<span class="c"># 6. Run the sequence (plain rclpy, no moveit_py)</span>
+python3 scripts/run_pick_and_place.py --record \
+  --prompt "pick up the red block and place it on the plate" \
+  --log /tmp/my_episode/grasp_log.csv --meta /tmp/my_episode/grasp_meta.json
+
+<span class="c"># 7. Read the verdict</span>
+cat /tmp/my_episode/grasp_meta.json   <span class="c"># placed_on_plate, grasp_held, simulated_attachment</span></pre>
+      <p class="callout"><b>For the full 20-episode batch instead of one episode:</b> <code>bash scripts/batch.sh 1 20</code> does all of the above per episode, from a clean sim restart, with up to 3 retries each; <code>bash scripts/status.sh</code> (run from the plain host shell) reports ground truth on how far it got.</p>
+      <p class="callout"><b>To convert recorded bags into the dataset:</b> <code>python3 scripts/port_bag.py --out &lt;path&gt; --indices "1 2 3 ... 15"</code>, reading directly from each episode's bag, no <code>lerobot</code> package needed.</p>
+    </section>
+
+    <section class="block" id="manifest">
+      <h2>File manifest</h2>
+      <p class="block-dek">What's actually tracked in git under this directory, and what each piece is for.</p>
+      <div class="manifest-tree">Headless_Task-Grounded_Pick-and-Place_in_Gazebo/<br>
+&#9500;&#9472;&#9472; doc/<span class="c">                                    # this report and the source specification</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; headless_pick_and_place_specification.md<span class="c">  # binding spec (renamed from *_workflow.md)</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; PICK_AND_PLACE_REPORT.{html,docx} / _FR.{html,docx}<span class="c">  # this document, EN/FR</span><br>
+&#9500;&#9472;&#9472; MEASUREMENTS.md<span class="c">                        # the raw measurement log this report is built from</span><br>
+&#9500;&#9472;&#9472; models/<br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; red_block.sdf<span class="c">                     # &sect;1, &sect;8, &sect;9 (contact params + DetachableJoint)</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; plate.sdf<span class="c">                         # &sect;1, unchanged from spec</span><br>
+&#9500;&#9472;&#9472; scripts/<br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; grab_frame.py<span class="c">                     # &sect;2, &sect;6 camera-frame verification</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; ik_helper.py, precompute_ik.py<span class="c">   # &sect;3&ndash;4, moveit_py-only process</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; run_pick_and_place.py<span class="c">            # &sect;5&ndash;6, &sect;9, plain-rclpy process</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; episode.sh, batch.sh<span class="c">             # &sect;10, the per-episode recording driver</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; status.sh<span class="c">                        # &sect;11, disk-ground-truth batch status</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; port_bag.py<span class="c">                      # &sect;12, dataset conversion without torch</span><br>
+&#9500;&#9472;&#9472; contracts/<span class="c">                          # &sect;10, front-camera and held-out-camera rosetta contracts</span><br>
+&#9500;&#9472;&#9472; datasets/<span class="c">                           # &sect;12, meta/README tracked; parquet/mp4 payload gitignored</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; mycobot_pick_place_train/<br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; mycobot_pick_place_heldout/<br>
+&#9492;&#9472;&#9472; .gitignore</div>
+      <p class="prose">The recorded bags themselves (&asymp;1.7&nbsp;GB across 20 episodes) live only in the <code>gazebo_to_lerobot</code> container under <code>/workspace/htgpp/episodes/</code>, not in this repository and not in the dataset directories above &mdash; regenerable via <code>batch.sh</code>, not something to version-control.</p>
+    </section>
+
+    <footer>Headless_Task-Grounded_Pick-and-Place_in_Gazebo report &middot; written 2026-09-22 &middot; commit f944dbe on main &middot; Tomislav Ilic</footer>
+  </main>
+</div>

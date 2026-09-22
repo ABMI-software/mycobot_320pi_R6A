@@ -1,0 +1,22 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <model name="plate">
+    <static>true</static>
+    <link name="link">
+      <collision name="collision">
+        <geometry>
+          <cylinder><radius>0.06</radius><length>0.008</length></cylinder>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <cylinder><radius>0.06</radius><length>0.008</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.9 0.9 0.85 1</ambient>
+          <diffuse>0.95 0.95 0.9 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
