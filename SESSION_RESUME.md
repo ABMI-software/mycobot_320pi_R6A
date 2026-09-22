@@ -1,6 +1,6 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-> **Date de dernière mise à jour :** 22 septembre 2026 (rattrapage documentaire de la séance du 10/09)
+> **Date de dernière mise à jour :** 22 septembre 2026 (renommage des caméras, règle .xlsx, conflit de la PR d'Osama résolu)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
 > **Branche :** `main` (pick-and-place + DREAM mergés via PR #9 le 09/09/2026)
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
@@ -8,7 +8,77 @@
 
 ---
 
-## État actuel (10 septembre 2026 — après-midi, Gazebo réaliste et protocole d'essais)
+## État actuel (22 septembre 2026 — mise au propre du dépôt)
+
+### Ce qui a été accompli aujourd'hui
+
+**La séance du 10/09 n'était documentée nulle part** — entrée ajoutée au
+CHANGELOG et ici (voir plus bas). `CLAUDE.md` décrivait encore l'état DREAM de
+juillet : ajout de deux sections de septembre (checkpoint `vgg_montage0901_ft_e30`,
+invalidation de la démo markerless, et ce que valent réellement les chiffres de
+précision et d'extrinsèque).
+
+**PR #12 inspectée** (Gazebo→LeRobot + ROS2→RLDS→OpenVLA, mergée le 22/09). Le
+contrat OpenVLA est respecté à la lettre (`state` 8-dim ↔ `POS_QUAT`, `action`
+7-dim ↔ `EEF_POS`) et l'enregistrement est réellement testé, pas affirmé :
+`test_openvla_transform.py` stubbe `prismatic` pour importer les vrais fichiers
+sans torch. Quatre réserves relevées, aucune bloquante pour une preuve de
+tuyauterie : la vérification FK est **une pose statique affichée, non assertée**
+(l'accord à 7 décimales implique un bras immobile à cet instant) ; la convention
+de repère du delta de rotation (`R_i⁻¹·R_j` = repère **outil**) n'est écrite
+nulle part ; le signe du gripper vient d'un visionnage, pas d'une calibration ;
+le recadrage 320×240 → 224² jette ~25 % du champ horizontal.
+
+**Une seule convention de nom pour les caméras secondaires : `right/left/top`.**
+Le dépôt en portait deux et **cinq fichiers de launch s'abonnaient à des topics
+sans publieur**. Voir CHANGELOG. Le correctif du 10/09 avait aligné les liens du
+mauvais côté de la scission.
+
+**Le conflit de la PR d'Osama est résolu.** Diagnostic : la branche a été
+réécrite après la PR #9, donc **142 de ses 161 commits sont des doublons** de
+commits déjà sur `main` (identiques au patch près, SHA différents) et la base de
+fusion remonte à juin. Les 27 fichiers en conflit portaient presque tous deux
+fois la même modification. Résolu par fusion (pas de réécriture, pas de
+force-push) dont l'arbre a été obtenu en rejouant les **19 commits réellement
+nouveaux** sur `main` — apport net vérifié identique, 44 fichiers.
+
+### Décisions prises
+
+- **Les classeurs `.xlsx` deviennent commitables sur approbation explicite**,
+  au lieu d'être interdits. Motif : un classeur est opaque au diff, donc celui
+  qui le commite se porte garant de son contenu. `precision_campagne_2026-09-09.xlsx`
+  reste donc dans la PR d'Osama.
+- **`right/left/top`** l'emporte sur `_1/2/3` pour les caméras.
+- **Fusion plutôt que rebase** pour la PR d'Osama : la règle de branchement
+  interdit de réécrire une branche en relecture.
+- Sur le conflit du chemin IK, **la version d'Osama l'emporte** : son
+  `_dossier_dream()` cherche le *fichier* `mycobot_ik.py` et supprime le chemin
+  absolu codé en dur vers le home d'un tiers.
+
+### Prochaines actions
+
+1. [ROUGE] **Pousser `main` puis la PR, dans cet ordre** — la branche de PR
+   contient les commits de `main`.
+2. [ROUGE] **Rejouer le tri en simulation** : le dégagement des doigts n'a été
+   chiffré que géométriquement, et le cylindre — le cas qui motive le
+   correctif — ne gagne que 2,3 mm par doigt.
+3. [JAUNE] **Trancher quel côté mérite le nom « droite »** : +Y est à droite vu
+   depuis la caméra frontale, à gauche vu du robot tourné vers +X. Le collecteur
+   v1 et le nom du joint se contredisaient.
+4. [JAUNE] **Débloquer rosbridge côté système** (désalignement ABI `fastcdr`).
+5. [VERT] Reprendre les actions du 09/09, aucune n'a avancé : affaissement à
+   3 portées, cas *outil couché* du scotch, éclairage à 86 de luminance.
+
+### Commande rapide de reprise
+
+```bash
+git push origin main
+git push origin feature/pick-and-place-osama
+```
+
+---
+
+## État précédent (10 septembre 2026 — après-midi, Gazebo réaliste et protocole d'essais)
 
 ### Ce qui a été accompli aujourd'hui
 

@@ -9,6 +9,28 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — le cylindre roulait hors du bac au relâcher (sim de tri, 22/09)
+
+- **`sim_sorting_grasp` écarte les doigts avant de remonter**, au lieu de
+  remonter à la largeur exacte de l'objet. À cette largeur les doigts restent
+  au contact : sur un cylindre, la remontée glisse sur la surface courbe, fait
+  basculer l'objet et le pousse par-dessus la paroi. Nouvelle constante
+  `CLEAR_MARGIN_MM = 2.0` et fonction `angle_for_footprint()`, qui inverse
+  `_FOOTPRINT_TABLE` pour rendre l'angle le plus ouvert dont l'encombrement
+  reste sous `BIN_INNER_HALF_MM − marge`.
+- Le dégagement est borné par `min(release, …)` : les doigts ne se referment
+  jamais plus que le relâchement, et ne s'ouvrent jamais au-delà de la marge.
+  L'encombrement au dégagement reste donc sous les 47,5 mm que la garde
+  existante vérifie déjà.
+- **Le gain est géométrique, calculé sur `_FOOTPRINT_TABLE`, pas observé**, et
+  il dépend fortement de l'objet — demi-encombrement au relâcher → après
+  dégagement : `yellow_box` 35,8 → 45,5 mm, `red_cube` 41,0 → 45,5,
+  `green_cylinder` 43,2 → 45,5, `blue_cube` **inchangé** (déjà plus ouvert que
+  la marge n'autorise). Le cylindre, cas qui motive le correctif, ne gagne que
+  **2,3 mm par doigt** : si le basculement persiste, le levier n'est pas la
+  marge — la réduire à 1 mm n'en rendrait qu'un de plus — mais la hauteur de
+  dépose ou l'ordre remontée/ouverture.
+
 ### Corrigé — cinq fichiers de launch pontaient des topics caméra inexistants (22/09)
 
 - **Les 3 caméras secondaires du URDF sont renommées `camera_link_right` /
