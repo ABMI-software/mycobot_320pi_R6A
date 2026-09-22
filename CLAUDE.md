@@ -37,7 +37,7 @@ This repo is not just a control-software project — it's the starting substrate
 1. **Physics-accurate digital twin** → migrate the simulation path from Gazebo/DART to **NVIDIA Isaac Sim + Isaac Lab**, unlocking photorealistic rendering, soft-body gripper physics, and GPU-parallel training envs. See [`.claude/skills/isaac-sim-integration/SKILL.md`](.claude/skills/isaac-sim-integration/).
 2. **AI physics** → use Isaac Sim's differentiable physics and learned world models to train policies that transfer to the real robot without hand-tuned dynamics.
 3. **Vision-Language-Action models** → fine-tune a VLA (OpenVLA / Octo / π0 class) on episodic teleop data, deploy a VLA inference node behind the same ROS2 topics the teleop dashboard already uses. See [`.claude/agents/vla-integrator.md`](.claude/agents/vla-integrator.md).
-4. **Pose estimation at production accuracy** → keypoint detection sim-to-real gap is now closed (`vgg_ultimate_v4_mix_ft_e30`: ~99% synthetic / **91.6% real**, up from ~26%, via a mix-fine-tune on 50K synthetic + real_3cam×5 oversampled). Remaining gap is in **angle reconstruction**, not detection — see "DREAM pose-estimation — validation status" below. See [`.claude/skills/dream-workflow/SKILL.md`](.claude/skills/dream-workflow/).
+4. **Pose estimation at production accuracy** → detection on the pick bench is solved (`vgg_montage0901_ft_e30`, median 1.81 px, 100% detection). The open gaps are **angle reconstruction** and **viewpoint generalisation** — read "DREAM — September 2026 state" below *before* the July sections, which it supersedes on the model. See [`.claude/skills/dream-workflow/SKILL.md`](.claude/skills/dream-workflow/).
 5. **Robot training + standardized benchmarks** → a reproducible loop of (teleop demos → LeRobot dataset → VLA fine-tune → sim eval → real-robot eval). See [`.claude/skills/lerobot-dataset/SKILL.md`](.claude/skills/lerobot-dataset/).
 6. **POC-ready demonstrator** → a single-command launch that shows the full stack (digital twin + VLA policy + real robot + dashboard) running coherently.
 
@@ -45,7 +45,70 @@ This repo is not just a control-software project — it's the starting substrate
 
 ---
 
-## DREAM pose-estimation — validation status (2026-07-13)
+## DREAM — September 2026 state (read before the July sections below)
+
+The two July sections that follow are still accurate about the **dashboard**. On
+the **model** — what DREAM can be trusted to do — they are superseded by these
+measurements.
+
+- **Current checkpoint: `vgg_montage0901_ft_e30`** (fine-tuned from
+  `vgg_ultimate_v4_mix_ft_e30`, which is untouched). The 52 px systematic bias on
+  the pick bench is gone: median **53.82 → 1.81 px**, detection **54.8% → 100%**
+  on 800 held-out frames, no regression on `real_3cam`. Cause:
+  `synthetic_data_collector_v3.py:505` imposes `TABLE_CLEARANCE = 0.13 m`, which
+  rejected **100%** of the real pick poses (72.5–114.5 mm) — out-of-domain
+  extrapolation, closed with 1404 real poses.
+- **DREAM does not self-calibrate a camera that has moved.** The 2026-09-02
+  markerless demo (27.9 mm / 1.62°) was **invalidated the same day**: with this
+  checkpoint `base`, `link1` and `link2` are **constants per rig** — shifting the
+  image 30 px moves them 0% — so fitting a camera pose on them recovers the pose
+  implicit in the fine-tuning data. It is circular, and the low residual is low
+  *because* it is circular. On the SVPRO, the one camera that actually moved, it
+  fails (54.9 mm / 7.16°). Root cause: fine-tuning on two **fixed** cameras
+  rewarded reciting the base position. Minimal acceptance test before believing
+  any future claim: shift the image N px, the detection must follow N px.
+- **A held-out set must hold out a viewpoint, not just joint poses.** The 800
+  validation frames were 26° apart in joint space but all from one viewpoint —
+  they measured generalisation to arm poses, not to views.
+- **J6 confirmed structurally unobservable on the real robot**: FK displacement
+  of all 7 keypoints = 0.0000 mm over −52.6°…+46.7°. **J5 usable envelope: 0° to
+  −60°** (100% / ~6 px), falling to 42.9% / 47.7 px at −100°.
+- **`link1` and `link2` are the same 3D point in the FK** — two network outputs
+  for one physical point, inseparable whatever the camera or the view count.
+- **The pick does not go through DREAM** — it uses the ArUco marker extrinsic.
+  Only the multicam dashboard anchors on the memorised base.
+
+---
+
+## Precision and extrinsics — what the numbers actually mean (2026-09-09)
+
+- **The ±0.5 mm from Elephant Robotics is a *repeated positioning precision***, a
+  repeatability — **not** an absolute cartesian accuracy. `‖FK(q_read) − P_target‖`
+  aggregates joint reading, FK model, offsets, TCP, settling and frame changes;
+  it can neither confirm nor refute that spec.
+- Measured as **RP per ISO 9283** (not max deviation, which underestimates it),
+  **3 of 6 unidirectional series exceed ±0.5 mm** (up to 0.838 mm). The earlier
+  "the robot meets its spec" claim is retracted — it rested on the two best
+  series, judged on the wrong statistic.
+- **Approach direction dominates**: 5.918 mm bias across 4 directions, confirmed
+  three times by three protocols (5.847 · 5.88 on 20/08 · 5.918), within 0.07 mm.
+  Never mix approach directions between teaching a point and returning to it.
+- **The vision has no scale error.** The −3.25% read on a 50 mm ArUco is an
+  obliquity artifact — a 100 mm tag gives +0.005%. Drop the "−2.6% → 7.4 mm"
+  block from the slides.
+- **An extrinsic's `erreur_sol_rms_mm` is a fit residual, not an accuracy.**
+  Leave-one-out on the 09/09 calibration: **5.46 mm** at a point it was not
+  fitted on (12.25 mm at the furthest marker) against the 0.594 mm announced —
+  ≈9×. Probable cause: marker positions surveyed with a tape measure
+  (`workspace_markers.yaml` bounds itself at ±5 mm).
+- **The extrinsic goes stale.** On 09/09 the camera had moved 9.9 mm / 1.63°,
+  leaving 14.1 mm on the ground — 45% of the ball's radius. Recalibrate
+  (60 frames, 4 ArUco centres, SQPNP) at the start of any session that needs
+  millimetres. Extrinsics are **not committed**.
+
+---
+
+## DREAM pose-estimation — validation status (2026-07-13, superseded above on the model)
 
 Live validation tool: `ros2 run mycobot_gateway dream_validation_dashboard` — overlays DREAM's camera-only pose estimate against real encoder angles, with a per-joint MAE/RMS counter (cumulative over the session, not a rolling window) and a robust 2-pass + Kalman-filtered solver. Current checkpoint: `vgg_ultimate_v4_mix_ft_e30`.
 

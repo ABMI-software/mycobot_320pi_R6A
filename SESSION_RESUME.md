@@ -1,7 +1,6 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-## État actuel (9 septembre 2026 — soir, méthodologie et extrinsèque)
-> **Date de dernière mise à jour :** 9 septembre 2026 (méthodologie des essais de précision + validation extrinsèque par leave-one-out)
+> **Date de dernière mise à jour :** 22 septembre 2026 (rattrapage documentaire de la séance du 10/09)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
 > **Branche :** `main` (pick-and-place + DREAM mergés via PR #9 le 09/09/2026)
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
@@ -9,8 +8,64 @@
 
 ---
 
-## État actuel (9 septembre 2026 — soir, test des 4 directions)
-## État actuel (9 septembre 2026 — après-midi, campagne de précision)
+## État actuel (10 septembre 2026 — remise en marche du dépôt après la PR #9)
+
+*Entrée écrite le 22/09 : la séance du 10/09 n'avait été documentée nulle part,
+ni ici ni dans le CHANGELOG. Elle ne contient aucune mesure — uniquement la
+réparation de trois régressions d'intégration introduites par le merge.*
+
+### Ce qui a été accompli
+
+**Trois régressions post-PR #9 corrigées, chacune empêchait un lancement.**
+
+1. **7 nœuds ne trouvaient plus `training/dream`.** Ils remontaient 4 niveaux
+   depuis `os.path.abspath(__file__)` — donc hors du dépôt — et sans `realpath`
+   ne suivaient pas le symlink de `colcon --symlink-install`. Résultat :
+   `ModuleNotFoundError` (`mycobot_ik`, `mycobot_fk`) au lancement de
+   `sorting_orchestrator`, `pick_and_place_aruco`, `precision_benchmark`…
+   Alignés sur le motif déjà correct de `dream_inference_node.py`.
+2. **Le robot ne se chargeait plus dans Gazebo.** Les joints
+   `world_to_camera_right/left/top` référençaient des liens
+   `camera_link_right/left/top` inexistants (les liens définis sont
+   `camera_link_1/2/3`) : `robot_state_publisher` échouait au parsing URDF.
+   Résidu de la résolution de conflit de la PR #9, où la version des joints a
+   été gardée sans aligner les noms de liens.
+3. **Toute la stack sim tombait au lancement.** Le commit `bc5ddbe6` avait
+   ré-écrasé l'include rosbridge avec `PythonLaunchDescriptionSource`, qui ne
+   sait pas parser un `.xml`. `AnyLaunchDescriptionSource` restauré pour
+   rosbridge, `PythonLaunchDescriptionSource` gardé pour `gz_sim.launch.py`.
+
+### Décisions prises
+
+- **Ne pas traiter le blocage rosbridge dans le dépôt.** Le désalignement ABI
+  `fastcdr` (`symbol lookup error`) est au niveau de `/opt/ros/jazzy` : il se
+  corrige côté système (apt), pas par un correctif de launch.
+
+### Prochaines actions
+
+1. [ROUGE] **Débloquer rosbridge côté système** (ABI `fastcdr`) — sans lui, la
+   chaîne de téléop reste inutilisable même avec le launch réparé.
+2. [ROUGE] **Reprendre les prochaines actions du 09/09**, aucune n'a avancé
+   depuis : affaissement à 3 portées, cas *outil couché* du scotch, éclairage
+   remonté à 86 de luminance avant toute calibration visant 0,12 mm.
+3. [JAUNE] **Mettre à jour les supports de présentation** avec les verdicts
+   révisés du 09/09 (retrait du bloc échelle, répétabilité en RP ISO 9283).
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/ros_jazzy && colcon build --packages-select mycobot_gateway mycobot_description --symlink-install
+source install/setup.bash
+ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim
+```
+
+---
+
+## État précédent (9 septembre 2026 — soir, méthodologie et extrinsèque)
+
+## État précédent (9 septembre 2026 — soir, test des 4 directions)
+## État précédent (9 septembre 2026 — après-midi, campagne de précision)
 
 ### Ce qui a été accompli
 
@@ -156,7 +211,7 @@ cd ~/Osama_ws/src/mycobot_R6A
 env -u VIRTUAL_ENV MYCOBOT_PI=10.10.0.219 /usr/bin/python3 scripts/pick_dashboard.py
 ```
 
-## État actuel (2 septembre 2026 — soir, la démo markerless est invalidée)
+## État précédent (2 septembre 2026 — soir, la démo markerless est invalidée)
 
 ### Ce qui a été accompli
 
@@ -200,7 +255,7 @@ python scripts/dream_extrinseque_markerless.py \
     --capture training/dream/captures/markerless_0902 --cameras arducam,svpro
 ```
 
-## État actuel (2 septembre 2026 — après-midi, DREAM markerless démontré)
+## État précédent (2 septembre 2026 — après-midi, DREAM markerless démontré)
 Branche active : **`feature/calibration-cam`**. Deux Arducams calibrées (intrinsèques mesurés). Plan validé :
 
 - **Point 2 — Régénérer les GT** du dataset `/tmp/dream_data/real_cam0/` avec les K mesurés au lieu des `fx=fy=610` codés en dur. Les fichiers JSON NDDS contiennent les `projected_location` calculées avec la mauvaise matrice. À recalculer avec FK + nouveaux `K`. Voir [`training/dream/convert_to_ndds.py`](training/dream/convert_to_ndds.py).
@@ -428,7 +483,7 @@ python scripts/dream_extrinseque_markerless.py \
     --capture training/dream/captures/markerless_0902 --cameras arducam
 ```
 
-## État actuel (2 septembre 2026 — matin, le biais DREAM est corrigé)
+## État précédent (2 septembre 2026 — matin, le biais DREAM est corrigé)
 
 ### Ce qui a été accompli
 
@@ -492,7 +547,7 @@ cd training/dream && python3 evaluate_dream.py \
 
 ---
 
-## État actuel (1er septembre 2026 — soir, verdict sur DREAM au pick)
+## État précédent (1er septembre 2026 — soir, verdict sur DREAM au pick)
 
 ### Le résultat
 
@@ -539,7 +594,7 @@ python3 scripts/fk_vs_dream_series.py --balayage # LE BRAS BOUGE
 
 ---
 
-## État actuel (1er septembre 2026 — le biais DREAM est chiffré)
+## État précédent (1er septembre 2026 — le biais DREAM est chiffré)
 
 ### Ce qui a été accompli
 
@@ -632,7 +687,7 @@ python3 scripts/fk_vs_dream_series.py --n 4   # LE BRAS BOUGE
 
 ---
 
-## État actuel (31 août 2026 — nuit, FK validée contre DREAM)
+## État précédent (31 août 2026 — nuit, FK validée contre DREAM)
 
 ### Ce qui a été accompli
 
@@ -683,7 +738,7 @@ python3 scripts/fk_vs_dream_diagnostic.py --brut \
 
 ---
 
-## État actuel (31 août 2026 — soir, self-calibration markerless)
+## État précédent (31 août 2026 — soir, self-calibration markerless)
 
 ### Ce qui a été accompli
 
@@ -747,7 +802,7 @@ python scripts/pick_and_place_live_dashboard.py --calib-only --move   # LE BRAS 
 
 ---
 
-## État actuel (31 août 2026 — simulation, saisie physique)
+## État précédent (31 août 2026 — simulation, saisie physique)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -842,7 +897,7 @@ ros2 run mycobot_gateway sim_sorting_grasp          # -p only:="red_cube"
 
 ---
 
-## État actuel (28 août 2026 — après-midi)
+## État précédent (28 août 2026 — après-midi)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -909,7 +964,7 @@ cd ~/Osama_ws/src/mycobot_R6A
 /usr/bin/python3 scripts/pick_dashboard.py
 ```
 
-## État actuel (28 août 2026 — soir, simulation)
+## État précédent (28 août 2026 — soir, simulation)
 
 ### Ce qui a été accompli
 
@@ -964,7 +1019,7 @@ source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
 ros2 launch mycobot_gateway pick_and_place_sorting.launch.py
 ```
 
-## État actuel (28 août 2026 — matin)
+## État précédent (28 août 2026 — matin)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -1024,7 +1079,7 @@ cd ~/Osama_ws/src/mycobot_R6A
 /usr/bin/python3 scripts/pick_dashboard.py
 ```
 
-## État actuel (27 août 2026 — soir)
+## État précédent (27 août 2026 — soir)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -1106,7 +1161,7 @@ setsid nohup /usr/bin/python3 scripts/pick_dashboard.py > /tmp/dash.log 2>&1 &
 tail -f /tmp/dash.log        # le journal sort maintenant du tableau de bord
 ```
 
-## État actuel (27 août 2026 — après-midi)
+## État précédent (27 août 2026 — après-midi)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -1174,7 +1229,7 @@ cd ~/Osama_ws/src/mycobot_R6A
 setsid nohup /usr/bin/python3 scripts/pick_dashboard.py >/dev/null 2>&1 &
 ```
 
-## État actuel (26 août 2026 — soir)
+## État précédent (26 août 2026 — soir)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -1238,7 +1293,7 @@ cd ~/Osama_ws/src/mycobot_R6A
 setsid nohup /usr/bin/python3 scripts/pick_dashboard.py >/dev/null 2>&1 &
 ```
 
-## État actuel (25 août 2026 — matin)
+## État précédent (25 août 2026 — matin)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -1340,7 +1395,7 @@ cd ~/Osama_ws/src/mycobot_R6A
 
 ---
 
-## État actuel (24 août 2026 — soir)
+## État précédent (24 août 2026 — soir)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -1414,7 +1469,7 @@ cd ~/Osama_ws/src/mycobot_R6A
 /usr/bin/python3 scripts/pick_dashboard.py
 ```
 
-## État actuel (24 août 2026 — journée)
+## État précédent (24 août 2026 — journée)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -1466,7 +1521,7 @@ conda deactivate
 
 ---
 
-## État actuel (20 août 2026 — après-midi)
+## État précédent (20 août 2026 — après-midi)
 
 **Cycle pick-and-place complet réussi sur le robot réel**, de la localisation par
 vision au dépôt en bac vérifié par image.
@@ -1673,7 +1728,7 @@ La transaction produite était seulement une sonde temporaire :
   `marker_size_m: 0.080` contre commentaire `50 mm`. La frontière actuelle
   utilise les centres et n'utilise pas cette taille, mais elle devra être
   mesurée/corrigée avant un futur PnP par coins.
-## État actuel (9 juin 2026 — soir — calibration main-œil sur robot réel)
+## État précédent (9 juin 2026 — soir — calibration main-œil sur robot réel)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -1801,7 +1856,7 @@ source ~/ros_jazzy/install/setup.bash
 
 ---
 
-## État actuel (3 juin 2026 — nuit — pick-and-place Gazebo visual debug)
+## État précédent (3 juin 2026 — nuit — pick-and-place Gazebo visual debug)
 
 ### Ce qui a été accompli (session de débogage visuel Gazebo)
 
@@ -1850,7 +1905,7 @@ ros2 launch mycobot_gateway pick_and_place_aruco.launch.py
 
 ---
 
-## État actuel (3 juin 2026 — soir — pick-and-place Gazebo validé)
+## État précédent (3 juin 2026 — soir — pick-and-place Gazebo validé)
 
 ### Ce qui a été accompli aujourd'hui
 
@@ -1889,7 +1944,7 @@ ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
 
 ---
 
-## État actuel (3 juin 2026 — pick-and-place ArUco scaffoldé)
+## État précédent (3 juin 2026 — pick-and-place ArUco scaffoldé)
 
 ### 🧭 Prochaine action prioritaire
 
@@ -1903,7 +1958,7 @@ ros2 launch mycobot_gateway pick_and_place_aruco_real.launch.py
 
 ---
 
-## État actuel (28 avril 2026 — soir)
+## État précédent (28 avril 2026 — soir)
 
 ### Ce qui a été accompli
 
