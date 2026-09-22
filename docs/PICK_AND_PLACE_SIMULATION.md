@@ -12,7 +12,40 @@ Pour le vrai bras, voir [`PICK_AND_PLACE_REAL.md`](PICK_AND_PLACE_REAL.md).
 
 ---
 
-## Résultat mesuré (31/08/2026)
+## Résultat mesuré (22/09/2026) — 3 objets sur 4
+
+Deux cycles complets en `headless`, résultats identiques. **Ceci contredit le
+relevé du 31/08 reproduit plus bas sur le cylindre**, qui est conservé tel quel :
+c'est un historique, pas l'état courant.
+
+| objet | cycle 1 | cycle 2 | écart au centre |
+|---|---|---|---|
+| `red_cube` | ✔ | ✔ | −1/−2 · −0/−2 mm |
+| `blue_cube` | ✔ | ✔ | −11/+10 · −13/+11 mm |
+| **`green_cylinder`** | **✘** | **✘** | **−81/−122 · −35/−102 mm** |
+| `yellow_box` | ✔ | ✔ | +0/+0 · +3/+15 mm |
+
+Le cylindre finit à une dizaine de centimètres du bac, poussé vers −Y, une fois
+au sol (z = 0,025) une fois perché sur un rebord (z = 0,051).
+
+**Trié seul, il réussit** (−11/−23 mm). La seule différence entre les trois
+passages est l'orientation du poignet — **φ = 120° aux deux échecs, 105° à la
+réussite** — héritée de la pose de l'objet précédent via `q_ref=q_lift`. Le
+résultat dépend donc de **l'ordre de tri**, pas seulement de l'objet : un essai
+sur un objet isolé ne peut pas attraper ce défaut.
+
+La marge des doigts est hors de cause. Au dégagement introduit par `aeb39dfc`
+ils passent de 44 à 49,1 mm d'écartement, soit **2,5 mm de jeu par côté** autour
+du cylindre — ils ne le touchent plus. Ce qui le déplace est la remontée
+`q_place → q_over_bin`, qui n'est pas verticale et balaie latéralement.
+
+**Ce qui a changé entre les deux relevés n'est pas établi.** `aeb39dfc` est
+intervenu sur cette séquence depuis le 31/08 ; l'A/B qui le confirmerait ou
+l'écarterait n'a pas été fait.
+
+---
+
+## Résultat mesuré (31/08/2026) — historique, contredit sur le cylindre
 
 4 objets sur 4, en **115 s**.
 
@@ -51,7 +84,7 @@ Deux terminaux, `conda deactivate` d'abord dans chacun.
 
 ```bash
 # 1 — le banc (Gazebo + les trois contrôleurs)
-source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
+source /opt/ros/jazzy/setup.bash && source <votre_ws>/install/setup.bash
 ros2 launch mycobot_gateway sim_grasp.launch.py          # headless:=true pour sans fenêtre
 
 # 2 — le cycle de tri
@@ -165,8 +198,12 @@ motrice : c'est un parallélogramme, elle tourne du même angle que son servo.
 7. **Descendre poser** l'objet sur le fond (1 mm de garde sous lui).
 8. **Rendre la largeur exacte** de l'objet : il repose déjà, la force de serrage
    tombe à zéro et il est libéré sans que les doigts s'écartent.
-9. **Remonter**, puis seulement **ouvrir en grand**.
-10. **Vérifier** que l'objet est dans l'emprise du bac.
+9. **Écarter les doigts** au maximum que le bac autorise — encombrement sous
+   `BIN_INNER_HALF_MM − CLEAR_MARGIN_MM`, soit 45,5 mm de demi-largeur — toujours
+   au fond du bac. Ajouté par `aeb39dfc` pour supprimer le frottement de la
+   remontée sur la surface courbe du cylindre ; **mesuré insuffisant le 22/09**.
+10. **Remonter**, puis seulement **ouvrir en grand**.
+11. **Vérifier** que l'objet est dans l'emprise du bac.
 
 Les étapes 2, 3 et 5 partagent une **orientation de poignet unique** : résoudre
 l'IK indépendamment à chaque hauteur laissait φ changer d'un point au suivant, et
@@ -218,8 +255,12 @@ Bacs : 100 × 100 mm hors-tout, parois de 5 mm hautes de 30 mm, fond à z = 2 mm
 
 ## Limites
 
-- **Trois passages seulement**, tous dans la même session et sur la même scène.
-  Rien ne dit ce que donne un démarrage à froid ou des objets déplacés.
+- **Le résultat dépend de l'ordre de tri.** L'orientation du poignet est héritée
+  de l'objet précédent (`q_ref=q_lift`) : le cylindre échoue à φ = 120° en cycle
+  complet et réussit à φ = 105° trié seul. Un essai objet par objet ne prouve
+  donc rien sur le cycle.
+- **Trois passages seulement** au 31/08, deux au 22/09, tous dans la même session
+  et sur la même scène. Rien ne dit ce que donne un démarrage à froid.
 - **Le biais de `yellow_box` (−12 mm en X) n'est pas expliqué** — mesuré,
   reproductible, mais la cause n'a pas été cherchée.
 - **Pas de vision.** Les positions viennent de la pose Gazebo des objets, pas du

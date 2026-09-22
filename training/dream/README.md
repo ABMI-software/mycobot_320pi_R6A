@@ -167,7 +167,7 @@ lumineux, lumière neutre-blanche, ombres douces plutôt que dures).
 
 Précision par seuil : 37,1% <2px · 98,8% <5px · 99,5% <10px · 99,7% <20px ·
 99,9% <50px. Erreur moyenne par frame : 2,62 ± 2,33 px. **Dépasse le record
-v2 (97,7 %)**. Détails : [`../VGG_ULTIMATE_V4_50K.md`](../VGG_ULTIMATE_V4_50K.md).
+v2 (97,7 %)**. Détails : [`../VGG_ULTIMATE_V4_50K.md`](VGG_ULTIMATE_V4_50K.md).
 
 ---
 

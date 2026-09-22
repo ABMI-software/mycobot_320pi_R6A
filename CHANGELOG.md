@@ -1651,15 +1651,15 @@ d'écart par joint** (angles estimés vs encodeurs réels) comme livrable
 d'évaluation, puis **visual servoing** pour le pick-and-place. Maillons manquants
 identifiés : calibration extrinsèque `T_base_camera` de la caméra fixe, puis
 brique glue keypoints → angles (reprojection-min sur la FK existante
-[`training/dream/mycobot_fk.py`](../training/dream/mycobot_fk.py) /
-[`training/dream/mycobot_ik.py`](../training/dream/mycobot_ik.py)).
+[`training/dream/mycobot_fk.py`](training/dream/mycobot_fk.py) /
+[`training/dream/mycobot_ik.py`](training/dream/mycobot_ik.py)).
 
 ### Ajouté — outillage pose estimation eye-to-hand (astra RGB-D)
 
 Pipeline complet keypoints → angles → courbe d'écart par joint, caméra astra
 fixe devant le bras. Validé en simulation ; premier run réel en cours.
 
-- [`training/dream/estimate_angles_from_keypoints.py`](../training/dream/estimate_angles_from_keypoints.py)
+- [`training/dream/estimate_angles_from_keypoints.py`](training/dream/estimate_angles_from_keypoints.py)
   — remonte des keypoints DREAM aux angles j1..j6. Mode 2D (reprojection, `cv2`)
   et **mode 3D** (depth → correspondance 3D). Self-tests : le 3D récupère
   j1–j4 à <2° **sans amorçage** (la profondeur supprime la fragilité mono) ;
@@ -1667,24 +1667,24 @@ fixe devant le bras. Validé en simulation ; premier run réel en cours.
 - [`training/calibration/oni_grabber_rgbd.cpp`](../training/calibration/oni_grabber_rgbd.cpp)
   — grabber OpenNI Astra : couleur + depth aligné couleur (D2C) + FOV (intrinsèques)
   vers `/dev/shm`. Extension du grabber couleur existant.
-- [`training/calibration/calibrate_astra_extrinsic_shm.py`](../training/calibration/calibrate_astra_extrinsic_shm.py)
+- [`training/calibration/calibrate_astra_extrinsic_shm.py`](training/calibration/calibrate_astra_extrinsic_shm.py)
   — extrinsèque `T_base_camera` par recalage 3D (Kabsch) sur les marqueurs sol,
   sans ChArUco. Sort `astra_extrinsic.yaml` + `cam_astra.npz`.
-- [`training/calibration/check_astra_markers.py`](../training/calibration/check_astra_markers.py),
-  [`training/calibration/astra_preview.py`](../training/calibration/astra_preview.py)
+- [`training/calibration/check_astra_markers.py`](training/calibration/check_astra_markers.py),
+  [`training/calibration/astra_preview.py`](training/calibration/astra_preview.py)
   — aide au cadrage / preview live couleur+depth.
-- [`training/dream/capture_astra_rgbd.py`](../training/dream/capture_astra_rgbd.py)
+- [`training/dream/capture_astra_rgbd.py`](training/dream/capture_astra_rgbd.py)
   — dataset RGB-D + encodeurs (mouvement calqué sur `capture_real_3cam` :
   home d'abord, `speed=25`, `settle=3s`). Réutilise le bridge TCP validé.
-- [`training/dream/plot_angle_error_curve.py`](../training/dream/plot_angle_error_curve.py)
+- [`training/dream/plot_angle_error_curve.py`](training/dream/plot_angle_error_curve.py)
   — le livrable : DREAM → depth → angles vs encodeurs → courbe d'écart par joint.
-- [`training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md`](../training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md)
+- [`training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md`](training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md)
   — procédure de calibration extrinsèque.
 
 ### Modifié — Documentation
 
-- [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) — historique modèles DREAM : `vgg_ultimate_v4_mix_ft_e30` finalisé (91,6% réel), date à jour.
-- [`SESSION_RESUME.md`](../SESSION_RESUME.md) — entrée datée 8 juillet 2026 (état pose estimation + direction eye-to-hand).
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — historique modèles DREAM : `vgg_ultimate_v4_mix_ft_e30` finalisé (91,6% réel), date à jour.
+- [`SESSION_RESUME.md`](SESSION_RESUME.md) — entrée datée 8 juillet 2026 (état pose estimation + direction eye-to-hand).
 
 ---
 
@@ -1694,7 +1694,7 @@ fixe devant le bras. Validé en simulation ; premier run réel en cours.
 
 `vgg_ultimate_v4_e50` (50K synthétique, intrinsèques caméra corrigées) évalué à
 **99.4% de détection** (2.61px erreur moyenne), dépassant le précédent record
-v2 (97.7%). Voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](../training/dream/VGG_ULTIMATE_V4_50K.md).
+v2 (97.7%). Voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](training/dream/VGG_ULTIMATE_V4_50K.md).
 
 Le transfert sim-to-real reste bloqué à ≈27% sur `real_3cam_ndds` malgré ce
 gain. Un fine-tune depuis `best_network.pth` sur un mix synthétique 50K + réel
@@ -1704,8 +1704,8 @@ est en cours pour combler l'écart — voir
 
 ### Modifié — Documentation
 
-- [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) — historique modèles DREAM à jour (v4, mix fine-tune)
-- [`training/README.md`](../training/README.md), [`training/dream/README.md`](../training/dream/README.md) — tableaux de résultats à jour
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — historique modèles DREAM à jour (v4, mix fine-tune)
+- [`training/README.md`](training/README.md), [`training/dream/README.md`](training/dream/README.md) — tableaux de résultats à jour
 ## [1.15.2-pre] - 2026-06-09 — branche `feature/pick-and-place`
 
 ### Calibration main-œil robot réel — pipeline complet + nœuds caméra
@@ -1877,10 +1877,10 @@ Calibration ChArUco des deux Arducams Pi (cam_0, cam_3) avec un nouvel outil `tr
 
 ### Ajouté — `training/calibration/`
 
-- [`calibrate_camera.py`](../training/calibration/calibrate_camera.py) — calibrateur ChArUco unifié (UVC `--source v4l2` + Astra `--source astra` via OpenNI wrapper). Quality gating (markers / sharpness / coverage grid / diversité temporelle), rejet outliers per-view-error, **auto-save** quand `target_samples` atteint, fallback save-on-quit ≥ 12 vues, CLAHE optionnel pour capteurs bruités. Presets caméra auto-appliqués via `--name` (cam_* → arducam, astra* → astra_rgb).
-- [`generate_board.py`](../training/calibration/generate_board.py) — génère un PNG ChArUco à imprimer aux dimensions exactes (DPI configurable).
-- [`probe_charuco.py`](../training/calibration/probe_charuco.py) — probe single-frame (a servi à débusquer 2 régressions OpenCV 4.6 : `DetectorParameters()` et `CharucoBoard((sx,sy),…)` qui segfault sur access aux propriétés — fix par fallback legacy `_create()`).
-- [`probe_astra.py`](../training/calibration/probe_astra.py) — probe Astra 15 s, 4 modes (raw / CLAHE / swap-RB / swap-RB+CLAHE).
+- [`calibrate_camera.py`](training/calibration/calibrate_camera.py) — calibrateur ChArUco unifié (UVC `--source v4l2` + Astra `--source astra` via OpenNI wrapper). Quality gating (markers / sharpness / coverage grid / diversité temporelle), rejet outliers per-view-error, **auto-save** quand `target_samples` atteint, fallback save-on-quit ≥ 12 vues, CLAHE optionnel pour capteurs bruités. Presets caméra auto-appliqués via `--name` (cam_* → arducam, astra* → astra_rgb).
+- [`generate_board.py`](training/calibration/generate_board.py) — génère un PNG ChArUco à imprimer aux dimensions exactes (DPI configurable).
+- [`probe_charuco.py`](training/calibration/probe_charuco.py) — probe single-frame (a servi à débusquer 2 régressions OpenCV 4.6 : `DetectorParameters()` et `CharucoBoard((sx,sy),…)` qui segfault sur access aux propriétés — fix par fallback legacy `_create()`).
+- [`probe_astra.py`](training/calibration/probe_astra.py) — probe Astra 15 s, 4 modes (raw / CLAHE / swap-RB / swap-RB+CLAHE).
 
 ### Mesuré
 
@@ -2046,20 +2046,20 @@ Session dédiée à débloquer la **pose estimation DREAM** (bloqué ~26 % déte
 
 ### Ajouté — Tooling DREAM
 
-- [`training/dream/evaluate_dream_relaxed.py`](../training/dream/evaluate_dream_relaxed.py) — wrapper de `evaluate_dream.py` qui monkey-patch les seuils de peak detection sans toucher la lib vendored `/tmp/DREAM/`. CLI : `--peak-thresh` (défaut 0.001 vs lib 0.01) et `--next-best-score` (défaut 0.05 vs lib 0.25).
+- [`training/dream/evaluate_dream_relaxed.py`](training/dream/evaluate_dream_relaxed.py) — wrapper de `evaluate_dream.py` qui monkey-patch les seuils de peak detection sans toucher la lib vendored `/tmp/DREAM/`. CLI : `--peak-thresh` (défaut 0.001 vs lib 0.01) et `--next-best-score` (défaut 0.05 vs lib 0.25).
 - Backup du checkpoint pré-resume : `training/checkpoints_dream/vgg_mixed_real_synth/best_network.e25.{pth,yaml}`.
 
 ### Ajouté — Claude Code project structure
 
 Structure complète pour que les sessions Claude aient le contexte projet dès le démarrage :
 
-- [`CLAUDE.md`](../CLAUDE.md) à la racine — project overview, 3 envs Python, branch map, POC scope (digital twin · AI physics · VLA · pose estimation)
+- [`CLAUDE.md`](CLAUDE.md) à la racine — project overview, 3 envs Python, branch map, POC scope (digital twin · AI physics · VLA · pose estimation)
 - [`.claude/settings.json`](../.claude/settings.json) — permissions partagées projet-wide
 - [`.claude/rules/`](../.claude/rules/) (5) — `python-environments` · `ros2-conventions` · `real-robot-safety` · `git-branching` · `documentation`
 - [`.claude/commands/`](../.claude/commands/) (5) — `launch-sim` · `launch-teleop` · `real-robot-preflight` · `train-dream` · `collect-synthetic`
 - [`.claude/skills/`](../.claude/skills/) (6) — `teleop-troubleshoot` · `dream-workflow` · `gazebo-setup` · `real-robot-session` · `isaac-sim-integration` · `lerobot-dataset`
 - [`.claude/agents/`](../.claude/agents/) (6) — `ros2-debugger` · `dream-trainer` · `teleop-tuner` · `urdf-surgeon` · `digital-twin-engineer` · `vla-integrator`
-- [`.claude/hooks/validate-ros2-build.sh`](../.claude/hooks/validate-ros2-build.sh) — inactif par défaut (à câbler dans settings si désiré)
+- [`.claude/hooks/validate-ros2-build.sh`](.claude/hooks/validate-ros2-build.sh) — inactif par défaut (à câbler dans settings si désiré)
 
 La skill `isaac-sim-integration` contient la roadmap 5-phases pour Isaac Sim (USD conversion → ROS2 bridge → synth data DREAM → Isaac Lab parallel envs → real-robot validation). **Aucune migration démarrée** — uniquement la planification. Gazebo reste sur `main`.
 
@@ -2090,7 +2090,7 @@ La skill `isaac-sim-integration` contient la roadmap 5-phases pour Isaac Sim (US
 
 ### 🎨 Dashboard ABMI + boutons dynamiques
 
-Refonte complète de la GUI [`teleop/teleop_dashboard.py`](../teleop/teleop_dashboard.py) sur la charte **ABMI** (navy `#1B1A3E` + pink `#E6417A`) avec logo intégré. Trois onglets, KPI cards, caméra opérateur inline, comparaison sim ↔ réel côte à côte et ActionButton dynamiques avec feedback visuel.
+Refonte complète de la GUI [`teleop/teleop_dashboard.py`](teleop/teleop_dashboard.py) sur la charte **ABMI** (navy `#1B1A3E` + pink `#E6417A`) avec logo intégré. Trois onglets, KPI cards, caméra opérateur inline, comparaison sim ↔ réel côte à côte et ActionButton dynamiques avec feedback visuel.
 
 ### Ajouté
 
@@ -2111,9 +2111,9 @@ Refonte complète de la GUI [`teleop/teleop_dashboard.py`](../teleop/teleop_dash
 
 ### Modifié
 
-- [`docs/TELEOP_DASHBOARD.md`](TELEOP_DASHBOARD.md) — **réécrit** pour l'UI 3-tabs, sections par onglet, tableau topics in/out, troubleshooting mis à jour
-- [`docs/TELEOPERATION.md`](TELEOPERATION.md) — section dashboard regénérée + topic `/teleop/camera/image` ajouté dans le listing des publications de Stage 4
-- [`README.md`](../README.md) — ligne dashboard dans le tableau outils, commentaire T4 rafraîchi
+- [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) — **réécrit** pour l'UI 3-tabs, sections par onglet, tableau topics in/out, troubleshooting mis à jour
+- [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) — section dashboard regénérée + topic `/teleop/camera/image` ajouté dans le listing des publications de Stage 4
+- [`README.md`](README.md) — ligne dashboard dans le tableau outils, commentaire T4 rafraîchi
 
 ### Non changé
 

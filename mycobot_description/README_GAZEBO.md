@@ -66,6 +66,12 @@ l'objet. `sorting_orchestrator` fait le même parcours mais **téléporte** l'ob
 via `set_pose` — d'où l'objet qui saute. Il est antérieur à la pince modélisée
 et conservé pour sa partie perception.
 
+**État mesuré au 22/09/2026 : 3 objets sur 4**, sur deux cycles complets aux
+résultats identiques. `green_cylinder` finit hors du bac, alors qu'il réussit
+trié seul : l'orientation du poignet est héritée de l'objet précédent, donc le
+résultat dépend de l'ordre de tri. Chiffres et diagnostic dans
+[`docs/PICK_AND_PLACE_SIMULATION.md`](../docs/PICK_AND_PLACE_SIMULATION.md).
+
 ## Visuels caméra (URDF Gazebo)
 
 Les 4 caméras embarquées dans le URDF (`mycobot_pro_320_pi_gazebo.urdf` —
