@@ -54,7 +54,7 @@ python3 bridge_pi.py
 
 #### Terminal Tour-1 : Diagnostic
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 source quick_commands.sh
 setup_bridge
 ./diagnose.sh
@@ -64,7 +64,7 @@ setup_bridge
 
 #### Terminal Tour-2 : Lancer le bridge_tour
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 conda deactivate
 source install/setup.bash
 ros2 run mycobot_gateway bridge_tour
@@ -88,7 +88,7 @@ ros2 run mycobot_gateway bridge_tour
 
 #### Terminal Tour-3 : Monitorer les messages entrants
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 conda deactivate
 source install/setup.bash
 ros2 topic echo /from_robot
@@ -96,7 +96,7 @@ ros2 topic echo /from_robot
 
 #### Terminal Tour-4 : Envoyer un message de test
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 source quick_commands.sh
 send_cmd "ping"
 ```

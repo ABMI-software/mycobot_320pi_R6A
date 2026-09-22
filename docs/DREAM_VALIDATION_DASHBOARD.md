@@ -47,7 +47,7 @@ python3 -c "import numpy; print(numpy.__file__)"
 ```bash
 deactivate                              # si (.venv) est dans le prompt
 source /opt/ros/jazzy/setup.bash
-source ~/Osama_ws/install/setup.bash    # PAS ~/ros_jazzy/install — autre clone
+source <your_ws>/install/setup.bash    # PAS ~/ros_jazzy/install — autre clone
 ```
 
 ## Les 5 nœuds

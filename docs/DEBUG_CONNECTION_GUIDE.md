@@ -20,7 +20,7 @@ J'ai créé `bridge_pi_debug.py` avec des logs détaillés pour voir exactement 
 **Depuis le PC Tour** :
 
 ```bash
-scp /home/genji/ros_jazzy/src/mycobot_R6A/bridge_pi_debug.py \
+scp <your_ws>/src/mycobot_320pi_R6A/bridge_pi_debug.py \
     er@10.10.0.218:~/colcon_ws/src/mycobot_ros2/mycobot_320/mycobot_320pi/mycobot_gateway/
 ```
 
@@ -44,7 +44,7 @@ python3 bridge_pi_debug.py
 ### 🧪 Étape 3 : Lancer un test depuis le PC Tour
 
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 source quick_commands.sh
 send_cmd "ping"
 ```

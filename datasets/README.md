@@ -83,12 +83,12 @@ ds = MyCobotMultiViewDataset("datasets/real_dataset", split="train",
 Pour l'entraînement :
 ```bash
 # Multi-view synthétique
-/home/genji/miniconda/bin/python3 training/train.py \
+<miniconda>/bin/python3 training/train.py \
   --dataset datasets/synthetic_dataset \
   --multi-view --backbone resnet50 --epochs 150
 
 # Multi-view réel
-/home/genji/miniconda/bin/python3 training/train.py \
+<miniconda>/bin/python3 training/train.py \
   --dataset datasets/real_dataset \
   --multi-view --views cam0 cam3 --backbone resnet50 --epochs 300
 ```

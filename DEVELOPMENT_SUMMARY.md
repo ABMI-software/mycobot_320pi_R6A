@@ -150,7 +150,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 ## 📁 Structure du Workspace Tour
 
 ```
-~/Osama_ws/src/mycobot_R6A/
+<your_ws>/src/mycobot_320pi_R6A/
 ├── SESSION_RESUME.md               # Point de départ sessions dev
 ├── DEVELOPMENT_SUMMARY.md          # Ce fichier
 ├── CHANGELOG.md                    # Historique des versions
@@ -308,7 +308,7 @@ Contrôler un robot **MyCobot 320 Pi** depuis un PC distant (**Tour**) via ROS2 
 # IMPORTANT: Désactiver Conda avant ROS2 (Python 3.13 vs 3.12)
 conda deactivate
 source /opt/ros/jazzy/setup.bash
-source ~/Osama_ws/install/setup.bash
+source <your_ws>/install/setup.bash
 ```
 
 ### 1. Visualisation standalone (sans robot)
@@ -331,7 +331,7 @@ python3 pi_camera_server.py --cameras 0 3 --names cam0 cam3
 ```bash
 conda deactivate
 source /opt/ros/jazzy/setup.bash
-source ~/Osama_ws/install/setup.bash
+source <your_ws>/install/setup.bash
 
 # Modes de contrôle disponibles :
 ros2 launch mycobot_gateway simple_gui.launch.py        # GUI graphique
@@ -384,7 +384,7 @@ Pipeline validé sur le robot physique le 22/04/2026 — voir [`docs/REAL_ROBOT_
 
 ### 3. Meshes Gazebo non trouvés
 **Cause:** `GZ_SIM_RESOURCE_PATH` non défini
-**Solution:** Ajouter dans le launch file ou `export GZ_SIM_RESOURCE_PATH=~/Osama_ws/install/mycobot_description/share`
+**Solution:** Ajouter dans le launch file ou `export GZ_SIM_RESOURCE_PATH=<your_ws>/install/mycobot_description/share`
 
 ### 4. DREAM — Belief maps effondrées (all-zeros)
 **Cause:** Fine-tuning manuel avec MSE sur grille quasi-vide
@@ -852,7 +852,7 @@ cd /tmp/DREAM && pip install -e . -r requirements.txt
 
 ```bash
 # Compiler les packages
-cd ~/Osama_ws/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 colcon build --symlink-install
 
 # Compiler un seul package

@@ -79,14 +79,14 @@ publishing #1: std_msgs.msg.String(data='test_moteur_1')
 
 ### Pour chaque nouveau terminal :
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 conda deactivate  # IMPORTANT !
 source install/setup.bash
 ```
 
 ### Ou utiliser le script rapide :
 ```bash
-source /home/genji/ros_jazzy/src/mycobot_R6A/quick_commands.sh
+source <your_ws>/src/mycobot_320pi_R6A/quick_commands.sh
 setup_bridge  # Configure l'environnement
 ```
 

@@ -53,7 +53,7 @@ Since the **camera is connected to the Raspberry Pi**, we use this architecture:
 
 ```bash
 # Copy the vision-enabled bridge to Pi
-scp /home/genji/ros_jazzy/src/mycobot_R6A/mycobot_gateway/scripts/bridge_pi_vision.py \
+scp <your_ws>/src/mycobot_320pi_R6A/mycobot_gateway/scripts/bridge_pi_vision.py \
     er@10.10.0.221:~/bridge_pi_vision.py
 
 # SSH to Pi and run
@@ -64,7 +64,7 @@ python3 bridge_pi_vision.py
 ### Step 2: Run on Tour (PC)
 
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 conda deactivate  # IMPORTANT!
 source install/setup.bash
 

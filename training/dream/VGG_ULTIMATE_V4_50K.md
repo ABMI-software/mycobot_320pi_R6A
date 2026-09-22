@@ -25,11 +25,11 @@ Date : 2026-07-02 · Robot : MyCobot 320 Pi (variante sans grippeur)
 ```bash
 conda deactivate
 source ~/ros_jazzy/venv_dream/bin/activate
-cd /home/genji/Osama_ws/src/mycobot_R6A/training/dream
+cd <your_ws>/src/mycobot_320pi_R6A/training/dream
 
 python train_dream_ultimate_v4.py \
-    --data /home/genji/Osama_ws/src/mycobot_R6A/training/dream/dream_data/synthetic_50k_ndds \
-    --output /home/genji/Osama_ws/src/mycobot_R6A/training/dream/output/checkpoints_dream/vgg_ultimate_v4_e50 \
+    --data <your_ws>/src/mycobot_320pi_R6A/training/dream/dream_data/synthetic_50k_ndds \
+    --output <your_ws>/src/mycobot_320pi_R6A/training/dream/output/checkpoints_dream/vgg_ultimate_v4_e50 \
     --epochs 50 --batch-size 8 --workers 8 --patience 5
 ```
 

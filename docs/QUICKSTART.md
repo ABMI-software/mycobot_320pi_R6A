@@ -17,7 +17,7 @@ Attendez le message :
 ### 2️⃣ Sur le PC Tour (Ubuntu 24.04 + ROS2 Jazzy)
 
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 conda deactivate  # IMPORTANT !
 source install/setup.bash
 ros2 run mycobot_gateway bridge_tour
@@ -32,7 +32,7 @@ Attendez le message :
 
 Nouveau terminal sur le PC Tour :
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 conda deactivate
 source install/setup.bash
 ros2 topic pub /to_robot std_msgs/msg/String "{data: 'test_moteur_1'}" -1
@@ -49,14 +49,14 @@ Vous devriez voir :
 ### Script de diagnostic
 Vérifie que tout est correctement configuré :
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 source install/setup.bash
 ./diagnose.sh
 ```
 
 ### Commandes rapides
 ```bash
-source /home/genji/ros_jazzy/src/mycobot_R6A/quick_commands.sh
+source <your_ws>/src/mycobot_320pi_R6A/scripts/quick_commands.sh
 ```
 
 Puis utilisez les alias :
@@ -77,7 +77,7 @@ ROS2 Jazzy utilise Python 3.12, conda active Python 3.13 → incompatible !
 
 ### ⚠️ TOUJOURS sourcer le bon environnement
 ```bash
-source install/setup.bash  # Dans /home/genji/ros_jazzy/src/mycobot_R6A
+source install/setup.bash  # depuis <your_ws>, jamais depuis src/
 ```
 Ne PAS utiliser uniquement `/opt/ros/jazzy/setup.bash`
 
@@ -101,7 +101,7 @@ Ou alors le définir de manière identique dans **tous** les terminaux.
 
 ### Problème : "No executable found"
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 source install/setup.bash  # Important !
 ros2 pkg executables mycobot_gateway  # Doit afficher bridge_tour
 ```
@@ -153,7 +153,7 @@ ros2 topic list  # Doit afficher /to_robot et /from_robot
 
 Ajoutez ceci à votre `~/.bashrc` :
 ```bash
-alias mycobot_env='cd /home/genji/ros_jazzy/src/mycobot_R6A && conda deactivate && source install/setup.bash'
+alias mycobot_env='cd <your_ws>/src/mycobot_320pi_R6A && conda deactivate && source install/setup.bash'
 ```
 
 Ensuite, dans chaque nouveau terminal, tapez simplement :

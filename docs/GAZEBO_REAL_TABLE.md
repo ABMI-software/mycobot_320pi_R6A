@@ -70,7 +70,7 @@ de vrais `DICT_4X4_50`, identiques aux mêmes IDs dans `DICT_4X4_1000`, construi
 en géométrie SDF pour éviter toute dépendance aux textures de Gazebo Classic.
 Le relief de rendu maximal est de 0,13 mm et n'ajoute aucune collision.
 
-Le dossier `/home/genji/ros_jazzy/src/moveo_R5A` contient des textures ArUco
+Le dossier `<your_ws>/src/moveo_R5A` contient des textures ArUco
 et des tags sur les maillons du Moveo ; les quatre repères du plateau sont
 documentés dans le projet MyCobot actuel.
 

@@ -20,7 +20,7 @@ python3 bridge_pi.py
 ### 2️⃣ Sur le PC Tour - Terminal 1 (Bridge)
 
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 conda deactivate
 source install/setup.bash
 ros2 run mycobot_gateway bridge_tour
@@ -33,7 +33,7 @@ ros2 run mycobot_gateway bridge_tour
 ### 3️⃣ Sur le PC Tour - Terminal 2 (Tests interactifs)
 
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 ./robot_test_interactive.sh
 ```
 
@@ -78,7 +78,7 @@ python3 -c "from pymycobot.mycobot import MyCobot; mc = MyCobot('/dev/ttyUSB0', 
 
 ### Monitorer les messages du robot (PC Tour)
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 conda deactivate
 source install/setup.bash
 ros2 topic echo /from_robot

@@ -114,7 +114,7 @@ Fichiers additionnels (racine workspace) :
 
 ### Méthode 1 : Commandes manuelles
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 conda deactivate
 source install/setup.bash
 ros2 run mycobot_gateway bridge_tour
@@ -122,7 +122,7 @@ ros2 run mycobot_gateway bridge_tour
 
 ### Méthode 2 : Scripts rapides
 ```bash
-source /home/genji/ros_jazzy/src/mycobot_R6A/quick_commands.sh
+source <your_ws>/src/mycobot_320pi_R6A/quick_commands.sh
 start_bridge
 ```
 

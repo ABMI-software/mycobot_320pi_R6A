@@ -10,7 +10,7 @@ Ajouté `export ROS_DOMAIN_ID=10` dans `quick_commands.sh`
 
 ### 1️⃣ Rechargez les commandes
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 source quick_commands.sh
 ```
 
