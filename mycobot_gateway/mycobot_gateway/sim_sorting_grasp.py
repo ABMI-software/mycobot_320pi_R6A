@@ -106,6 +106,7 @@ TRANSIT_Z = 0.110      # hauteur de transfert : le max atteignable a r=0.28
 # grand ouvert seulement apres etre remonte.
 PLACE_CLEARANCE_M = 0.001    # garde sous l'objet au moment de le poser
 BIN_INNER_HALF_MM = 47.5     # demi-ouverture utile d'un bac
+CLEAR_MARGIN_MM = 2.0        # marge doigts <-> paroi au moment de degager l'objet
 BIN_FLOOR_Z = 0.002    # dessus du fond du bac
 MIN_TRANSIT_Z = 0.060  # la pointe ne doit jamais passer sous ca en transit
 
@@ -155,6 +156,16 @@ def footprint_half_mm(angle: float) -> float:
     angles = [a for a, _ in _FOOTPRINT_TABLE]
     halves = [h for _, h in _FOOTPRINT_TABLE]
     return float(np.interp(angle, angles, halves))
+
+
+def angle_for_footprint(max_half_mm: float) -> float:
+    """Angle le plus OUVERT (le plus petit) dont l'encombrement reste sous
+    `max_half_mm`. Sert a degager les doigts au maximum permis par le bac."""
+    # L'encombrement decroit quand l'angle croit : on inverse la table sur des
+    # demi-largeurs croissantes.
+    halves = [h for _, h in _FOOTPRINT_TABLE][::-1]
+    angles = [a for a, _ in _FOOTPRINT_TABLE][::-1]
+    return float(np.interp(max_half_mm, halves, angles))
 
 
 def rotation_top_down(phi_rad: float) -> np.ndarray:
@@ -464,10 +475,18 @@ class SimSortingGrasp(Node):
             self.open_gripper()
             return 'chemin vers le bac non sur'
         self.move_to(q_place)
-        # L'objet repose deja sur le fond : rendre sa largeur exacte suffit a
-        # annuler la force de serrage, sans que les doigts s'ecartent assez
-        # pour toucher la paroi.
+        # L'objet repose deja sur le fond : rendre sa largeur exacte annule
+        # d'abord la force de serrage.
         self.set_gripper(release, settle=1.2)
+        # Puis on ECARTE les doigts au maximum que le bac autorise (encombrement
+        # sous BIN_INNER_HALF - marge) AVANT de remonter. A la largeur exacte de
+        # l'objet, les doigts restent au contact ; pour un cylindre, les remonter
+        # ainsi glisse sur sa surface courbe et le fait basculer puis rouler
+        # par-dessus la paroi. Les degager d'abord supprime ce couple, sans que
+        # l'ouverture soit assez large pour toucher la paroi.
+        clearance = min(release,
+                        angle_for_footprint(BIN_INNER_HALF_MM - CLEAR_MARGIN_MM))
+        self.set_gripper(clearance, settle=0.8)
         self.move_to(q_over_bin)
         self.open_gripper()
 
