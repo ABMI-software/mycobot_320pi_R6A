@@ -9,6 +9,45 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — trois briques VLA, mergées sans jamais passer par ce fichier (22/09)
+
+Les PR #12 et #13 ont ajouté **trois répertoires de premier niveau** et leur
+documentation propre, sans qu'aucune entrée n'apparaisse ici ni dans
+`INDEX.md`. Rattrapé. Les portées diffèrent nettement et ne doivent pas être
+confondues.
+
+**`Gazebo_to_LeRobot_Pipeline/` et `ROS2_to_RLDS_Conversion_OpenVLA/` (PR #12)
+sont des preuves de tuyauterie, pas des entraînements.** Épisodes ROS2 →
+LeRobot v3.0, puis → RLDS/TFDS, le format d'Open X-Embodiment, via un fork du
+convertisseur maintenu par le premier auteur d'OpenVLA. Le contrat est respecté
+à la lettre — `state` 8-dim ↔ `POS_QUAT`, `action` 7-dim ↔ `EEF_POS` — et
+l'enregistrement dans les configs, transforms et mixtures d'OpenVLA est
+réellement testé : `test_openvla_transform.py` stubbe `prismatic` pour importer
+les vrais fichiers sans torch. **Deux épisodes de mouvements scriptés, aucune
+tâche réelle.** Quatre réserves relevées à l'audit, aucune bloquante pour une
+preuve de tuyauterie : la vérification FK est une pose statique affichée et non
+assertée ; la convention de repère du delta de rotation (`R_i⁻¹·R_j` = repère
+**outil**) n'est écrite nulle part ; le signe du gripper vient d'un visionnage ;
+le recadrage 320×240 → 224² jette ~25 % du champ horizontal.
+Documentation : `docs/PIPELINE.html` et `.docx` dans chacun des deux.
+
+**`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/` (PR #13) va plus loin** :
+**20 épisodes** enregistrés en Gazebo headless, portés en deux jeux au format
+LeRobot — `mycobot_pick_place_train` (épisodes 1-15, caméra frontale, 2670
+images) et `mycobot_pick_place_heldout` (16-20, `/synth_camera_right`, 927
+images). **La coupure tient un point de vue à l'écart, pas seulement des
+images** : c'est exactement la lacune que `CLAUDE.md` reproche au jeu de
+validation DREAM, dont les 800 images venaient toutes d'une seule vue.
+- **La saisie est une attache simulée, pas une préhension physique**, et le
+  document le dit en titre de section. Le problème de saisie n'est pas résolu.
+- Mesures honnêtes et chiffrées : facteur temps réel **0,082** (un trajet de
+  6-8 s de simulation coûte 60-80 s de temps réel, un cycle complet 5 à 7 min),
+  décalage des doigts **~0,10 m** sous `gripper_base`, et un blocage de ~2,9 h
+  observé dans une trajectoire dont la cause n'est pas isolée — d'où la
+  consigne de superviser les runs.
+- Documentation : `MEASUREMENTS.md` (runs 1-18, confiance annoncée par item),
+  `doc/headless_pick_and_place_specification.md` et les rapports HTML/Word.
+
 ### Ajouté — intégration continue, et le test qui manquait (22/09)
 
 - **`.github/workflows/ci.yml`.** Deux travaux : contrôles statiques (chaque

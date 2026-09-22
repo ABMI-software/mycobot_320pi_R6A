@@ -126,6 +126,18 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | [docs/DEBUG_CONNECTION_GUIDE.md](docs/DEBUG_CONNECTION_GUIDE.md) | Guide de débogage connexion |
 | [docs/BRIDGE_PI_UPGRADE_GUIDE.md](docs/BRIDGE_PI_UPGRADE_GUIDE.md) | Mise à jour bridge Pi |
 
+### 🤖 Briques VLA — données épisodiques (PR #12 et #13)
+
+⚠ Trois répertoires de portées **différentes**. Aucun n'entraîne de modèle.
+
+| Document | Description |
+|----------|-------------|
+| [Gazebo_to_LeRobot_Pipeline/docs/PIPELINE.html](Gazebo_to_LeRobot_Pipeline/docs/PIPELINE.html) | Export d'épisodes ROS2 → LeRobot v3.0. **Preuve de tuyauterie**, 2 épisodes scriptés. Version Word et FR à côté |
+| [ROS2_to_RLDS_Conversion_OpenVLA/docs/PIPELINE.html](ROS2_to_RLDS_Conversion_OpenVLA/docs/PIPELINE.html) | → RLDS/TFDS, le format d'Open X-Embodiment, enregistré dans les configs, transforms et mixtures d'OpenVLA. `state` 8-dim ↔ `POS_QUAT`, `action` 7-dim ↔ `EEF_POS` |
+| [Headless_Task-Grounded_Pick-and-Place_in_Gazebo/MEASUREMENTS.md](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/MEASUREMENTS.md) | **Ce qui a été mesuré, runs 1-18**, avec le niveau de confiance annoncé item par item : facteur temps réel 0,082, décalage des doigts ~0,10 m, blocage de 2,9 h non élucidé |
+| [.../doc/headless_pick_and_place_specification.md](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/doc/headless_pick_and_place_specification.md) | Spécification de la tâche |
+| [.../datasets/README.md](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/datasets/README.md) | **20 épisodes → 2 jeux LeRobot** : train 1-15 (2670 images, caméra frontale), held-out 16-20 (927 images, `/synth_camera_right`). La coupure tient un **point de vue** à l'écart — la lacune même que `CLAUDE.md` reproche au jeu de validation DREAM. ⚠ La saisie y est une **attache simulée**, pas une préhension physique |
+
 ### 🔬 Roadmap POC (Isaac Sim, VLA, AI physics)
 | Document | Description |
 |----------|-------------|

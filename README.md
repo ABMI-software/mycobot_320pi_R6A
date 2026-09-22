@@ -177,7 +177,10 @@ Topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (FR) (FR).
 | **In progress** | Extrinsic recalibration exists as a node and a script ([`scripts/calibration_extrinseque_auto.py`](scripts/calibration_extrinseque_auto.py)) with leave-one-out self-check, but is not yet wired as an automatic startup step in any launch file |
 | **In progress** | Learned object detection: a YOLOv8 detector ([`scripts/yolo_object_detect.py`](scripts/yolo_object_detect.py)) is used by the live pick pipeline, but the ROS 2 node in the graph is still HSV-based |
 | **In progress** | Physical-grasp sorting in simulation: outcome is **not deterministic** at identical commanded geometry — see [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) |
-| **In progress** | VLA data plumbing: [`Gazebo_to_LeRobot_Pipeline/`](Gazebo_to_LeRobot_Pipeline/) and [`ROS2_to_RLDS_Conversion_OpenVLA/`](ROS2_to_RLDS_Conversion_OpenVLA/) are pipeline proofs on scripted episodes, not trained policies |
+| **Validated** | Episode export to LeRobot v3.0 and to RLDS/TFDS, the Open X-Embodiment format, registered in OpenVLA's own configs, transforms and mixtures — and tested, not asserted. **Two scripted episodes: this proves the plumbing, it trains nothing** ([`Gazebo_to_LeRobot_Pipeline/`](Gazebo_to_LeRobot_Pipeline/), [`ROS2_to_RLDS_Conversion_OpenVLA/`](ROS2_to_RLDS_Conversion_OpenVLA/)) |
+| **In progress** | Task-grounded pick-and-place in headless Gazebo: **20 episodes**, 2670 training frames and 927 from a camera mount never seen in training — a held-out *viewpoint*, not just held-out images ([`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/)) |
+| **In progress** | That dataset's grasp is a **simulated attachment, not a physical grasp** — the grasp itself is unsolved there, and the sim runs at a 0.082 real-time factor |
+| **To come** | An actual VLA fine-tune. It needs far more episodes on a real task than any of the above provides |
 | **To come** | Replace HSV thresholding with a learned detector *inside the ROS 2 graph* |
 | **To come** | Higher simulation realism for vision-guided pick-and-place |
 | **To come** | Extended multi-view fusion and an additional keypoint, to lift the last-joint limitation |
@@ -357,6 +360,7 @@ is [`INDEX.md`](INDEX.md) (FR).
 | Simulation and data | [`docs/SYNTHETIC_DATA.md`](docs/SYNTHETIC_DATA.md) (FR) · [`docs/GAZEBO_REAL_TABLE.md`](docs/GAZEBO_REAL_TABLE.md) (FR) · [`mycobot_description/README.md`](mycobot_description/README.md) (FR) |
 | Pick-and-place | [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) · [`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md) (FR) · [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) |
 | Deployment and diagnosis | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (FR) · [`docs/DEBUG_CONNECTION_GUIDE.md`](docs/DEBUG_CONNECTION_GUIDE.md) (FR) · [`docs/BRIDGE_PI_UPGRADE_GUIDE.md`](docs/BRIDGE_PI_UPGRADE_GUIDE.md) (FR) |
+| VLA data pipelines | [`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/MEASUREMENTS.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/MEASUREMENTS.md) — what was measured, with per-item confidence · [`.../doc/headless_pick_and_place_specification.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/doc/headless_pick_and_place_specification.md) · [`.../datasets/README.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/datasets/README.md) — the two LeRobot datasets and why the split holds out a camera. Each of `Gazebo_to_LeRobot_Pipeline/` and `ROS2_to_RLDS_Conversion_OpenVLA/` carries its own `docs/PIPELINE.html` |
 | Where work stands | [`SESSION_RESUME.md`](SESSION_RESUME.md) (FR) |
 
 ## Roadmap
