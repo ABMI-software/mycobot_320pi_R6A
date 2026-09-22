@@ -12,6 +12,11 @@ simulation and adapted to the physical bench.
 
 Research and Innovation Department, ABMI.
 
+> **Language.** This page is in English; most of the project documentation is
+> in French. Links marked **(FR)** lead to French documents.
+
+![The digital twin: the measured bench replicated in Gazebo, wood texture and the four 50 mm ArUco markers](docs/real_table_wood_gazebo.png)
+
 *R6A* stands for **Robot à 6 Axes**. The work started on a five-axis arm — R5A —
 and moved to a six-axis one; the name followed the hardware. Earlier material
 still carrying the R5A label refers to this same project before that change.
@@ -81,7 +86,7 @@ cannot be attributed to the model rather than to the robot. The protocol,
 standard by standard, is in
 [`training/calibration/PROTOCOLE_ESSAIS_PRECISION.md`](training/calibration/PROTOCOLE_ESSAIS_PRECISION.md);
 the method behind it in
-[`training/calibration/METHODOLOGIE_PRECISION.md`](training/calibration/METHODOLOGIE_PRECISION.md).
+[`training/calibration/METHODOLOGIE_PRECISION.md`](training/calibration/METHODOLOGIE_PRECISION.md) (FR).
 
 The project runs on **two complementary benches, in Nanterre and in Lyon**,
 which imposes a shared protocol across sites so that campaigns stay comparable.
@@ -146,10 +151,16 @@ flowchart TB
 | `precision_benchmark` | 9-target grid, CSV report |
 | `trajectory_to_robot_bridge`, `gripper_to_robot_bridge` | Hand-teleoperation bridges |
 
-Full node and launch inventory: [`mycobot_gateway/README.md`](mycobot_gateway/README.md).
-Topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+The live ROS graph of the pose-estimation branch, two cameras detected:
+
+![ROS graph of the DREAM validation dashboard](docs/dream_dashboard_rosgraph.png)
+
+Full node and launch inventory: [`mycobot_gateway/README.md`](mycobot_gateway/README.md) (FR) (FR).
+Topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (FR) (FR).
 
 ## Status
+
+![The sorting bench in Gazebo: four objects, four bins, physical grasping](docs/pick_and_place_sim.png)
 
 | State | Item |
 |---|---|
@@ -158,11 +169,11 @@ Topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | **Validated** | End-to-end synthetic data generation under Gazebo, with scene randomisation |
 | **Validated** | Marker-free pose estimation (DREAM architecture) trained, sim-to-real fine-tuned, evaluated on held-out real frames — see [`training/dream/README.md`](training/dream/README.md) |
 | **Validated** | Real-time ROS 2 dashboard comparing inference against encoders |
-| **Validated** | Vision-guided pick-and-place, validated in simulation then replayed closed-loop on the physical bench — see [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) |
+| **Validated** | Vision-guided pick-and-place, validated in simulation then replayed closed-loop on the physical bench — see [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) |
 | **Validated** | Structured metrology campaign, repeatability assessed against ISO 9283 |
 | **In progress** | Extrinsic recalibration exists as a node and a script ([`scripts/calibration_extrinseque_auto.py`](scripts/calibration_extrinseque_auto.py)) with leave-one-out self-check, but is not yet wired as an automatic startup step in any launch file |
 | **In progress** | Learned object detection: a YOLOv8 detector ([`scripts/yolo_object_detect.py`](scripts/yolo_object_detect.py)) is used by the live pick pipeline, but the ROS 2 node in the graph is still HSV-based |
-| **In progress** | Physical-grasp sorting in simulation: outcome is **not deterministic** at identical commanded geometry — see [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) |
+| **In progress** | Physical-grasp sorting in simulation: outcome is **not deterministic** at identical commanded geometry — see [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) |
 | **In progress** | VLA data plumbing: [`Gazebo_to_LeRobot_Pipeline/`](Gazebo_to_LeRobot_Pipeline/) and [`ROS2_to_RLDS_Conversion_OpenVLA/`](ROS2_to_RLDS_Conversion_OpenVLA/) are pipeline proofs on scripted episodes, not trained policies |
 | **To come** | Replace HSV thresholding with a learned detector *inside the ROS 2 graph* |
 | **To come** | Higher simulation realism for vision-guided pick-and-place |
@@ -284,6 +295,15 @@ scripts/                    calibration, diagnostics, dashboards, robot bridges
 teleop/                     hand-teleoperation pipeline
 tests/                      pick FSM, IK control, safety, live ArUco geometry
 docs/                       architecture, procedures, per-domain documentation
+CHANGELOG.md                version history
+SESSION_RESUME.md           running log: where active work stands
+INDEX.md                    map of every document in the repository
+DEVELOPMENT_SUMMARY.md      long-form development record
+RAPPORT_PICK_AND_PLACE_LIVE.md   report of the first live vision-guided pick
+CLAUDE.md, .claude/         project conventions in machine-readable form;
+                            CONTRIBUTING.md is their source of truth
+aruco_markers_workspace.pdf      printable ArUco sheet for the workspace
+bridge_pi_debug.py          standalone bridge diagnostic, run on the robot board
 Gazebo_to_LeRobot_Pipeline/            episode export to LeRobot format
 ROS2_to_RLDS_Conversion_OpenVLA/       episode export to RLDS / OpenVLA
 Headless_Task-Grounded_Pick-and-Place_in_Gazebo/  headless pick-and-place POC
@@ -296,14 +316,14 @@ worthless detached from it.
 
 | Subject | Where |
 |---|---|
-| Precision campaign: protocol, standard, procedure and result per test | [`training/calibration/PROTOCOLE_ESSAIS_PRECISION.md`](training/calibration/PROTOCOLE_ESSAIS_PRECISION.md) |
-| Measurement methodology | [`training/calibration/METHODOLOGIE_PRECISION.md`](training/calibration/METHODOLOGIE_PRECISION.md) |
+| Precision campaign: protocol, standard, procedure and result per test | [`training/calibration/PROTOCOLE_ESSAIS_PRECISION.md`](training/calibration/PROTOCOLE_ESSAIS_PRECISION.md) (FR) |
+| Measurement methodology | [`training/calibration/METHODOLOGIE_PRECISION.md`](training/calibration/METHODOLOGIE_PRECISION.md) (FR) |
 | Raw campaign data, Lyon bench (repeatability, approach directions, leave-one-out) | `training/calibration/*_2026-09-09.csv` |
 | Keypoint model: training runs, evaluation, joint observability | [`training/dream/README.md`](training/dream/README.md) |
-| Validation dashboard and its reading | [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md) |
-| Sorting simulation: measured state and rejected hypotheses | [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) |
-| Closed-loop pick-and-place on hardware | [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) |
-| Version history | [`CHANGELOG.md`](CHANGELOG.md) |
+| Validation dashboard and its reading | [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md) (FR) |
+| Sorting simulation: measured state and rejected hypotheses | [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) |
+| Closed-loop pick-and-place on hardware | [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) |
+| Version history | [`CHANGELOG.md`](CHANGELOG.md) (FR) |
 
 Two cautions when reading any of it. An extrinsic's fit residual is **not** an
 accuracy — leave-one-out on a held-out marker is the honest figure. And a
@@ -325,13 +345,21 @@ questions and are routinely confused.
 
 ## Contributing
 
-- Branch per domain; see [`.claude/rules/git-branching.md`](.claude/rules/git-branching.md).
-- Conventional commit prefixes: `feat` · `fix` · `docs` · `refactor` · `test` ·
-  `chore` · `perf`, scoped by domain.
-- Any user-visible change updates [`CHANGELOG.md`](CHANGELOG.md) in the same commit.
-- A change affecting the physical robot requires a documented physical test pass.
-- Three Python environments coexist and must not be mixed; see
-  [`.claude/rules/python-environments.md`](.claude/rules/python-environments.md).
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before the first commit. In short:
+
+- Three Python environments coexist and must not be mixed — `conda deactivate`
+  before any ROS 2 command, every time.
+- Branch per domain; commit scope matches branch.
+- Conventional prefixes (`feat` · `fix` · `docs` · `refactor` · `test` · `chore`
+  · `perf`), scoped, with the *why* and its measured numbers in the body.
+- Any user-visible change updates [`CHANGELOG.md`](CHANGELOG.md) (FR) in the
+  same commit.
+- Anything touching the physical robot requires a preflight and a documented
+  physical test pass.
+- State the protocol with a number, or do not state the number.
+
+`.claude/` restates these rules for tooling; `CONTRIBUTING.md` is the source of
+truth.
 
 ## Licence and contact
 
@@ -339,6 +367,9 @@ Apache License 2.0 — see [`LICENSE`](LICENSE). Both ROS 2 packages declare the
 same SPDX identifier (`Apache-2.0`) in their `package.xml`.
 
 Copyright 2026 ABMI.
+
+To cite this work, see [`CITATION.cff`](CITATION.cff) — GitHub turns it into a
+*Cite this repository* button.
 
 **Dr. José Bernardo** — [jo.bernardo@abmi-groupe.com](mailto:jo.bernardo@abmi-groupe.com)
 Direction Recherche & Innovation, ABMI.

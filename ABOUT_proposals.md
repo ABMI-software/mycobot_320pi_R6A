@@ -1,8 +1,31 @@
-# GitHub "About" — proposals
+# GitHub "About" — description and topics
 
-Three variants of the repository description, from plainest to most
-value-oriented. GitHub caps this field at **350 characters**; the count for each
-is given below. Pick one and paste it into *Settings → About → Description*.
+## In use
+
+This is the description currently set on the repository:
+
+> R&D project on environment-adaptive robotics. Digital-twin-driven pipeline:
+> synthetic data generation, sim-to-real adaptation of a markerless pose
+> estimation model, and ISO 9283-based metrological characterisation on a real
+> multi-camera bench.
+
+**243 characters** of the 350 GitHub allows. Written by the maintainer as a
+condensation of the variants below, which are kept as alternatives.
+
+One word was changed from the maintainer's draft: *validation* became
+**characterisation**. ISO 9283 is used here to compute pose repeatability, and
+the measured campaign found 3 of 6 unidirectional series outside the
+manufacturer's ±0.5 mm — up to 0.838 mm. "Validation" reads as "the bench
+passed"; it did not, and the internal documentation is explicit about it.
+"Characterisation" states what was actually done: the instrument was measured.
+The distinction matters if a partner or an auditor reads the figures.
+
+---
+
+## Alternatives
+
+Three variants, from plainest to most value-oriented, kept for reuse — in a
+release note, a slide, or a funding summary. Character counts are given below.
 
 ---
 

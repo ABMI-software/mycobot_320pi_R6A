@@ -9,6 +9,14 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+## [1.17.0] - 2026-09-22
+
+Première version taguée du dépôt. Le CHANGELOG annonçait suivre le *Semantic
+Versioning* depuis ses débuts et numérotait ses sections, mais **aucune version
+n'avait jamais été taguée dans git** : les numéros ne renvoyaient à rien
+d'accessible. `v1.17.0` marque l'état qui suit, et les sections ci-dessous
+couvrent tout ce qui séparait cette version de la 1.16.0 du 13/07.
+
 ### Mesuré — la remontée verticale ne corrige pas le cylindre, qui échoue au hasard (22/09)
 
 Hypothèse testée puis **rejetée**, code annulé, rien n'est conservé dans l'arbre.

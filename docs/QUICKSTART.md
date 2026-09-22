@@ -134,7 +134,7 @@ ros2 topic list  # Doit afficher /to_robot et /from_robot
 
 - `README.md` — Documentation utilisateur détaillée
 - `SESSION_TEST.md` — Logs de test et résultats
-- `SUMMARY.md` — Résumé complet du projet
+- [`INDEX.md`](../INDEX.md) — carte de toute la documentation du dépôt
 - `test_bridge.sh` — Script de test automatisé
 - `diagnose.sh` — Script de diagnostic complet
 

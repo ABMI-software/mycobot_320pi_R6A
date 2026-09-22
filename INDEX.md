@@ -91,7 +91,6 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 |----------|-------------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture du système (3 chemins de commande : GUI/CLI, téléop main, vision DREAM) |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Guide de déploiement |
-| [docs/SUMMARY.md](docs/SUMMARY.md) | Résumé court du projet |
 
 ### 🧪 Tests & Procédures
 | Document | Description |

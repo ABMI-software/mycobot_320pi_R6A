@@ -1,5 +1,9 @@
 # Rule — documentation discipline
 
+> **`CONTRIBUTING.md` (repository root) is the source of truth for this project's
+> conventions.** This file restates them for tooling. If the two disagree, fix
+> this one.
+
 Docs get stale fast in this repo. The rule below keeps the three always-current files actually current, without turning every PR into a documentation exercise.
 
 ## Three always-current files
@@ -32,7 +36,7 @@ If you're unsure whether a change is "user-visible" for the CHANGELOG: if a futu
 
 ## Do not
 
-- **Do not create `SUMMARY.md`, `NOTES.md`, `TODO.md`, `IDEAS.md`.** The three always-current files plus the dedicated docs are sufficient. Scratchpad work goes in issues/PR bodies, not in the repo.
+- **Do not create `SUMMARY.md`, `NOTES.md`, `TODO.md`, `IDEAS.md`.** The three always-current files plus the dedicated docs are sufficient. Scratchpad work goes in issues/PR bodies, not in the repo. `INDEX.md` and `DEVELOPMENT_SUMMARY.md` predate this rule, are maintained and are the only exceptions — do not add others, and do not use this line to justify a new one.
 - **Do not duplicate content across docs.** Link to the canonical source. Example: real-robot gains live in [`docs/REAL_ROBOT_TEST_PROCEDURE.md`](../../docs/REAL_ROBOT_TEST_PROCEDURE.md) + [`.claude/agents/teleop-tuner.md`](../agents/teleop-tuner.md); other docs should link, not restate.
 - **Do not backdate CHANGELOG entries.** Today's work goes under today's date; if the session spans midnight, pick one date and stick with it.
 - **Do not remove old CHANGELOG entries** to make the file shorter. It's a history; truncating it defeats the purpose.

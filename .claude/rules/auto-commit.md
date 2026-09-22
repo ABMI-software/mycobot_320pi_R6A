@@ -1,5 +1,9 @@
 # Rule — Auto-documentation and auto-commit
 
+> **`CONTRIBUTING.md` (repository root) is the source of truth for this project's
+> conventions.** This file restates them for tooling. If the two disagree, fix
+> this one.
+
 The user does not want to ask Claude to update docs or commit at the end of each session. Claude must **do it proactively**, on the correct branch, with the correct scope — without prompting.
 
 This rule governs when, what, and how.
