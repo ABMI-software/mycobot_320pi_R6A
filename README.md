@@ -1,5 +1,6 @@
 # R6A — Modular Vision-Guided Robotics
 
+[![CI](https://github.com/ABMI-software/mycobot_320pi_R6A/actions/workflows/ci.yml/badge.svg)](https://github.com/ABMI-software/mycobot_320pi_R6A/actions/workflows/ci.yml)
 ![ROS 2](https://img.shields.io/badge/ROS%202-Jazzy-blue)
 ![Python](https://img.shields.io/badge/Python-3.12-blue)
 ![Gazebo](https://img.shields.io/badge/Gazebo-Harmonic-orange)
@@ -293,17 +294,20 @@ training/
 datasets/                   synthetic and real datasets (images via Git LFS)
 scripts/                    calibration, diagnostics, dashboards, robot bridges
 teleop/                     hand-teleoperation pipeline
-tests/                      pick FSM, IK control, safety, live ArUco geometry
+tests/                      pick FSM, IK control, safety, live ArUco geometry,
+                            and that every launch file still builds
 docs/                       architecture, procedures, per-domain documentation
 CHANGELOG.md                version history
 SESSION_RESUME.md           running log: where active work stands
 INDEX.md                    map of every document in the repository
 DEVELOPMENT_SUMMARY.md      long-form development record
 RAPPORT_PICK_AND_PLACE_LIVE.md   report of the first live vision-guided pick
-CLAUDE.md, .claude/         project conventions in machine-readable form;
-                            CONTRIBUTING.md is their source of truth
+CONTRIBUTING.md             conventions — the source of truth
+SECURITY.md                 threat model and reporting
+CITATION.cff                how to cite this work
+.github/                    CI, issue and pull-request templates
+CLAUDE.md, .claude/         the conventions restated for tooling
 aruco_markers_workspace.pdf      printable ArUco sheet for the workspace
-bridge_pi_debug.py          standalone bridge diagnostic, run on the robot board
 Gazebo_to_LeRobot_Pipeline/            episode export to LeRobot format
 ROS2_to_RLDS_Conversion_OpenVLA/       episode export to RLDS / OpenVLA
 Headless_Task-Grounded_Pick-and-Place_in_Gazebo/  headless pick-and-place POC

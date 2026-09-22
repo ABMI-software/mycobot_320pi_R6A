@@ -1,0 +1,23 @@
+name: Évolution
+description: Une capacité qui manque
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Le besoin
+      description: Ce qui est impossible ou pénible aujourd'hui. Pas la solution — le problème.
+    validations: {required: true}
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Piste envisagée
+      description: Facultatif.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Comment saurait-on que c'est fait
+      description: >-
+        De préférence une mesure, pas une impression. Sur ce dépôt, « ça marche »
+        s'est déjà révélé faux trois passages plus tard.
+    validations: {required: true}

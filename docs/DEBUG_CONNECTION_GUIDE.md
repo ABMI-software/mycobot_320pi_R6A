@@ -1,5 +1,12 @@
 # 🐛 Guide Debug - Connexion Tour se ferme immédiatement
 
+> ⚠ **`bridge_pi_debug.py` a été supprimé du dépôt (22/09/2026).** Son unique
+> commit, en mars 2026, l'avait enregistré **déjà corrompu** — en-tête et corps
+> entrelacés, jamais exécutable. Les instructions ci-dessous qui le nomment
+> n'ont donc jamais pu fonctionner. Le pont de la Pi est
+> [`scripts/gripper_bridge.py`](../scripts/gripper_bridge.py), seul à répondre
+> à `get_pro_gripper_status`.
+
 ## 🔍 Problème identifié
 
 ```

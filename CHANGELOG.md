@@ -9,6 +9,35 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — intégration continue, et le test qui manquait (22/09)
+
+- **`.github/workflows/ci.yml`.** Deux travaux : contrôles statiques (chaque
+  `.py` suivi compile, chaque `package.xml` est du XML valide, `CITATION.cff`
+  porte ses champs obligatoires, tous les liens internes résolvent) et une
+  construction `colcon` réelle dans un conteneur `ros:jazzy-ros-base`.
+- **`tests/test_launch_files.py`** appelle `generate_launch_description()` sur
+  les 23 fichiers de launch. C'est le test qui manquait : `sim_grasp.launch.py`
+  est resté inchargeable douze jours sans que rien ne le signale. Vérifié en
+  réintroduisant le bug d'origine — le test le rattrape.
+- `.github/known-broken-links.txt` recense 9 cibles de liens jamais commitées.
+  C'est une **dette explicite**, pas une exception : la CI échoue sur tout lien
+  cassé qui n'y figure pas.
+- Gabarits d'issue et de pull request, `SECURITY.md`, et
+  `mycobot_description/README.md` — la convention ROS veut un `README.md` par
+  paquet, celui-ci n'en avait pas.
+
+### Supprimé — `bridge_pi_debug.py`, jamais exécutable (22/09)
+
+- Le fichier avait **un seul commit dans son histoire, en mars 2026, et il y
+  était déjà corrompu** : quatre shebangs concaténés sur la première ligne,
+  en-tête et corps entrelacés, 157 lignes de plus de 120 caractères, et des
+  renvois à ROS *galactic*. Il n'a jamais pu démarrer.
+- Personne ne l'a vu parce que rien ne compilait les fichiers Python du dépôt.
+  C'est le premier contrôle de la CI qui l'a fait tomber.
+- `docs/TEST_COMPLET.md` et `docs/DEBUG_CONNECTION_GUIDE.md` disaient pourtant
+  de le lancer sur la Pi. Les deux portent désormais un avertissement et
+  renvoient vers `scripts/gripper_bridge.py`.
+
 ## [1.17.0] - 2026-09-22
 
 Première version taguée du dépôt. Le CHANGELOG annonçait suivre le *Semantic
@@ -1705,7 +1734,7 @@ fixe devant le bras. Validé en simulation ; premier run réel en cours.
   et **mode 3D** (depth → correspondance 3D). Self-tests : le 3D récupère
   j1–j4 à <2° **sans amorçage** (la profondeur supprime la fragilité mono) ;
   j5 faible, **j6 non observable** (keypoint sur l'axe de j6 — limite structurelle).
-- [`training/calibration/oni_grabber_rgbd.cpp`](../training/calibration/oni_grabber_rgbd.cpp)
+- [`training/calibration/oni_grabber_rgbd.cpp`](training/calibration/oni_grabber_rgbd.cpp)
   — grabber OpenNI Astra : couleur + depth aligné couleur (D2C) + FOV (intrinsèques)
   vers `/dev/shm`. Extension du grabber couleur existant.
 - [`training/calibration/calibrate_astra_extrinsic_shm.py`](training/calibration/calibrate_astra_extrinsic_shm.py)
@@ -2095,11 +2124,11 @@ Session dédiée à débloquer la **pose estimation DREAM** (bloqué ~26 % déte
 Structure complète pour que les sessions Claude aient le contexte projet dès le démarrage :
 
 - [`CLAUDE.md`](CLAUDE.md) à la racine — project overview, 3 envs Python, branch map, POC scope (digital twin · AI physics · VLA · pose estimation)
-- [`.claude/settings.json`](../.claude/settings.json) — permissions partagées projet-wide
-- [`.claude/rules/`](../.claude/rules/) (5) — `python-environments` · `ros2-conventions` · `real-robot-safety` · `git-branching` · `documentation`
-- [`.claude/commands/`](../.claude/commands/) (5) — `launch-sim` · `launch-teleop` · `real-robot-preflight` · `train-dream` · `collect-synthetic`
-- [`.claude/skills/`](../.claude/skills/) (6) — `teleop-troubleshoot` · `dream-workflow` · `gazebo-setup` · `real-robot-session` · `isaac-sim-integration` · `lerobot-dataset`
-- [`.claude/agents/`](../.claude/agents/) (6) — `ros2-debugger` · `dream-trainer` · `teleop-tuner` · `urdf-surgeon` · `digital-twin-engineer` · `vla-integrator`
+- [`.claude/settings.json`](.claude/settings.json) — permissions partagées projet-wide
+- [`.claude/rules/`](.claude/rules/) (5) — `python-environments` · `ros2-conventions` · `real-robot-safety` · `git-branching` · `documentation`
+- [`.claude/commands/`](.claude/commands/) (5) — `launch-sim` · `launch-teleop` · `real-robot-preflight` · `train-dream` · `collect-synthetic`
+- [`.claude/skills/`](.claude/skills/) (6) — `teleop-troubleshoot` · `dream-workflow` · `gazebo-setup` · `real-robot-session` · `isaac-sim-integration` · `lerobot-dataset`
+- [`.claude/agents/`](.claude/agents/) (6) — `ros2-debugger` · `dream-trainer` · `teleop-tuner` · `urdf-surgeon` · `digital-twin-engineer` · `vla-integrator`
 - [`.claude/hooks/validate-ros2-build.sh`](.claude/hooks/validate-ros2-build.sh) — inactif par défaut (à câbler dans settings si désiré)
 
 La skill `isaac-sim-integration` contient la roadmap 5-phases pour Isaac Sim (USD conversion → ROS2 bridge → synth data DREAM → Isaac Lab parallel envs → real-robot validation). **Aucune migration démarrée** — uniquement la planification. Gazebo reste sur `main`.
@@ -2148,7 +2177,7 @@ Refonte complète de la GUI [`teleop/teleop_dashboard.py`](teleop/teleop_dashboa
   - Toast horodaté dans la status bar Home (`✓ Send robot home · 14:23:05`)
 - **Presets de gains** — 🐢 Safe start (0.6/0.6/0.6/0.3) · ⚙️ Nominal (1.2/1.2/1.6/0.25) · ⚡ Reactive (1.6/1.6/2.0/0.15). Le preset actif reste highlighted en SUCCESS solide.
 - **Polling passif** de `get_angles` (0.3 s) pour remonter les angles réels quand `/joint_states` n'est pas là
-- [`teleop/assets/abmi_logo.png`](../teleop/assets/) — logo chargé automatiquement
+- [`teleop/assets/abmi_logo.png`](teleop/assets/) — logo chargé automatiquement
 
 ### Modifié
 
