@@ -1,6 +1,6 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-> **Date de dernière mise à jour :** 23 septembre 2026 (déport d'outil, butées articulaires, suite de tests remise en marche)
+> **Date de dernière mise à jour :** 23 septembre 2026 (déport d'outil, butées articulaires, suite de tests remise en marche ; revue de la PR #14)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
 > **Branche :** `fix/tool-offset-and-test-collection`, issue de `main`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
@@ -73,6 +73,10 @@ Suite de tests : **171 passés, 23 échoués, 3 ignorés** contre 0 exécuté.
 4. [JAUNE] Trancher si `rviz_sync`, `slider_control` et `marker_follow_full`
    doivent passer à l'URDF Gazebo.
 5. [VERT] Écrire le `workspace_safety_checker` lui-même, une fois 1 et 2 faits.
+6. [JAUNE] **Trancher sur la PR #14** : poster ou non le commentaire de revue
+   rédigé ci-dessous, et décider du sort de
+   `fix/pr14-process-scope-and-paths` (proposer à l'auteur, ou laisser la PR
+   être mergée telle quelle). Voir « Le second fil de la séance ».
 
 ### Où on en est, concrètement
 
@@ -80,12 +84,94 @@ Travail sur la branche **`fix/tool-offset-and-test-collection`**, issue de
 `main`, quatre commits, **non poussée**. Elle a été créée parce que la séance
 avait démarré sur `main` et qu'un `checkout` vers
 `fix/pr14-process-scope-and-paths` est intervenu en cours de route ; cette
-branche-là a reçu un commit d'une autre main (`7a4ff756`) et n'a pas été
-touchée.
+branche-là porte le commit `7a4ff756`, issu du second fil décrit plus bas ;
+aucun fichier n'est commun aux deux.
 
 ⚠ Ses `.claude/rules/` exigent un trailer `Co-Authored-By`, à rebours de
 `CLAUDE.md` sur `main`. C'est `CLAUDE.md` qui a été suivi : aucun commit de
 cette séance ne porte d'attribution.
+
+### Le second fil de la séance — la PR #14
+
+Revue de la **PR #14** de `citdemond`, *« Add a single-entry-point demo launch
+file for the pick-and-place POC »*, **ouverte et non mergée**. Elle remplace
+les sept étapes manuelles de `episode.sh` par une commande, via
+`scripts/run_demo.py` et deux launch files, dans
+`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/`.
+
+Ce qu'elle apporte tient. Les quatre bugs qu'elle corrige sont réels, et
+`attach_mode` déclaré en argument de lancement met la limite — le bloc est
+porté par une soudure `DetachableJoint`, pas par une prise — sous les yeux de
+qui lance la démo, au lieu de l'enterrer dans un rapport.
+
+**Le défaut bloquant était le nettoyage de processus.** `run_demo.py` tuait par
+motif nu (`gz sim`, `parameter_bridge`, `robot_state_publisher`, `move_group`),
+au démarrage **et** à l'arrêt. Dans le conteneur c'est sans risque : il possède
+son espace de processus. Sur la PC Tour, non — treize launch files de
+`mycobot_gateway/launch/` lancent ces mêmes exécutables, dont
+`sim_grasp.launch.py` et le tableau de bord multicam. Lancer la démo pendant
+qu'un de ces bancs tourne le tuait, silencieusement.
+
+Quatre corrections sur **`fix/pr14-process-scope-and-paths`** (`7a4ff756`),
+branchée sur la tête de la PR, **non poussée** :
+
+1. Chaque fils est lancé dans sa propre session et signalé **par groupe** : le
+   démontage n'a plus besoin de la liste de motifs. Mesuré — un SIGKILL sur le
+   seul PID du parent laisse un petit-fils vivant, le même signal au groupe
+   n'en laisse aucun. Le balayage de démarrage passe derrière un argument
+   `reap_stale`, **défaut `false`** : il liste ce qui gêne et s'arrête.
+   `matching_pids()` exclut sa propre ascendance, `pgrep -f` comparant la ligne
+   de commande entière — c'est ce piège qui donnait `LAUNCH_EXIT=143`.
+2. Trois chemins `/workspace` codés en dur, dont `controller.yaml`, qui porte
+   le rattrapage de la course perdue au démarrage à froid.
+3. `exit_code` vaut 1 jusqu'à preuve du contraire. Un run tué se déclarait en
+   succès, contre un contrat qui dit « 0 = posé sur l'assiette et tenu ».
+4. Les docstrings annonçaient `ros2 launch <fichier>.launch.py` ; ce dossier
+   n'a ni `package.xml`, ni `CMakeLists.txt`, ni `setup.py`.
+
+⚠ **Rien n'a tourné de bout en bout** — il y faut le conteneur, Gazebo et
+MoveIt. Vérifié hors ligne seulement : les deux launch files chargent et
+déclarent `reap_stale`, le refus d'`attach_mode` sort toujours en 2, la
+détection refuse et **épargne** un leurre, `reap_stale:=true` en tue un, et le
+démontage par groupe atteint le petit-fils.
+
+**Aucune entrée CHANGELOG** pour ces corrections : elles portent sur du code
+non mergé, absent de `main`.
+
+#### Le commentaire de revue, rédigé et non posté
+
+> Solid work — the four bugs are real and the comments earn their keep, and
+> putting `attach_mode` in the launch arguments is the right call: nobody can
+> watch this demo and mistake the weld for a grasp.
+>
+> Four things I'd change before merge, proposed as a branch off your head
+> (`fix/pr14-process-scope-and-paths`):
+>
+> 1. `pkill_stale()` kills by bare command-line pattern, at startup *and* at
+>    teardown. Safe in the container; on the workstation, thirteen launch files
+>    under `mycobot_gateway/launch/` run `robot_state_publisher` /
+>    `parameter_bridge` — including `sim_grasp.launch.py` and the multicam
+>    dashboard. The branch spawns each child in its own session and signals by
+>    process group instead (measured: PID-only SIGKILL leaves a grandchild
+>    alive, group SIGKILL doesn't), and gates the startup sweep behind a new
+>    `reap_stale` argument, default false.
+> 2. `/workspace/install/.../controller.yaml` is load-bearing in the respawn
+>    fallback and pins the demo to one machine; same for
+>    `sys.path.insert("/workspace/htgpp")` in `precompute_ik.py`.
+> 3. `exit_code` defaulted to 0, so a killed run reported success against the
+>    headless file's own "0 = placed and held" contract.
+> 4. `ros2 launch pick_and_place_demo.launch.py` only resolves from inside
+>    `launch/` — this folder has no `package.xml`.
+>
+> Two questions rather than changes: could the report land as Markdown? Two
+> `.docx` are invisible to `git diff`, and the repo asks for explicit approval
+> on binary workbooks for that reason. And this adds two launch files, a script
+> and five arguments with no `CHANGELOG.md` / `INDEX.md` entry — the repo
+> convention is same-commit.
+
+Il n'a **pas** été posté : publier sur la PR d'un tiers est une action
+sortante, et `gh` n'est pas installé ici (il faudrait passer par l'API avec le
+token). À poster tel quel, ou à recomposer.
 
 ### Commande rapide de reprise
 
