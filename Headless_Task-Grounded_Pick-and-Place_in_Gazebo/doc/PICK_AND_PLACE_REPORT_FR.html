@@ -405,7 +405,7 @@ footer {
         <span><b>Sandbox</b> ~/tomislav/robotics/Headless_Task-Grounded_Pick-and-Place_in_Gazebo</span>
         <span><b>H&ocirc;te</b> Ubuntu WSL2, ~4,9&nbsp;Go de RAM utilisable, CPU uniquement</span>
         <span><b>Reproduit via</b> le conteneur Docker <code>gazebo_to_lerobot</code> (Ubuntu 24.04, ROS2 Jazzy, Gazebo Harmonic)</span>
-        <span><b>Commit</b> f944dbe sur <code>main</code></span>
+        <span><b>Commit</b> 5c92a565 sur <code>main</code></span>
         <span><b>&Eacute;crit le</b> 22/09/2026</span>
       </div>
     </div>
@@ -413,7 +413,8 @@ footer {
     <section class="block" id="overview">
       <h2>Vue d'ensemble</h2>
       <p class="block-dek">Ce document est le rapport d'impl&eacute;mentation de <code>headless_pick_and_place_specification.md</code> &mdash; le fichier situ&eacute; dans ce m&ecirc;me dossier, trait&eacute; comme une sp&eacute;cification contraignante des <em>objectifs</em> de conception et de v&eacute;rification, pas des d&eacute;tails d'impl&eacute;mentation. Selon l'instruction directrice sous laquelle ce travail a &eacute;t&eacute; men&eacute;, les choix de programmation pr&eacute;cis de ce document pouvaient librement &ecirc;tre remplac&eacute;s par de meilleures solutions ; chaque objectif devait &ecirc;tre soit atteint, soit explicitement signal&eacute; comme probl&egrave;me.</p>
-      <p class="prose">En bref&nbsp;: chaque &eacute;tape num&eacute;rot&eacute;e de la sp&eacute;cification (Parties 1&agrave;8) a &eacute;t&eacute; impl&eacute;ment&eacute;e et v&eacute;rifi&eacute;e, vingt &eacute;pisodes au format LeRobot ont &eacute;t&eacute; enregistr&eacute;s et r&eacute;partis en un jeu d'entra&icirc;nement de 15 &eacute;pisodes et un jeu de validation &agrave; cam&eacute;ra tenue &agrave; l'&eacute;cart de 5 &eacute;pisodes, et le pipeline est enti&egrave;rement auto-v&eacute;rifiant (un contr&ocirc;le r&eacute;ussite/&eacute;chec bas&eacute; sur un CSV tourne &agrave; la fin de chaque &eacute;pisode). La seule d&eacute;viation structurante se situe dans le m&eacute;canisme de prise lui-m&ecirc;me&nbsp;: apr&egrave;s qu'une exp&eacute;rience de physique d&eacute;lib&eacute;r&eacute;e et born&eacute;e n'a produit aucune tenue par friction, le bloc est port&eacute; par une soudure Gazebo <code>DetachableJoint</code>, d&eacute;clench&eacute;e &agrave; la fermeture de la pince et rel&acirc;ch&eacute;e &agrave; son ouverture &mdash; &eacute;tiquet&eacute;e <b>ATTACHE SIMUL&Eacute;E, PAS une prise physique</b> partout o&ugrave; elle appara&icirc;t, dans les commentaires de code, les lignes de journal, et les m&eacute;tadonn&eacute;es de chaque &eacute;pisode. Quatre bugs ont &eacute;t&eacute; corrig&eacute;s dans le chemin de s&eacute;quencement bras/pince, trois autres dans l'infrastructure du lot d'enregistrement, et deux sont signal&eacute;s comme m&eacute;ritant un rapport en amont.</p>
+      <p class="prose">En bref&nbsp;: chaque &eacute;tape num&eacute;rot&eacute;e de la sp&eacute;cification (Parties 1&agrave;8) a &eacute;t&eacute; impl&eacute;ment&eacute;e et v&eacute;rifi&eacute;e, vingt &eacute;pisodes au format LeRobot ont &eacute;t&eacute; enregistr&eacute;s et r&eacute;partis en un jeu d'entra&icirc;nement de 15 &eacute;pisodes et un jeu de validation &agrave; cam&eacute;ra tenue &agrave; l'&eacute;cart de 5 &eacute;pisodes, et le pipeline est enti&egrave;rement auto-v&eacute;rifiant (un contr&ocirc;le r&eacute;ussite/&eacute;chec bas&eacute; sur un CSV tourne &agrave; la fin de chaque &eacute;pisode). La seule d&eacute;viation structurante se situe dans le m&eacute;canisme de prise lui-m&ecirc;me&nbsp;: apr&egrave;s qu'une exp&eacute;rience de physique d&eacute;lib&eacute;r&eacute;e et born&eacute;e n'a produit aucune tenue par friction, le bloc est port&eacute; par une soudure Gazebo <code>DetachableJoint</code>, d&eacute;clench&eacute;e &agrave; la fermeture de la pince et rel&acirc;ch&eacute;e &agrave; son ouverture &mdash; &eacute;tiquet&eacute;e <b>ATTACHE SIMUL&Eacute;E, PAS une prise physique</b> partout o&ugrave; elle appara&icirc;t, dans les commentaires de code, les lignes de journal, et les m&eacute;tadonn&eacute;es de chaque &eacute;pisode. Quatre bugs ont &eacute;t&eacute; corrig&eacute;s dans le chemin de s&eacute;quencement bras/pince, trois autres dans l'infrastructure du lot d'enregistrement, trois autres dans l'orchestrateur de d&eacute;mo ajout&eacute; le 22/09/2026 (&sect;13&ndash;15), et quatre sont signal&eacute;s comme m&eacute;ritant un rapport en amont.</p>
+      <p class="prose"><b>Addendum, 22/09/2026 (&sect;13&ndash;15)&nbsp;:</b> un manager a demand&eacute; un point d'entr&eacute;e unique <code>ros2 launch</code> pour r&eacute;ellement ex&eacute;cuter et regarder cette d&eacute;mo, plut&ocirc;t que le parcours manuel en 7 &eacute;tapes (&sect;manuel) qui &eacute;tait le seul moyen de la lancer avant. Deux fichiers launch encapsulent d&eacute;sormais un seul script orchestrateur, avec <code>gui</code>, <code>record</code>, <code>block_x</code>/<code>block_y</code> et <code>attach_mode</code> expos&eacute;s comme des arguments <code>ros2 launch</code> ordinaires et document&eacute;s &mdash; <code>attach_mode</code> d&eacute;lib&eacute;r&eacute;ment, pour que la limite de l'attache simul&eacute;e soit visible au point d'usage, pas seulement dans ce document.</p>
       <p class="prose">Ce rapport suit la m&ecirc;me structure que les runbooks de <code>Gazebo_to_LeRobot_Pipeline/docs/</code> et <code>ROS2_to_RLDS_Conversion_OpenVLA/docs/</code>&nbsp;: un compte-rendu &eacute;tape par &eacute;tape associant ce qui a &eacute;t&eacute; fait au contr&ocirc;le concret qui le prouve, une section de r&eacute;f&eacute;rence pour les bugs et les limites, et un guide manuel, ex&eacute;cutable par un humain, en fin de document.</p>
     </section>
 
@@ -668,10 +669,84 @@ gz model -m red_block -p</pre>
       <p class="callout warn"><b>Report&eacute;, pas abandonn&eacute;&nbsp;:</b> ceci n'a pas &eacute;t&eacute; charg&eacute; via la vraie classe <code>LeRobotDataset</code> &mdash; ce contr&ocirc;le n&eacute;cessite <code>torch</code> et se fera sur la machine GPU. Voir <code>datasets/README.md</code> pour la m&ecirc;me remarque conserv&eacute;e avec les donn&eacute;es elles-m&ecirc;mes.</p>
     </article>
 
+    <!-- ===================================================== ADDENDUM 2026-09-22 ===================================================== -->
+    <section class="block" id="addendum-head">
+      <h2>Addendum, 22/09/2026&nbsp;: un fichier launch testable</h2>
+      <p class="block-dek">Absent de la sp&eacute;cification &mdash; une demande directe du chef de projet, cit&eacute;e int&eacute;gralement car elle expose son propre raisonnement&nbsp;: <i>&laquo;&nbsp;Ce qui serait int&eacute;ressant est de mettre en place aussi un launch pour qu'on puisse le tester. Si j'ai bien compris tout est fait et valid&eacute; en backstage automatis&eacute;, sans v&eacute;rification 3D sur gazebo, vu que ta machine ne te le permet pas. Peux-tu t'assurer que le pipeline de lancement sur mon PC soit pr&ecirc;t et que cela fonctionne comme pr&eacute;vu&nbsp;?&nbsp;&raquo;</i> L&eacute;gitime, et v&eacute;ritablement absent avant le &sect;15&nbsp;: ce projet avait <code>sim_full.launch.py</code> et <code>move_group.launch.py</code>, mais la d&eacute;mo elle-m&ecirc;me &eacute;tait orchestr&eacute;e par <code>episode.sh</code>/<code>batch.sh</code> plus le parcours manuel en 7 &eacute;tapes du &sect;manuel, avec du <code>&amp;</code> en arri&egrave;re-plan et du polling <code>until &hellip; sleep</code>. Aucun point d'entr&eacute;e unique n'existait.</p>
+    </section>
+
+    <article class="step" id="s13">
+      <div class="step-head"><span class="step-num">13</span><h3>Robustesse de l'IK pour une position de bloc choisie par le manager</h3></div>
+      <p class="step-purpose">Le lot d'enregistrement (&sect;10) n'a jamais eu besoin que de 9 positions de bloc pr&eacute;-valid&eacute;es. Un argument de fichier launch laisse un relecteur choisir <em>n'importe quelle</em> position atteignable et relancer &mdash; ce qui impliquait que le chemin IK &agrave; pose unique ait la m&ecirc;me protection que le chemin par lot.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>La nouvelle tentative de coh&eacute;rence de branche (amorcer depuis une configuration connue comme bonne, retenter jusqu'&agrave; 6 fois, rejeter toute solution hors de la branche coude-haut orient&eacute;e vers l'avant utilis&eacute;e par chaque &eacute;pisode enregistr&eacute;) ne vivait auparavant que dans le chemin par lot <code>--poses</code> de <code>precompute_ik.py</code>. Extraite dans <code>solve_waypoints_robust()</code> et d&eacute;sormais partag&eacute;e par le chemin &agrave; pose unique aussi.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p>Test &agrave; position explicite (0,25&nbsp;; 0,00)&nbsp;: <code>approach J1=+0.367 descend J3=-2.420 branch_ok=True</code> &mdash; la m&ecirc;me branche utilis&eacute;e par chaque &eacute;pisode enregistr&eacute;. Test en d&eacute;tection live (sans <code>--block-x</code>/<code>--block-y</code>, lisant la pose Gazebo r&eacute;ellement stabilis&eacute;e du bloc)&nbsp;: r&eacute;sultat identique, une fois le bug de timeout ci-dessous corrig&eacute;.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Bug trouv&eacute; et corrig&eacute;&nbsp;:</b> <code>live_block_xyz()</code> levait <code>RuntimeError: could not read live pose of red_block: ''</code> &mdash; pas la sortie partielle d&eacute;j&agrave; document&eacute;e ("s'affiche puis se bloque"), v&eacute;ritablement vide. Cela s'ex&eacute;cute juste apr&egrave;s la construction de <code>MoveItPy</code> elle-m&ecirc;me (~90&nbsp;s)&nbsp;; la charge CPU de cette machine &agrave; ce moment pr&eacute;cis semble avoir suffi &agrave; affamer le sous-processus <code>gz model</code> au point qu'il n'affiche m&ecirc;me rien avant son d&eacute;lai de 10&nbsp;s. Corrig&eacute; en retentant (5&times;, 25&nbsp;s chacun) plut&ocirc;t qu'en se fiant &agrave; un seul court d&eacute;lai.</p>
+    </article>
+
+    <article class="step" id="s14">
+      <div class="step-head"><span class="step-num">14</span><h3><code>run_demo.py</code> &mdash; un seul orchestrateur derri&egrave;re les deux fichiers launch</h3></div>
+      <p class="step-purpose">Porte la s&eacute;quence de d&eacute;marrage d&eacute;j&agrave; &eacute;prouv&eacute;e de <code>scripts/episode.sh</code> vers Python, g&eacute;n&eacute;ralis&eacute;e pour une position de bloc arbitraire et un enregistreur optionnel, avec un arr&ecirc;t propre des processus.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>D&eacute;marrer <code>sim_full.launch.py</code> (GUI ou headless selon l'argument) &rarr; attendre les trois contr&ocirc;leurs <code>active</code>, avec le m&ecirc;me repli de relance s&eacute;quentielle qu'<code>episode.sh</code> utilise pour la course de d&eacute;marrage &agrave; froid des lanceurs &rarr; spawn de l'assiette et du bloc &agrave; la position demand&eacute;e &rarr; attendre, puis lire la pose <em>stabilis&eacute;e</em> du bloc &rarr; r&eacute;soudre l'IK contre cette pose stabilis&eacute;e, pas celle command&eacute;e (&sect;13) &rarr; d&eacute;marrer <code>move_group</code> &rarr; si <code>record:=true</code>, d&eacute;marrer et activer le cycle de vie de l'enregistreur rosetta &rarr; lancer <code>run_pick_and_place.py</code> &rarr; afficher le verdict depuis <code>grasp_meta.json</code>. <code>record:=false</code> (par d&eacute;faut) saute enti&egrave;rement l'&eacute;tape d'enregistrement &mdash; aucune installation de <code>rosetta</code> n&eacute;cessaire pour le cas courant.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p>Deux ex&eacute;cutions compl&egrave;tes ind&eacute;pendantes de bout en bout (bloc &agrave; (0,25&nbsp;; 0,00), headless), affichant chacune <code>RESULT: motions_ok=True placed_on_plate=True grasp_held=True</code>. <code>attach_mode</code> invalide test&eacute; s&eacute;par&eacute;ment&nbsp;: rejet&eacute; immédiatement avec le code de sortie 2 et la raison explicit&eacute;e, avant que quoi que ce soit ne soit lanc&eacute;.</p>
+        </div>
+      </div>
+      <p class="callout bug"><b>Trois bugs trouv&eacute;s et corrig&eacute;s ici, tous sp&eacute;cifiques au fait de s'ex&eacute;cuter comme enfant d'un fichier launch plut&ocirc;t que comme script bash</b> (aucun n'existait dans <code>episode.sh</code>, car il n'&eacute;tait jamais invoqu&eacute; ainsi)&nbsp;:</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)">
+        <li><b>Suicide par nettoyage&nbsp;:</b> le motif <code>"ros2 launch"</code> du nettoyage de processus r&eacute;siduels (copi&eacute; d'<code>episode.sh</code>) correspondait &agrave; son propre parent &mdash; car ce script est d&eacute;sormais lui-m&ecirc;me lanc&eacute; <em>par</em> un processus <code>ros2 launch</code> (le <code>ExecuteProcess</code> du fichier launch), contrairement &agrave; <code>episode.sh</code>, toujours invoqu&eacute; directement depuis bash. Il tuait son propre parent d&egrave;s la premi&egrave;re seconde de chaque ex&eacute;cution. R&eacute;duit aux deux fichiers launch internes pr&eacute;cis qui doivent r&eacute;ellement &ecirc;tre nettoy&eacute;s (<code>sim_full.launch.py</code>, <code>move_group.launch.py</code>).</li>
+        <li><b>Le d&eacute;lai plantait au lieu de retenter&nbsp;:</b> l'utilitaire <code>sh()</code> laissait le <code>TimeoutExpired</code> de <code>subprocess.run</code> se propager et planter tout le script d&egrave;s le tout premier sondage des contr&ocirc;leurs &mdash; qui est <em>cens&eacute;</em> expirer plusieurs fois avant que la sim n'ait m&ecirc;me d&eacute;marr&eacute;. La commande <code>timeout</code> de bash elle-m&ecirc;me (utilis&eacute;e partout dans <code>episode.sh</code>) revient normalement au lieu de planter&nbsp;; <code>sh()</code> fait d&eacute;sormais de m&ecirc;me.</li>
+        <li><b>Le nettoyage ne nettoyait pas vraiment&nbsp;:</b> envoyer SIGINT/SIGTERM au handle de sous-processus externe <code>ros2 launch sim_full.launch.py</code> ne se propage pas de mani&egrave;re fiable &agrave; Gazebo/<code>move_group</code> &mdash; confirm&eacute; directement&nbsp;: un premier nettoyage &laquo;&nbsp;r&eacute;ussi&nbsp;&raquo; a laiss&eacute; les deux totalement vivants. La propre gestion des signaux de <code>ros2 launch</code> semble &ecirc;tre ce qui d&eacute;mant&egrave;le ses processus g&eacute;r&eacute;s, et un signal livr&eacute; ext&eacute;rieurement au wrapper lui-m&ecirc;me ne d&eacute;clenche pas cela. Compl&eacute;t&eacute; avec les m&ecirc;mes motifs <code>pkill</code> que <code>pkill_stale()</code> utilise d&eacute;j&agrave; au <em>d&eacute;but</em> d'une ex&eacute;cution, d&eacute;sormais aussi ex&eacute;cut&eacute;s &agrave; la <em>fin</em>. Voir le signalement candidat en amont ci-dessous.</li>
+      </ul>
+    </article>
+
+    <article class="step" id="s15">
+      <div class="step-head"><span class="step-num">15</span><h3>Deux fichiers launch&nbsp;: un point d'entr&eacute;e unique</h3></div>
+      <p class="step-purpose">Un pour le manager, avec l'interface graphique Gazebo&nbsp;; un pour cette machine, headless, se terminant avec un code de r&eacute;ussite/&eacute;chec.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <pre>ros2 launch pick_and_place_demo.launch.py            <span class="c"># avec l'interface Gazebo</span>
+ros2 launch pick_and_place_no_gui_demo.launch.py      <span class="c"># headless, code de sortie r&eacute;ussite/&eacute;chec</span></pre>
+          <p>Les deux encapsulent l'orchestrateur du &sect;14&nbsp;; le fichier launch lui-m&ecirc;me ne fait que d&eacute;clarer des arguments et lancer un <code>ExecuteProcess</code>.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>ros2 launch pick_and_place_no_gui_demo.launch.py --show-args</pre>
+          <p>Affiche tous les arguments d&eacute;clar&eacute;s avec leur description &mdash; y compris celle d'<code>attach_mode</code>, qui &eacute;nonce la limite directement plut&ocirc;t que seulement dans ce document.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Argument</th><th>D&eacute;faut</th><th>Pourquoi</th></tr></thead>
+          <tbody>
+            <tr><td><code>gui</code></td><td><code>true</code> (d&eacute;mo) / <code>false</code> fig&eacute; (no-gui)</td><td>Tout l'int&eacute;r&ecirc;t de la variante GUI est de voir&nbsp;; tout l'int&eacute;r&ecirc;t de la variante sans GUI est de ne pas en avoir besoin.</td></tr>
+            <tr><td><code>record</code></td><td><code>false</code></td><td>Regarder, pas collecter des donn&eacute;es &mdash; avec <code>record:=false</code>, aucune installation de <code>rosetta</code> n'est n&eacute;cessaire.</td></tr>
+            <tr><td><code>block_x</code>, <code>block_y</code></td><td>0,25 / 0,00</td><td>D&eacute;placer l'objet et relancer (le &sect;13 a rendu cela s&ucirc;r pour tout point atteignable).</td></tr>
+            <tr><td><code>attach_mode</code></td><td><code>simulated</code></td><td>Rend la soudure visible dans la commande elle-m&ecirc;me, et valid&eacute;e&nbsp;: toute autre valeur est une erreur franche nommant les &sect;8&ndash;9.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="callout"><b><code>gui:=true</code> reste ouvert d&eacute;lib&eacute;r&eacute;ment&nbsp;:</b> apr&egrave;s avoir affich&eacute; le verdict, la variante GUI ne d&eacute;mant&egrave;le rien &mdash; Gazebo et <code>move_group</code> continuent de tourner pour que la sc&egrave;ne finale reste &agrave; l'&eacute;cran. Ctrl+C sur le launch pour tout arr&ecirc;ter&nbsp;; cela atteint bien le gestionnaire de signaux propre de <code>run_demo.py</code>, qui ex&eacute;cute le m&ecirc;me nettoyage que le &sect;14.</p>
+      <p class="callout warn"><b>Non v&eacute;rifi&eacute; visuellement&nbsp;:</b> le rendu GUI lui-m&ecirc;me n'a pas &eacute;t&eacute; v&eacute;rifi&eacute; &mdash; cette machine n'a pas d'&eacute;cran (m&ecirc;me limite que la remarque sur le facteur temps r&eacute;el du &sect;1). La variante sans GUI a &eacute;t&eacute; v&eacute;rifi&eacute;e deux fois de bout en bout&nbsp;; la variante GUI partage le m&ecirc;me orchestrateur &agrave; l'identique et n'a &eacute;t&eacute; v&eacute;rifi&eacute;e que pour le passage correct des arguments et le d&eacute;marrage.</p>
+    </article>
+
     <!-- ===================================================== LADDER ===================================================== -->
     <section class="block" id="ladder">
       <h2>&Eacute;chelle de v&eacute;rification</h2>
-      <p class="block-dek">Chaque barreau d&eacute;pend strictement de celui du dessous. Le pipeline atteint chaque barreau demand&eacute; par la sp&eacute;cification&nbsp;; celui qu'il n'atteint pas est la prise rigide grossi&egrave;re que la Partie&nbsp;10 elle-m&ecirc;me anticipait comme plafond.</p>
+      <p class="block-dek">Chaque barreau d&eacute;pend strictement de celui du dessous. Le pipeline atteint chaque barreau demand&eacute; par la sp&eacute;cification&nbsp;; celui qu'il n'atteint pas est la prise rigide grossi&egrave;re que la Partie&nbsp;10 elle-m&ecirc;me anticipait comme plafond. Le niveau&nbsp;7 est un ajout ult&eacute;rieur (&sect;13&ndash;15) que la sp&eacute;cification n'a jamais demand&eacute;&nbsp;: un point d'entr&eacute;e unique et testable.</p>
       <div class="ladder">
         <div class="rung reached">
           <div class="level">Niveau&nbsp;0</div>
@@ -701,6 +776,10 @@ gz model -m red_block -p</pre>
           <div class="level">Niveau&nbsp;6</div>
           <div><span class="tag">Non tent&eacute; ici</span><h5>Charg&eacute; et valid&eacute; via la vraie classe <code>LeRobotDataset</code></h5><p>N&eacute;cessite <code>torch</code>&nbsp;; report&eacute; &agrave; la machine GPU par choix (&sect;12).</p></div>
         </div>
+        <div class="rung reached">
+          <div class="level">Niveau&nbsp;7</div>
+          <div><span class="tag">R&eacute;ussi</span><h5>Point d'entr&eacute;e unique <code>ros2 launch</code>, toute position de bloc atteignable</h5><p>V&eacute;rifi&eacute; deux fois de bout en bout via <code>pick_and_place_no_gui_demo.launch.py</code> (&sect;13&ndash;15)&nbsp;: <code>RESULT: motions_ok=True placed_on_plate=True grasp_held=True</code> les deux fois, avec un arr&ecirc;t propre des processus. La variante GUI partage le m&ecirc;me orchestrateur, mais son rendu n'a pas &eacute;t&eacute; v&eacute;rifi&eacute; visuellement (pas d'&eacute;cran sur cette machine).</p></div>
+        </div>
       </div>
     </section>
 
@@ -720,6 +799,9 @@ gz model -m red_block -p</pre>
             <tr><td>Le conteneur et ses processus meurent en cours d'ex&eacute;cution avec des &eacute;carts de plusieurs heures dans les horodatages des journaux ROS</td><td>Mise en veille/reprise de l'h&ocirc;te (WSL2 met en pause l'horloge de la VM&nbsp;; les horodatages d'horloge murale sautent &agrave; la reprise, les monotones non)</td><td>Chaque script de lot v&eacute;rifie la vivacit&eacute; avec un d&eacute;lai born&eacute;, jamais un seul fichier marqueur&nbsp;; <code>status.sh</code> rend une mise en veille visible apr&egrave;s coup</td></tr>
             <tr><td><code>pip install lerobot==0.6.0</code> entra&icirc;ne toute une cha&icirc;ne de d&eacute;pendances CUDA/triton et est tu&eacute; &agrave; r&eacute;p&eacute;tition</td><td>Aucune restriction <code>--index-url</code> sur les d&eacute;pendances transitives de ce paquet, contrairement &agrave; l'&eacute;tape d'installation <code>torch</code> CPU uniquement</td><td>Installation de <code>lerobot</code>/<code>torch</code> abandonn&eacute;e enti&egrave;rement&nbsp;; le jeu de donn&eacute;es est &eacute;crit directement avec <code>pyarrow</code>+<code>ffmpeg</code> (&sect;12)</td></tr>
             <tr><td>Trois lanceurs de contr&ocirc;leurs parall&egrave;les expirent par intermittence au d&eacute;marrage &agrave; froid</td><td>Contention pour le verrou/service interne du gestionnaire de contr&ocirc;leurs sous le facteur temps r&eacute;el lent de cette VM</td><td>Repli de relance s&eacute;quentielle, un &agrave; la fois, quand le lancement parall&egrave;le ne converge pas en 60&nbsp;s</td></tr>
+            <tr><td>L'orchestrateur de d&eacute;mo (&sect;14) tuait son propre parent d&egrave;s la premi&egrave;re seconde de chaque ex&eacute;cution</td><td>Le motif <code>"ros2 launch"</code> du nettoyage de processus r&eacute;siduels correspondait &agrave; son propre parent, maintenant qu'il s'ex&eacute;cute comme enfant d'un fichier launch</td><td>R&eacute;duit aux fichiers launch internes pr&eacute;cis &agrave; nettoyer (<code>sim_full.launch.py</code>, <code>move_group.launch.py</code>)</td></tr>
+            <tr><td>L'orchestrateur de d&eacute;mo plantait au tout premier sondage de contr&ocirc;leurs, cens&eacute; expirer</td><td>Le <code>TimeoutExpired</code> de <code>subprocess.run</code> se propageait au lieu de revenir normalement comme la commande <code>timeout</code> de bash</td><td>L'utilitaire <code>sh()</code> l'intercepte d&eacute;sormais et renvoie un r&eacute;sultat en &eacute;chec, exactement comme le ferait <code>timeout</code></td></tr>
+            <tr><td><code>live_block_xyz()</code> (&sect;13) &eacute;chouait avec une sortie <code>gz model</code> v&eacute;ritablement vide</td><td>D&eacute;lai de 10&nbsp;s trop court juste apr&egrave;s les ~90&nbsp;s de construction de <code>MoveItPy</code> sous la charge CPU de cette machine</td><td>Retenter jusqu'&agrave; 5&times; &agrave; 25&nbsp;s chacun</td></tr>
           </tbody>
         </table>
       </div>
@@ -727,7 +809,7 @@ gz model -m red_block -p</pre>
 
     <section class="block" id="bugs-upstream">
       <h2>Bugs &agrave; signaler en amont</h2>
-      <p class="block-dek">Trois d&eacute;fauts qui se reproduisent ind&eacute;pendamment de cette VM &mdash; de la vraie friction dans du code dont d'autres &eacute;quipes d&eacute;pendent. <b>Le d&eacute;p&ocirc;t effectif des tickets n'a pas &eacute;t&eacute; fait</b> et n&eacute;cessite un feu vert explicite s&eacute;par&eacute;.</p>
+      <p class="block-dek">Quatre d&eacute;fauts qui se reproduisent ind&eacute;pendamment de cette VM &mdash; de la vraie friction dans du code dont d'autres &eacute;quipes d&eacute;pendent. <b>Le d&eacute;p&ocirc;t effectif des tickets n'a pas &eacute;t&eacute; fait</b> et n&eacute;cessite un feu vert explicite s&eacute;par&eacute;.</p>
 
       <div class="bugcard">
         <h4><code>MoveItPy</code> ne peut pas partager un processus avec un n&#339;ud <code>rclpy</code> ordinaire<span class="status-pill">Pas encore d&eacute;pos&eacute;</span></h4>
@@ -765,6 +847,19 @@ gz model -m red_block -p</pre>
           <dd>Cible de <code>child_link</code> red&eacute;finie vers <code>link6</code>, le vrai lien Gazebo, trouv&eacute; en listant les vrais liens du mod&egrave;le avec <code>gz model -m mycobot_320 --link</code>.</dd>
           <dt>Pourquoi c'est important</dt>
           <dd>Cela a co&ucirc;t&eacute; un cycle de d&eacute;bogage complet identique en apparence &agrave; l'&eacute;chec pr&eacute;c&eacute;dent et authentique de la prise par friction (&sect;8) &mdash; les deux se pr&eacute;sentant comme &laquo;&nbsp;le bloc n'a pas bouge&nbsp;&raquo;. Une erreur de validation du nom de lien au chargement du plugin (la m&ecirc;me information que <code>gz model --link</code> affiche d&eacute;j&agrave;) aurait permis de le d&eacute;tecter immédiatement.</dd>
+        </dl>
+      </div>
+
+      <div class="bugcard">
+        <h4>Un signal livr&eacute; ext&eacute;rieurement &agrave; un processus <code>ros2 launch</code> ne d&eacute;mant&egrave;le pas de mani&egrave;re fiable ce qu'il g&egrave;re<span class="status-pill">Pas encore d&eacute;pos&eacute;</span></h4>
+        <p class="repo">D&eacute;p&ocirc;t candidat&nbsp;: ros2/launch ou ros2/launch_ros</p>
+        <dl>
+          <dt>Sympt&ocirc;me</dt>
+          <dd>Envoyer SIGINT, puis sur d&eacute;lai SIGTERM/SIGKILL, &agrave; un handle <code>Popen</code> pour <code>ros2 launch gazebo_to_lerobot_bringup sim_full.launch.py</code> (d&eacute;marr&eacute; comme sous-processus de l'orchestrateur du &sect;14, lui-m&ecirc;me ex&eacute;cut&eacute; comme <code>ExecuteProcess</code> d'un <em>autre</em> fichier launch) signalait le processus comme termin&eacute; proprement &mdash; mais Gazebo et <code>move_group</code>, les processus que ce fichier launch interne g&eacute;rait, &eacute;taient toujours pleinement vivants ensuite, confirm&eacute; directement via <code>pgrep</code>. Un Ctrl+C interactif sur un <code>ros2 launch</code> au premier plan d&eacute;mant&egrave;le tout correctement&nbsp;; un signal livr&eacute; par programme &agrave; l'objet processus n'atteint apparemment pas le m&ecirc;me chemin d'arr&ecirc;t interne.</dd>
+          <dt>Correction utilis&eacute;e ici</dt>
+          <dd>Compl&eacute;t&eacute; avec un <code>pkill</code> explicite contre les motifs de processus pr&eacute;cis (<code>gz sim</code>, <code>move_group</code>, les fichiers launch internes) apr&egrave;s la tentative par signal, plut&ocirc;t que de d&eacute;pendre de la propre cascade de <code>ros2 launch</code>.</dd>
+          <dt>Pourquoi c'est important</dt>
+          <dd>Toute orchestration qui imbrique un appel <code>ros2 launch</code> dans un autre script ou fichier launch &mdash; un motif pas exotique du tout, et exactement la conception du &sect;14 &mdash; peut faire fuiter silencieusement des processus Gazebo/n&#339;ud, &agrave; moins que l'appelant ne suive et ne tue lui-m&ecirc;me ce qu'il a d&eacute;marr&eacute;.</dd>
         </dl>
       </div>
     </section>
@@ -819,6 +914,47 @@ python3 scripts/run_pick_and_place.py --record \
 cat /tmp/my_episode/grasp_meta.json   <span class="c"># placed_on_plate, grasp_held, simulated_attachment</span></pre>
       <p class="callout"><b>Pour le lot complet de 20 &eacute;pisodes plut&ocirc;t qu'un seul&nbsp;:</b> <code>bash scripts/batch.sh 1 20</code> fait tout ce qui pr&eacute;c&egrave;de par &eacute;pisode, depuis un red&eacute;marrage propre de la sim, avec jusqu'&agrave; 3 nouvelles tentatives chacun&nbsp;; <code>bash scripts/status.sh</code> (ex&eacute;cut&eacute; depuis le shell h&ocirc;te ordinaire) rapporte la v&eacute;rit&eacute; terrain sur la progression.</p>
       <p class="callout"><b>Pour convertir les bags enregistr&eacute;s en jeu de donn&eacute;es&nbsp;:</b> <code>python3 scripts/port_bag.py --out &lt;chemin&gt; --indices "1 2 3 ... 15"</code>, lisant directement le bag de chaque &eacute;pisode, sans besoin du paquet <code>lerobot</code>.</p>
+
+      <h3 style="margin-top:28px;font-size:1.15rem">Lancer les fichiers launch &agrave; la place, &agrave; la main</h3>
+      <p class="prose">Tout ce qui pr&eacute;c&egrave;de (&eacute;tapes 1&agrave;7) est ce que <code>run_demo.py</code> du &sect;14 fait d&eacute;sormais automatiquement. Pour le lancer via les fichiers launch &agrave; la place&nbsp;:</p>
+      <pre><span class="c"># Copier les nouveaux fichiers dans le conteneur si ce n'est pas d&eacute;j&agrave; fait (m&ecirc;me convention que tout autre script ici)</span>
+docker cp scripts/run_demo.py gazebo_to_lerobot:/workspace/htgpp/run_demo.py
+docker cp scripts/precompute_ik.py gazebo_to_lerobot:/workspace/htgpp/precompute_ik.py
+docker cp launch gazebo_to_lerobot:/workspace/htgpp/launch
+
+<span class="c"># Headless, se termine avec un code de r&eacute;ussite/&eacute;chec -- lancer celui-ci juste pour v&eacute;rifier que &ccedil;a marche toujours</span>
+docker exec -it gazebo_to_lerobot bash -c '
+  source /opt/ros/jazzy/setup.bash; source /workspace/install/setup.bash
+  ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py
+  echo "code de sortie : $?"'
+
+<span class="c"># Avec l'interface graphique (n&eacute;cessite un &eacute;cran X/Wayland accessible depuis le conteneur -- pas cette machine)</span>
+docker exec -it gazebo_to_lerobot bash -c '
+  source /opt/ros/jazzy/setup.bash; source /workspace/install/setup.bash
+  ros2 launch /workspace/htgpp/launch/pick_and_place_demo.launch.py'
+
+<span class="c"># Essayer une autre position de bloc</span>
+ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py block_x:=0.28 block_y:=0.05
+
+<span class="c"># Voir tous les arguments et leur description</span>
+ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py --show-args</pre>
+
+      <p class="prose"><b>Comment lire le r&eacute;sultat.</b> Le launch affiche une ligne <code>RESULT</code> encadr&eacute;e pr&egrave;s de la fin&nbsp;:</p>
+      <pre>[demo 14:19:10] ============================================================
+[demo 14:19:10] RESULT: motions_ok=True placed_on_plate=True grasp_held=True
+[demo 14:19:10] carry mechanism: SIMULATED ATTACHMENT (gz DetachableJoint), NOT a physical grasp
+[demo 14:19:10] ============================================================</pre>
+      <p class="prose">Les trois <code>motions_ok</code>, <code>placed_on_plate</code> et <code>grasp_held</code> doivent &ecirc;tre <code>True</code> pour une r&eacute;ussite. Les m&ecirc;mes champs sont aussi &eacute;crits dans <code>demo/grasp_meta.json</code> sous la racine du projet, pour qu'un script puisse v&eacute;rifier le r&eacute;sultat sans analyser du texte de journal&nbsp;:</p>
+      <pre>cat /workspace/htgpp/demo/grasp_meta.json
+<span class="c"># { "placed_on_plate": true, "grasp_held": true, "simulated_attachment": true, ... }</span></pre>
+      <p class="prose"><b>V&eacute;rifier la validation d'<code>attach_mode</code>.</b> Toute valeur autre que <code>simulated</code> doit &eacute;chouer immédiatement, avant que quoi que ce soit ne soit lanc&eacute;&nbsp;:</p>
+      <pre>ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py attach_mode:=friction
+<span class="c"># -&gt; "attach_mode: only 'simulated' is currently supported. ..." code de sortie 2, rien n'a d&eacute;marr&eacute;</span></pre>
+      <p class="prose"><b>Confirmer un arr&ecirc;t propre.</b> Apr&egrave;s la fin du launch (ou apr&egrave;s Ctrl+C sur la variante GUI), aucun processus de simulation ne devrait rester&nbsp;:</p>
+      <pre>docker exec gazebo_to_lerobot bash -c 'pgrep -af "gz sim|move_group|sim_full"'
+<span class="c"># rien affich&eacute; = propre. Les entr&eacute;es marqu&eacute;es &lt;defunct&gt; sont des processus</span>
+<span class="c"># zombies d&eacute;j&agrave; morts en attente d'&ecirc;tre r&eacute;colt&eacute;s -- inoffensifs, ne retiennent aucune ressource, sans danger.</span></pre>
+      <p class="callout warn"><b>Premi&egrave;re ex&eacute;cution sur un conteneur neuf&nbsp;?</b> Le dossier <code>waypoints/</code> pr&eacute;-r&eacute;solu du &sect;10 n'est pas n&eacute;cessaire ici&nbsp;: le chemin de d&eacute;tection live du &sect;13 r&eacute;sout l'IK pour l&agrave; o&ugrave; le bloc atterrit r&eacute;ellement, chaque fois, pour n'importe quelle position pass&eacute;e.</p>
     </section>
 
     <section class="block" id="manifest">
@@ -832,13 +968,17 @@ cat /tmp/my_episode/grasp_meta.json   <span class="c"># placed_on_plate, grasp_h
 &#9500;&#9472;&#9472; models/<br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; red_block.sdf<span class="c">                     # &sect;1, &sect;8, &sect;9 (param&egrave;tres de contact + DetachableJoint)</span><br>
 &#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; plate.sdf<span class="c">                         # &sect;1, inchang&eacute; par rapport &agrave; la spec</span><br>
+&#9500;&#9472;&#9472; launch/<span class="c">                             # &sect;15, le point d'entr&eacute;e unique ros2 launch</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; pick_and_place_demo.launch.py<span class="c">     # gui:=true par d&eacute;faut, pour le manager</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; pick_and_place_no_gui_demo.launch.py<span class="c">  # toujours headless, code de sortie r&eacute;ussite/&eacute;chec</span><br>
 &#9500;&#9472;&#9472; scripts/<br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; grab_frame.py<span class="c">                     # &sect;2, &sect;6 v&eacute;rification par image cam&eacute;ra</span><br>
-&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; ik_helper.py, precompute_ik.py<span class="c">   # &sect;3&ndash;4, processus moveit_py seul</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; ik_helper.py, precompute_ik.py<span class="c">   # &sect;3&ndash;4, &sect;13, processus moveit_py seul</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; run_pick_and_place.py<span class="c">            # &sect;5&ndash;6, &sect;9, processus rclpy pur</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; episode.sh, batch.sh<span class="c">             # &sect;10, le pilote d'enregistrement par &eacute;pisode</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; status.sh<span class="c">                        # &sect;11, &eacute;tat du lot v&eacute;rit&eacute;-disque</span><br>
-&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; port_bag.py<span class="c">                      # &sect;12, conversion du jeu de donn&eacute;es sans torch</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; port_bag.py<span class="c">                      # &sect;12, conversion du jeu de donn&eacute;es sans torch</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; run_demo.py<span class="c">                      # &sect;14, orchestrateur derri&egrave;re les deux fichiers launch</span><br>
 &#9500;&#9472;&#9472; contracts/<span class="c">                          # &sect;10, contrats rosetta cam&eacute;ra avant et cam&eacute;ra tenue &agrave; l'&eacute;cart</span><br>
 &#9500;&#9472;&#9472; datasets/<span class="c">                           # &sect;12, meta/README suivis&nbsp;; charge utile parquet/mp4 dans .gitignore</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; mycobot_pick_place_train/<br>
@@ -847,6 +987,6 @@ cat /tmp/my_episode/grasp_meta.json   <span class="c"># placed_on_plate, grasp_h
       <p class="prose">Les bags enregistr&eacute;s eux-m&ecirc;mes (&asymp;1,7&nbsp;Go pour 20 &eacute;pisodes) ne vivent que dans le conteneur <code>gazebo_to_lerobot</code>, sous <code>/workspace/htgpp/episodes/</code>, ni dans ce d&eacute;p&ocirc;t ni dans les dossiers de jeux de donn&eacute;es ci-dessus &mdash; r&eacute;g&eacute;n&eacute;rables via <code>batch.sh</code>, pas quelque chose &agrave; versionner.</p>
     </section>
 
-    <footer>Rapport Headless_Task-Grounded_Pick-and-Place_in_Gazebo &middot; &eacute;crit le 22/09/2026 &middot; commit f944dbe sur main &middot; Tomislav Ilic</footer>
+    <footer>Rapport Headless_Task-Grounded_Pick-and-Place_in_Gazebo &middot; &eacute;crit le 22/09/2026 &middot; commit 5c92a565 sur main &middot; Tomislav Ilic</footer>
   </main>
 </div>
