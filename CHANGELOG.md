@@ -9,6 +9,23 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — un refus du bridge n'est plus ignoré (23/09)
+
+- `move()` et `grip()` de
+  [`scripts/pick_and_place_vision.py`](scripts/pick_and_place_vision.py)
+  imprimaient la réponse du bridge puis **continuaient quoi qu'elle dise**.
+  Sur `ERROR:`, les étapes suivantes partaient sur une pose que le robot
+  n'avait jamais atteinte et le cycle se déroulait à vide. Elles lèvent
+  désormais une `RuntimeError`.
+- C'est d'autant plus utile que `send_coords` échoue normalement **en
+  silence**, en rendant `OK` (247,8 mm d'erreur mesurés le 20/08) : un
+  `ERROR:` explicite est la seule fois où il dit la vérité, et c'est
+  exactement ce qui était jeté.
+- Les deux tests qui décrivaient ce garde-fou
+  (`test_pick_control_safety.py`, commités le 27/08) étaient **rouges depuis
+  l'origine** — le comportement qu'ils spécifient n'avait jamais été écrit.
+  Ils passent.
+
 ### Corrigé — une source unique pour les butées articulaires, et deux URDF qui mentaient (23/09)
 
 - Le dépôt portait **onze déclarations de butées pour trois jeux de valeurs**,
