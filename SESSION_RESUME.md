@@ -1,14 +1,90 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-> **Date de dernière mise à jour :** 22 septembre 2026 (renommage des caméras, règle .xlsx, conflit de la PR d'Osama résolu)
+> **Date de dernière mise à jour :** 23 septembre 2026 (déport d'outil, butées articulaires, suite de tests remise en marche)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
-> **Branche :** `main` (pick-and-place + DREAM mergés via PR #9 le 09/09/2026)
+> **Branche :** `fix/tool-offset-and-test-collection`, issue de `main`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.221` (pas `.223`/`.225` comme certains anciens docs)
 
 ---
 
-## État actuel (22 septembre 2026 — mise au propre du dépôt)
+## État actuel (23 septembre 2026 — inventaire avant le `workspace_safety_checker`)
+
+### Ce qui a été accompli aujourd'hui
+
+Inventaire demandé avant d'écrire un `workspace_safety_checker` (limites
+articulaires, enveloppe, garde au sol, zones interdites, support caméra, bacs,
+orientation pince, auto-collisions). Il a buté sur des bloquants qu'il a fallu
+lever d'abord.
+
+**Le banc réel ne démarrait pas depuis un clone.** `scripts/tool_offset.json`
+n'a **jamais été commité** et `pick_fsm.py` le lisait au niveau module :
+`pytest tests/` rendait 5 erreurs de collecte et **0 test exécuté**, là où la
+doc annonce 95. Le déport passe maintenant par `charge_deport()` avec une
+sentinelle — l'import réussit, tout usage géométrique lève.
+
+**Deux calibrations d'outil incompatibles cohabitent, et c'est non résolu.**
+Le test de contact du 27/08 exige `pointe(q_contact).Z = 0 ± 1 mm` : le déport
+de 110,4 mm (7,73° de l'axe **−X** de la bride, pas +Z) donne +0,04 mm ; le
+recalage du 09/09 qui le raccourcit de 17,33 mm donne **+17,1 mm**. Le recalage
+a invalidé ce test sans que personne le voie, la suite ne collectant plus.
+
+**Onze déclarations de butées pour trois jeux de valeurs**, jusqu'à 25,3° sur
+J2. Nommées dans `diff_ik.py`, dédoublonnées côté commande sans changer une
+seule valeur, et verrouillées par `tests/test_joint_limits_coherence.py`.
+
+**L'en-tête de deux URDF était faux** sur les limites *et* sur la cinématique.
+`joint5_to_joint4` diffère de 8 mm en Z, et c'est l'URDF d'origine l'intrus —
+`mycobot_fk.py`, donc `diff_ik`, `pick_fsm` et DREAM, utilisent la valeur des
+autres. Trois launch chargent pourtant l'intrus.
+
+**Un refus du bridge n'est plus ignoré** dans `pick_and_place_vision.py`.
+
+Suite de tests : **171 passés, 23 échoués, 3 ignorés** contre 0 exécuté.
+
+### Décisions prises
+
+1. **Aucune valeur de déport n'est écrite au dépôt** tant qu'une mesure
+   physique n'a pas tranché. Ni valeur par défaut, ni repli silencieux : un
+   déport faux de 17 mm ferait descendre les doigts 17 mm sous ce que
+   `garde_au_sol` croit protéger.
+2. **Le domaine pratique fait foi pour ce qui commande le robot** — seul des
+   trois jeux adossé à une contrainte mesurée (firmware, J2 ±137°).
+3. **`precision_benchmark_node` garde l'enveloppe URDF Gazebo.** L'élargir
+   changerait la distribution des poses d'une campagne de précision.
+4. Les trois tests portant sur des modules jamais commités sont **ignorés avec
+   leur raison**, pas supprimés : ils encodent une spécification.
+
+### Prochaines actions
+
+1. [ROUGE] **Mesurer le déport d'outil** : doigts fermés au contact de la
+   planche, `get_angles`, vérifier que `pointe(q)[2]` rend 0 — sans rejouer le
+   point qui a produit le déport (piège circulaire, BOUCLE_FERMEE § 5.3).
+   Tout le reste du `workspace_safety_checker` en dépend.
+2. [ROUGE] **Relever la géométrie des obstacles** : le support caméra n'est
+   modélisé nulle part (`table_camera` de `real_table.sdf` est un capteur sans
+   volume de collision), et `workspace_markers.yaml` est périmé de **12,9 à
+   28,1 mm** selon le marqueur depuis que la planche a bougé le 10/09. Sans ce
+   relevé, les contrôles « zones interdites » et « distance au support caméra »
+   ne peuvent pas être écrits.
+3. [JAUNE] **Résorber la dérive d'API** des 23 tests rouges restants
+   (`releve_les_doigts` renommé `cale_les_doigts`, signatures à 2 contre 3
+   valeurs).
+4. [JAUNE] Trancher si `rviz_sync`, `slider_control` et `marker_follow_full`
+   doivent passer à l'URDF Gazebo.
+5. [VERT] Écrire le `workspace_safety_checker` lui-même, une fois 1 et 2 faits.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/mycobot_ws/src/mycobot_320pi_R6A
+/usr/bin/python3 -m pytest tests/ -q
+```
+
+---
+
+## État précédent (22 septembre 2026 — mise au propre du dépôt)
 
 ### Ce qui a été accompli aujourd'hui
 
