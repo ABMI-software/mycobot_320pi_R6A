@@ -9,6 +9,44 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — la suite de tests ne collectait plus, et deux calibrations d'outil se contredisent (23/09)
+
+- `scripts/tool_offset.json` **n'a jamais été commité** (vérifié sur tout
+  l'historique) alors que `pick_fsm.py:86` le lisait au niveau module.
+  `pick_fsm`, `pick_dashboard` et **cinq fichiers de test sur sept** étaient
+  donc inimportables depuis un clone : `pytest tests/` rendait 5 erreurs de
+  collecte et **0 test exécuté**, là où la doc annonce 95 tests.
+- Le déport passe désormais par `charge_deport()`. Fichier absent →
+  sentinelle `_DeportInconnu` : l'import réussit, mais tout usage géométrique
+  lève un message actionnable. **Ni valeur par défaut, ni repli silencieux** —
+  `garde_au_sol`, `PLANCHER` et `capsules` se calculent tous depuis ce
+  vecteur, donc un déport faux de 17 mm ferait descendre les doigts 17 mm plus
+  bas que ce que le garde-fou croit protéger. Surcharge possible par
+  `MYCOBOT_TOOL_OFFSET_MM` pour un essai hors robot.
+- **Aucune valeur n'est écrite au dépôt, parce que deux calibrations
+  incompatibles y cohabitent.** Le test `test_la_reference_de_l_outil_est_bien_
+  le_bout_des_doigts` (27/08) exige `pointe(q_contact).Z = 0 ± 1 mm` : le
+  déport de 110,4 mm — à 7,73° de l'axe **−X de la bride**, et non +Z — donne
+  **+0,04 mm** et passe ; le recalage du 09/09, qui le raccourcit de 17,33 mm,
+  donne **+17,1 mm** et échouerait. Le recalage a invalidé ce test sans que
+  personne le voie, la suite ne collectant plus depuis que le JSON manque.
+  Trancher demande une mesure physique : doigts fermés au contact de la
+  planche, `get_angles`, vérifier que `pointe(q)[2]` rend bien 0 — sans
+  rejouer le point qui a produit le déport (piège circulaire, cf.
+  `PICK_AND_PLACE_BOUCLE_FERMEE.md` § 5.3).
+- `tests/conftest.py` fige explicitement la géométrie **contre laquelle les
+  tests ont été écrits**, avec l'avertissement de ne pas l'employer sur le
+  robot.
+- Trois tests portaient sur des modules jamais commités
+  (`live_aruco_geometry`, `adaptive_pick_by_demo`, `joint_ik_control` : le
+  commit `281b4950` a ajouté les tests sans le code testé). Passés en
+  `pytest.importorskip` avec la raison écrite plutôt que supprimés — ils
+  encodent une spécification.
+- Résultat : **161 passés, 25 échoués, 3 ignorés** contre 0 exécuté. Les 25
+  échecs sont préexistants et hors de ce lot — dérive d'API entre les tests et
+  `pick_fsm` (`releve_les_doigts` renommé `cale_les_doigts`, signatures à 2
+  contre 3 valeurs).
+
 ### Modifié — l'évaluation RoboPEPP est menée par ABMI Lyon (23/09)
 
 - Licence **open-source**, évaluation **conduite par ABMI Lyon** — qui tient
