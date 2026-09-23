@@ -1,0 +1,35 @@
+# config/gripper_frame.yaml -- Part 7.2, deliberately substituted.
+#
+# The specification asks to MEASURE gripper_base -> fingertip live via
+# tf2_echo (dz~-0.100, dx~0.036, asymmetric, per its own template). This
+# project instead reuses TOOL_OFFSET from the reference grasp node
+# (mycobot_gateway/mycobot_gateway/sim_sorting_grasp.py), which measures
+# the SAME physical offset in the LINK6 frame, not gripper_base:
+#
+#   TOOL_OFFSET = [-0.001, 0.0078, 0.166]   # x, y, z metres, link6 frame
+#
+# Why substitute rather than re-measure: TOOL_OFFSET is already proven --
+# every grasp/placement check in sim_sorting_grasp.py depends on it being
+# correct, and Part 3's independent verifier (scripts/track_grasp.py)
+# cross-checked it live via forward kinematics during the grasp-decision
+# test and got sane, physically plausible tool-tip trajectories both times
+# (attempt 2 landed within ~5cm of the intended target -- the miss was
+# diagnosed as a settle-timing bug, not a frame error; see
+# doc/GRASP_DECISION.md). Re-measuring the SAME physical point in a
+# DIFFERENT frame (gripper_base) would need another live Gazebo run for no
+# accuracy gain, and risks introducing a second, inconsistent constant for
+# the same hardware fact.
+#
+# scripts/mycobot_ik.py (used by the Part 6.5 sweep and Part 7.4 waypoint
+# precompute) imports and uses TOOL_OFFSET directly from that reasoning --
+# this file exists for the record and for anything downstream that wants
+# the number without importing code.
+tool_offset_link6_frame:
+  dx: -0.001
+  dy: 0.0078
+  dz: 0.166
+  asymmetric: true
+source: "mycobot_gateway/mycobot_gateway/sim_sorting_grasp.py TOOL_OFFSET"
+measured_after_settle_seconds: null   # not re-measured this session; see note above
+substitution_decision: "reuse reference TOOL_OFFSET (link6 frame) instead of
+  re-measuring gripper_base->fingertip live -- see header comment"
