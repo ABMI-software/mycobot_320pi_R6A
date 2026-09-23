@@ -75,14 +75,14 @@ JOINT_NAMES = [
 ]
 
 # Limites articulaires conservatrices (degrés) — MyCobot 320 Pi.
-_JOINT_LIMITS_DEG = [
-    (-168.0, 168.0),
-    (-135.0, 135.0),
-    (-150.0, 150.0),
-    (-145.0, 145.0),
-    (-165.0, 165.0),
-    (-180.0, 180.0),
-]
+_SCRIPTS = Path(__file__).resolve().parents[2] / 'scripts'
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+from diff_ik import PRACTICAL_JOINT_LIMITS_DEG  # noqa: E402
+
+# Domaine pratique, cf. scripts/diff_ik.py — ces poses partent au robot reel.
+_JOINT_LIMITS_DEG = [tuple(v) for v in PRACTICAL_JOINT_LIMITS_DEG]
 
 _HANDEYE_METHODS = {
     "TSAI": cv2.CALIB_HAND_EYE_TSAI,
