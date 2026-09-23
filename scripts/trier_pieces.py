@@ -24,6 +24,7 @@ pendant qu'on le survole.
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -39,6 +40,32 @@ import saisir_cube_bleu as sc                                          # noqa: E
 import yolo26_dashboard as y                                           # noqa: E402
 
 DEMI_COTE_BAC_MM = 52.5        # bac de 105 mm : au-dela, on n'est plus dedans
+
+
+def _detenteur_des_cameras():
+    """Nom du processus qui tient deja une camera du banc, ou None.
+
+    Deux raisons de refuser de demarrer, et la seconde est la plus grave :
+
+    * **l'exposition.** A la SECONDE ouverture de /dev/video2, le pilote UVC
+      relache les reglages manuels et retombe sur ses defauts — `auto_exposure`
+      a 3 (auto) et `exposure_time_absolute` a 157 au lieu de 75. L'image du
+      tableau de bord se surexpose, et sa surveillance ne la rattrape qu'au
+      battement suivant. Toutes les mesures du banc sont a 75.
+    * **le pont.** `gripper_bridge.py` est mono-client et bloquant : une seconde
+      connexion est acceptee puis plus rien ne repond. Le tableau de bord tient
+      le pont, donc un script de saisie lance en meme temps le fige.
+    """
+    for index in (pd.registre.detect_cameras(probe_capture=False)):
+        sortie = subprocess.run(['fuser', f'/dev/video{index.v4l2_index}'],
+                                capture_output=True, text=True)
+        for pid in sortie.stdout.split():
+            chemin = Path('/proc') / pid / 'cmdline'
+            try:
+                return chemin.read_bytes().replace(b'\0', b' ').decode().strip()
+            except OSError:
+                return f'PID {pid}'
+    return None
 
 
 _ORIGINE_Z_LARGAGE = fsm.z_largage
@@ -98,9 +125,23 @@ def descend_asservi(ctx, xy, z_vise, R):
     Copie de `saisir_cube_bleu.descend_asservi`, orientation en plus : le pave
     jaune est a 331 mm, ou l'outil ne peut pas etre tenu vertical.
     """
+    # PLANCHER MESURE, et non plancher de consigne. `cale_les_doigts` du projet
+    # fait deja `max(PLANCHER_POINTE, cible[2])` ; cette descente-ci ne le
+    # faisait pas, et elle est passee dessous : pointe a 8,6 mm sur le pave
+    # jaune le 22/09, pour un plancher a 13,9. Mesures du 07/09 sur le rouleau :
+    # a -4,7 mm la pointe racle la planche, a -3,1 elle tient sans racler.
+    if z_vise < fsm.PLANCHER_POINTE:
+        print(f'  milieu de la piece a {z_vise:.1f} mm, sous le plancher '
+              f'{fsm.PLANCHER_POINTE:.1f} — on vise le plancher, pas le milieu',
+              flush=True)
+        z_vise = fsm.PLANCHER_POINTE
     consigne = z_vise
     p = sc.va(ctx, xy, consigne, 'descente', vitesse=fsm.VITESSE_DESCENTE, R=R)
     for passe in range(sc.PASSES_ASSERVIES):
+        if p[2] <= fsm.PLANCHER_POINTE:
+            print(f'  pointe a {p[2]:.1f} mm, au plancher — on ne descend pas plus',
+                  flush=True)
+            break
         ecart = z_vise - p[2]
         if abs(ecart) <= sc.TOLERANCE_Z_MM:
             break
@@ -213,6 +254,14 @@ def main():
     a.add_argument('--accepte-svpro', action='store_true',
                    help='larguer meme si seule la SVPRO voit le bac (~19 mm)')
     args = a.parse_args()
+
+    detenteur = _detenteur_des_cameras()
+    if detenteur is not None:
+        raise SystemExit(
+            f'une camera du banc est deja tenue par :\n  {detenteur}\n'
+            'Le fermer d abord. Une seconde ouverture fait retomber l arducam en\n'
+            'exposition automatique (157 au lieu de 75), et le pont TCP, mono-client,\n'
+            'se fige si deux processus le commandent. RIEN ENVOYE.')
 
     objet = args.piece
     bac = y.DESTINATION[objet]

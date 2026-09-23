@@ -11,7 +11,7 @@ Package ROS2 central du projet MyCobot 320 Pi R6A. Fournit le bridge TCP vers la
 
 ```
 ┌──────────────────────────────┐    TCP:5005    ┌────────────────────────────┐
-│      PC Tour (10.10.0.115)   │◄──────────────►│  Raspberry Pi (10.10.0.225)│
+│      PC Tour (10.10.0.115)   │◄──────────────►│  Raspberry Pi (10.10.0.224)│
 │                              │                │                            │
 │  bridge_tour (ROS2 node)     │                │  bridge_pi_simple.py       │
 │  Sub: /to_robot (JSON)       │                │  → pymycobot /dev/ttyAMA0  │
@@ -58,6 +58,7 @@ Package ROS2 central du projet MyCobot 320 Pi R6A. Fournit le bridge TCP vers la
 | `rviz_sync.launch.py` | Sync robot réel → RViz |
 | `pick_and_place.launch.py` | Cycle pick & place mono-objet (cube rouge → zone verte) |
 | `pick_and_place_sorting.launch.py` | Pick & place multi-objets par couleur (4 objets → 4 bacs) |
+| `banc_realiste.launch.py` | **Banc réaliste** — plateau mesuré, 4 pièces peintes + 4 bacs, arducam et SVPRO à leur pose extrinsèque calibrée (`/arducam/image_raw`, `/svpro/image_raw`) ; masses fiche 2022 et butées mesurées |
 | `synthetic_data.launch.py` | Collecte données sim (monde de base) |
 | `synthetic_data_v2.launch.py` | Collecte v2 (domain randomization) |
 | `synthetic_data_v3.launch.py` | Collecte v3 (monde randomized_v2 — 6 lights, 12 objets) |
@@ -84,7 +85,7 @@ source install/setup.bash
 ### Démarrer la Raspberry Pi
 
 ```bash
-ssh er@10.10.0.225
+ssh er@10.10.0.224
 
 # Terminal 1 : bridge robot
 python3 bridge_pi_simple.py
@@ -173,9 +174,9 @@ conda deactivate
 
 ### "Impossible de se connecter à la Pi"
 ```bash
-ping 10.10.0.225
-nc -zv 10.10.0.225 5005   # bridge robot
-nc -zv 10.10.0.225 5006   # camera server
+ping 10.10.0.224
+nc -zv 10.10.0.224 5005   # bridge robot
+nc -zv 10.10.0.224 5006   # camera server
 ```
 
 ### "No executable found"

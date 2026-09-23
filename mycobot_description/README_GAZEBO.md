@@ -41,13 +41,50 @@ sudo apt install ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
 | `worlds/pick_and_place.sdf` | Table 0.8×0.8 m + cube cible rouge + zone de dépose verte (mono-objet) |
 | `worlds/pick_and_place_sorting.sdf` | Table 1.0×0.6 m + 4 objets dynamiques (cube R, cube B, cylindre G, boîte Y) côté +X + 4 bacs colorés à parois côté −X (multi-objet par couleur) |
 | `worlds/real_table.sdf` | Plateau mesuré 622×449×8,5 mm + ArUco 19/23/25/26 de 50 mm + caméra de dessus + cube et bac |
+| `worlds/banc_realiste_yolo26.sdf` | **Banc réaliste** — même plateau, marqueurs aux positions relevées AU ROBOT, les 4 pièces peintes et leurs 4 bacs, et les caméras **arducam et SVPRO à leur pose extrinsèque calibrée** (généré par `scripts/generer_banc_realiste.py`) |
 
 Pour le plateau réel : `ros2 launch mycobot_gateway real_table.launch.py`
-(`demo:=true` pour le cycle physique du cube rouge). **La séquence complète
+(cycle physique guidé par les quatre caméras, cube et bac aléatoires ; boutons
+« Randomiser cube + bac » et « Lancer la prise » ; `demo:=false`
+pour la scène seule, `seed:=7` pour reproduire une position). **La séquence complète
 commence par `conda deactivate` puis un `colcon build`** — sans le build,
 `models/` n'est pas installé et la scène se lance sans bois ni marqueurs. Voir
 [le guide du plateau réel](../docs/GAZEBO_REAL_TABLE.md) pour la construction,
 les coordonnées et les hypothèses de placement.
+
+## Banc réaliste — les 4 pièces vues par yolo26
+
+```bash
+ros2 launch mycobot_gateway banc_realiste.launch.py   # terminal 1
+/usr/bin/python3 scripts/yolo26_gazebo.py             # terminal 2
+```
+
+Les deux caméras sont posées à **leur pose extrinsèque mesurée**, avec leurs
+intrinsèques : le même fichier de calibration vaut en simulation et au banc, donc
+`Vision.vers_base` rend des millimètres robot sans qu'une ligne de la chaîne de
+tri ne change. Mesuré, objets posés à des millimètres connus : **arducam 3,5 mm**
+d'écart médian, SVPRO 9,0 mm — la hiérarchie du banc, sans réglage pour
+l'obtenir.
+
+Masses de la fiche 320 Pi 2022 (bras 3 kg, pince 0,340 kg) et butées mesurées
+(J1 168, J2 135, J3 150, J4 145, J5 165, J6 180°).
+
+Trois pièges, tous silencieux :
+
+- **`real_table.sdf` n'a pas de système de capteurs** — sa `table_camera` déclare
+  un sujet qui ne publiera jamais. Le monde réaliste l'ajoute.
+- **Le rendu des capteurs segfaute sur NVIDIA** si libEGL choisit Mesa. Le
+  lancement pose `__EGL_VENDOR_LIBRARY_FILENAMES`.
+- **Le nom du `<world>` doit valoir celui du fichier**, sinon `ros_gz_sim create`
+  attend un service qui n'existe pas et le robot n'apparaît jamais.
+
+Après toute recalibration d'une caméra réelle, régénérer, sinon le jumeau reste
+faux sans le signaler :
+
+```bash
+/usr/bin/python3 scripts/generer_banc_realiste.py
+colcon build --packages-select mycobot_description --symlink-install
+```
 
 ## Tri des 4 objets par saisie physique
 

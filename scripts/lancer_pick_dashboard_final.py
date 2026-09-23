@@ -50,6 +50,8 @@ import argparse
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -73,6 +75,45 @@ SVPRO = CALIB / 'svpro_extrinsic_servo.yaml'
 # 5 mm. Elle avait alors ete validee PAR LA BALLE, pas par le residu. On ne
 # refuse donc pas a ce seuil — on l'affiche et on le dit.
 LOO_SVPRO_ATTENDU_MM = 5.0
+
+
+PERIODE_EXPOSITION_S = 1.0
+
+
+def tient_l_exposition(module):
+    """Repose l'exposition manuelle de l'arducam chaque seconde, sans condition.
+
+    Mesure du 22/09 a 17:51:54 : le pilote UVC relache le reglage tout seul et
+    repart sur ses defauts — `auto_exposure = 3` et `exposure_time_absolute =
+    157` au lieu de 75. L'image se lave sans que rien ne le dise.
+
+    Deux pieges, tous deux payes ce jour-la :
+
+    * la relecture rend la valeur STOCKEE, pas celle que le capteur applique.
+      Les deux se separent des qu'un reglage a ete pose dans le mauvais ordre
+      ou qu'un second processus a ouvert le peripherique : on lit 75 sur une
+      image lavee. Une surveillance qui n'ecrit QUE si la relecture a derive
+      est donc aveugle a la panne qu'elle surveille. On repose sans condition.
+    * `regle_exposition` doit passer en manuel AVANT de poser le temps, en deux
+      appels — sa propre docstring le dit. Tout ecrire d'un coup laisse le
+      pilote stocker la valeur sans l'appliquer.
+
+    Ecrire un controle V4L2 ne demande pas l'acces exclusif : ce fil ne prend
+    jamais la camera, donc il ne provoque pas lui-meme la bascule qu'il corrige.
+    """
+    specs = [s for s in module.registre.detect_cameras(probe_capture=False)
+             if s.manual_exposure >= 0]
+    if not specs:
+        return
+    def boucle():
+        while True:
+            for spec in specs:
+                module.regle_exposition(spec.v4l2_index, spec.manual_exposure)
+            time.sleep(PERIODE_EXPOSITION_S)
+    threading.Thread(target=boucle, daemon=True).start()
+    print('exposition : ' + ', '.join(f'{s.name} tenue a {s.manual_exposure}'
+                                      for s in specs)
+          + f' (repose toutes les {PERIODE_EXPOSITION_S:.0f} s)', flush=True)
 
 
 def calibre_svpro():
@@ -178,6 +219,8 @@ def main():
                   yolo26_dashboard.DESTINATION.items())), flush=True)
     else:
         pick_dashboard.INVENTAIRE.update(inventaire)
+
+    tient_l_exposition(pick_dashboard)
 
     fenetre = pick_dashboard.Fenetre()
     fenetre.show()

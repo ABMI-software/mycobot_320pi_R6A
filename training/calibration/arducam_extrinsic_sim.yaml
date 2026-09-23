@@ -1,0 +1,58 @@
+source: 'Jumeau SIMULE de arducam : meme T_cam_world que le banc reel, intrinseques
+  sans distorsion. Genere par scripts/generer_monde_yolo26.py.'
+camera_index: 2
+intrinsics_stem: sim_arducam
+reprojection_rms_px: 0.4812
+marker_size_mesure_mm: 48.778
+marker_size_yaml_mm: 50.0
+markers_used:
+- 19
+- 23
+- 25
+- 26
+frame_id: base_link
+resolution:
+- 640
+- 480
+T_cam_world:
+- - 0.1651209319841711
+  - -0.9862430300282898
+  - 0.007730688280928294
+  - -0.13592774575714686
+- - -0.9726234597634114
+  - -0.164130233662943
+  - -0.1645140477758648
+  - 0.16183880160055622
+- - 0.16351967263461187
+  - 0.019645664111090297
+  - -0.98634444518287
+  - 1.0566410706141998
+- - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+camera: arducam
+deplacement_constate: position precedente (4.4, -124.7, 1070.0) mm ; nouvelle (7.1,
+  -128.3, 1069.9) mm ; deplacement 4.5 mm.
+exposition: 'expo 45, gain 60. ATTENTION : apres un rebranchement USB, la valeur d
+  exposition ne rend PLUS la meme luminance et le GAIN est remis a 0 par les anciens
+  scripts, ce qui noircit l image. Regler expo ET gain, et verifier la luminance (~85).'
+piege_detection: 'Le 10/09, deux marqueurs sur quatre etaient indetectables : un CABLE
+  NOIR touchait leur bordure noire. ArUco cherche un quadrilatere noir ferme ; un
+  cable qui touche le bord fusionne avec lui et le contour n est plus un carre. Contraste
+  (236) et nettete (4318) etaient pourtant meilleurs que sur les marqueurs detectes.
+  Ecarter le cable a suffi : 4/4 a toutes les expositions.'
+taille_marqueur_NE_PAS_CORRIGER: 'Le champ marker_size_mesure_mm ci-dessous vaut ~48,7
+  mm. NE PAS en conclure que les marqueurs font 48,7 mm, et NE PAS corriger marker_size_mm
+  dans workspace_markers.yaml. Mesure du 10/09 : la detection ArUco tire les coins
+  d un petit carre vers l INTERIEUR, d autant plus que le marqueur est vu de biais
+  (correlation -0,920 avec l obliquite). Cinq marqueurs IDENTIQUES se mesurent de
+  47,7 a 49,7 mm alors que chacun repete a 0,108 mm pres. Extrapole a une vue de face
+  : 50,65 mm. Preuve independante : les distances entre centres (383-580 mm) sont
+  justes a -0,044 %, contre -2,6 % sur les cotes. Les marqueurs font 50 mm.'
+validation_leave_one_out_mm:
+  19: 1.59
+  23: 1.63
+  25: 1.12
+  26: 4.1
+sauvegarde: arducam_extrinsic_pick.avant_2209_1756.yaml

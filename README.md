@@ -546,6 +546,38 @@ python3 performance_analyzer.py --guided
 
 ## 🎯 Pick-and-place (Gazebo)
 
+### Banc réaliste vu par yolo26 — `banc_realiste`
+
+Variante réaliste du monde ci-dessous : les **4 pièces peintes et leurs 4 bacs**
+sur le plateau mesuré, les marqueurs aux positions relevées **au robot**, et les
+deux caméras du banc — arducam et SVPRO — **à leur pose extrinsèque calibrée,
+avec leurs intrinsèques**.
+
+```bash
+ros2 launch mycobot_gateway banc_realiste.launch.py   # terminal 1
+/usr/bin/python3 scripts/yolo26_gazebo.py             # terminal 2
+```
+
+Conséquence de poser les caméras à leur pose réelle : le même fichier de
+calibration vaut des deux côtés, donc `Vision.vers_base`, le modèle yolo26 et
+`pick_fsm` tournent sans modification. Mesuré, objets posés à des millimètres
+connus — **arducam 3,5 mm** d'écart médian, SVPRO 9,0 mm, 7 classes sur 8 des deux
+vues. La caméra quasi verticale précise, l'oblique deux à trois fois plus
+grossière : la hiérarchie du banc, sans réglage pour l'obtenir.
+
+Masses de la fiche 320 Pi 2022 (bras 3 kg, pince 0,340 kg), butées mesurées
+(J1 168, J2 135, J3 150, J4 145, J5 165, J6 180°).
+
+> **Si une caméra réelle bouge et qu'on la recalibre**, régénérer le monde, sinon
+> le jumeau reste faux sans le signaler :
+> `/usr/bin/python3 scripts/generer_banc_realiste.py` puis `colcon build
+> --packages-select mycobot_description --symlink-install`.
+
+> ⚠ **Échauffement.** Gazebo avec interface tient le processeur à 85-100 °C
+> (critique 100). Surveiller : `watch -n 2 'sensors | grep "Package id"'`.
+
+Détail, pièges et limites : [`mycobot_description/README_GAZEBO.md`](mycobot_description/README_GAZEBO.md).
+
 ### Réplique du banc réel — `real_table`
 
 Monde qui reproduit le poste physique plutôt qu'une table générique : plateau
@@ -569,7 +601,10 @@ ros2 launch mycobot_gateway real_table.launch.py
 
 | argument | défaut | effet |
 |---|---|---|
-| `demo:=true` | `false` | exécute un cycle de préhension physique du cube rouge vers le bac |
+| `demo` | `true` | exécute un cycle de préhension physique guidé par les quatre caméras ; `false` pour la scène seule |
+| `randomize` | `true` | place le cube et le bac aléatoirement dans la zone accessible au lancement |
+| `panel` | `true` | ouvre les boutons « Randomiser cube + bac » et « Lancer la prise » avec l'interface graphique |
+| `seed` | `-1` | graine aléatoire ; une valeur positive reproduit la même position |
 | `robot_appearance:=realistic` | `original` | base grise et coques blanc satiné — **visuel seulement**, la cinématique, les collisions et les inerties sont inchangées |
 | `headless:=true` | `false` | sans interface graphique |
 | `bridge_camera:=false` | `true` | ne publie pas les images de la caméra de dessus |

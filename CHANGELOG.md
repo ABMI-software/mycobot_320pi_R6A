@@ -9,6 +9,80 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — le banc reel en simulation, vu par yolo26 (23/09)
+
+- **`ros2 launch mycobot_gateway banc_realiste.launch.py`** — variante REALISTE
+  de `real_table.launch.py` : les 4 pieces peintes et leurs 4 bacs sur le plateau
+  mesure, les marqueurs aux positions relevees AU ROBOT, et les deux cameras du
+  banc a **leur pose extrinseque calibree, avec leurs intrinseques**. Masses de la
+  fiche 320 Pi 2022 (bras 3 kg, pince 0,340 kg) et butees mesurees
+  (J1 168, J2 135, J3 150, J4 145, J5 165, J6 180 deg), deja portees par l'URDF.
+- **`/usr/bin/python3 scripts/yolo26_gazebo.py`** — yolo26 sur les cameras de
+  Gazebo, en millimetres robot, avec les deux vues annotees (`--sans-fenetre`
+  pour le texte seul, `--une-passe` pour un controle rapide).
+- **`scripts/generer_pieces_gazebo.py`** — les 8 modeles Gazebo (4 pieces, 4 bacs)
+  GENERES DEPUIS `tri_couleur.py`. Les cotes ne sont pas recopiees : une piece
+  redimensionnee dans le dossier de fabrication se propage par regeneration.
+- **`scripts/generer_banc_realiste.py`** — le monde
+  `mycobot_description/worlds/banc_realiste_yolo26.sdf`, genere depuis
+  `real_table.sdf` + `planche_actuelle.yaml` + les deux extrinseques.
+- **Extrinseques SIMULEES** `arducam_extrinsic_sim.yaml`, `svpro_extrinsic_sim.yaml`
+  et leurs `sim_*.meta.json` : meme `T_cam_world` et memes fx/fy/cx/cy que le banc,
+  mais **distorsion nulle**. Gazebo rend une projection pinhole pure ; appliquer a
+  ces images le modele rationnel du vrai objectif (k1 = 5,4, k3 = -48,2) decalerait
+  chaque point de plusieurs millimetres sans rien signaler.
+
+**Mesure — la simulation retrouve la hierarchie du banc.** Les objets sont poses a
+des millimetres connus, la detection est comparee a la verite :
+
+| | arducam | SVPRO |
+|---|---:|---:|
+| Classes detectees | 7/8 | 7/8 |
+| Ecart median | **3,5 mm** | 9,0 mm |
+| Pire ecart | 7,1 mm | 18,4 mm |
+
+La camera quasi verticale est precise, l'oblique deux a trois fois plus grossiere
+— exactement leurs roles au banc, sans aucun reglage pour l'obtenir.
+
+**Non resolu : `bac_jaune` n'est detecte par aucune des deux vues** alors qu'il
+l'est en reel. Ni la teinte (ecart 0 apres correction) ni l'exposition (75,5 contre
+76,6) ne l'expliquent. Le jaune partage la teinte du bois — 19 contre 21, dans la
+bande de +/-8 — et le bac simule n'a pas le reflet de rebord du vrai.
+
+### Corrige — trois pannes muettes de la chaine Gazebo (23/09)
+
+- **`real_table.sdf` n'a pas de systeme de capteurs.** Sa `table_camera` declare
+  `/camera/image_raw`, mais aucun greffon ne l'anime : la scene se charge, le
+  capteur existe, et le sujet reste **muet sans le moindre message**. L'option
+  `bridge_camera:=true` ne peut donc rien donner. Ajoute dans le monde realiste ;
+  `real_table.sdf` garde le defaut.
+- **Le rendu des capteurs segfaute sur NVIDIA.** libEGL prend Mesa
+  (« egl: failed to create dri2 screen ») au lieu du fournisseur NVIDIA et le fil
+  de rendu meurt : la scene tourne, les sujets image restent vides. Le lancement
+  pose desormais `__EGL_VENDOR_LIBRARY_FILENAMES` et `__GLX_VENDOR_LIBRARY_NAME`.
+- **Ogre2 casse sur une collision de materiaux** (« HLMS Datablock [Hash
+  0x64f0b670] already exists ») — les quatre ArUco portent des visuels de memes
+  noms. Le monde realiste rend les capteurs avec **Ogre v1**.
+- **Le nom du monde doit valoir celui du fichier** : Gazebo sert ses services sous
+  `/world/<nom>/...` et `ros_gz_sim create` les y cherche. Un monde nomme
+  `real_table` dans un fichier `banc_realiste_yolo26.sdf` se charge sans erreur et
+  le robot n'apparait jamais, sur une attente muette.
+
+### Corrige — une descente refusee change de ROULIS, pas de millimetres (23/09)
+
+`scripts/yolo26_dashboard.py` : `_saisie` enregistrait deja le couple
+(inclinaison, roulis) qui avait ferme la pince a vide ; `_descente` ne le faisait
+pas. Un refus de branche renvoyait vers RECALAGE, qui affine le XY et redescend
+avec **le meme roulis**. Journal du 22/09 sur le cylindre vert : neuf descentes,
+neuf fois « palier Z=113 exige 71 deg — changement de branche refuse », avec des
+recalages de 2,92 puis 0,87 puis 0,26 puis 0,12 mm. Le XY n'etait pas le probleme.
+
+Borne **obligatoire** : `DETECTION` appelle `repart_a_zero`, qui efface
+`ctx.essais`. Sans borne, le `_descente` d'origine ne rend plus jamais son `ECHEC`
+terminal, `ctx.echecs` n'augmente plus, et la boucle tourne sans fin. Passe
+`ROULIS_REFUSES_MAX = 4` angles, la reponse d'origine repasse.
+
+
 ### Ajoute — yolo26 entraine sur les 8 pieces peintes, et vue deux cameras (18/09)
 
 - **`.venv/bin/python scripts/yolo26_visualisation.py [--camera arducam|svpro]

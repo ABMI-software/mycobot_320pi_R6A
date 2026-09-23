@@ -1,0 +1,21 @@
+{
+  "name": "sim_arducam",
+  "commentaire": "Intrinseques SIMULEES : memes fx, fy, cx, cy que cam_3, distorsion NULLE. Gazebo rend une projection pinhole pure ; appliquer les coefficients reels a ces images decalerait chaque point.",
+  "resolution": [
+    640,
+    480
+  ],
+  "results": {
+    "fx": 496.307502700341,
+    "fy": 494.142967106682,
+    "cx": 313.37381079861257,
+    "cy": 248.00566176810372,
+    "dist_coeffs": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}

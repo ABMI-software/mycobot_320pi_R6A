@@ -80,6 +80,21 @@ DESTINATION = {piece: f'bac_{couleur}' for piece, couleur in OBJETS.items()}
 # domine `rebord + GARDE_LARGAGE` pour un bac aussi bas.
 HAUTEUR_BAC = tc.BAC[2]
 DEMI_COTE_BAC_MM = tc.BAC[0] / 2.0
+# Duree pendant laquelle une cible verrouillee survit a une trame sans
+# detection. Assez pour un clignotement de yolo26, trop court pour courir
+# apres une piece reellement enlevee.
+# On saisit 1 mm PLUS HAUT que la mi-hauteur de la piece. Demande de
+# l'operateur le 22/09, apres le cycle ou le calage des doigts est descendu a
+# 8,7 mm pour un plancher a 13,9 : il vise le milieu, depasse vers le bas, et
+# finit plus pres de la planche que voulu. Un millimetre de marge ne change
+# rien a la prise d'un cube de 40 a 50 mm et eloigne les doigts du bois.
+MARGE_HAUTEUR_PRISE_MM = 1.0
+TENUE_CIBLE_S = 1.5
+# Nombre d'angles de prise qu'un objet a le droit de faire refuser avant que la
+# machine reprenne sa conclusion normale. Sans cette borne, changer d'angle est
+# une boucle sans fin (voir `_descente` dans `branche`).
+ROULIS_REFUSES_MAX = 4
+_CIBLE_TENUE = {}
 
 # `_detecte_objet` lit la derniere image traitee sans attendre. yolo26 ayant une
 # image de retard, le bras a peine degage serait juge sur une image ou il
@@ -221,6 +236,13 @@ def hauteur_triangulee(classe, camera, boite):
     if not Z_PLAUSIBLE_MM[0] <= z <= Z_PLAUSIBLE_MM[1]:
         return None
     HAUTEURS_MESUREES[classe] = z
+    # La hauteur mesuree remplace celle du dossier : le pave jaune se pose sur
+    # trois faces (40, 30 ou 50 mm de haut) et le dossier ne dit pas laquelle.
+    # Mesure du 22/09 : 12,4 a 15,5 mm de mi-hauteur, donc pose sur sa face de
+    # 30. Une hauteur de prise fausse ferme la pince au-dessus de l'objet.
+    if classe in fsm.Z_PRISE_PAR_CLASSE:
+        haut = z + MARGE_HAUTEUR_PRISE_MM
+        fsm.Z_PRISE_PAR_CLASSE[classe] = (haut, haut)
     return z
 
 
@@ -431,6 +453,22 @@ def _renomme_le_banc(module, inventaire=None):
     # Plus aucun marqueur colle sur les bacs : c'est la classe qui les nomme.
     module.MARQUEUR_CARTON.clear()
     module.HAUTEUR_CARTON = HAUTEUR_BAC
+    # Le scotch et le petit robot etaient saisis par leur EPAISSEUR et non par
+    # leur centre — un anneau et une figurine a maillons. Les quatre pieces
+    # peintes sont des solides pleins : on vise leur milieu.
+    module.PRISE_PAR_EPAISSEUR.clear()
+    # Hauteurs de prise : `Z_PRISE_PAR_CLASSE` ne connaissait que balle, scotch
+    # et robot, donc `choisit_pose_prise` retombait sur ses valeurs GENERIQUES
+    # (11,9 / 41,9) pour nos pieces, en le signalant dans le journal. On pose
+    # les mi-hauteurs du dossier de fabrication (`tri_couleur.OBJET_PAR_COULEUR`).
+    # Meme valeur outil droit et outil incline : les saisies inclinees du 22/09
+    # (pave jaune et cube rouge a -15 deg) ont tenu en visant cette mi-hauteur,
+    # et je n'ai pas de mesure qui justifierait un autre nombre.
+    module_fsm = fsm
+    module_fsm.Z_PRISE_PAR_CLASSE.clear()
+    for couleur, (_, poses) in tc.OBJET_PAR_COULEUR.items():
+        mi = poses[0][2] / 2.0 + MARGE_HAUTEUR_PRISE_MM
+        module_fsm.Z_PRISE_PAR_CLASSE[tc.NOM_PIECE[couleur]] = (mi, mi)
 
 
 def _renomme_les_cartons(fenetre):
@@ -638,6 +676,83 @@ def branche(module, service=None, inventaire=None, poids=None, seuil=None):
 
     module.Fenetre._suivi_vise = _suivi_vise
 
+    # ---- Ne pas changer de cible sur un clignotement de detection ----------
+    origine_position_objet = module.Fenetre._position_objet
+
+    def _position_objet(self, classe, precedent=None):
+        """Position de l'objet suivi, tenue TENUE_CIBLE_S apres sa derniere vue.
+
+        Le tableau de bord verrouille bien sa cible, mais il la lache des que
+        `_position_objet` rend None, et repart alors sur la piece la plus
+        proche : « suivi n a plus lieu d etre — nouveau choix ». Une seule trame
+        sans detection suffit. Sur le banc du 22/09 la machine partait sur le
+        cube rouge alors qu'elle avait verrouille le bleu, sans que rien n'ait
+        bouge sur la planche.
+
+        Or yolo26 clignote : mesure du meme jour, `bac_bleu` passe de 0,10 a
+        0,76 et `bac_jaune` de 0,26 a 0,94 d'une trame a l'autre, la piece
+        etant immobile. Ce n'est pas l'objet qui disparait, c'est le detecteur
+        qui hesite.
+
+        On tient donc la DERNIERE position connue pendant une seconde et demie.
+        Au-dela, l'objet a vraiment disparu — enleve a la main, ou tombe — et le
+        choix reprend normalement. La tenue ne masque rien : elle est annoncee
+        dans le journal, et la saisie reste verifiee par le statut de la pince.
+        """
+        vu = origine_position_objet(self, classe, precedent)
+        maintenant = time.time()
+        if vu is not None:
+            _CIBLE_TENUE[classe] = (np.asarray(vu, float), maintenant)
+            return vu
+        memoire = _CIBLE_TENUE.get(classe)
+        if memoire is None or maintenant - memoire[1] > TENUE_CIBLE_S:
+            _CIBLE_TENUE.pop(classe, None)
+            return None
+        self.ctx.note(f'{classe} non vu depuis {maintenant - memoire[1]:.1f} s — '
+                      f'cible TENUE, pas de nouveau choix')
+        return memoire[0].copy()
+
+    module.Fenetre._position_objet = _position_objet
+
+    # ---- Degager en UN mouvement, au lieu de balayer -----------------------
+    origine_degagement = fsm._degagement
+
+    def _degagement(ctx):
+        """Essaie la pose de degagement APPRISE avant le balayage du FSM.
+
+        `fsm._degagement` rend la main tout de suite si la vue de dessus voit
+        deja l'objet. Sinon il parcourt `BALAYAGE_J1`, pose par pose, en
+        verifiant a chaque fois — d'ou le bras qui part dans plusieurs
+        directions, et les 11 s de degagement mesurees sur le cycle de 62 s du
+        22/09.
+
+        Or il existe une pose APPRISE sur ce banc, bras place a la main puis
+        angles relus aux codeurs, qui degage la vue a tous les coups : c'est
+        celle que le tri en ligne de commande utilise entre chaque piece, et
+        elle n'a jamais echoue en huit cycles. On la tente d'abord ; le balayage
+        reste derriere, pour le cas ou elle ne suffirait pas.
+
+        La pince est forcement VIDE ici : `ETATS_RAMASSAGE` interdit
+        DEGAGEMENT des qu'un objet est tenu. On n'ajoute donc pas un detour a
+        un transport.
+        """
+        import calibration_dialogue
+        appris = calibration_dialogue.pose_degagement()
+        if appris is not None and not ctx.en_main and not fsm.porte_objet(ctx):
+            # Le bras en appui refuse tout deplacement large : meme precaution
+            # que l'original, qui appelle `degage_du_sol` avant de bouger.
+            fsm.degage_du_sol(ctx)
+            if fsm.va_vers_par_etapes(ctx, appris, nom='degagement appris',
+                                      stabilise=False) is not None:
+                ctx.note('degage en un mouvement sur la pose apprise')
+        return origine_degagement(ctx)
+
+    # La table `ACTIONS` capture la fonction A L'IMPORT : reassigner
+    # `fsm._degagement` seul ne changerait rien, la machine appellerait toujours
+    # l'originale. Meme piege que `_largage`, corrige plus haut.
+    fsm._degagement = _degagement
+    fsm.ACTIONS['DEGAGEMENT'] = _degagement
+
     # ---- Hauteur de lacher : le plancher etait taille pour un carton --------
     origine_z_largage = fsm.z_largage
 
@@ -701,7 +816,62 @@ def branche(module, service=None, inventaire=None, poids=None, seuil=None):
             ctx.note(f'{classe} largue a {ecart:.0f} mm du centre de {vise}')
         return resultat
 
+    # `ACTIONS` capture la fonction a l'import : sans cette seconde ligne la
+    # machine appelle toujours l'originale et la garde ne sert a rien.
     fsm._largage = _largage
+    fsm.ACTIONS['LARGAGE'] = _largage
+
+    # ---- Une descente refusee doit changer de ROULIS, pas de millimetres ----
+    origine_descente = fsm._descente
+
+    def _descente(ctx):
+        """Marque le couple (inclinaison, roulis) qui a fait refuser la descente.
+
+        `_saisie` enregistre deja dans `ctx.prises_ratees` le couple qui a
+        ferme la pince a vide, pour en changer au tour suivant. `_descente`, lui,
+        ne le faisait pas : un refus de branche renvoyait vers RECALAGE, qui
+        affine le XY et redescend avec LE MEME ROULIS.
+
+        Journal du 22/09 sur le cylindre vert a (211,-159) : neuf descentes,
+        neuf fois « palier Z=113 exige 71 deg — changement de branche refuse »,
+        avec des recalages de plus en plus fins — 2,92 puis 0,87 puis 0,26 puis
+        0,12 mm. Le XY n'a jamais ete le probleme. La boucle s'est arretee sur
+        « 3 echecs d affilee sans progres » sans avoir essaye un autre angle,
+        alors que `ROULIS` en propose huit.
+
+        On repart donc a DETECTION, seul etat qui rappelle
+        `choisit_pose_prise` — et celle-ci met en DERNIER les couples ratés,
+        sans les supprimer : quand tous ont echoue, il faut bien en reproposer un.
+
+        BORNE OBLIGATOIRE. `DETECTION` appelle `repart_a_zero`, qui efface
+        `ctx.essais` : le `_descente` d'origine ne rend donc plus jamais son
+        `ECHEC` terminal, `ctx.echecs` n'augmente plus, et `choisit_pose_prise`
+        reproposant les couples rates quand ils ont tous echoue, la boucle
+        tournerait sans fin. Passe `ROULIS_REFUSES_MAX` angles, on laisse donc
+        repasser la reponse d'origine et la machine s'arrete comme avant.
+        """
+        avant_essais = ctx.essais.get('DESCENTE', 0)
+        suite = origine_descente(ctx)
+        if suite not in ('RECALAGE', 'ECHEC') or ctx.essais.get('DESCENTE', 0) <= avant_essais:
+            return suite
+        if ctx.balle_xy is None:
+            return suite
+        couple = (ctx.inclinaison_balle, ctx.roulis_balle)
+        cle = fsm.cle_roulis('balle', ctx.balle_xy)
+        rates = ctx.prises_ratees.setdefault(cle, [])
+        if couple not in rates:
+            rates.append(couple)
+        ctx.prise_apprise.pop(cle, None)
+        if len(rates) >= ROULIS_REFUSES_MAX:
+            ctx.note(f'  {len(rates)} angles refuses sur cet objet — on laisse '
+                     f'la machine conclure')
+            return suite
+        ctx.note(f'  inclinaison {couple[0]:+.0f} roulis {couple[1]:+.0f} refusee a la '
+                 f'descente — on change d angle, pas de millimetres')
+        return 'DETECTION'
+
+    fsm._descente = _descente
+    fsm.ACTIONS['DESCENTE'] = _descente
 
     dessine_detections(module, service)
     return service

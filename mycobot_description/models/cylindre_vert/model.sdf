@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!-- Genere par scripts/generer_pieces_gazebo.py — regenerer plutot qu'editer.
+     Cotes lues dans tri_couleur.OBJET_PAR_COULEUR['vert'] : (44.0, 44.0, 50.0) mm.
+     Origine au CENTRE DE LA BASE : une pose a Z=0 repose sur la planche. -->
+<sdf version="1.9">
+  <model name="cylindre_vert">
+    <link name="corps">
+      <pose>0 0 0.025000 0 0 0</pose>
+      <inertial>
+        <mass>0.038013</mass>
+        <inertia>
+          <ixx>0.000012519</ixx><iyy>0.000012519</iyy><izz>0.000009199</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="collision">
+        <geometry><cylinder><radius>0.022000</radius><length>0.050000</length></cylinder></geometry>
+        <surface>
+          <friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction>
+        </surface>
+      </collision>
+      <visual name="visual">
+        <geometry><cylinder><radius>0.022000</radius><length>0.050000</length></cylinder></geometry>
+        <material>
+          <ambient>0.463 0.647 0.039 1</ambient>
+          <diffuse>0.463 0.647 0.039 1</diffuse>
+          <specular>0.1 0.1 0.1 1</specular>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

@@ -1,5 +1,104 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (23 septembre 2026 — le banc réel répliqué sous Gazebo, vu par yolo26)
+
+### Ce qui a été accompli aujourd'hui
+
+**Le banc est répliqué en simulation et yolo26 le lit.** Les 4 pièces peintes et
+leurs 4 bacs sont des modèles Gazebo **générés depuis `tri_couleur.py`** — les
+cotes ne sont pas recopiées, elles sont lues dans le dossier de fabrication. Les
+marqueurs sont remis aux positions relevées **au robot**
+(`planche_actuelle.yaml`) : le monde portait encore la forme au ruban, fausse de
+10 à 16 mm.
+
+**Les deux caméras sont à leur pose extrinsèque calibrée, avec leurs
+intrinsèques.** C'est tout l'intérêt : le même fichier de calibration vaut des
+deux côtés, donc `Vision.vers_base`, le modèle yolo26 et `pick_fsm` tournent sans
+qu'une ligne change. La simulation n'est pas une maquette de la chaîne, c'est la
+chaîne avec d'autres images en entrée.
+
+**Mesure — la hiérarchie du banc se reproduit d'elle-même.** Objets posés à des
+millimètres connus, détection comparée à la vérité : arducam **3,5 mm** d'écart
+médian (pire 7,1), SVPRO **9,0 mm** (pire 18,4), 7 classes sur 8 des deux vues.
+La caméra quasi verticale précise, l'oblique deux à trois fois plus grossière —
+sans aucun réglage pour l'obtenir. C'est ce qui dit que le jumeau est fidèle.
+
+**Trois pannes muettes de la chaîne Gazebo corrigées** : `real_table.sdf` n'a pas
+de système de capteurs (ses caméras ne rendent rien, sans message) ; le rendu des
+capteurs segfaute sur NVIDIA faute du bon fournisseur EGL ; Ogre2 casse sur une
+collision de matériaux entre les quatre ArUco, d'où Ogre v1.
+
+**Une descente refusée change maintenant de roulis, pas de millimètres.**
+`_saisie` enregistrait déjà le couple qui avait fermé la pince à vide, `_descente`
+non — d'où les neuf échecs du cylindre vert le 22/09 avec des recalages de plus en
+plus fins sur un XY qui n'était pas le problème. Borné à 4 angles, sans quoi la
+boucle n'a plus aucune sortie.
+
+### Décisions prises
+
+- **Éclairage laissé NORMAL**, identique à `real_table.sdf`, à la demande de
+  l'utilisateur. Le baisser d'un tiers rendait l'image caméra fidèle (luminance
+  76,6, celle de l'arducam réelle à l'exposition 75) mais la scène invivable. À
+  plein éclairage la caméra simulée est à 226 et 14 % de ses pixels saturent ;
+  la détection tient quand même. Réglage disponible dans
+  `generer_banc_realiste.py` (`FACTEUR_LUMIERE`).
+- **Extrinsèques simulées à distorsion nulle**, plutôt que de réutiliser les
+  coefficients réels. Gazebo rend une projection pinhole pure ; le modèle
+  rationnel du vrai objectif (k1 = 5,4, k3 = -48,2) décalerait chaque point de
+  plusieurs millimètres en silence.
+- **Nom distinct `banc_realiste`**, `real_table.launch.py` laissé intact.
+  Aucun fichier DREAM ni l'URDF touché.
+
+### Ce qui reste ouvert
+
+- **`bac_jaune` n'est détecté par aucune des deux vues simulées** alors qu'il
+  l'est en réel. Ni la teinte (écart 0) ni l'exposition ne l'expliquent. Le jaune
+  partage la teinte du bois (19 contre 21, bande ±8) et le bac simulé n'a pas le
+  reflet de rebord du vrai.
+- **La branche de fusion `merge/main-dans-pick-osama` (e3707cbb87) n'est pas
+  posée** sur `feature/pick-and-place-osama` : 5 fichiers de doc sales bloquent
+  l'avance rapide.
+- **L'alerte de calibration reste non tranchée** : `arducam — extrinsèque à 38 mm
+  au pire`. Quatre saisies du premier coup sont incompatibles avec 38 mm d'erreur
+  de visée — c'est donc la planche qui a bougé, pas la caméra, et la règle est
+  alors de remesurer 19 et 23 **au robot**. Le squelette projeté tranchera.
+- **Le correctif de roulis n'a pas tourné en boucle réelle** : le cylindre a été
+  trié par script, pas par la machine à états qu'il vise.
+- **L'empilement de trois overlays ROS** (`src/mycobot_R6A/install`,
+  `~/Osama_ws/install`, `~/ros_jazzy/install` figé au 07/07) fait qu'une
+  modification peut sembler sans effet sans aucun message. Les deux premiers sont
+  construits ; le troisième devrait disparaître.
+
+### Attention — échauffement
+
+Gazebo avec interface tient le processeur à **85-100 °C** (seuil critique 100),
+serveur physique à 120 % et fenêtre à 70 %. Le GPU, lui, reste à 55 °C et 6 % :
+c'est le processeur qui porte tout. Surveiller avec
+`watch -n 2 'sensors | grep "Package id"'`, et `nvidia-smi` pour yolo26, qui lui
+travaille sur le GPU. Un bridage (facteur temps réel 0,5, caméras à 5 Hz) est
+proposé mais pas appliqué.
+
+### Prochaines actions
+
+1. [ROUGE] Trancher l'alerte de calibration par le squelette projeté, bras libre.
+2. [ROUGE] Vérifier le correctif de roulis dans une vraie boucle du tableau de
+   bord : le journal doit dire « on change d angle, pas de millimètres ».
+3. [JAUNE] Brider Gazebo avant toute session longue avec interface.
+4. [JAUNE] Fermer `bac_jaune` en simulation — piste : le rebord du bac.
+5. [VERT] Poser la branche de fusion, puis nettoyer les overlays.
+
+### Commande rapide de reprise
+
+```bash
+# le banc réel en simulation
+ros2 launch mycobot_gateway banc_realiste.launch.py
+/usr/bin/python3 scripts/yolo26_gazebo.py
+
+# le banc réel, pour de vrai (bridge de la Pi requis sur le port 5005)
+/usr/bin/python3 scripts/lancer_pick_dashboard_final.py
+```
+
+
 ## État actuel (18 septembre 2026 — yolo26 entraîné sur les pièces peintes)
 
 ### Ce qui a été accompli aujourd'hui
