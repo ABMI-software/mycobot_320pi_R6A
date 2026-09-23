@@ -9,6 +9,20 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — l'évaluation RoboPEPP est menée par ABMI Lyon (23/09)
+
+- Licence **open-source**, évaluation **conduite par ABMI Lyon** — qui tient
+  aussi le banc définissant la baseline métrologique. UC3 et UC4 peuvent donc
+  être menés par les mêmes mains, sur le même banc, dans une seule campagne :
+  c'est la plus grosse source d'incomparabilité entre deux évaluations qui
+  disparaît.
+- Deux points restent à verrouiller, consignés dans la spécification : le
+  **lien du dépôt** (sans lui, personne ne saura que l'évaluation existe) et la
+  **licence exacte**. Ce dépôt est sous Apache-2.0 ; MIT, BSD ou Apache
+  s'intègrent sans difficulté, mais **GPL ou AGPL imposeraient leurs conditions
+  à ce qui embarque la brique**. À trancher avant d'écrire `pepp_localizer`,
+  pas après.
+
 ### Ajouté — spécification d'évaluation des briques interchangeables (22/09)
 
 - [`docs/SPEC_VALIDATION_BRIQUES.md`](docs/SPEC_VALIDATION_BRIQUES.md) définit

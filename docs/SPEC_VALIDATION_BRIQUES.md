@@ -244,21 +244,30 @@ Aucune ne peut être tranchée depuis le code seul.
    travail a commencé hors de ce dépôt ; ce qui manque n'est pas la décision
    d'évaluer, mais l'accord sur les mesures à produire.
 5. **Le banc de référence.** Les données de campagne actuelles viennent de
-   **Lyon** ; si Nanterre doit produire des mesures comparables, le protocole
-   commun est un prérequis, pas une conséquence.
+   **Lyon**, qui mène aussi l'évaluation RoboPEPP : UC3 et UC4 ont donc tout
+   intérêt à être menés là, dans une seule campagne. Si Nanterre doit produire
+   des mesures comparables, le protocole commun est un prérequis, pas une
+   conséquence.
 
 ---
 
 ## 10. RoboPEPP — évaluation en cours, hors de ce dépôt
 
-**État au 22/09/2026 :** RoboPEPP est en cours de test et de validation. Ce
-dépôt n'en porte **aucune trace** — ni branche, ni pull request, ni fichier. Le
-travail se déroule ailleurs.
+**État au 23/09/2026 :** RoboPEPP est en cours de test et de validation,
+**mené par ABMI Lyon**, sous **licence open-source**. Ce dépôt n'en porte
+encore aucune trace — ni branche, ni pull request, ni fichier.
 
-Ce n'est pas un problème en soi. Ce qui en est un : **une validation menée hors
-de ce cadre risque de produire des chiffres incomparables avec ceux de DREAM**,
-et il faudra tout refaire. Le projet a déjà payé cette erreur le 02/09, avec une
-démonstration invalidée le jour même faute d'avoir posé la bonne épreuve.
+**Lyon tient aussi le banc qui définit la baseline** (§5). C'est une
+circonstance favorable qu'il serait dommage de gâcher : l'équipe qui évalue
+RoboPEPP a sous la main l'instrument, le protocole des treize essais et
+l'opérateur qui l'a exécuté. UC3 et UC4 peuvent donc être menés **par les
+mêmes mains, sur le même banc, dans la même campagne** — ce qui supprime d'un
+coup la plus grosse source d'incomparabilité entre deux évaluations.
+
+Le risque restant : **une validation menée hors de ce cadre produira des
+chiffres incomparables avec ceux de DREAM**, et il faudra la refaire. Le projet
+a déjà payé cette erreur le 02/09, avec une démonstration invalidée le jour même
+faute d'avoir posé la bonne épreuve.
 
 ### Ce que l'évaluation doit produire pour se brancher ici
 
@@ -288,9 +297,18 @@ Sans ces cinq points, le résultat ne sera pas opposable à DREAM :
   démontrables et lesquelles seront noyées dans le bruit.
 - La grille de 9 cibles de `precision_benchmark_node` et son rapport CSV.
 
-⚠ **À remonter dès que possible :** où vit ce travail, et sous quelle licence.
-Tant que ce document ne peut pas y renvoyer, l'équipe qui lira cette
-spécification ne saura pas que l'évaluation existe.
+### Deux points à verrouiller
+
+⚠ **Le lien du dépôt.** Tant que ce document ne peut pas y renvoyer, quiconque
+lit cette spécification ignorera que l'évaluation existe — et la referait.
+
+⚠ **La licence exacte, pas seulement « open-source ».** Ce dépôt est sous
+**Apache-2.0** (voir [`../LICENSE`](../LICENSE)). Une brique sous MIT, BSD ou
+Apache s'y intègre sans difficulté. Une brique sous **GPL ou AGPL** impose ses
+conditions à ce qui l'embarque : la question doit être tranchée **avant**
+d'écrire `pepp_localizer`, pas après. Si le doute existe, un appel réseau vers
+un service séparé isole la contrainte — mais c'est un choix d'architecture, à
+faire en connaissance de cause.
 
 ---
 
