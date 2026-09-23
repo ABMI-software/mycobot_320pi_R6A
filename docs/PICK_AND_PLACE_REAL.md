@@ -563,6 +563,44 @@ ajoute du bruit au lieu de remplacer de vraies vues.
 
 ---
 
+## Le tri des 4 pièces — commande de référence
+
+C'est **la** commande du banc au quotidien :
+
+```bash
+/usr/bin/python3 scripts/lancer_pick_dashboard_final.py
+```
+
+Elle enchaîne, dans cet ordre : la question de calibration (un seul « oui »
+calibre les **deux** caméras), le chargement de yolo26 sur les 8 classes, la
+surveillance d'exposition de l'arducam, puis la fenêtre du tableau de bord.
+
+Prérequis, tous vérifiables avant de lancer :
+
+| | Comment le vérifier |
+|---|---|
+| Le bridge tourne sur le Pi | **Aller-retour TCP sur le port 5005**, jamais un `ping` — `.224` répond au ping sans servir le bridge |
+| Aucune autre caméra ouverte | `fuser /dev/video*` : un second client remet l'exposition en auto |
+| Aucun `bridge_tour` résiduel | `gripper_bridge.py` est **mono-client et bloquant** : la connexion est acceptée puis plus rien ne répond |
+
+Sans le bridge, la fenêtre s'ouvre quand même — la vision fonctionne, la barre
+d'état affiche « pont injoignable » et aucun mouvement n'est possible.
+
+Options utiles : `--sans-question` (sauter la calibration), `--sans-yolo`,
+`--inventaire cube_rouge=2` (nombre de pièces à trier par classe).
+
+> Les correctifs validés vivent dans `scripts/yolo26_dashboard.py`, qui greffe
+> yolo26 et ses gardes sur `pick_dashboard` **sans jamais l'éditer**. Attention :
+> `fsm.ACTIONS` capture les fonctions **à l'import** — réaffecter `fsm.<fn>` seul
+> est inerte, il faut aussi réécrire l'entrée du dictionnaire. Une garde posée
+> sans cela reste inactive sans rien signaler.
+
+Le même banc en simulation : `ros2 launch mycobot_gateway banc_realiste.launch.py`
+puis `/usr/bin/python3 scripts/yolo26_gazebo.py` — voir
+[`../mycobot_description/README_GAZEBO.md`](../mycobot_description/README_GAZEBO.md).
+
+---
+
 ## Lancer la démo complète
 
 Prérequis : bridge lancé sur le Pi (`python3 ~/gripper_bridge.py`).

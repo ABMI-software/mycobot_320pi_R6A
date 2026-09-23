@@ -68,6 +68,20 @@ bande de +/-8 — et le bac simule n'a pas le reflet de rebord du vrai.
   `real_table` dans un fichier `banc_realiste_yolo26.sdf` se charge sans erreur et
   le robot n'apparait jamais, sur une attente muette.
 
+### Documente — la commande de reference du banc, et la methode (23/09)
+
+- **`/usr/bin/python3 scripts/lancer_pick_dashboard_final.py`** etait la commande
+  du banc au quotidien et n'apparaissait dans **aucune** documentation. Ajoutee au
+  README et a `docs/PICK_AND_PLACE_REAL.md`, avec ses prerequis verifiables
+  (aller-retour TCP 5005, aucune autre camera ouverte, aucun `bridge_tour`
+  residuel) et le piege de `fsm.ACTIONS`, qui capture les fonctions a l'import.
+- **Les sept etapes qui rendent le banc simule realiste** sont ecrites dans
+  `mycobot_description/README_GAZEBO.md`, dans l'ordre et avec leurs mesures :
+  generation depuis le dossier de fabrication, marqueurs remis a la reference
+  robot, cameras a leur pose calibree, extrinseques simulees sans distorsion,
+  teintes de la peinture et non du trace, valeur du materiau baissee pour ne pas
+  ecreter, eclairage.
+
 ### Corrige — une descente refusee change de ROULIS, pas de millimetres (23/09)
 
 `scripts/yolo26_dashboard.py` : `_saisie` enregistrait deja le couple

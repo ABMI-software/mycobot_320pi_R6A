@@ -546,6 +546,21 @@ python3 performance_analyzer.py --guided
 
 ## 🎯 Pick-and-place (Gazebo)
 
+### Le banc réel — tri des 4 pièces
+
+```bash
+/usr/bin/python3 scripts/lancer_pick_dashboard_final.py
+```
+
+Calibration des deux caméras, yolo26 sur les 8 classes, surveillance de
+l'exposition de l'arducam, puis le tableau de bord. Le bridge doit tourner sur
+le Pi — à vérifier par un **aller-retour TCP sur le port 5005**, jamais par un
+`ping` : `.224` répond au ping sans servir le bridge. Sans lui la fenêtre s'ouvre
+quand même, la vision marche, aucun mouvement n'est possible.
+
+Méthode, calibration et limites :
+[`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md).
+
 ### Banc réaliste vu par yolo26 — `banc_realiste`
 
 Variante réaliste du monde ci-dessous : les **4 pièces peintes et leurs 4 bacs**

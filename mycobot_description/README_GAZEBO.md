@@ -86,6 +86,72 @@ faux sans le signaler :
 colcon build --packages-select mycobot_description --symlink-install
 ```
 
+### Comment le banc a été rendu réaliste — les étapes, dans l'ordre
+
+Chacune a été **mesurée**, pas estimée. Elles sont données dans l'ordre parce que
+chacune dépend de la précédente.
+
+**1. Les objets, générés depuis le dossier de fabrication.**
+`scripts/generer_pieces_gazebo.py` lit `tri_couleur.py` : cotes
+(`OBJET_PAR_COULEUR`, `BAC`) et teintes. Rien n'est recopié — une pièce
+redimensionnée là-bas se propage par régénération. Origine au **centre de la
+base** : une pose à Z = 0 repose sur la planche, sans calcul de demi-hauteur.
+
+**2. Les marqueurs remis à la référence mesurée AU ROBOT.**
+Le monde portait encore la forme au ruban, fausse de 10 à 16 mm.
+`planche_actuelle.yaml` est la seule référence qui ne passe pas par une caméra.
+
+**3. Les caméras à leur pose extrinsèque calibrée.**
+C'est l'étape qui fait tout le reste. Gazebo oriente sa caméra +X vers l'avant,
+OpenCV +Z : la conversion passe par `[z_cv, -x_cv, -y_cv]`. Les intrinsèques vont
+dans `<lens><intrinsics>`, et le `horizontal_fov` en découle
+(`2·atan(largeur / 2·fx)`). Vérification : les positions obtenues — arducam
+(7 ; −128 ; 1070) mm, SVPRO (371 ; 458 ; 781) mm — retombent sur celles
+enregistrées indépendamment dans les fichiers de calibration.
+
+**4. Des extrinsèques simulées à distorsion NULLE.**
+Gazebo rend une projection pinhole pure ; son `<distortion>` est un plumb-bob à
+cinq paramètres, incapable du modèle rationnel du vrai objectif (k1 = 5,4,
+k3 = −48,2). D'où `arducam_extrinsic_sim.yaml` et `svpro_extrinsic_sim.yaml` :
+même `T_cam_world`, mêmes fx/fy/cx/cy, coefficients nuls. **Mélanger image
+simulée et coefficients réels décale chaque point de plusieurs millimètres sans
+rien signaler.**
+
+**5. Les couleurs prises sur la peinture, pas sur le tracé.**
+`tri_couleur.BGR` n'est qu'une couleur d'aperçu ; les teintes **mesurées** sont
+`TEINTES` (rouge 0, jaune 21, vert 39, bleu 98). Le premier jet utilisait le
+tracé — le vert était à H = 60 au lieu de 39.
+
+**6. La valeur du matériau baissée pour ne pas écrêter.**
+À V = 235, le rendu saturait et les teintes **s'effondraient l'une sur l'autre** :
+jaune et vert sortaient tous deux à H = 30 au lieu de 21 et 39. À V = 165 les
+quatre teintes rendues valent exactement les mesurées.
+
+**7. L'éclairage.** Laissé **normal**, identique à `real_table.sdf`. Le baisser
+d'un tiers (`FACTEUR_LUMIERE` dans `generer_banc_realiste.py`) ramène l'image
+caméra à 76,6 de luminance — celle de l'arducam réelle à l'exposition 75 — mais
+assombrit la scène qu'on regarde. À plein éclairage, 14 % des pixels saturent et
+la détection tient quand même.
+
+### Puis yolo26 par-dessus
+
+Aucune adaptation du modèle : `scripts/yolo26_gazebo.py` lit les deux sujets
+image, soumet les trames au **même** `ServiceYOLO26` que le banc réel, et projette
+les boîtes avec `Vision.vers_base` sur les extrinsèques simulées. Le résultat est
+en millimètres robot, directement comparable à la vérité du monde.
+
+Contrôle en une commande, avec les deux vues annotées :
+
+```bash
+/usr/bin/python3 scripts/yolo26_gazebo.py            # --sans-fenetre, --une-passe
+```
+
+**Reste ouvert :** `bac_jaune` n'est détecté par aucune des deux vues, alors qu'il
+l'est en réel. Ni la teinte (écart 0 après l'étape 6) ni l'exposition (75,5 contre
+76,6) ne l'expliquent. Le jaune partage la teinte du bois — 19 contre 21, dans la
+bande de ±8 — et le bac simulé, mat et à parois de 2 mm, n'a pas le reflet de
+rebord du vrai.
+
 ## Tri des 4 objets par saisie physique
 
 ```bash
