@@ -74,13 +74,63 @@ Suite de tests : **171 passés, 23 échoués, 3 ignorés** contre 0 exécuté.
    doivent passer à l'URDF Gazebo.
 5. [VERT] Écrire le `workspace_safety_checker` lui-même, une fois 1 et 2 faits.
 
+### Où on en est, concrètement
+
+Travail sur la branche **`fix/tool-offset-and-test-collection`**, issue de
+`main`, quatre commits, **non poussée**. Elle a été créée parce que la séance
+avait démarré sur `main` et qu'un `checkout` vers
+`fix/pr14-process-scope-and-paths` est intervenu en cours de route ; cette
+branche-là a reçu un commit d'une autre main (`7a4ff756`) et n'a pas été
+touchée.
+
+⚠ Ses `.claude/rules/` exigent un trailer `Co-Authored-By`, à rebours de
+`CLAUDE.md` sur `main`. C'est `CLAUDE.md` qui a été suivi : aucun commit de
+cette séance ne porte d'attribution.
+
 ### Commande rapide de reprise
 
 ```bash
 conda deactivate
 cd ~/mycobot_ws/src/mycobot_320pi_R6A
-/usr/bin/python3 -m pytest tests/ -q
+/usr/bin/python3 -m pytest tests/ -q        # 171 passés, 23 échoués, 3 ignorés
 ```
+
+**Le tableau de bord ne démarre plus sans déport d'outil** — c'est voulu. Pour
+travailler hors robot en attendant la mesure :
+
+```bash
+MYCOBOT_TOOL_OFFSET_MM='-109.395,-8.9,11.9' /usr/bin/python3 scripts/pick_dashboard.py
+```
+
+Cette valeur est celle du **27/08**, celle contre laquelle les tests ont été
+écrits. **Ce n'est pas une mesure** : ne pas s'en servir pour saisir.
+
+### [ROUGE] La mesure du déport, pas à pas
+
+Tout le `workspace_safety_checker` en dépend, et une seule pose ne suffit pas :
+elle donne une équation pour trois inconnues, et la valider sur elle-même est
+le piège circulaire de BOUCLE_FERMEE § 5.3.
+
+1. Pince **fermée**, amener les doigts au contact de la planche. Relever `q`
+   par `get_angles`.
+2. Recommencer sur **au moins quatre azimuts nettement différents** — c'est ce
+   qui sépare la longueur de la direction.
+3. Résoudre au sens des moindres carrés, pour chaque pose :
+   `p_bride(q)[2] + R_bride(q)[2, :] @ TOOL = 0`
+   (`pose_bride` est dans `pick_fsm.py`). **Garder une pose de côté** pour la
+   validation, jamais une de celles qui ont produit le déport.
+4. Écrire le résultat et vérifier :
+
+```bash
+echo '{"tool_offset_mm": [x, y, z]}' > scripts/tool_offset.json
+/usr/bin/python3 -m pytest tests/ -q -k reference_de_l_outil
+```
+
+Attendu : `pointe(q_contact).Z = 0 ± 1 mm`. Si la mesure confirme le recalage
+du 09/09 (93,07 mm) plutôt que le 27/08 (110,4 mm), **c'est le test qu'il faut
+mettre à jour**, pas la mesure — et il faudra alors revoir avec lui les
+hauteurs décalées de +16,9 mm au même moment, `pick_fsm.py:96` prévenant
+qu'elles vont ensemble.
 
 ---
 
