@@ -1,0 +1,57 @@
+# Contract for the four-object sorting episodes, TRAIN split (48 episodes,
+# table camera). Derived from
+# Headless_Task-Grounded_Pick-and-Place_in_Gazebo/contracts/mycobot_pick_place.yaml
+# (which itself derives from Gazebo_to_LeRobot_Pipeline's mycobot_320_pi.yaml),
+# with the camera pointed at real_table.sdf's own table_camera
+# (/camera/image_raw) instead of the robot-mounted synth_camera used by the
+# single-object acquisition -- see doc/WORLD_SELECTION.md for why this world
+# and this camera are the target.
+#
+# The gripper joint (gripper_controller) is in observation.state and action,
+# same reasoning as the source contract: a sorting policy cannot be trained
+# without commanding the gripper. 6 arm joints + 1 gripper = 7 dims.
+#
+# Per A5: ground truth object poses are NEVER in this contract -- observation
+# is images + joint/gripper proprioception only. Verified by grep, see
+# doc/CONTRACT_VERIFICATION.md.
+#
+# action := the follower's own achieved state (/joint_states), same
+# simplification as the source contracts: no leader arm exists here, so
+# action records what the arm DID, not a separately-commanded target.
+#
+# simulated_attachment: recorded per-episode in episode metadata (Part 9.4),
+# not baked into this contract -- Part 3 found the reference grasp mechanism
+# genuine, but two live attempts on this hardware failed for a diagnosed
+# timing reason unrelated to the mechanism (doc/GRASP_DECISION.md). Whichever
+# actually ran for a given episode is what episode_XXX's meta records.
+
+robot_type: mycobot_320_pi
+robot_interface: ros2
+fps: 30
+
+observations:
+  observation.images.table:
+    channel: {topic: /camera/image_raw,
+              type: sensor_msgs/msg/Image,
+              qos: {reliability: best_effort, history: keep_last, depth: 10}}
+    align: {strategy: hold, timeline: header}
+    apply: [resize: [224, 224]]
+
+  observation.state:
+    channel: {topic: /joint_states, type: sensor_msgs/msg/JointState,
+              qos: {reliability: best_effort, history: keep_last, depth: 50}}
+    align: {strategy: hold, timeline: header}
+    select: [position.joint2_to_joint1, position.joint3_to_joint2,
+             position.joint4_to_joint3, position.joint5_to_joint4,
+             position.joint6_to_joint5, position.joint6output_to_joint6,
+             position.gripper_controller]
+
+actions:
+  action:
+    channel: {topic: /joint_states, type: sensor_msgs/msg/JointState,
+              qos: {reliability: best_effort, history: keep_last, depth: 50}}
+    align: {strategy: hold, timeline: header}
+    select: [position.joint2_to_joint1, position.joint3_to_joint2,
+             position.joint4_to_joint3, position.joint5_to_joint4,
+             position.joint6_to_joint5, position.joint6output_to_joint6,
+             position.gripper_controller]
