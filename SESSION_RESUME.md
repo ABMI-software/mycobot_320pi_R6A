@@ -1,5 +1,41 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (30 septembre 2026 — après-midi, pince sur support dans l'axe de J6)
+
+### Ce qui a été accompli aujourd'hui
+
+**La pince est remontée comme le prévoit le constructeur**, sur un support,
+dans l'axe de J6. `tool_offset.json` (pince sur le côté, 93 mm) et
+l'orientation imposée de `pick_fsm.py` ne valent plus.
+
+**Les quatre pièces sont triées** en boucle ouverte, sans la FSM
+(`scripts/cycle_pince_axe_j6.py`) : cube rouge, pavé jaune, cylindre vert,
+cube bleu (2e essai). Prise à J5 ≈ 90°, pince verticale ; largage incliné
+de 15 à 30°, les bacs étant à 383-433 mm d'allonge.
+
+**Arducam recalibrée** : déplacée de 69,5 mm, contrôle 0,12 mm après écriture.
+
+### Décisions prises
+
+- Mouvements **continus** : descente, fermeture, remontée et trajet vers le
+  bac enchaînés sans arrêt.
+- Pas de planificateur de trajet (Dijkstra, RRT) : l'espace est dégagé.
+
+### Prochaines actions
+
+1. [ROUGE] Mesurer au réglet le bout des doigts fermés → `tool_offset.json`.
+2. [ROUGE] Reprendre `pick_fsm.py` selon le plan de `docs/PINCE_SUPPORT_AXE_J6.md` § 6.
+3. [JAUNE] Réorienter la SVPRO (elle ne voit plus que 19 et 25), la recalibrer.
+4. [VERT] Aligner l'URDF Gazebo sur le nouveau montage.
+
+### Commande rapide de reprise
+
+```bash
+cd ~/Osama_ws/src/mycobot_R6A
+.venv/bin/python scripts/cycle_pince_axe_j6.py <x> <y> <hauteur> <bac_x> <bac_y> --essai
+```
+
+
 ## État actuel (23 septembre 2026 — le banc réel répliqué sous Gazebo, vu par yolo26)
 
 ### Ce qui a été accompli aujourd'hui

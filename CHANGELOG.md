@@ -9,6 +9,20 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — pince montee sur support, dans l'axe de J6 (30/09)
+
+- **`scripts/cycle_pince_axe_j6.py`** — un cycle saisie -> bac en boucle
+  ouverte pour la pince sur support : survol vertical (J5 ~ 90), descente en
+  deux segments enchaines, fermeture confirmee par le statut, remontee et
+  trajet vers le bac sans arret, largage pince inclinee de 15 a 30 deg.
+  `--essai` calcule et verifie tout sans rien envoyer. Gardes : hauteur
+  minimale du trajet, derive XY <= 6 mm, ecart codeurs <= 2,8 deg.
+  Les quatre pieces peintes triees sur le banc reel.
+- **`docs/PINCE_SUPPORT_AXE_J6.md`** — geometrie mesuree (centre de prise
+  ~[-24, 0, +146] mm repere bride), recalibration arducam (controle 0,12 mm),
+  resultats des essais et plan de reprise de `pick_fsm.py`, dont
+  l'orientation imposee `Q_REFERENCE` ne vaut plus avec ce montage.
+
 ### Ajoute — le banc reel en simulation, vu par yolo26 (23/09)
 
 - **`ros2 launch mycobot_gateway banc_realiste.launch.py`** — variante REALISTE
