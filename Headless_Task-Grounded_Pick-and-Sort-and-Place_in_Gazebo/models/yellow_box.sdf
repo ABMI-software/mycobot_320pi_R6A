@@ -1,0 +1,60 @@
+<?xml version="1.0" ?>
+<!-- Extracted verbatim from mycobot_320pi_R6A/mycobot_description/worlds/real_table.sdf
+     (branch feature/pick-and-place-osama, added this session). World pose there: 0.10 0.09 0.020.
+     Note: sim_sorting_grasp.py grasps this one with phi_deg=90 (pinches the
+     30mm side); it is not rotationally symmetric like the cubes/cylinder. -->
+<sdf version="1.9">
+  <model name="yellow_box">
+    <link name="link">
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>0.05 0.03 0.04</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.7 0.6 0.05 1</ambient>
+          <diffuse>0.95 0.85 0.10 1</diffuse>
+          <specular>0.4 0.4 0.1 1</specular>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.05 0.03 0.04</size>
+          </box>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.0</mu>
+              <mu2>1.0</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>1.08e-5</ixx>
+          <iyy>1.71e-5</iyy>
+          <izz>2.04e-5</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+    </link>
+    <!-- SIMULATED ATTACHMENT, NOT A PHYSICAL GRASP (Part 3/A8 decision;
+         doc/GRASP_DECISION.md). See red_cube.sdf for the full rationale. -->
+    <plugin filename="gz-sim-detachable-joint-system"
+            name="gz::sim::systems::DetachableJoint">
+      <parent_link>link</parent_link>
+      <child_model>mycobot_320</child_model>
+      <child_link>link6</child_link>
+      <attach_topic>/htgspp/attach</attach_topic>
+      <detach_topic>/htgspp/detach</detach_topic>
+      <output_topic>/htgspp/attached</output_topic>
+    </plugin>
+  </model>
+</sdf>
