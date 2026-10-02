@@ -22,8 +22,8 @@
       <visual name="visual">
         <geometry><box><size>0.050000 0.030000 0.040000</size></box></geometry>
         <material>
-          <ambient>0.647 0.463 0.039 1</ambient>
-          <diffuse>0.647 0.463 0.039 1</diffuse>
+          <ambient>0.647 0.486 0.039 1</ambient>
+          <diffuse>0.647 0.486 0.039 1</diffuse>
           <specular>0.1 0.1 0.1 1</specular>
         </material>
       </visual>

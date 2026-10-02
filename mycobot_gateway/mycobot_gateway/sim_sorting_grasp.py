@@ -16,9 +16,9 @@ Trois chiffres mesures gouvernent le cycle, tous issus des meshes de la pince
     vers 1.11 rad — d'ou `_SPAN_TABLE`, qui donne l'angle pour une largeur ;
   * l'encombrement EXTERIEUR des doigts refermes (78 a 93 mm) depasse
     l'ouverture utile d'un bac (95 mm de libre pour 100 mm hors-tout). Les
-    doigts ne peuvent donc pas entrer dans le bac : on lache a `DROP_TIP_Z`,
-    ou l'objet — qui pend sous la pointe — est deja sous le rebord alors que
-    les doigts restent au-dessus.
+    doigts ne peuvent donc pas entrer dans le bac : le dessous de l'objet
+    a 5 mm au-dessus du rebord (`BIN_RIM_Z`), on ecarte les doigts, l'objet
+    tombe au fond, puis on remonte.
 
 Le bac vert impose la seule vraie contrainte cinematique : son azimut (164.7°)
 demande J1 ≈ 187° a l'outil sorti, au-dela de la butee. Il n'est atteignable
@@ -43,10 +43,14 @@ import numpy as np
 import rclpy
 from builtin_interfaces.msg import Duration
 from controller_manager_msgs.srv import ListControllers
+from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray, String
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from vision_msgs.msg import Detection3DArray
+
+from .vision import tri_scene
 
 _SCRIPTS = Path(__file__).resolve().parents[2] / 'scripts'
 if str(_SCRIPTS) not in sys.path:
@@ -95,24 +99,31 @@ _FOOTPRINT_TABLE = [(0.00, 80.8), (0.20, 72.8), (0.40, 63.3), (0.60, 52.3),
 
 APPROACH_Z = 0.110     # survol avant descente
 TRANSIT_Z = 0.110      # hauteur de transfert : le max atteignable a r=0.28
-# L'objet est POSE au fond du bac, pas lache au-dessus : 1 mm de garde sous
-# lui, puis on ouvre. Lacher de plus haut le faisait rebondir sur la paroi et
-# rester couche sur le rebord (mesure du 31/08 : cube bleu a 44.6 deg).
-#
-# Les doigts peuvent descendre dans le bac parce que la collision demande DEUX
-# conditions simultanees : etre sous le rebord (haut a 30 mm) ET plus ecarte
-# que la paroi interne (+-47.5 mm). Refermes sur l'objet ils ne font que
-# +-34 a +-44 mm ; c'est en s'OUVRANT qu'ils depassent (+-81 mm grand ouverts).
-# D'ou l'ouverture en deux temps : juste de quoi liberer l'objet au fond, puis
-# grand ouvert seulement apres etre remonte.
-PLACE_CLEARANCE_M = 0.001    # garde sous l'objet au moment de le poser
 BIN_INNER_HALF_MM = 47.5     # demi-ouverture utile d'un bac
-BIN_FLOOR_Z = 0.002    # dessus du fond du bac
 MIN_TRANSIT_Z = 0.060  # la pointe ne doit jamais passer sous ca en transit
 
 IK_ITERATIONS = 60       # 150 ne gagnait rien : la tolerance est a 0.05 mm
 JOINT_SPEED_DPS = 75.0   # vitesse articulaire visee, deg/s
 SETTLE_TOL_DEG = 0.35    # arrive quand l'ecart passe sous ca
+
+# Perception : trois messages fusionnes successifs, d'accord a 4 mm pres. La
+# fusion des 4 cameras tient 0,65 mm de mediane, 2,07 mm au pire (01/10).
+PERCEPTION_SAMPLES = 3
+# Ouverture d'approche dans la scene de tri : largeur pincee + 24 mm.
+APPROACH_MARGIN_MM = 24.0
+# Largage incline (bac hors de portee de l'outil vertical) : le dessous de
+# l'objet a 5 mm au-dessus du rebord (30 mm), descente lente, ouverture en deux
+# temps — l'objet est pose, pas jete. Approche et retrait 50 mm plus haut.
+DROP_TILTS_DEG = (15.0, 30.0, 45.0)
+DROP_ABOVE_RIM_M = 0.005
+DROP_DESCENT_S = 2.0
+BIN_RIM_Z = 0.030
+DROP_RISE_M = 0.05
+# Relacher = ecarter les doigts de 20 mm AVANT de remonter, sinon l'objet
+# glisse entre eux pendant la montee (video 4 vues du 02/10).
+RELEASE_ABOVE_RIM_EXTRA_MM = 20.0
+RELEASE_SETTLE_S = 2.0
+PERCEPTION_STABLE_M = 0.004
 
 JOINT_LIMITS_DEG = np.array([(-168., 168.), (-135., 135.), (-150., 150.),
                              (-145., 145.), (-165., 165.), (-180., 180.)])
@@ -122,12 +133,13 @@ class Target:
     """Un objet a trier : sa taille, la largeur a pincer, son bac."""
 
     def __init__(self, model, height, grip_mm, bin_xy, phi_deg=None,
-                 squeeze_mm=SQUEEZE_MM):
+                 squeeze_mm=SQUEEZE_MM, phis=None):
         self.model = model
         self.height = height
         self.grip_mm = grip_mm
         self.bin_xy = bin_xy
         self.phi_deg = phi_deg          # None = laisse l'IK choisir
+        self.phis = phis                # orientations permises si phi_deg est libre
         self.squeeze_mm = squeeze_mm    # ecrasement commande sous la
                                         # largeur reelle = force de serrage
 
@@ -141,6 +153,18 @@ TARGETS = [
     # plus fort qu'une face plane pour qu'il ne file pas a la levee.
     Target('green_cylinder', 0.050, 44.0, (-0.22,  0.06), squeeze_mm=6.0),
     Target('yellow_box',     0.040, 30.0, (-0.22,  0.18), phi_deg=90.0),
+]
+
+# Scene de tri (tri_yolo.launch.py) : memes pieces aux noms des classes yolo26.
+# Le bac vient de la perception (pose_source:=perception), d'ou bin_xy vide.
+TRI_TARGETS = [
+    # Un cube se pince par deux faces : a 45° les doigts tombent sur les aretes
+    # (71 mm de diagonale pour 50) et le cube file (cube_bleu, graine 4, 01/10).
+    # Pieces a lacet nul dans la scene V1, d'ou 0 ou 90°.
+    Target('cube_rouge',    0.040, 40.0, None, phis=(0.0, 90.0)),
+    Target('pave_jaune',    0.040, 30.0, None, phi_deg=90.0),
+    Target('cylindre_vert', 0.050, 44.0, None, squeeze_mm=6.0),
+    Target('cube_bleu',     0.050, 50.0, None, phis=(0.0, 90.0)),
 ]
 
 
@@ -163,6 +187,13 @@ def rotation_top_down(phi_rad: float) -> np.ndarray:
     z = np.array([0.0, 0.0, -1.0])
     x = np.array([math.cos(phi_rad), math.sin(phi_rad), 0.0])
     return np.column_stack([x, np.cross(z, x), z])
+
+
+def _rotation_about(axis, angle):
+    """Rotation de `angle` (rad) autour de l'axe unitaire `axis` (Rodrigues)."""
+    k = np.asarray(axis, dtype=float)
+    K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    return np.eye(3) + math.sin(angle) * K + (1 - math.cos(angle)) * K @ K
 
 
 def tool_tip(q_deg: np.ndarray) -> np.ndarray:
@@ -188,17 +219,30 @@ class SimSortingGrasp(Node):
         self.declare_parameter('settle_time', 1.5)     # plafond d'attente
         self.declare_parameter('only', '')
         self.declare_parameter('startup_timeout', 60.0)
+        self.declare_parameter('pose_source', 'gazebo')
+        self.declare_parameter('max_attempts', 1)
+        self.pose_source = str(self.get_parameter('pose_source').value)
+        self.max_attempts = int(self.get_parameter('max_attempts').value)
+        if self.pose_source not in ('gazebo', 'vision', 'perception') or self.max_attempts < 1:
+            raise ValueError('pose_source must be gazebo/vision/perception and max_attempts >= 1')
+        self.perceived = []
+        self.vision_pose = None
+        self.vision_received = 0.0
         self.world = str(self.get_parameter('world_name').value)
         move_dur = float(self.get_parameter('move_duration').value)
         self.move_dur = move_dur if move_dur > 0.0 else None
         self.settle = float(self.get_parameter('settle_time').value)
         only = str(self.get_parameter('only').value)
         self.only = [m.strip() for m in only.split(',') if m.strip()]
+        if self.pose_source == 'vision' and self.only != ['red_cube']:
+            raise ValueError('vision mode currently requires only:=red_cube')
         self.startup_timeout = float(self.get_parameter('startup_timeout').value)
         if not math.isfinite(self.startup_timeout) or self.startup_timeout <= 0.0:
             raise ValueError('startup_timeout doit etre positif et fini')
         self.targets = []
-        for target in TARGETS:
+        if self.pose_source == 'perception':
+            self.targets = list(TRI_TARGETS)
+        for target in ([] if self.pose_source == 'perception' else TARGETS):
             param = f'bin_xy.{target.model}'
             self.declare_parameter(param, list(target.bin_xy))
             bin_xy = tuple(self.get_parameter(param).value)
@@ -218,10 +262,88 @@ class SimSortingGrasp(Node):
             Float64MultiArray, '/gripper_position_controller/commands', 10)
         self.pub_status = self.create_publisher(String, '/pickplace/status', 10)
         self.create_subscription(JointState, '/joint_states', self._joint_cb, 10)
+        if self.pose_source == 'vision':
+            self.create_subscription(PoseStamped, '/vision/red_cube/pose', self._vision_cb, 10)
+        if self.pose_source == 'perception':
+            self.create_subscription(Detection3DArray, '/yolo/objects_3d', self._perception_cb, 10)
         self.controller_client = self.create_client(
             ListControllers, '/controller_manager/list_controllers')
 
     # ── etat ────────────────────────────────────────────────────────────
+    def _vision_cb(self, msg):
+        point = msg.pose.position
+        xyz = np.array([point.x, point.y, point.z])
+        if msg.header.frame_id != 'world' or not np.isfinite(xyz).all():
+            return
+        self.vision_pose = msg
+        self.vision_received = time.monotonic()
+
+    def _perception_cb(self, msg):
+        self.perceived.append((time.monotonic(), {
+            d.results[0].hypothesis.class_id: np.array(
+                [d.bbox.center.position.x, d.bbox.center.position.y, d.bbox.center.position.z])
+            for d in msg.detections}))
+        self.perceived = self.perceived[-PERCEPTION_SAMPLES:]
+
+    def perceived_poses(self, needed):
+        """Pieces AND bins from /yolo/objects_3d only (protocol, step 9).
+
+        Seen from the observation pose, where the arm hides 4.3 % of the board;
+        `needed` classes in PERCEPTION_SAMPLES fresh messages that agree within
+        PERCEPTION_STABLE_M, median of them.
+        """
+        q_observe = np.array(tri_scene.OBSERVATION_Q_DEG)
+        if not self.transit(q_observe, 'pose d observation'):
+            raise RuntimeError('pose d observation inatteignable sans racler')
+        requested = time.monotonic()
+        deadline = requested + 30.0
+        while rclpy.ok() and time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+            fresh = [seen for t, seen in self.perceived if t > requested]
+            if len(fresh) < PERCEPTION_SAMPLES or not all(needed <= set(s) for s in fresh):
+                continue
+            stack = {n: np.array([s[n] for s in fresh]) for n in needed}
+            if all(np.max(np.ptp(v[:, :2], axis=0)) < PERCEPTION_STABLE_M for v in stack.values()):
+                return {n: np.median(v, axis=0) for n, v in stack.items()}
+        missing = needed - set(self.perceived[-1][1]) if self.perceived else needed
+        raise RuntimeError(f'perception : pas de position stable (absentes : {sorted(missing)})')
+
+    def target_poses(self, target=None):
+        """Use fresh vision for aiming; Gazebo poses are only grasp verification."""
+        if self.pose_source == 'gazebo':
+            return self.object_poses()
+        if self.pose_source == 'perception':
+            return self.perceived_poses({target.model, tri_scene.PAIRS[target.model]})
+        self.status('localisation du cube par les quatre cameras…')
+        deadline = time.monotonic() + 25.0
+        # Require a new observation after any previous motion or failed attempt.
+        requested = time.monotonic()
+        samples = []
+        previous_stamp = None
+        while rclpy.ok() and time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=.1)
+            msg = self.vision_pose
+            if msg is None or self.vision_received <= requested:
+                continue
+            stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+            age = self.get_clock().now().nanoseconds * 1e-9 - stamp
+            if not 0 <= age <= 1.5 or stamp == previous_stamp:
+                continue
+            previous_stamp = stamp
+            p = msg.pose.position
+            xyz = np.array([p.x, p.y, p.z])
+            if (not .14 <= np.linalg.norm(xyz[:2]) <= .32
+                    or not .01 <= xyz[2] <= .03):
+                samples.clear()
+                continue
+            samples.append(xyz)
+            samples = samples[-3:]
+            if len(samples) == 3 and np.max(np.ptp(samples, axis=0)) < .004:
+                position = np.median(samples, axis=0)
+                self.status(f'vision stable : {np.round(position, 4).tolist()} m')
+                return {'red_cube': position}
+        raise RuntimeError('pas de position visuelle recente et stable — mouvement annule')
+
     def _joint_cb(self, msg: JointState):
         names = list(msg.name)
         if all(j in names for j in ARM_JOINTS):
@@ -231,8 +353,13 @@ class SimSortingGrasp(Node):
             self.grip_pos = msg.position[names.index(GRIPPER_JOINTS[0])]
 
     def spin_for(self, seconds: float):
-        end = time.time() + seconds
-        while time.time() < end:
+        # Gazebo rendering can run slower than wall time with four cameras.
+        # Gripper settling and trajectory durations are simulation seconds.
+        end = self.get_clock().now().nanoseconds * 1e-9 + seconds
+        watchdog = time.monotonic() + max(15.0, seconds * 15.0)
+        while rclpy.ok() and self.get_clock().now().nanoseconds * 1e-9 < end:
+            if time.monotonic() > watchdog:
+                raise RuntimeError('horloge de simulation arretee ou trop lente')
             rclpy.spin_once(self, timeout_sec=0.05)
 
     def status(self, text: str):
@@ -279,7 +406,10 @@ class SimSortingGrasp(Node):
 
     def _solve_at_phi(self, tip, phi_deg, q_ref):
         """Meilleure solution pour UN phi donne, ou None."""
-        rot = rotation_top_down(math.radians(phi_deg))
+        return self._solve_at_rot(tip, rotation_top_down(math.radians(phi_deg)), q_ref)
+
+    def _solve_at_rot(self, tip, rot, q_ref):
+        """Meilleure solution pour UNE orientation d'outil, ou None."""
         flange_mm = (np.asarray(tip) - rot @ TOOL_OFFSET) * 1000.0
         best = None
         for seed in self._seeds(tip):
@@ -321,7 +451,7 @@ class SimSortingGrasp(Node):
                 best = (travel, q)
         return None if best is None else best[1]
 
-    def solve_column(self, x, y, heights, phi_deg=None, q_ref=None):
+    def solve_column(self, x, y, heights, phi_deg=None, q_ref=None, phis=None):
         """Une pile de poses a la MEME orientation de poignet.
 
         Rebalayer phi a chaque hauteur faisait tourner le poignet entre la
@@ -330,7 +460,7 @@ class SimSortingGrasp(Node):
         """
         q_ref = self.q_deg if q_ref is None else q_ref
         phis = ([phi_deg] if phi_deg is not None
-                else list(range(0, 180, 15)))
+                else list(phis) if phis is not None else list(range(0, 180, 15)))
         best = None
         for phi in phis:
             column, prev = [], q_ref
@@ -352,6 +482,27 @@ class SimSortingGrasp(Node):
             if best[0] < 75.0:      # assez bon, on ne balaie pas les 11 autres
                 break
         return (None, None) if best is None else (best[2], best[1])
+
+    def tilted_drop(self, bx, by, z_release, q_ref):
+        """Outil incline vers l'exterieur au-dessus du bac, quand la verticale n'y va pas.
+
+        Comme au banc reel (bacs a 0.36-0.45 m, 30/09 et 01/10) : la pointe
+        au-dessus du centre du bac, on lache, l'objet tombe dans le bac.
+        Rend (q_haut, q_largage, inclinaison) ou None.
+        """
+        az = math.atan2(by, bx)
+        tangent = np.array([-math.sin(az), math.cos(az), 0.0])
+        for tilt in DROP_TILTS_DEG:
+            for phi in (math.degrees(az) + 90.0, math.degrees(az)):
+                rot = _rotation_about(tangent, -math.radians(tilt)) @ \
+                    rotation_top_down(math.radians(phi))
+                q_release = self._solve_at_rot([bx, by, z_release], rot, q_ref)
+                if q_release is None:
+                    continue
+                q_up = self._solve_at_rot([bx, by, z_release + DROP_RISE_M], rot, q_release)
+                if q_up is not None:
+                    return q_up, q_release, tilt
+        return None
 
     def _path_clears_table(self, q_from, q_to, floor=MIN_TRANSIT_Z) -> bool:
         """La pointe reste-t-elle haute sur toute l'interpolation articulaire ?"""
@@ -383,12 +534,12 @@ class SimSortingGrasp(Node):
         self.pub_arm.publish(traj)
 
         self.spin_for(duration)
-        deadline = time.time() + self.settle
-        while time.time() < deadline:
+        deadline = time.monotonic() + max(5.0, self.settle * 10.0)
+        while rclpy.ok() and time.monotonic() < deadline:
             if float(np.max(np.abs(self.q_deg - q_deg))) < SETTLE_TOL_DEG:
-                break
+                return tool_tip(self.q_deg)
             rclpy.spin_once(self, timeout_sec=0.02)
-        return tool_tip(self.q_deg)
+        raise RuntimeError('le bras simule n a pas atteint la consigne articulaire')
 
     def set_gripper(self, angle: float, settle: float = 1.5):
         """Ouvre/ferme les quatre joints, bornes sur les limites de l'URDF."""
@@ -459,16 +610,47 @@ class SimSortingGrasp(Node):
         grasp_z = max(0.018, target.height * 0.45)
 
         self.status(f'▶ {name} : saisie en ({x:+.3f}, {y:+.3f})')
-        self.open_gripper()
+        if target.bin_xy is None:
+            # Scene de tri : objets a 30 mm des bacs. Grand ouverts, les doigts
+            # (+-81 mm) se posaient sur la paroi du bac voisin et se refermaient
+            # dans le vide (pave_jaune, graine 5, 01/10).
+            self.set_gripper(angle_for_span(target.grip_mm + APPROACH_MARGIN_MM))
+        else:
+            self.open_gripper()
 
         # Survol, saisie et levee partagent le meme phi : le poignet ne tourne
         # pas une fois les doigts sur l'objet.
         column, phi = self.solve_column(
-            x, y, [APPROACH_Z, grasp_z, TRANSIT_Z], target.phi_deg)
+            x, y, [APPROACH_Z, grasp_z, TRANSIT_Z], target.phi_deg, phis=target.phis)
         if column is None:
             return 'aucune orientation de poignet ne sert les trois hauteurs'
         q_above, q_grasp, q_lift = column
         self.status(f'  poignet phi={phi}°')
+
+        # Le depot est resolu AVANT de toucher l'objet : un bac hors de portee
+        # faisait lacher la piece au hasard sur la planche, contre une autre
+        # (graine 4, 01/10).
+        bx, by = (target.bin_xy if target.bin_xy is not None
+                  else poses[tri_scene.PAIRS[name]][:2])
+        # Lacher au-dessus du rebord, doigts hors du bac : dedans, la paroi
+        # (95 mm) les empechait de s'ouvrir plus que le cube bleu (50 mm), qui
+        # restait pince puis glissait a la remontee (02/10).
+        z_release = BIN_RIM_Z + DROP_ABOVE_RIM_M + target.height / 2.0
+        bin_column, bin_phi = self.solve_column(
+            bx, by, [TRANSIT_Z, z_release], q_ref=q_lift)
+        tilted = None
+        if bin_column is None:
+            tilted = self.tilted_drop(bx, by, z_release, q_lift)
+            if tilted is None:
+                self.open_gripper()
+                return 'aucune pose de depot au-dessus du bac (ni verticale ni inclinee)'
+            q_over_bin, q_place, tilt = tilted
+            self.status(f'  bac a {math.hypot(bx, by) * 1000:.0f} mm : largage incline '
+                        f'{tilt:.0f}°, objet a z={z_release:.3f}')
+        else:
+            q_over_bin, q_place = bin_column
+            self.status(f'  bac : poignet phi={bin_phi}°, largage vertical, '
+                        f'objet a z={z_release:.3f}')
 
         if not self.transit(q_above, f'{name} survol'):
             return 'chemin de survol non sur'
@@ -485,37 +667,21 @@ class SimSortingGrasp(Node):
         held = self.object_poses().get(name)
         if held is None or held[2] < 0.06:
             self.open_gripper()
-            return f'prise ratee (objet reste a z={held[2]:.3f} m)'
+            return ('prise ratee (pose de verification indisponible)' if held is None
+                    else f'prise ratee (objet reste a z={held[2]:.3f} m)')
         self.status(f'  tenu a z={held[2]:.3f} m')
 
-        bx, by = target.bin_xy
-        # On descend jusqu'a poser l'objet sur le fond du bac.
-        place_z = BIN_FLOOR_Z + PLACE_CLEARANCE_M + target.height / 2.0
-        release = angle_for_span(target.grip_mm)
-        garde = BIN_INNER_HALF_MM - footprint_half_mm(release)
-        if garde < 0.0:
-            self.open_gripper()
-            return (f'doigts trop larges pour le bac a l ouverture '
-                    f'({footprint_half_mm(release):.0f} > {BIN_INNER_HALF_MM} mm)')
-
-        bin_column, bin_phi = self.solve_column(
-            bx, by, [TRANSIT_Z, place_z], q_ref=q_lift)
-        if bin_column is None:
-            self.open_gripper()
-            return 'aucune pose de depot au-dessus du bac'
-        q_over_bin, q_place = bin_column
-        self.status(f'  bac : poignet phi={bin_phi}°, depot a z={place_z:.3f}, '
-                    f'garde laterale {garde:.1f} mm')
 
         if not self.transit(q_over_bin, f'{name} vers bac'):
             self.open_gripper()
             return 'chemin vers le bac non sur'
-        self.move_to(q_place)
-        # L'objet repose deja sur le fond : rendre sa largeur exacte suffit a
-        # annuler la force de serrage, sans que les doigts s'ecartent assez
-        # pour toucher la paroi.
-        self.set_gripper(release, settle=1.2)
-        self.move_to(q_over_bin)
+        self.move_to(q_place, duration=DROP_DESCENT_S)
+        self.set_gripper(angle_for_span(target.grip_mm + RELEASE_ABOVE_RIM_EXTRA_MM),
+                         settle=RELEASE_SETTLE_S)
+        dropped = self.object_poses().get(name)
+        if dropped is not None:
+            self.status(f'  doigts ecartes, objet a z={dropped[2]:.3f} m avant la remontee')
+        self.move_to(q_over_bin, duration=DROP_DESCENT_S)
         self.open_gripper()
 
         landed = self.object_poses().get(name)
@@ -524,7 +690,7 @@ class SimSortingGrasp(Node):
         dx, dy = landed[0] - bx, landed[1] - by
         if abs(dx) < 0.047 and abs(dy) < 0.047 and landed[2] < 0.06:
             return (f'OK — dans le bac, ecart {dx * 1000:+.0f}/{dy * 1000:+.0f} mm '
-                    f'du centre')
+                    f'du centre, centre de l objet a z={landed[2] * 1000:.0f} mm')
         return (f'hors du bac : ecart {dx * 1000:+.0f}/{dy * 1000:+.0f} mm, '
                 f'z={landed[2]:.3f}')
 
@@ -535,13 +701,21 @@ class SimSortingGrasp(Node):
         for target in self.targets:
             if self.only and target.model not in self.only:
                 continue
-            poses = self.object_poses()
-            try:
-                results[target.model] = self.sort_one(target, poses)
-            except Exception as exc:                     # noqa: BLE001
-                results[target.model] = f'erreur : {exc}'
-            self.status(f'  {target.model} : {results[target.model]}')
+            for attempt in range(self.max_attempts):
+                try:
+                    poses = self.target_poses(target)
+                    results[target.model] = self.sort_one(target, poses)
+                except Exception as exc:                 # noqa: BLE001
+                    results[target.model] = f'erreur : {exc}'
+                self.status(f'  {target.model} (essai {attempt + 1}) : {results[target.model]}')
+                # Retry only an empty grasp. Other failures may leave an object
+                # in an unknown state and must not start another descent.
+                if not results[target.model].startswith('prise ratee'):
+                    break
 
+        if self.pose_source == 'vision' and any(
+                verdict.startswith('erreur') for verdict in results.values()):
+            return results
         self.open_gripper()
         q_home = self.solve_tip([0.25, 0.0, TRANSIT_Z])
         if q_home is not None:
@@ -565,7 +739,8 @@ def main(args=None):
         mark = '✔' if verdict.startswith('OK') else '✘'
         print(f'  {mark} {model:16} {verdict}')
     print('=' * 62)
+    return 0 if results and all(v.startswith('OK') for v in results.values()) else 1
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

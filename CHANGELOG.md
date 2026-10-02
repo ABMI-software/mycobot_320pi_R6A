@@ -9,6 +9,38 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — tri des 4 pieces dans Gazebo pilote par yolo26 sur 4 cameras (29/09-02/10)
+
+Protocole complet : `docs/PROTOCOLE_YOLO_GAZEBO.md`.
+
+- **Scene `tri_yolo.launch.py`** — 4 pieces et 4 bacs tires au hasard sur la
+  replique du banc, cameras aux poses du jeu DREAM 50K (`camera_layout:=dream50k`).
+  `piece_reach:=0.28` place les objets a portee de saisie comme au banc reel.
+- **Perception seule** — `yolo_gazebo_node` (yolo26 sur chaque camera),
+  `yolo_localizer` : boite 3D de la classe recalee sur la boite 2D
+  (`tri_scene.locate_from_box`), puis **fusion par la mediane des 4 cameras**
+  sur `/yolo/objects_3d` (0,65 mm median, 2,07 mm au pire, 10 scenes).
+  `gazebo_ground_truth` et `yolo_gt_overlay` servent a la validation seulement.
+- **yolo26 v6c** (`pieces_v6c_gazebo_yolo26s`, 74 images reelles x10 +
+  1 036 Gazebo) devient le modele par defaut de `scripts/yolo26_service.py` :
+  283/283 pieces sur les 4 cameras, mAP50 reel 0,990 (v5 : 0,967).
+- **`sim_sorting_grasp pose_source:=perception`** — objets ET bacs lus sur
+  `/yolo/objects_3d`, appaires par la classe. Depot resolu avant la saisie,
+  ouverture d'approche = largeur + 24 mm, cubes pinces a 0 ou 90°, largage
+  incline 15/30/45° pour les bacs hors de portee verticale, 2 essais apres
+  une prise a vide. Graine 1 : 4/4 tries.
+
+### Corrige — l'objet glissait entre les doigts au lacher (02/10)
+
+- **`sim_sorting_grasp`** : la pince ne s'ouvrait qu'a la largeur de l'objet
+  puis remontait ; pour le cube bleu, doigts dans le bac, la paroi les
+  empechait de s'ouvrir. Desormais, pour tous les objets : lacher 5 mm
+  au-dessus du rebord, doigts ecartes de 20 mm, 2 s, puis remontee lente.
+  Verifie : chaque objet est au fond du bac avant la remontee.
+- **`sim_grasp.launch.py`** : `--switch-timeout 30` sur les spawners ; avec 4
+  cameras rendues, l'activation depassait les 5 s par defaut (2 lancements
+  sur 5) et le bras restait immobile.
+
 ### Ajoute — pince montee sur support, dans l'axe de J6 (30/09)
 
 - **`scripts/cycle_pince_axe_j6.py`** — un cycle saisie -> bac en boucle

@@ -1,5 +1,46 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (2 octobre 2026 — tri des 4 pièces dans Gazebo, piloté par yolo26)
+
+### Ce qui a été accompli (29/09 → 02/10)
+
+**Le bras simulé trie les 4 pièces à partir de la perception seule** : yolo26
+(v6c) sur les 4 caméras DREAM 50K, boîte 3D recalée, fusion par la médiane
+(0,65 mm médian, 2,07 mm au pire), objet ↔ bac par la classe. Graine 1 :
+**4/4 triés**, chaque objet au fond de son bac. Vidéo 4 vues :
+`~/Downloads/tri_simulation/tri_4_objets_4vues_graine1_lacher.mp4`.
+
+**Lâcher corrigé** (vu par Osama sur la vidéo) : l'objet glissait entre les
+doigts à la remontée ; il est maintenant lâché 5 mm au-dessus du rebord, doigts
+écartés, avant de remonter.
+
+**yolo26 v6c adopté** (réel ×10 + 1 036 images Gazebo) : 283/283 pièces sur
+les 4 caméras, mAP50 réel 0,990.
+
+### Décisions prises
+
+- Fusion des 4 caméras par la médiane, plutôt que sélection d'une caméra.
+- Objets placés à portée de saisie (`piece_reach:=0.28`), bacs libres ;
+  largage incliné jusqu'à 45°.
+- Campagnes Gazebo sans fenêtre, `taskset -c 16-23`, arrêt à 88 °C tenu
+  10 s : la fenêtre Gazebo a atteint 91 °C.
+
+### Prochaines actions
+
+1. [ROUGE] Campagne de 10 graines avec le nouveau lâcher (arrêtée 2 fois sur
+   la température), puis taux et causes dans le protocole et le Word.
+2. [JAUNE] Validation par Osama des étapes 8 et 9.
+3. [VERT] Saisie inclinée, pour des objets au-delà de 0,28 m.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate; source /opt/ros/jazzy/setup.bash; source ~/Osama_ws/install/setup.bash
+ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1 headless:=true panel:=false piece_reach:=0.28
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true \
+  -p pose_source:=perception -p world_name:=tri_yolo -p max_attempts:=2
+```
+
 ## État actuel (30 septembre 2026 — après-midi, pince sur support dans l'axe de J6)
 
 ### Ce qui a été accompli aujourd'hui
