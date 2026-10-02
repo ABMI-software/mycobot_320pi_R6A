@@ -1,0 +1,4 @@
+#!/usr/bin/python3
+"""ArUco Localizer Node wrapper script."""
+from mycobot_gateway.aruco_localizer_node import main
+main()

@@ -1,0 +1,269 @@
+<?xml version="1.0" ?>
+<!--
+  Monde Gazebo pour le benchmark de précision — MyCobot 320 Pi
+  =============================================================
+
+  Contenu
+  -------
+  - Plan de sol + table (robot monté à l'origine)
+  - 4 marqueurs workspace (cubes colorés, IDs 0-3) à positions connues
+    dans le repère base du robot :
+        ID 0 :  ( 0.150, -0.150, 0.0 )  [avant-gauche,   bleu]
+        ID 1 :  ( 0.150,  0.150, 0.0 )  [avant-droit,    vert]
+        ID 2 :  ( 0.280, -0.150, 0.0 )  [arrière-gauche, jaune]
+        ID 3 :  ( 0.280,  0.150, 0.0 )  [arrière-droit,  orange]
+  - Cube cible avec marqueur objet (ID 10) : rouge, 4 cm
+    Position initiale : (0.22, 0.00, 0.02)
+  - Caméra overhead centrée sur le workspace
+
+  Note
+  ----
+  En simulation, le gz_sim_localizer_node lit les poses directement via
+  ros_gz_bridge (pas de détection ArUco). Les marqueurs colorés servent
+  uniquement de repères visuels.
+-->
+<sdf version="1.9">
+  <world name="precision_benchmark">
+
+    <!-- ── Physique ─────────────────────────────────────────────────────── -->
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <!-- ── Éclairage ────────────────────────────────────────────────────── -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.85 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <attenuation><range>1000</range><constant>0.9</constant></attenuation>
+      <direction>-0.5 0.3 -0.9</direction>
+    </light>
+
+    <light type="directional" name="fill">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 8 0 0 0</pose>
+      <diffuse>0.4 0.4 0.5 1</diffuse>
+      <direction>0.5 -0.3 -0.7</direction>
+    </light>
+
+    <light type="point" name="bench_light">
+      <cast_shadows>false</cast_shadows>
+      <pose>0.22 0 1.2 0 0 0</pose>
+      <diffuse>0.7 0.7 0.65 1</diffuse>
+      <attenuation><range>3</range><constant>0.4</constant><linear>0.1</linear></attenuation>
+    </light>
+
+    <!-- ── Sol ──────────────────────────────────────────────────────────── -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="col">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+          <material><ambient>0.55 0.55 0.52 1</ambient><diffuse>0.6 0.6 0.57 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ── Table sous le robot ──────────────────────────────────────────── -->
+    <model name="table">
+      <static>true</static>
+      <pose>0 0 -0.02 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>0.9 0.9 0.04</size></box></geometry>
+          <material>
+            <ambient>0.35 0.25 0.15 1</ambient>
+            <diffuse>0.45 0.32 0.20 1</diffuse>
+          </material>
+        </visual>
+        <collision name="col">
+          <geometry><box><size>0.9 0.9 0.04</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         MARQUEURS WORKSPACE ArUco (IDs 0-3)
+         Dalles 10×10 cm avec texture ArUco DICT_4X4_1000 (PNG 240×240).
+         Positions dans le repère base du robot :
+           ID 0 : ( 0.150, -0.150 )   ID 1 : ( 0.150,  0.150 )
+           ID 2 : ( 0.280, -0.150 )   ID 3 : ( 0.280,  0.150 )
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ID 0 : avant-gauche -->
+    <model name="ws_marker_0">
+      <static>true</static>
+      <pose>0.150 -0.150 0.001 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0 0 0 0</specular>
+            <pbr><metal>
+              <albedo_map>textures/aruco_4x4_0000.png</albedo_map>
+            </metal></pbr>
+          </material>
+        </visual>
+        <collision name="col">
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ID 1 : avant-droit -->
+    <model name="ws_marker_1">
+      <static>true</static>
+      <pose>0.150 0.150 0.001 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0 0 0 0</specular>
+            <pbr><metal>
+              <albedo_map>textures/aruco_4x4_0001.png</albedo_map>
+            </metal></pbr>
+          </material>
+        </visual>
+        <collision name="col">
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ID 2 : arrière-gauche -->
+    <model name="ws_marker_2">
+      <static>true</static>
+      <pose>0.280 -0.150 0.001 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0 0 0 0</specular>
+            <pbr><metal>
+              <albedo_map>textures/aruco_4x4_0002.png</albedo_map>
+            </metal></pbr>
+          </material>
+        </visual>
+        <collision name="col">
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ID 3 : arrière-droit -->
+    <model name="ws_marker_3">
+      <static>true</static>
+      <pose>0.280 0.150 0.001 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0 0 0 0</specular>
+            <pbr><metal>
+              <albedo_map>textures/aruco_4x4_0003.png</albedo_map>
+            </metal></pbr>
+          </material>
+        </visual>
+        <collision name="col">
+          <geometry><box><size>0.100 0.100 0.002</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         CUBE CIBLE (marqueur objet ID 10)
+         Rouge, 4 cm, centre du workspace
+         Position : (0.22, 0.00, 0.02)
+         ═══════════════════════════════════════════════════════════════════ -->
+    <model name="target_cube">
+      <static>false</static>
+      <pose>0.22 0.00 0.02 0 0 0</pose>
+      <link name="link">
+        <!-- Corps rouge visible sur 5 faces -->
+        <visual name="vis_body">
+          <geometry><box><size>0.04 0.04 0.04</size></box></geometry>
+          <material>
+            <ambient>0.85 0.10 0.10 1</ambient>
+            <diffuse>0.95 0.15 0.15 1</diffuse>
+            <specular>0.40 0.10 0.10 1</specular>
+          </material>
+        </visual>
+        <!-- Marqueur ArUco ID 10 sur la face supérieure (décalé 0.021 au-dessus du centre) -->
+        <visual name="vis_aruco">
+          <pose>0 0 0.021 0 0 0</pose>
+          <geometry><box><size>0.038 0.038 0.001</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0 0 0 0</specular>
+            <pbr><metal>
+              <albedo_map>textures/aruco_4x4_0010.png</albedo_map>
+            </metal></pbr>
+          </material>
+        </visual>
+        <collision name="col">
+          <geometry><box><size>0.04 0.04 0.04</size></box></geometry>
+        </collision>
+        <inertial>
+          <mass>0.05</mass>
+          <inertia>
+            <ixx>1.33e-5</ixx><iyy>1.33e-5</iyy><izz>1.33e-5</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         GRILLE DE POINTS CIBLES (repères visuels)
+         9 petits disques gris aux positions de la grille de test 3×3
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Ligne x=0.15 -->
+    <model name="grid_pt_0"> <static>true</static> <pose>0.15 -0.10 0.001 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><cylinder><radius>0.008</radius><length>0.002</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 0.6</ambient></material></visual></link></model>
+    <model name="grid_pt_1"> <static>true</static> <pose>0.15  0.00 0.001 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><cylinder><radius>0.008</radius><length>0.002</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 0.6</ambient></material></visual></link></model>
+    <model name="grid_pt_2"> <static>true</static> <pose>0.15  0.10 0.001 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><cylinder><radius>0.008</radius><length>0.002</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 0.6</ambient></material></visual></link></model>
+
+    <!-- Ligne x=0.22 -->
+    <model name="grid_pt_3"> <static>true</static> <pose>0.22 -0.10 0.001 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><cylinder><radius>0.008</radius><length>0.002</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 0.6</ambient></material></visual></link></model>
+    <model name="grid_pt_4"> <static>true</static> <pose>0.22  0.00 0.001 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><cylinder><radius>0.008</radius><length>0.002</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 0.6</ambient></material></visual></link></model>
+    <model name="grid_pt_5"> <static>true</static> <pose>0.22  0.10 0.001 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><cylinder><radius>0.008</radius><length>0.002</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 0.6</ambient></material></visual></link></model>
+
+    <!-- Ligne x=0.28 -->
+    <model name="grid_pt_6"> <static>true</static> <pose>0.28 -0.10 0.001 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><cylinder><radius>0.008</radius><length>0.002</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 0.6</ambient></material></visual></link></model>
+    <model name="grid_pt_7"> <static>true</static> <pose>0.28  0.00 0.001 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><cylinder><radius>0.008</radius><length>0.002</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 0.6</ambient></material></visual></link></model>
+    <model name="grid_pt_8"> <static>true</static> <pose>0.28  0.10 0.001 0 0 0</pose>
+      <link name="l"><visual name="v"><geometry><cylinder><radius>0.008</radius><length>0.002</length></cylinder></geometry>
+        <material><ambient>0.5 0.5 0.5 0.6</ambient></material></visual></link></model>
+
+  </world>
+</sdf>

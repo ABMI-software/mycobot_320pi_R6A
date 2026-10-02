@@ -1,0 +1,4 @@
+#!/usr/bin/python3
+"""FK End-Effector Pose Node wrapper script."""
+from mycobot_gateway.fk_ee_pose_node import main
+main()

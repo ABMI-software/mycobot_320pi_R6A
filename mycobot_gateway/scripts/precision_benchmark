@@ -1,0 +1,4 @@
+#!/usr/bin/python3
+"""Precision Benchmark Node wrapper script."""
+from mycobot_gateway.precision_benchmark_node import main
+main()

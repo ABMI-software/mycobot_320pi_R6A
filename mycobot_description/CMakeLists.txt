@@ -15,6 +15,7 @@ install(DIRECTORY
   worlds
   models
   DESTINATION share/${PROJECT_NAME}
+  FILES_MATCHING PATTERN "*"
 )
 
 if(BUILD_TESTING)

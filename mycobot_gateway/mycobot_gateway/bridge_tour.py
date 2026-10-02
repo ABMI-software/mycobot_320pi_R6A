@@ -65,7 +65,7 @@ class BridgeTour(Node):
             with self.lock:
                 if self.socket:
                     self.socket.sendall((msg.data + '\n').encode('utf-8'))
-                    self.get_logger().info(f"📤 Envoyé vers Pi: {msg.data}")
+                    self.get_logger().debug(f"📤 Envoyé vers Pi: {msg.data}")
         except BrokenPipeError:
             self.get_logger().error(f"❌ Broken pipe - Pi déconnectée")
             self.connected = False
@@ -98,7 +98,7 @@ class BridgeTour(Node):
                     msg.data = data.decode('utf-8').strip()
                     if msg.data:
                         self.publisher_.publish(msg)
-                        self.get_logger().info(f"📥 Reçu de Pi: {msg.data}")
+                        self.get_logger().debug(f"📥 Reçu de Pi: {msg.data}")
                 else:
                     self.get_logger().warn("⚠️  Pi a fermé la connexion.")
                     self.connected = False
