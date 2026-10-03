@@ -1,10 +1,64 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-> **Date de dernière mise à jour :** 22 septembre 2026 (renommage des caméras, règle .xlsx, conflit de la PR d'Osama résolu)
+> **Date de dernière mise à jour :** 3 octobre 2026 (démo pick-and-place GUI regardée sous WSL2, `run_gui_demo.sh`)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
 > **Branche :** `main` (pick-and-place + DREAM mergés via PR #9 le 09/09/2026)
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.221` (pas `.223`/`.225` comme certains anciens docs)
+
+---
+
+## État actuel (3 octobre 2026 — matin)
+
+### Ce qui a été accompli aujourd'hui
+
+**La démo GUI du POC headless a enfin été regardée.** Le §15 du rapport avait
+livré `pick_and_place_demo.launch.py` sans vérification visuelle (pas d'écran).
+Les 02–03/10, elle a été exécutée et observée de bout en bout dans Gazebo sur
+le portable WSL2, en partant de rien : démon Docker arrêté, ni image ni
+conteneur `gazebo_to_lerobot`. Le bras saisit le cube rouge et le pose sur
+l'assiette, à ~3 mm du centre ; `RESULT: motions_ok=True placed_on_plate=True
+grasp_held=True`, sans interface comme avec.
+
+**Cinq obstacles, tous mesurés et documentés** dans l'addendum §16–30 du
+rapport (EN/FR, HTML + Word) :
+- démon Docker à lancer à la main (`sudo sh -c 'nohup dockerd …'`), pas de
+  systemd dans WSL ;
+- `moveit_py` absent de l'image (`ros-jazzy-moveit` ne l'inclut pas) —
+  `run_demo.py` le présente comme « no reachable elbow-up IK solution » ;
+- simulation figée : le `DISPLAY=172.24.112.1:0` de l'hôte, transmis par
+  `run.sh`, bloque le capteur caméra et donc le pas de simulation
+  (contrôleurs jamais actifs) ; `DISPLAY=:0` (WSLg) corrige ;
+- fenêtre Gazebo blanche : D3D12 n'offre qu'OpenGL 4.1 sans compute shaders,
+  `ogre` comme `ogre2` ; llvmpipe (OpenGL 4.5, logiciel) corrige ;
+- vue minuscule qui se dézoome seule : mode Follow sur `mycobot_320`
+  (décalage 3 m / 2 m) et boîte englobante incluant le support de caméras.
+
+**`scripts/run_gui_demo.sh`** regroupe les trois corrections d'affichage, place
+la caméra près du bras et nettoie `move_group`/Gazebo à la sortie. Vérifié :
+démarrage, cadrage, contrôleurs actifs en 20–22 s, arrêt sans processus
+résiduel ; la séquence complète avec la version précédente du script (seule la
+sortie diffère).
+
+### Décisions prises
+
+- `Dockerfile`, `run.sh` et `run_demo.py` **non modifiés** : les corrections
+  vivent dans le script et dans les commandes documentées ; les trois
+  corrections permanentes sont proposées dans le rapport.
+- `moveit_py` installé dans le **conteneur**, pas dans l'image : un
+  `docker rm` le perd.
+
+### Prochaines actions
+1. [ROUGE] Faire reproduire la démo par José sur son poste avec l'addendum §16–30.
+2. [JAUNE] Appliquer les trois corrections permanentes (Dockerfile, run.sh, run_demo.py).
+3. [VERT] Ajouter les branches `*_tomislav_branch` à la carte de `.claude/rules/git-branching.md`.
+
+### Commande rapide de reprise
+```bash
+sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'
+docker start gazebo_to_lerobot
+docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh
+```
 
 ---
 
