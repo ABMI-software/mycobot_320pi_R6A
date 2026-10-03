@@ -9,6 +9,28 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — démo pick-and-place GUI regardée sous WSL2, en une commande (03/10)
+
+- La démo GUI du POC headless (`pick_and_place_demo.launch.py`, §15 du
+  rapport) a été **exécutée et regardée de bout en bout dans Gazebo** pour la
+  première fois, sur un portable WSL2, en partant d'une machine sans image ni
+  conteneur. Résultat : `motions_ok=True placed_on_plate=True grasp_held=True`.
+- Nouveau
+  [`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/scripts/run_gui_demo.sh`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/scripts/run_gui_demo.sh) :
+  `docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh` lance
+  toute la démo avec `DISPLAY=:0`, un rendu OpenGL logiciel et la caméra
+  cadrée sur le bras, et nettoie `move_group`/Gazebo à la sortie.
+- Rapport EN/FR (HTML + Word) : nouvel addendum **§16–30**, pas à pas, avec
+  pour chaque problème son symptôme à l'écran, sa cause et sa correction.
+  Cinq problèmes : démon Docker à lancer à la main (pas de systemd dans WSL),
+  **`moveit_py` absent de l'image** (signalé à tort comme « no reachable IK
+  solution »), **simulation figée** par le `DISPLAY=172.24.112.1:0` de l'hôte
+  transmis au conteneur, **fenêtre Gazebo blanche** (D3D12 = OpenGL 4.1 sans
+  compute shaders), caméra bloquée au loin par le mode Follow.
+- Non modifiés, corrections proposées : `Dockerfile` (ajouter
+  `ros-jazzy-moveit-py`), `run.sh` (`DISPLAY=:0` sous WSLg), `run_demo.py`
+  (afficher la vraie erreur de l'IK).
+
 ### Modifié — l'évaluation RoboPEPP est menée par ABMI Lyon (23/09)
 
 - Licence **open-source**, évaluation **conduite par ABMI Lyon** — qui tient
