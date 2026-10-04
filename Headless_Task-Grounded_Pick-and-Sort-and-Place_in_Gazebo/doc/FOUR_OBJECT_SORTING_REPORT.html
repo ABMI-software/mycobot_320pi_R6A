@@ -867,19 +867,32 @@ docker exec -it gazebo_to_lerobot /workspace/htgspp/scripts/run_gui_demo.sh epis
       <h3 style="margin-top:26px;font-size:1.1rem">What this does not prove, updated 2026-10-04</h3>
       <ul style="max-width:70ch;color:var(--ink-soft)"><li><b>No longer true:</b> "no episode has completed against real physics". 60/60 did, plus the smoke episodes.</li><li><b>Lift J2 ≤ 48°.</b> Object positions are restricted to the validated region; objects near the robot base are outside this dataset until the folded-lift obstruction is fixed (§24).</li><li><b>Fixed release yaw.</b> Every box is released square to its bin, so place motions end in few wrist orientations: red 90° ×11, 180° ×4; blue 180° ×14, 90° ×1; yellow 90° ×15 (§25).</li><li><b>The settle rule alone does not catch a propped cube.</b> A blue cube resting on the rim at 28° has its centre at 43 mm, under the lowest-point threshold of 45 mm, so <code>placed_in_correct_bin</code> would accept it. No episode of the batch was propped (all landed at their exact flat height, §26), but the next batch should also gate on the landed tilt, now recorded.</li><li><b>One labelled collision.</b> Training episode 11 (source 12) displaces a non-target object 22.9 mm (§26).</li><li><b>Overhead camera only.</b> The gripper hides the object at the grasp and lift instants; a wrist camera would see the contact. The yellow bin sits at the frame's lower edge and is mostly covered while placing.</li><li><b>Still true from the specification:</b> weld, not grasp; ground-truth poses and scripted selection; visual domain gap; sixty episodes is a smoke test, not a training set; the datasets have not been loaded by the real <code>LeRobotDataset</code> class (needs PyTorch).</li></ul>
       <h3 style="margin-top:26px;font-size:1.1rem">Manual execution, as run on 2026-10-04</h3>
-      <pre><span class="c"># host (WSL2): Docker has no systemd here</span>
+      <p class="prose">Commands run in two places: the <b>WSL2 host</b> (your Ubuntu prompt) and a <b>shell inside the container</b>. <code>docker start</code> only starts the container in the background; <code>docker exec -it gazebo_to_lerobot bash</code> opens the shell inside it, whose <code>~/.bashrc</code> loads ROS 2 and the workspace.</p>
+      <pre><span class="c"># 1. WSL2 host: start Docker (no systemd in WSL) and the container</span>
 sudo sh -c 'nohup dockerd &gt; /tmp/dockerd.log 2&gt;&amp;1 &amp;'
-docker start gazebo_to_lerobot
+docker start gazebo_to_lerobot<span class="c">          # runs in the background, gives no shell</span>
 
-<span class="c"># container</span>
+<span class="c"># 2. WSL2 host: open a shell inside the container</span>
+docker exec -it gazebo_to_lerobot bash<span class="c">  # prompt becomes root@&lt;container id&gt;</span>
+
+<span class="c"># 3. container shell</span>
 cd /workspace/htgspp &amp;&amp; bash preflight.sh<span class="c">            # PREFLIGHT PASSED</span>
+exit<span class="c">                                                 # back to the host</span>
+
+<span class="c"># 4. WSL2 host: the batch, detached so closing the terminal does not stop it (~2.7 h)</span>
 docker exec -d -w /workspace/htgspp -e CONTAINER_NAME=gazebo_to_lerobot gazebo_to_lerobot \
-    bash -c 'bash scripts/batch.sh 1 60 &gt;&gt; batch.log 2&gt;&amp;1'<span class="c">     # ~2.7 h</span>
+    bash -c 'bash scripts/batch.sh 1 60 &gt;&gt; batch.log 2&gt;&amp;1'
+
+<span class="c"># 5. after the batch, in a container shell (step 2 again)</span>
+cd /workspace/htgspp
 python3 scripts/port_bag.py --split train   --out datasets/mycobot_sorting_train
 python3 scripts/port_bag.py --split heldout --out datasets/mycobot_sorting_heldout
 
-<span class="c"># one episode, watch it or get a pass/fail code</span>
-cd launch &amp;&amp; ros2 launch pick_and_sort_and_place_no_gui_demo.launch.py episode:=16; echo $?</pre>
+<span class="c"># one episode, watch it or get a pass/fail code (container shell)</span>
+cd /workspace/htgspp/launch &amp;&amp; ros2 launch pick_and_sort_and_place_no_gui_demo.launch.py episode:=16; echo $?
+
+<span class="c"># or the GUI demo straight from the WSL2 host, no shell needed</span>
+docker exec -it gazebo_to_lerobot /workspace/htgspp/scripts/run_gui_demo.sh episode:=16</pre>
       <h3 style="margin-top:26px;font-size:1.1rem">New files since 2026-09-23</h3>
       <div class="table-wrap"><table><thead><tr><th>Path</th><th>What</th></tr></thead><tbody><tr><td><code>launch/pick_and_sort_and_place_demo.launch.py</code>, <code>..._no_gui_demo.launch.py</code></td><td>§27, the two launch files</td></tr><tr><td><code>scripts/run_demo.py</code>, <code>scripts/run_gui_demo.sh</code></td><td>§27, orchestrator and WSL2 one-command GUI</td></tr><tr><td><code>scripts/weld.py</code></td><td>§20, confirmed weld commands</td></tr><tr><td><code>scripts/recorder_lifecycle.py</code></td><td>§17, recorder bring-up by service call</td></tr><tr><td><code>scripts/make_episode_world.py</code>, <code>make_table_textures.sh</code></td><td>§22, per-episode scene variation</td></tr><tr><td><code>scripts/check_frames.py</code>, <code>check_colour.py</code>, <code>finalize_verdict.py</code></td><td>§21, recording checks, final verdict</td></tr><tr><td><code>scripts/repro_harness.py</code>, <code>bin_probe.py</code>, <code>framing_check.py</code></td><td>§24–25, harness and probes</td></tr><tr><td><code>scripts/check_place_path.py</code>, <code>analyse_batch.py</code>, <code>measure_perf.sh</code></td><td>§18, §24–25, offline checks and measurements</td></tr><tr><td><code>worlds/sorting_table.sdf</code></td><td>§16, the bench with no objects or bins</td></tr><tr><td><code>MEASUREMENTS.md</code></td><td>every number of this addendum, §1–10</td></tr></tbody></table></div>
     </section>

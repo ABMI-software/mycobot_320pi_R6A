@@ -58,9 +58,11 @@ descendant vers la prise (vérifié image par image). Conservé et étiqueté :
 
 ### Commande rapide de reprise
 ```bash
+# hôte WSL2
 sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'
-docker start gazebo_to_lerobot
-docker exec -it gazebo_to_lerobot /workspace/htgspp/scripts/run_gui_demo.sh episode:=16
+docker start gazebo_to_lerobot      # démarre le conteneur en arrière-plan, ne donne pas de shell
+docker exec -it gazebo_to_lerobot /workspace/htgspp/scripts/run_gui_demo.sh episode:=16   # démo GUI
+docker exec -it gazebo_to_lerobot bash                    # ou un shell dans le conteneur (ROS déjà chargé)
 ```
 
 ---

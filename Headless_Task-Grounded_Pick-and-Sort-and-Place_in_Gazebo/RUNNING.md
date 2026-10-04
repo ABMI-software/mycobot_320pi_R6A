@@ -6,11 +6,24 @@
 (`MEASUREMENTS.md` §10, `datasets/README.md`). The history before that
 (the smoke-test blockers of 2026-09-23) is in `doc/SMOKE_TEST.md`.
 
+## Where each command runs
+
+Every command below runs in a **shell inside the container**, unless it starts
+with `docker` or `sudo` (those run on the WSL2 host, your Ubuntu prompt). From
+the host:
+
+    sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'   # WSL has no systemd: start Docker by hand
+    docker start gazebo_to_lerobot                          # starts the container in the background, gives no shell
+    docker exec -it gazebo_to_lerobot bash                  # a shell inside it; the prompt becomes root@<container id>
+
+That shell's `~/.bashrc` loads ROS 2 and the workspace, so nothing needs
+sourcing. `exit` leaves it; the container keeps running.
+
 ## 0. Watch one episode, or check one pass/fail
 
 Two launch files run a single row of `config/episode_matrix.csv` (1–60:
 1–15 red cube, 16–30 blue cube, 31–45 green cylinder, 46–60 yellow box)
-exactly as the batch does, without recording:
+exactly as the batch does, without recording. In a container shell:
 
     cd /workspace/htgspp/launch
     ros2 launch pick_and_sort_and_place_demo.launch.py episode:=16          # Gazebo GUI, stays open; Ctrl+C to stop
@@ -27,7 +40,7 @@ in software (DISPLAY=:0, llvmpipe; `scripts/run_demo.py` sets both).
 
 ## 1. Check the environment
 
-    bash preflight.sh
+    cd /workspace/htgspp && bash preflight.sh
 
 Expect `PREFLIGHT PASSED`. If not, stop — the failing line names the cause.
 

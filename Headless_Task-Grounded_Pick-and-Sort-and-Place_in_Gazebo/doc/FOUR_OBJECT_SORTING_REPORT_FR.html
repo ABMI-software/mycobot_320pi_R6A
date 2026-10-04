@@ -867,19 +867,32 @@ docker exec -it gazebo_to_lerobot /workspace/htgspp/scripts/run_gui_demo.sh epis
       <h3 style="margin-top:26px;font-size:1.1rem">Ce que cela ne prouve pas, mis à jour le 04/10/2026</h3>
       <ul style="max-width:70ch;color:var(--ink-soft)"><li><b>N'est plus vrai :</b> « aucun épisode n'a abouti contre une physique réelle ». 60/60 ont abouti, plus les épisodes de fumée.</li><li><b>J2 de levée ≤ 48°.</b> Les positions des objets sont limitées à la région validée ; les objets proches de la base du robot sont hors de ce jeu de données tant que la gêne en levée repliée n'est pas corrigée (§24).</li><li><b>Lacet de dépose fixé.</b> Chaque boîte est lâchée d'équerre avec son bac, donc les déposes finissent sur peu d'orientations de poignet : rouge 90° ×11, 180° ×4 ; bleu 180° ×14, 90° ×1 ; jaune 90° ×15 (§25).</li><li><b>La règle de dépôt seule ne détecte pas un cube calé.</b> Un cube bleu appuyé sur le rebord à 28° a son centre à 43 mm, sous le seuil de 45 mm du point le plus bas, donc <code>placed_in_correct_bin</code> l'accepterait. Aucun épisode du lot n'était calé (tous à leur hauteur exacte à plat, §26), mais le prochain lot devrait aussi filtrer sur l'inclinaison d'atterrissage, désormais enregistrée.</li><li><b>Une collision étiquetée.</b> L'épisode d'entraînement 11 (source 12) déplace un objet non cible de 22,9 mm (§26).</li><li><b>Caméra zénithale seulement.</b> La pince cache l'objet aux instants de prise et de levée ; une caméra au poignet verrait le contact. Le bac jaune est au bord bas de l'image et en grande partie masqué pendant la dépose.</li><li><b>Toujours vrai selon la spécification :</b> soudure, pas prise ; poses de vérité terrain et sélection scriptée ; écart de domaine visuel ; soixante épisodes est un test de fumée, pas un jeu d'entraînement ; les jeux de données n'ont pas été chargés par la vraie classe <code>LeRobotDataset</code> (il faut PyTorch).</li></ul>
       <h3 style="margin-top:26px;font-size:1.1rem">Exécution manuelle, telle que menée le 04/10/2026</h3>
-      <pre><span class="c"># hôte (WSL2) : pas de systemd pour Docker ici</span>
+      <p class="prose">Les commandes s'exécutent à deux endroits : l'<b>hôte WSL2</b> (votre invite Ubuntu) et un <b>shell dans le conteneur</b>. <code>docker start</code> ne fait que démarrer le conteneur en arrière-plan ; <code>docker exec -it gazebo_to_lerobot bash</code> ouvre le shell à l'intérieur, dont le <code>~/.bashrc</code> charge ROS 2 et l'espace de travail.</p>
+      <pre><span class="c"># 1. hôte WSL2 : démarrer Docker (pas de systemd dans WSL) et le conteneur</span>
 sudo sh -c 'nohup dockerd &gt; /tmp/dockerd.log 2&gt;&amp;1 &amp;'
-docker start gazebo_to_lerobot
+docker start gazebo_to_lerobot<span class="c">          # tourne en arrière-plan, ne donne pas de shell</span>
 
-<span class="c"># conteneur</span>
+<span class="c"># 2. hôte WSL2 : ouvrir un shell dans le conteneur</span>
+docker exec -it gazebo_to_lerobot bash<span class="c">  # l'invite devient root@&lt;id du conteneur&gt;</span>
+
+<span class="c"># 3. shell du conteneur</span>
 cd /workspace/htgspp &amp;&amp; bash preflight.sh<span class="c">            # PREFLIGHT PASSED</span>
+exit<span class="c">                                                 # retour à l'hôte</span>
+
+<span class="c"># 4. hôte WSL2 : le lot, détaché pour que fermer le terminal ne l'arrête pas (~2,7 h)</span>
 docker exec -d -w /workspace/htgspp -e CONTAINER_NAME=gazebo_to_lerobot gazebo_to_lerobot \
-    bash -c 'bash scripts/batch.sh 1 60 &gt;&gt; batch.log 2&gt;&amp;1'<span class="c">     # ~2,7 h</span>
+    bash -c 'bash scripts/batch.sh 1 60 &gt;&gt; batch.log 2&gt;&amp;1'
+
+<span class="c"># 5. après le lot, dans un shell du conteneur (étape 2 à nouveau)</span>
+cd /workspace/htgspp
 python3 scripts/port_bag.py --split train   --out datasets/mycobot_sorting_train
 python3 scripts/port_bag.py --split heldout --out datasets/mycobot_sorting_heldout
 
-<span class="c"># un épisode, pour le regarder ou obtenir un code réussite/échec</span>
-cd launch &amp;&amp; ros2 launch pick_and_sort_and_place_no_gui_demo.launch.py episode:=16; echo $?</pre>
+<span class="c"># un épisode, pour le regarder ou obtenir un code réussite/échec (shell du conteneur)</span>
+cd /workspace/htgspp/launch &amp;&amp; ros2 launch pick_and_sort_and_place_no_gui_demo.launch.py episode:=16; echo $?
+
+<span class="c"># ou la démo GUI directement depuis l'hôte WSL2, sans shell</span>
+docker exec -it gazebo_to_lerobot /workspace/htgspp/scripts/run_gui_demo.sh episode:=16</pre>
       <h3 style="margin-top:26px;font-size:1.1rem">Nouveaux fichiers depuis le 23/09/2026</h3>
       <div class="table-wrap"><table><thead><tr><th>Chemin</th><th>Rôle</th></tr></thead><tbody><tr><td><code>launch/pick_and_sort_and_place_demo.launch.py</code>, <code>..._no_gui_demo.launch.py</code></td><td>§27, les deux fichiers launch</td></tr><tr><td><code>scripts/run_demo.py</code>, <code>scripts/run_gui_demo.sh</code></td><td>§27, orchestrateur et GUI en une commande sous WSL2</td></tr><tr><td><code>scripts/weld.py</code></td><td>§20, commandes de soudure confirmées</td></tr><tr><td><code>scripts/recorder_lifecycle.py</code></td><td>§17, démarrage de l'enregistreur par appel de service</td></tr><tr><td><code>scripts/make_episode_world.py</code>, <code>make_table_textures.sh</code></td><td>§22, variation de scène par épisode</td></tr><tr><td><code>scripts/check_frames.py</code>, <code>check_colour.py</code>, <code>finalize_verdict.py</code></td><td>§21, contrôles d'enregistrement, verdict final</td></tr><tr><td><code>scripts/repro_harness.py</code>, <code>bin_probe.py</code>, <code>framing_check.py</code></td><td>§24–25, banc d'essai et sondes</td></tr><tr><td><code>scripts/check_place_path.py</code>, <code>analyse_batch.py</code>, <code>measure_perf.sh</code></td><td>§18, §24–25, contrôles hors ligne et mesures</td></tr><tr><td><code>worlds/sorting_table.sdf</code></td><td>§16, le banc sans objets ni bacs</td></tr><tr><td><code>MEASUREMENTS.md</code></td><td>chaque nombre de cet addendum, §1–10</td></tr></tbody></table></div>
     </section>
