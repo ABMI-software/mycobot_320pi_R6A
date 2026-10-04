@@ -150,6 +150,9 @@ def port_episode(bag_dir, meta_path, image_topic, out_index, out_root, camera_ke
         "placed_in_correct_bin": meta.get("placed_in_correct_bin"),
         "landed_in_wrong_bin": meta.get("landed_in_wrong_bin"),
         "verdict": meta.get("verdict"),
+        # A PASS may have disturbed another object (the verifier flags it, it
+        # does not fail it); carried through so a downstream reader sees it.
+        "distractors_moved": meta.get("distractors_moved") or [],
         "video_shape": [h, w, 3],
         "parquet_path": str(parquet_path.relative_to(out_root)),
         "video_path": str(video_path.relative_to(out_root)),
@@ -163,7 +166,7 @@ def main():
     p.add_argument("--matrix", default="config/episode_matrix.csv")
     p.add_argument("--split", required=True, choices=["train", "heldout"])
     p.add_argument("--image-topic-table", default="/camera/image_raw")
-    p.add_argument("--image-topic-heldout", default="/synth_camera_right/image")
+    p.add_argument("--image-topic-heldout", default="/camera/image_raw")
     args = p.parse_args()
 
     import csv
@@ -193,6 +196,19 @@ def main():
         if meta.get("verdict") != "PASS":
             print(f"episode {idx}: verdict={meta.get('verdict')}, skipping (not clean)")
             continue
+        # Independent of the verdict file: the episode's own frames, colour and
+        # re-send records must ALL be clean too. Until 2026-10-03 those checks
+        # could fail without the verdict file changing (it stayed PASS); an
+        # episode verified by that older pipeline must not slip through here.
+        frames = json.loads((ep_dir / "frames.json").read_text()) if (ep_dir / "frames.json").exists() else {}
+        colour = json.loads((ep_dir / "colour.json").read_text()) if (ep_dir / "colour.json").exists() else {}
+        raw = json.loads((ep_dir / "grasp_meta.json").read_text())
+        problems = [n for n, bad in (("frames incomplete", not frames.get("complete")),
+                                     ("target colour not visible", not colour.get("ok")),
+                                     ("trajectory re-sends", raw.get("trajectory_resends_total") != 0)) if bad]
+        if problems:
+            print(f"episode {idx}: verdict PASS but {', '.join(problems)} -- skipping")
+            continue
         camera_key = "heldout" if args.split == "heldout" else "table"
         image_topic = args.image_topic_heldout if args.split == "heldout" else args.image_topic_table
         bag_path = meta.get("bag_path")
@@ -208,7 +224,9 @@ def main():
     with open(out_root / "meta" / "episodes.jsonl", "w") as f:
         for rec in episodes_meta:
             f.write(json.dumps({"episode_index": rec["episode_index"],
-                                "tasks": rec["tasks"], "length": rec["length"]}) + "\n")
+                                "tasks": rec["tasks"], "length": rec["length"],
+                                "source_episode": rec["source_episode"],
+                                "distractors_moved": rec["distractors_moved"]}) + "\n")
 
     tasks = [json.loads(l) for l in open("config/tasks.jsonl")]
     with open(out_root / "meta" / "tasks.jsonl", "w") as f:

@@ -9,6 +9,42 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — tri quatre objets : lot de 60 épisodes, jeux de données, deux launch files (04/10)
+
+- **Lot de 60 épisodes, 60/60 PASS du premier coup**, sous une seule version
+  de code (`f977d7af65dc`), sur un seul portable WSL2 : aucune reprise,
+  aucun renvoi de trajectoire, images complètes partout. Converti en
+  `mycobot_sorting_train` (48 épisodes, 29 735 images) et
+  `mycobot_sorting_heldout` (12 épisodes, 7 423 images). Détail :
+  `Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/MEASUREMENTS.md` §10.
+- **Deux launch files** dans `launch/` : `pick_and_sort_and_place_demo.launch.py`
+  (GUI Gazebo, reste ouvert) et `pick_and_sort_and_place_no_gui_demo.launch.py`
+  (headless, code de sortie 0 = PASS, 1 = échec, 2 = argument invalide),
+  `episode:=N` choisit une ligne de la matrice. Orchestrateur
+  `scripts/run_demo.py` ; `scripts/run_gui_demo.sh` lance la GUI en une
+  commande sous WSL2.
+- **Bacs : ouverture 80 mm**, parois 3 mm (86 mm hors tout), bac bleu déplacé
+  de 10 mm en −y. Les bacs de 100 mm s'interpénétraient (rouge/vert 15 mm) :
+  atterrissages inclinés et faux `WRONG_BIN`. Une ouverture de 70 mm a échoué
+  à la sonde (cubes calés sur le rebord à 28°).
+- **Dépose à lacet fixé** (`precompute_ik.py`) : en se fermant, les mors
+  mettent le cube d'équerre avec la pince, donc le cube atterrit au lacet
+  monde de la pince à la dépose (modulo 90°). Les boîtes sont lâchées
+  d'équerre avec le bac (0/90/180/270° pour les cubes, 90/270° pour la boîte
+  jaune non carrée). Avec un lacet libre, aucune géométrie de bac ne pouvait
+  convenir.
+- Placement des objets non cibles : exclusion autour des bacs calculée sur le
+  vrai carré, et non plus sur un cercle centré (`make_matrix.py`).
+- `weld.py` : la soudure est confirmée par le plugin et republiée si besoin
+  (course au chargement, cause de l'épisode 13 tenu en réserve).
+- `port_bag.py` reporte `distractors_moved` dans `meta/episodes.jsonl`.
+  L'épisode 12, qui a poussé le cylindre vert de 22,9 mm avec le mors ouvert
+  (cause vérifiée sur l'enregistrement), est conservé et étiqueté.
+- `run_pick_and_place.py` enregistre désormais le lacet et l'inclinaison à
+  l'atterrissage (pour le prochain lot).
+- Contrôleur : tolérances de but 0,026 rad, `goal_time` 1,0
+  (`Gazebo_to_LeRobot_Pipeline/overrides/.../controller.yaml`).
+
 ### Ajouté — démo pick-and-place GUI regardée sous WSL2, en une commande (03/10)
 
 - La démo GUI du POC headless (`pick_and_place_demo.launch.py`, §15 du

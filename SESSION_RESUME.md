@@ -1,10 +1,67 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-> **Date de dernière mise à jour :** 3 octobre 2026 (démo pick-and-place GUI regardée sous WSL2, `run_gui_demo.sh`)
+> **Date de dernière mise à jour :** 4 octobre 2026 (tri quatre objets : lot 60/60, jeux de données, deux launch files)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
 > **Branche :** `main` (pick-and-place + DREAM mergés via PR #9 le 09/09/2026)
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.221` (pas `.223`/`.225` comme certains anciens docs)
+
+---
+
+## État actuel (4 octobre 2026 — après-midi)
+
+### Ce qui a été accompli aujourd'hui
+
+**Le POC de tri quatre objets est terminé sur une seule machine** (le portable
+WSL2, conteneur `gazebo_to_lerobot`) : lot de 60 épisodes **60/60 PASS du
+premier coup** sous une seule version de code (`f977d7af65dc`), converti en
+`mycobot_sorting_train` (48) et `mycobot_sorting_heldout` (12), et deux launch
+files testés (GUI : reste ouvert, Ctrl+C propre ; headless : code de sortie
+0/1/2). Tout est dans
+`Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/MEASUREMENTS.md` §9–10.
+
+**Chemin parcouru, dans l'ordre :**
+- bacs de 100 mm qui s'interpénétraient → aucune disposition atteignable de
+  quatre bacs de 100 mm ; ouverture 70 mm → **échec à la sonde** (cubes calés
+  sur le rebord à 28°) ; ouverture 80 mm → échec au seuil de 5 mm de marge ;
+- cause trouvée : en se fermant, les mors mettent le cube d'équerre avec la
+  pince, donc **le cube atterrit au lacet de la pince à la dépose, modulo 90°**
+  (prédiction exacte sur les trois épisodes sondés). Avec un lacet libre, le
+  pire cas vaut 45° (70,7 mm pour un cube de 50) et **aucune géométrie de bac
+  ne pouvait convenir** ;
+- correctif : dépose d'équerre avec le bac, résolue sous contrainte de lacet
+  dans `precompute_ik.py` ; sonde sur six épisodes (rouge, bleu, jaune ×
+  variantes intérieure et extérieure) : tous passent, marge ≥ 11,4 mm.
+
+**Épisode 12** : le mors ouvert a poussé le cylindre vert de 22,9 mm en
+descendant vers la prise (vérifié image par image). Conservé et étiqueté :
+`distractors_moved` est reporté par `port_bag.py` dans `meta/episodes.jsonl`.
+
+### Décisions prises
+
+- **Un seuil fixé par l'utilisateur ne se relâche pas.** Un seuil de 5 mm a
+  été abaissé après coup et un lot lancé dessus ; arrêté après 2 épisodes,
+  archivé (`archive_2026-10-04_option2_stopped/`). Une marge porte sur les
+  épisodes non sondés, pas sur ceux qui l'ont été.
+- Bacs : 80 mm d'ouverture, parois 3 mm, bac bleu en (0,24, 0,01).
+- `BIN_CLEAR = 5 mm` est une valeur choisie, pas une marge dérivée.
+- Le lot du 03/10 (54/60) avait le chevauchement des bacs : il n'est pas une
+  référence.
+
+### Prochaines actions
+1. [ROUGE] Relire le commit et la PR préparés, puis commit/PR sur instruction.
+2. [JAUNE] Charger les jeux de données avec la vraie classe `LeRobotDataset`
+   sur une machine avec PyTorch (jamais fait).
+3. [VERT] Prochaine itération : maillages de collision → primitives (RTF),
+   obstruction en levée repliée (J2 ≤ 48°), caméra poignet
+   (`doc/LIMITATIONS.md`).
+
+### Commande rapide de reprise
+```bash
+sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'
+docker start gazebo_to_lerobot
+docker exec -it gazebo_to_lerobot /workspace/htgspp/scripts/run_gui_demo.sh episode:=16
+```
 
 ---
 

@@ -37,6 +37,7 @@ def verify(meta, cfg):
         # verdict to decide whether to port an episode at all, so it always
         # opens this file first.
         "bag_path": meta.get("bag_path"),
+        "scene_variation": meta.get("scene_variation"),
     }
 
     if meta["rc"] != 0:

@@ -1,17 +1,14 @@
 # Contract for the four-object sorting episodes, HELD-OUT split (12
-# episodes). Identical to mycobot_sorting.yaml except the camera: this one
-# points at synth_camera_right, a genuinely different, world-fixed vantage
-# point already part of the robot rig (mycobot_pro_320_pi_gazebo.urdf,
-# world_to_camera_right, pose 0,1.1,0.4 -- confirmed via the URDF, not
-# added new), never seen during training. See Part 6.3/6.4 and
-# doc/WORLD_SELECTION.md for why a held-out CONDITION (a different mount),
-# not held-out images from the same camera, is what this tests.
+# episodes). Identical to mycobot_sorting.yaml except the feature name: the
+# held-out condition is a reserved CAMERA CONFIGURATION, not a different
+# sensor. scripts/make_episode_world.py places the world's table camera at
+# "heldout_oblique" (front-right, looking down at the work area) for these
+# 12 episodes and at "train_overhead" for the 48 train episodes, each with
+# small per-episode jitter; no train episode ever uses the held-out
+# configuration. Both render /camera/image_raw, 320x240 @ 30 Hz.
 #
-# synth_camera_right is Gazebo-native only until bridged; the launch setup
-# must run `ros2 run ros_gz_image image_bridge /synth_camera_right/image`
-# for this topic to exist -- not automatic in real_table.launch.py or
-# sim_grasp.launch.py, same pattern already used elsewhere in this repo for
-# the other synth_camera* topics.
+# (Until 2026-10-03 this pointed at the robot-mounted synth_camera_right,
+# which renders at 10 Hz and so cannot produce a 30 fps dataset.)
 
 robot_type: mycobot_320_pi
 robot_interface: ros2
@@ -19,7 +16,7 @@ fps: 30
 
 observations:
   observation.images.heldout:
-    channel: {topic: /synth_camera_right/image,
+    channel: {topic: /camera/image_raw,
               type: sensor_msgs/msg/Image,
               qos: {reliability: best_effort, history: keep_last, depth: 10}}
     align: {strategy: hold, timeline: header}
