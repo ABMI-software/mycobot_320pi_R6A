@@ -26,7 +26,7 @@ else. It states, up front:
    in the reference pipeline (confirmed statically and at runtime), but
    two live attempts on the constrained host failed for a diagnosed timing
    reason unrelated to the mechanism. The labelled `DetachableJoint` weld
-   is the adopted floor on that hardware; if Role B's faster hardware
+   is the adopted floor on that hardware; if faster hardware
    achieves a genuine grasp, some or all episodes may carry
    `simulated_attachment: false` instead. Check the field — don't assume.
    Full account: `doc/GRASP_DECISION.md`.

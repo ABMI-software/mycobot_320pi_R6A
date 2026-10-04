@@ -58,14 +58,14 @@ object, cylinder included, before the unattended batch.)
 **Stop and report back if any of these four fails** — do not proceed to
 the full batch on a guess that it'll sort itself out, and do not retry
 past a second attempt on the same episode without reporting first. This
-is not extra caution for its own sake: on Role A hardware this session,
+is not extra caution for its own sake: on the memory-constrained machine of 2026-09-23,
 recorder wiring was confirmed working end to end exactly once, under
 Gazebo load — but no single episode was ever driven through to a
 completed PASS/FAIL/WRONG_BIN verdict, and a second, independent
 resource-exhaustion mode surfaced when testing the recorder in
 isolation (a lifecycle-service hang, unrelated to memory — see
-`doc/SMOKE_TEST.md`'s 2026-09-23 entries for the full record). Role B's
-hardware is expected to be materially less memory-constrained, but that
+`doc/SMOKE_TEST.md`'s 2026-09-23 entries for the full record). A machine
+with more memory was expected to avoid both, but that
 expectation itself hasn't been tested — these four episodes are that
 test. A failure here is exactly the kind of thing worth stopping for.
 

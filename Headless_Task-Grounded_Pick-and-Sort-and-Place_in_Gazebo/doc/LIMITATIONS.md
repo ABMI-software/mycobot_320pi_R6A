@@ -6,7 +6,7 @@ Volunteering the limits is what makes the rest credible.
 
 Per `doc/GRASP_DECISION.md`: the reference grasp mechanism is confirmed
 genuine (no weld/attach code anywhere, statically and at runtime), but two
-live attempts on Role A's hardware failed to complete a full grasp, for a
+live attempts on the memory-constrained machine of 2026-09-23 failed to complete a full grasp, for a
 diagnosed timing reason (the reference node's wall-clock settle logic vs.
 this container's RTF ≈0.14). A8 (simulated attachment) is therefore the
 adopted floor for episodes recorded on this hardware.
@@ -18,7 +18,7 @@ of grasping. This is labelled in the model's SDF comments, in
 `run_pick_and_place.py`'s own attach/detach calls, and in every episode's
 metadata — never silently.
 
-**If a physical grasp is adopted** (Role B re-runs Part 3's test and it
+**If a physical grasp is adopted** (Part 3's test is re-run on faster hardware and it
 succeeds there, per the recommendation in `doc/GRASP_DECISION.md`): it is
 still rigid-body contact with tuned friction, not the physical gripper.
 The physical MyCobot's Pro adaptive gripper stalls on an object at an
