@@ -9,6 +9,31 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — tri quatre objets : jeux de données au format LeRobot v3.0, chargés et testés avec SmolVLA (05/10)
+
+- `scripts/port_bag.py` réécrit sur l'écrivain de LeRobot (`LeRobotDataset.create`
+  / `add_frame` / `save_episode`). La première conversion ne se chargeait pas
+  et comportait quatre défauts : action = état au même instant (le
+  convertisseur avait décalé l'indice), horodatages en temps mural de
+  réception, clé caméra différente selon la partie, ni statistiques ni index
+  global. Désormais : **action[t] = état[t+1]** (aucun topic de commande n'a
+  été enregistré ; dernière image de chaque épisode retirée),
+  `timestamp = frame_index / 30`, appariement image–état sur l'horodatage
+  d'en-tête (temps simulé), une seule clé `observation.images.top`.
+- **Vérifié hors ligne avec lerobot 0.4.4** (épinglage provisoire, en un seul
+  endroit : `scripts/requirements-lerobot.txt`) : 48 / 12 épisodes, 29 687 /
+  7 411 images ; action[t] = état[t+1] sur chaque ligne ; l'image renvoyée par
+  le chargeur est identique à l'image décodée du MP4 au même indice ;
+  statistiques présentes.
+- **Test d'entraînement SmolVLA sur CPU** (`lerobot/smolvla_base`, lot de 1,
+  10 pas) : perte finie à chaque pas, ~4,1 s par pas, 3,5 Go de RAM au plus,
+  100 M de paramètres entraînables sur 450 M (expert d'action seul).
+- `distractors_moved` et la configuration caméra de chaque épisode dans
+  `meta/episodes_extra.jsonl` (l'écrivain 0.4.4 ne stocke pas de champ
+  par épisode personnalisé).
+- Contrats : l'état désiré du contrôleur et la commande de pince ajoutés en
+  canaux `adjunct` pour les prochains lots ; clé caméra unifiée.
+
 ### Ajouté — tri quatre objets : lot de 60 épisodes, jeux de données, deux launch files (04/10)
 
 - **Lot de 60 épisodes, 60/60 PASS du premier coup**, sous une seule version

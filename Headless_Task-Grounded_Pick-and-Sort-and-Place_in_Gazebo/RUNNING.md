@@ -104,19 +104,29 @@ and 15 per object across train + heldout.
 **outside** the episode folder, so a retry cannot erase it. Send that file
 back.
 
-## Convert to LeRobot format (after the batch, or per-object as episodes finish)
+## Convert to LeRobot format (after the batch)
 
-    python3 scripts/port_bag.py --out datasets/mycobot_sorting_train --split train
-    python3 scripts/port_bag.py --out datasets/mycobot_sorting_heldout --split heldout
+On the **WSL2 host, not in the container**: the converter uses LeRobot's own
+writer in a CPU-only venv, pinned in `scripts/requirements-lerobot.txt`
+(install commands at the top of that file). Copy the bags and the episode
+metadata out of the container first, then:
 
-Only ports episodes whose `grasp_meta.verdict.json` says `"verdict": "PASS"`
-and whose frames, colour check and re-send count are also clean; anything
-else is skipped with its reason printed. An episode that displaced another
-object is kept and labelled (`distractors_moved` in `meta/episodes.jsonl`).
+    V=~/venvs/lerobot044-cpu/bin/python
+    $V scripts/port_bag.py --split train   --out datasets/mycobot_sorting_train \
+        --episodes-dir <copy>/episodes --bags-dir <copy>/bags
+    $V scripts/port_bag.py --split heldout --out datasets/mycobot_sorting_heldout \
+        --episodes-dir <copy>/episodes --bags-dir <copy>/bags
+
+~1 min for held-out, ~4 min for train on the laptop. Only ports episodes whose
+`grasp_meta.verdict.json` says `"verdict": "PASS"` and whose frames, colour
+check and re-send count are also clean; anything else is skipped with its
+reason printed. An episode that displaced another object is kept and labelled
+(`distractors_moved` in the sidecar `meta/episodes_extra.jsonl`). Format,
+action definition and validation: `datasets/README.md`.
 
 ## What to return
 
-Either `datasets/` (19 MB converted, 2026-10-04) or the raw recordings under
+Either `datasets/` (112 MB converted, 2026-10-05) or the raw recordings under
 `/workspace/htgspp/bags/` (8.1 GB, regenerable from `batch.sh`).
 
 ## If this is the first run on this machine
