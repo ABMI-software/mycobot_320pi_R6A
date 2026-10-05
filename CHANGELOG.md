@@ -44,8 +44,8 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Lot de 60 épisodes, 60/60 PASS du premier coup**, sous une seule version
   de code (`f977d7af65dc`), sur un seul portable WSL2 : aucune reprise,
   aucun renvoi de trajectoire, images complètes partout. Converti en
-  `mycobot_sorting_train` (48 épisodes, 29 735 images) et
-  `mycobot_sorting_heldout` (12 épisodes, 7 423 images). **Corrigé le 05/10 :
+  `mycobot_sorting_train` (48 épisodes, 29 687 images) et
+  `mycobot_sorting_heldout` (12 épisodes, 7 411 images). **Corrigé le 05/10 :
   29 687 / 7 411** après reconversion (action en avance d'une image, horodatage
   en temps mural, clé caméra différente selon la partie, pas de statistiques) ;
   voir l'entrée du 05/10 ci-dessus. Détail :
