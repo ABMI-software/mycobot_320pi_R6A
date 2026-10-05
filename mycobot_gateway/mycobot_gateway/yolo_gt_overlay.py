@@ -12,7 +12,8 @@ here feeds perception or planning (invariant I4).
     /<camera>/image + /yolo/<camera>/detections + /yolo/<camera>/objects_3d
     + /validation/gt/objects -> /validation/yolo_gt/<camera>/image
                              -> /validation/yolo_gt/image   (2x2 mosaic)
-                             -> csv_path (optional)
+                             -> csv_path (optional, protocol step 11: one row per
+                                piece and camera, 2D IoU/pixel and 3D error)
 
 Not in the 3D view: TEXT markers do not exist under ogre2 ("Invalid Marker
 type 7", 29/09), and the ogre1 GUI that has them did not run here.
@@ -33,7 +34,9 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from vision_msgs.msg import Detection2DArray, Detection3DArray
 
+from .vision import tri_scene
 from .vision.sim_multicam_geometry import load_cameras
+from .vision.yolo_vs_gt import match_boxes, references
 
 _SCRIPTS = Path(__file__).resolve().parents[2] / 'scripts'
 if str(_SCRIPTS) not in sys.path:
@@ -50,8 +53,14 @@ VIEW_W, VIEW_H = 1280, 960
 # and their labels.
 VIEW_MARGIN_PX = 45
 LABEL_SCALE = 0.75
-CSV_FIELDS = ('stamp', 'camera', 'object_id', 'yolo_class', 'confidence', 'verdict',
-              'x_gt', 'y_gt', 'x_yolo', 'y_yolo', 'error_xy_mm')
+# Protocol step 11. match: TP, wrong_class (box matched, class wrong), FN, FP.
+# z_yolo is the plane height the box was localized on (half the announced
+# class height), z_gt the true box centre: dz grows when a piece is lifted.
+CSV_FIELDS = ('stamp_sim', 'seed', 'camera_id', 'frame_id', 'object_id', 'gt_class',
+              'yolo_class_id', 'yolo_class', 'confidence', 'x_min', 'y_min', 'x_max', 'y_max',
+              'u_yolo', 'v_yolo', 'u_gt', 'v_gt', 'du', 'dv', 'pixel_error', 'iou', 'match',
+              'hidden', 'truncated', 'plane_h', 'x_yolo', 'y_yolo', 'z_yolo',
+              'x_gt', 'y_gt', 'z_gt', 'dx', 'dy', 'dz', 'error_3d')
 # Raw images kept to find the one a detection was computed on (~2 s of camera).
 IMAGE_CACHE = 8
 CAMERAS = ('synth_camera', 'synth_camera_right', 'synth_camera_left', 'synth_camera_top')
@@ -184,12 +193,15 @@ class YoloGtOverlay(Node):
         self.declare_parameter('cameras', list(CAMERAS))
         self.declare_parameter('camera_layout', 'dream50k')
         self.declare_parameter('csv_path', '')
+        self.declare_parameter('seed', -1)
+        self.seed = int(self.get_parameter('seed').value)
         self.cams = list(self.get_parameter('cameras').value)
         desc = get_package_share_directory('mycobot_description')
         cameras = load_cameras(
             os.path.join(desc, 'urdf', '320_pi', 'mycobot_pro_320_pi_gazebo.urdf'),
             {'camera_layout': str(self.get_parameter('camera_layout').value)})
         self.cameras = {cam: cameras[cam] for cam in self.cams}
+        self.footprints = tri_scene.load_footprints(os.path.join(desc, 'models'))
         self.bridge = CvBridge()
         self.gt = None
         self.yolo, self.images, self.views, self.pub_cam = {}, {}, {}, {}
@@ -221,6 +233,8 @@ class YoloGtOverlay(Node):
             cache.pop(next(iter(cache)))
 
     def on_detections(self, cam, msg):
+        if self.csv and self.gt is not None:
+            self.write_csv(cam, msg)
         # yolo_gazebo_node copies the source image header onto its detections.
         source = self.images[cam].get((msg.header.stamp.sec, msg.header.stamp.nanosec))
         if source is None or self.gt is None or cam not in self.yolo:
@@ -241,8 +255,6 @@ class YoloGtOverlay(Node):
         view = crop(self.bridge.imgmsg_to_cv2(source, 'bgr8'), window)
         y.trace_detections(view, detections_in_view(msg, window), cam, LABEL_SCALE)
         draw_errors(view, camera, gt, matches, extra, window)
-        if self.csv:
-            self.write_csv(cam, gt, matches)
         self.views[cam] = view
         self.pub_cam[cam].publish(self.to_msg(view, msg.header))
         self.pub.publish(self.to_msg(mosaic(self.views, self.cams), msg.header))
@@ -253,20 +265,71 @@ class YoloGtOverlay(Node):
         out.header = header
         return out
 
-    def write_csv(self, cam, gt, matches):
-        s = self.yolo[cam].header.stamp
-        for name in sorted(gt):
-            found = matches[name]
-            row = {'stamp': f'{s.sec}.{s.nanosec:09d}', 'camera': cam, 'object_id': name,
-                   'verdict': verdict(name, found),
-                   'x_gt': round(gt[name][0][0], 5), 'y_gt': round(gt[name][0][1], 5)}
-            if found is not None:
-                row.update({'yolo_class': found[0], 'confidence': round(found[1], 4),
-                            'x_yolo': round(float(found[2][0]), 5),
-                            'y_yolo': round(float(found[2][1]), 5),
-                            'error_xy_mm': round(found[3] * 1000, 2)})
-            self.csv.writerow(row)
+    def write_csv(self, cam, msg):
+        camera = self.cameras[cam]
+        origins, centres = {}, {}
+        for d in self.gt.detections:
+            p, c = d.results[0].pose.pose.position, d.bbox.center.position
+            origins[d.id] = np.array([p.x, p.y, p.z])
+            centres[d.id] = np.array([c.x, c.y, c.z])
+        detections = []
+        for d in msg.detections:
+            c, sx, sy = d.bbox.center.position, d.bbox.size_x / 2, d.bbox.size_y / 2
+            detections.append({'classe': d.results[0].hypothesis.class_id, 'id': d.id,
+                               'conf': d.results[0].hypothesis.score,
+                               'boite': (c.x - sx, c.y - sy, c.x + sx, c.y + sy)})
+        refs = references(camera, origins, self.footprints)
+        matches, false_pos, missed = match_boxes(refs, detections)
+        s = msg.header.stamp
+        base = {'stamp_sim': f'{s.sec}.{s.nanosec:09d}', 'seed': self.seed, 'camera_id': cam,
+                'frame_id': msg.header.frame_id}
+        rows = []
+        for name, i, score in matches:
+            rows.append({**self.detection_row(camera, detections[i]),
+                         **self.gt_row(name, refs[name], centres[name]),
+                         'iou': round(score, 4),
+                         'match': 'TP' if detections[i]['classe'] == name else 'wrong_class'})
+        rows += [{**self.gt_row(name, refs[name], centres[name]), 'match': 'FN'} for name in missed]
+        rows += [{**self.detection_row(camera, detections[i]), 'match': 'FP'} for i in false_pos]
+        for row in rows:
+            if 'u_yolo' in row and 'u_gt' in row:
+                row['du'] = round(row['u_yolo'] - row['u_gt'], 2)
+                row['dv'] = round(row['v_yolo'] - row['v_gt'], 2)
+                row['pixel_error'] = round(float(np.hypot(row['du'], row['dv'])), 2)
+            if 'x_yolo' in row and 'x_gt' in row:
+                d = np.array([row['x_yolo'] - row['x_gt'], row['y_yolo'] - row['y_gt'],
+                              row['z_yolo'] - row['z_gt']])
+                row.update({'dx': round(d[0] * 1000, 2), 'dy': round(d[1] * 1000, 2),
+                            'dz': round(d[2] * 1000, 2),
+                            'error_3d': round(float(np.linalg.norm(d)) * 1000, 2)})
+            self.csv.writerow({**base, **row})
         self.csv_file.flush()
+
+    def detection_row(self, camera, d):
+        x0, y0, x1, y1 = d['boite']
+        u, v = (x0 + x1) / 2, (y0 + y1) / 2
+        row = {'yolo_class_id': d['id'], 'yolo_class': d['classe'],
+               'confidence': round(d['conf'], 4), 'x_min': round(x0, 2), 'y_min': round(y0, 2),
+               'x_max': round(x1, 2), 'y_max': round(y1, 2),
+               'u_yolo': round(u, 2), 'v_yolo': round(v, 2)}
+        # Same localization as yolo_localizer: the announced class's 3D box,
+        # registered on the 2D box centre.
+        try:
+            xyz = tri_scene.locate_from_box(camera, (u, v), self.footprints[d['classe']])
+        except ValueError:
+            return row
+        row.update({'plane_h': round(float(xyz[2]), 5), 'x_yolo': round(float(xyz[0]), 5),
+                    'y_yolo': round(float(xyz[1]), 5), 'z_yolo': round(float(xyz[2]), 5)})
+        return row
+
+    @staticmethod
+    def gt_row(name, ref, centre):
+        box = ref['box']
+        return {'object_id': name, 'gt_class': name, 'hidden': ref['hidden'],
+                'truncated': ref['truncated'],
+                'u_gt': round((box[0] + box[2]) / 2, 2), 'v_gt': round((box[1] + box[3]) / 2, 2),
+                'x_gt': round(float(centre[0]), 5), 'y_gt': round(float(centre[1]), 5),
+                'z_gt': round(float(centre[2]), 5)}
 
     def destroy_node(self):
         if self.csv:

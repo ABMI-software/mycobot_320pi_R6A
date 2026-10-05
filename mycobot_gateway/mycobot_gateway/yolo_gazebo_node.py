@@ -10,6 +10,8 @@ reads Gazebo poses (protocol invariant I4). Not connected to motion planning.
 """
 
 import csv
+import hashlib
+import json
 from pathlib import Path
 import sys
 
@@ -36,11 +38,20 @@ class YoloGazeboNode(Node):
         super().__init__('yolo_gazebo_node')
         self.declare_parameter('cameras', ['synth_camera_top'])
         self.declare_parameter('csv_path', '')
+        # run.yaml written by tri_yolo.launch.py (log_dir): the weights and the
+        # threshold are only known once the service is up.
+        self.declare_parameter('run_yaml', '')
         self.cameras = list(self.get_parameter('cameras').value)
         self.bridge = CvBridge()
         self.service = y.ServiceYOLO26()
         self.get_logger().info(f'yolo26 {self.service.poids}, threshold {self.service.seuil}, '
                                f'cameras {self.cameras}')
+        run_yaml = str(self.get_parameter('run_yaml').value)
+        if run_yaml:
+            with open(run_yaml, 'a') as f:
+                md5 = hashlib.md5(Path(self.service.chemin).read_bytes()).hexdigest()
+                f.write(f'yolo26:\n  weights: {json.dumps(self.service.chemin)}\n'
+                        f'  weights_md5: {md5}\n  threshold: {self.service.seuil}\n')
         # One image in flight per camera: the next result the service returns
         # for that camera is this image, so it carries this header.
         self.pending = {}

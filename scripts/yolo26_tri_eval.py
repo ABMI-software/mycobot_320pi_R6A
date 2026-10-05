@@ -40,15 +40,12 @@ import yolo26_dashboard as y                                         # noqa: E40
 from mycobot_gateway.vision import tri_scene as ts                   # noqa: E402
 from mycobot_gateway.vision.sim_multicam_geometry import load_cameras  # noqa: E402
 from mycobot_gateway.gazebo_ground_truth import read_pose_info  # noqa: E402
+from mycobot_gateway.vision.yolo_vs_gt import match_boxes, references  # noqa: E402
 
 URDF = RACINE / 'mycobot_description/urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf'
 MODELES = RACINE / 'mycobot_description/models'
 CAMERAS = ('synth_camera', 'synth_camera_right', 'synth_camera_left', 'synth_camera_top')
 PIECES = ts.OBJECTS + ts.BINS
-IOU_MIN = 0.5
-CACHEE = 0.5
-# Une piece dont moins de 10 % de la boite est dans l'image n'est pas attendue.
-VISIBLE_MIN = 0.1
 ATTENTE_S = 60.0
 
 
@@ -58,70 +55,10 @@ def poses_gazebo(monde):
     return {nom: T[:3, 3] for nom, T in poses.items()}
 
 
-def boite_gt(camera, xyz, empreinte):
-    coins = ts.corners(xyz[:2], empreinte) + [0, 0, xyz[2]]
-    uv = camera.project(coins)
-    return np.r_[uv.min(axis=0), uv.max(axis=0)]
-
-
-def iou(a, b):
-    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
-    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
-    inter = ix * iy
-    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
-    return inter / union if union > 0 else 0.0
-
-
-def aire(boite):
-    return max(0.0, boite[2] - boite[0]) * max(0.0, boite[3] - boite[1])
-
-
-def rogne(boite, camera):
-    return np.clip(boite, 0, [camera.width - 1, camera.height - 1] * 2)
-
-
-def couverture(boite, autre):
-    ix = max(0.0, min(boite[2], autre[2]) - max(boite[0], autre[0]))
-    iy = max(0.0, min(boite[3], autre[3]) - max(boite[1], autre[1]))
-    return ix * iy / ((boite[2] - boite[0]) * (boite[3] - boite[1]))
-
-
-def references(camera, poses, empreintes):
-    """Boite GT, distance a la camera et drapeau « cachee » par piece visible."""
-    refs = {}
-    for nom, xyz in poses.items():
-        entiere = boite_gt(camera, xyz, empreintes[nom])
-        boite = rogne(entiere, camera)
-        part = aire(boite) / aire(entiere)
-        if part >= VISIBLE_MIN:
-            centre = xyz + [0, 0, empreintes[nom].height / 2]
-            refs[nom] = {'boite': boite, 'tronquee': part < 0.99,
-                         'dist': np.linalg.norm(centre - camera.world_from_optical[:3, 3])}
-    for nom, r in refs.items():
-        r['cachee'] = any(couverture(r['boite'], o['boite']) > CACHEE
-                          for autre, o in refs.items() if autre != nom and o['dist'] < r['dist'])
-    return refs
-
-
-def apparie(refs, detections):
-    """Glouton sur l'IoU decroissant : (appariements, detections restantes, refs restantes)."""
-    paires = sorted(((iou(r['boite'], d['boite']), nom, i)
-                     for nom, r in refs.items() for i, d in enumerate(detections)), reverse=True)
-    pris_r, pris_d, apparies = set(), set(), []
-    for score, nom, i in paires:
-        if score < IOU_MIN or nom in pris_r or i in pris_d:
-            continue
-        pris_r.add(nom)
-        pris_d.add(i)
-        apparies.append((nom, i, score))
-    return apparies, [i for i in range(len(detections)) if i not in pris_d], \
-        [n for n in refs if n not in pris_r]
-
-
 def dessine(image, refs, detections, apparies):
     vue = image.copy()
     for nom, r in refs.items():
-        x0, y0, x1, y1 = (int(round(v)) for v in r['boite'])
+        x0, y0, x1, y1 = (int(round(v)) for v in r['box'])
         cv2.rectangle(vue, (x0, y0), (x1, y1), (255, 255, 255), 1)
     bonnes = {i for _, i, _ in apparies}
     for i, d in enumerate(detections):
@@ -212,7 +149,7 @@ def main():
             if detections is None:
                 raise RuntimeError('yolo26_service.py s est arrete')
             refs = references(cameras[nom_cam], poses, empreintes)
-            apparies, fausses, manquees = apparie(refs, detections)
+            apparies, fausses, manquees = match_boxes(refs, detections)
             cv2.imwrite(str(args.sortie / f'{nom_cam}.png'), dessine(image, refs, detections, apparies))
             base = {'seed': args.seed, 'stamp': f'{stamp.sec}.{stamp.nanosec:09d}',
                     'camera': nom_cam, 'poids': service.poids, 'seuil': service.seuil}
@@ -220,8 +157,8 @@ def main():
                 d, r = detections[i], refs[nom]
                 u = (d['boite'][0] + d['boite'][2]) / 2
                 v = (d['boite'][1] + d['boite'][3]) / 2
-                gu = (r['boite'][0] + r['boite'][2]) / 2
-                gv = (r['boite'][1] + r['boite'][3]) / 2
+                gu = (r['box'][0] + r['box'][2]) / 2
+                gv = (r['box'][1] + r['box'][3]) / 2
                 # Meme localisation que yolo_localizer : boite 3D de la classe
                 # ANNONCEE par yolo26, recalee sur le centre de la boite 2D.
                 try:
@@ -231,7 +168,7 @@ def main():
                     xyz, erreur_3d = (np.nan, np.nan), ''
                 lignes.append({**base, 'object_id': nom, 'gt_class': nom, 'yolo_class': d['classe'],
                                'verdict': 'TP' if d['classe'] == nom else 'mauvaise_classe',
-                               'cachee': r['cachee'], 'tronquee': r['tronquee'], 'confidence': round(d['conf'], 4),
+                               'cachee': r['hidden'], 'tronquee': r['truncated'], 'confidence': round(d['conf'], 4),
                                'iou': round(score, 4), 'u_yolo': u, 'v_yolo': v,
                                'u_gt': round(gu, 2), 'v_gt': round(gv, 2),
                                'pixel_error': round(float(np.hypot(u - gu, v - gv)), 2),
@@ -242,7 +179,7 @@ def main():
                                'x_max': d['boite'][2], 'y_max': d['boite'][3]})
             for nom in manquees:
                 lignes.append({**base, 'object_id': nom, 'gt_class': nom, 'verdict': 'FN',
-                               'cachee': refs[nom]['cachee'], 'tronquee': refs[nom]['tronquee']})
+                               'cachee': refs[nom]['hidden'], 'tronquee': refs[nom]['truncated']})
             for i in fausses:
                 d = detections[i]
                 lignes.append({**base, 'yolo_class': d['classe'], 'verdict': 'FP',

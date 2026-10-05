@@ -94,7 +94,7 @@ def main():
         return
     # La premiere inference compile et alloue : plusieurs secondes, a payer avant « pret ».
     modele.predict(np.zeros((480, 640, 3), np.uint8), imgsz=TAILLE, verbose=False)
-    print(json.dumps({'pret': True, 'poids': poids.name, 'seuil': seuil,
+    print(json.dumps({'pret': True, 'poids': poids.name, 'chemin': str(poids.resolve()), 'seuil': seuil,
                       'classes': list(modele.names.values())}), file=SORTIE, flush=True)
 
     entree = sys.stdin.buffer

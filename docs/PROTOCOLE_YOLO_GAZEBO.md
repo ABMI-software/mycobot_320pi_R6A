@@ -1057,6 +1057,36 @@ Avant (01/10, outil vertical seul, objets n'importe où entre les marqueurs) : 6
 Depuis l'extension de portée et le lâcher au-dessus du rebord : **plus aucun échec de portée, de prise
 ou de perception**. Les écarts penchent vers +x (33 positifs, 3 nuls, 4 négatifs ; de −2 à +17 mm) ; non expliqué.
 
+## Étape 11 : journalisation CSV (05/10)
+
+```bash
+ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1 piece_reach:=0.28 \
+    log_dir:=results/yolo_gazebo/2026-10-05_seed1
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true \
+    -p world_name:=tri_yolo -p pose_source:=perception -p max_attempts:=2 \
+    -p csv_path:=results/yolo_gazebo/2026-10-05_seed1/tri.csv
+```
+
+`log_dir` refuse un dossier existant : un essai n'en écrase jamais un autre.
+
+| Fichier | Écrit par | Contenu |
+|---|---|---|
+| `run.yaml` | `tri_yolo.launch.py`, puis `yolo_gazebo_node` | graine, `piece_reach`, position tirée de chaque pièce, 4 caméras (fx, position), masse totale du robot après xacro (1,840 kg), commit et nombre de fichiers modifiés ; poids yolo26 (chemin complet + **md5**) et seuil |
+| `yolo_vs_gt.csv` | `yolo_gt_overlay`, en continu | une ligne par pièce et par caméra à chaque détection, colonnes du § Étape 11 plus `hidden` / `truncated` ; `match` = TP, `wrong_class` (boîte appariée, classe fausse), FN, FP |
+| `tri.csv` | `sim_sorting_grasp` | un verdict par objet et par essai |
+
+Boîte de vérité, IoU et appariement : `vision/yolo_vs_gt.py`, **partagé** avec l'outil hors ligne
+`scripts/yolo26_tri_eval.py` (même calcul, plus de copie). `z_yolo` est la hauteur du plan de
+localisation (demi-hauteur de la classe annoncée), `z_gt` le centre vrai : `dz` grandit quand la
+pièce est levée.
+
+**Essai, graine 1** (8 min, 4/4 triés) : `yolo_vs_gt.csv` 11 872 lignes, TP 8 053, FN 3 227, FP 568,
+wrong_class 24. Les FN suivent le tri : **0 % en pose d'observation** (0-5 s sim), puis 12-38 % pendant
+le tri, ~50 % à la fin, quand les 4 objets sont au fond des bacs. Deux causes probables, non
+séparées : le bras qui masque les pièces, et les parois des bacs qui cachent les objets déposés. La
+référence (boîte amodale, occultation entre pièces seulement) ne modélise ni l'un ni l'autre. Pour un
+taux de détection, ne garder que les lignes en pose d'observation.
+
 ## Journal
 
 | Date | Étape | État | Preuve / mesure |
@@ -1086,3 +1116,4 @@ ou de perception**. Les écarts penchent vers +x (33 positifs, 3 nuls, 4 négati
 | 01/10/2026 | 9 — tri piloté par la perception | fait, **validé par Osama (05/10)** | `pose_source:=perception` : 6/40 triés, **6/6 des pièces à portée**, 0 échec de perception ou de prise ; 34 échecs de portée (outil vertical 0,28 m). Corrections : ouverture d'approche, cubes à 0/90°, dépôt résolu avant saisie |
 | 02/10/2026 | 9 suite — portée et lâcher | fait (graine 1), campagne en cours | `piece_reach:=0.28`, lâcher incliné 15/30/45°, 2 essais ; lâcher au-dessus du rebord pour tous, doigts écartés **avant** la remontée (glissement vu par Osama). Graine 1 : **4/4**, objets au fond avant la remontée, écart max +12/−10 mm (pavé). `--switch-timeout 30` |
 | 05/10/2026 | 9 suite — campagne 10 graines | fait, **validé par Osama (05/10)** | **40/40**, 0 deuxième essai ; lâcher vertical 10 / 15° 19 / 30° 11 ; écart au centre médiane 7 mm, max 17 mm ; Tmax 86 °C |
+| 05/10/2026 | 11 — journalisation CSV | fait (graine 1) | `log_dir:=` → `run.yaml` (md5 des poids, masse, commit), `yolo_vs_gt.csv` (colonnes du protocole, en continu), `tri.csv` ; `vision/yolo_vs_gt.py` partagé avec `yolo26_tri_eval.py` ; 21 tests OK |

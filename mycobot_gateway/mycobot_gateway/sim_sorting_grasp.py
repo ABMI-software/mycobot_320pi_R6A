@@ -30,6 +30,7 @@ Lancement (le banc doit tourner) :
   ros2 run mycobot_gateway sim_sorting_grasp
 """
 
+import csv
 import math
 import re
 import subprocess
@@ -221,6 +222,7 @@ class SimSortingGrasp(Node):
         self.declare_parameter('startup_timeout', 60.0)
         self.declare_parameter('pose_source', 'gazebo')
         self.declare_parameter('max_attempts', 1)
+        self.declare_parameter('csv_path', '')     # un verdict par essai (protocole, etape 11)
         self.pose_source = str(self.get_parameter('pose_source').value)
         self.max_attempts = int(self.get_parameter('max_attempts').value)
         if self.pose_source not in ('gazebo', 'vision', 'perception') or self.max_attempts < 1:
@@ -694,10 +696,21 @@ class SimSortingGrasp(Node):
         return (f'hors du bac : ecart {dx * 1000:+.0f}/{dy * 1000:+.0f} mm, '
                 f'z={landed[2]:.3f}')
 
+    def write_csv(self, rows):
+        path = str(self.get_parameter('csv_path').value)
+        if not path:
+            return
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'w', newline='') as f:
+            out = csv.DictWriter(f, fieldnames=('stamp_sim', 'object_id', 'attempt', 'ok', 'verdict'))
+            out.writeheader()
+            out.writerows(rows)
+
     def run(self) -> Dict[str, str]:
         self.wait_until_ready()
 
         results: Dict[str, str] = {}
+        rows = []
         for target in self.targets:
             if self.only and target.model not in self.only:
                 continue
@@ -708,10 +721,15 @@ class SimSortingGrasp(Node):
                 except Exception as exc:                 # noqa: BLE001
                     results[target.model] = f'erreur : {exc}'
                 self.status(f'  {target.model} (essai {attempt + 1}) : {results[target.model]}')
+                rows.append({'stamp_sim': f'{self.get_clock().now().nanoseconds / 1e9:.3f}',
+                             'object_id': target.model, 'attempt': attempt + 1,
+                             'ok': results[target.model].startswith('OK'),
+                             'verdict': results[target.model]})
                 # Retry only an empty grasp. Other failures may leave an object
                 # in an unknown state and must not start another descent.
                 if not results[target.model].startswith('prise ratee'):
                     break
+        self.write_csv(rows)
 
         if self.pose_source == 'vision' and any(
                 verdict.startswith('erreur') for verdict in results.values()):

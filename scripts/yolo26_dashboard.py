@@ -126,6 +126,7 @@ class ServiceYOLO26:
         if 'erreur' in pret:
             raise RuntimeError(pret['erreur'])
         self.poids = pret['poids']
+        self.chemin = pret['chemin']
         self.seuil = pret['seuil']
         self.arrete = False
         self._verrou = threading.Lock()
@@ -289,6 +290,50 @@ def juge_objets(vision, image, detections, module, angles=None, marqueurs=None):
     return rendus
 
 
+def _couleur_du_bac(image, boite):
+    """Couleur que portent les pixels du bac, ou None si le vote n'est pas net.
+
+    yolo26 prend le bac JAUNE VIDE pour un bac vert sur l'arducam : mesure du
+    30/09, deux boites « bac_vert » dans la meme image, dont une (0,86) a la
+    place exacte du bac jaune ; pave dedans, le meme bac sort « bac_jaune »
+    (0,86). Le tableau de bord cherchait alors le bac jaune ailleurs et ne
+    lachait pas. La teinte, elle, ne se trompe pas : memes bandes et memes
+    saturations que `tri_couleur`, le bois ne vote pas (saturation jaune 220).
+    """
+    a, d, b, e = (int(round(v)) for v in boite)
+    hsv = cv2.cvtColor(image[max(d, 0):e, max(a, 0):b], cv2.COLOR_BGR2HSV).reshape(-1, 3)
+    votes = {}
+    for couleur, reference in tc.TEINTES.items():
+        ecart = np.abs(hsv[:, 0].astype(int) - reference)
+        ecart = np.minimum(ecart, 180 - ecart)
+        seuil = tc.SATURATION_JAUNE if couleur == 'jaune' else tc.SATURATION_MIN
+        votes[couleur] = int(((ecart <= tc.BANDE_TEINTE) & (hsv[:, 1] >= seuil)).sum())
+    total = sum(votes.values())
+    gagnante = max(votes, key=votes.get)
+    return gagnante if total and votes[gagnante] >= PART_COULEUR_BAC * total else None
+
+
+# Part des pixels colores qu'une teinte doit reunir pour renommer un bac.
+# Mesure du 30/09 sur cinq images arducam : les deux erreurs corrigees votent a
+# plus de 0,6, aucune detection juste n'est renommee.
+PART_COULEUR_BAC = 0.6
+
+
+def _recolore_bacs(image, detections):
+    """Renomme chaque bac par sa couleur, puis garde le plus sur de chaque couleur."""
+    vus, rendus = set(), []
+    for d in sorted(detections, key=lambda d: -d['conf']):
+        if d['classe'] in BACS:
+            couleur = _couleur_du_bac(image, d['boite'])
+            if couleur is not None:
+                d = {**d, 'classe': f'bac_{couleur}'}
+            if d['classe'] in vus:
+                continue
+            vus.add(d['classe'])
+        rendus.append(d)
+    return rendus
+
+
 def _boite_arducam(classe):
     """Boite de cette classe vue par l'arducam, si la vue est fraiche."""
     vu = _DERNIER.get('arducam')
@@ -382,6 +427,32 @@ def _pastille(image, x, y, texte, fond, echelle=_ECHELLE):
     return lt + 2 * _MARGE, ht + base + 2 * _MARGE
 
 
+def trace_detections(image, detections, nom, echelle=_ECHELLE):
+    """Les boites de yolo26 et leur confiance, et le compte des pieces vues."""
+    hauteur_vue, largeur_vue = image.shape[:2]
+    occupes = []
+    for d in sorted(detections, key=lambda d: (d['boite'][1], d['boite'][0])):
+        a, b, c, e = (int(v) for v in d['boite'])
+        couleur = _couleur(d['classe'])
+        cv2.rectangle(image, (a, b), (c, e), couleur, max(_TRAIT, round(_TRAIT * echelle / _ECHELLE)),
+                      cv2.LINE_AA)
+        texte = f"{d['classe']} {d['conf']:.2f}"
+        (lt, ht), base = cv2.getTextSize(texte, _POLICE, echelle, 1)
+        taille = (lt + 2 * _MARGE, ht + base + 2 * _MARGE)
+        # Collee au bord haut de la boite, puis dedans, puis sous elle,
+        # puis a sa droite : la premiere place libre gagne.
+        ancres = [(a, b - taille[1]), (a, b), (a, e), (c + 2, b),
+                  (a, b + (e - b) // 2)]
+        ancres = [(min(max(x, 0), largeur_vue - taille[0]),
+                   min(max(y, 0), hauteur_vue - taille[1])) for x, y in ancres]
+        x0, y0, x1, y1 = _pose_libre(ancres, occupes, taille)
+        occupes.append((x0, y0, x1, y1))
+        _pastille(image, x0, y0, texte, couleur, echelle)
+    vus = len({d['classe'] for d in detections})
+    _pastille(image, 8, 8, f'{nom}  {vus}/8 pieces',
+              (70, 150, 70) if vus == 8 else (40, 110, 190), 0.45 * echelle / _ECHELLE)
+
+
 def dessine_detections(module, service):
     """Les boites de yolo26 et leur confiance, tracees sur les deux vues.
 
@@ -393,28 +464,7 @@ def dessine_detections(module, service):
     def _affiche(self, nom, image):
         vu = service.dernier(nom)
         if vu is not None:
-            detections = vu[1]
-            hauteur_vue, largeur_vue = image.shape[:2]
-            occupes = []
-            for d in sorted(detections, key=lambda d: (d['boite'][1], d['boite'][0])):
-                a, b, c, e = d['boite']
-                couleur = _couleur(d['classe'])
-                cv2.rectangle(image, (a, b), (c, e), couleur, _TRAIT, cv2.LINE_AA)
-                texte = f"{d['classe']} {d['conf']:.2f}"
-                (lt, ht), base = cv2.getTextSize(texte, _POLICE, _ECHELLE, 1)
-                taille = (lt + 2 * _MARGE, ht + base + 2 * _MARGE)
-                # Collee au bord haut de la boite, puis dedans, puis sous elle,
-                # puis a sa droite : la premiere place libre gagne.
-                ancres = [(a, b - taille[1]), (a, b), (a, e), (c + 2, b),
-                          (a, b + (e - b) // 2)]
-                ancres = [(min(max(x, 0), largeur_vue - taille[0]),
-                           min(max(y, 0), hauteur_vue - taille[1])) for x, y in ancres]
-                x0, y0, x1, y1 = _pose_libre(ancres, occupes, taille)
-                occupes.append((x0, y0, x1, y1))
-                _pastille(image, x0, y0, texte, couleur)
-            vus = len({d['classe'] for d in detections})
-            _pastille(image, 8, 8, f'{nom}  {vus}/8 pieces',
-                      (70, 150, 70) if vus == 8 else (40, 110, 190), 0.45)
+            trace_detections(image, vu[1], nom)
         origine(self, nom, image)
 
     module.Fenetre._affiche = _affiche
@@ -540,6 +590,7 @@ def branche(module, service=None, inventaire=None, poids=None, seuil=None):
         vu = service.dernier(camera)
         if vu is None:
             return None
+        vu = (vu[0], _recolore_bacs(vu[0], vu[1]), *vu[2:])
         _VISIONS[camera], _DERNIER[camera] = vision, vu
         return vu[0], vu[1], {**planche_vue, **(marqueurs or {})}
 
