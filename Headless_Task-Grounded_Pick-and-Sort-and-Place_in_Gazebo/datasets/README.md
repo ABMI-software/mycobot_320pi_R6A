@@ -12,6 +12,14 @@ mycobot_sorting_train/      48 episodes, 29 687 frames, camera configuration "tr
 mycobot_sorting_heldout/    12 episodes,  7 411 frames, camera configuration "heldout_oblique"
 ```
 
+> **Correction, 2026-10-05: the conversion was redone.** This file first gave
+> 29 735 / 7 423 frames, from a hand-written conversion of 2026-10-04. Redone
+> with LeRobot's own writer, it gives 29 687 / 7 411, one frame fewer per
+> episode. Why: the action was one frame early (`action[t]` equal to
+> `state[t]`), the timestamps were wall-clock receive time, the camera key
+> differed per split, and there were no statistics; that conversion also did
+> not load in LeRobot.
+
 | Feature | Type | Content |
 |---|---|---|
 | `observation.state` | float32 [7] | 6 arm joints + `gripper_controller`, rad, from `/joint_states` |

@@ -594,9 +594,11 @@ pin): `mycobot_sorting_train` 48 episodes, 29 687 frames;
 One frame fewer per episode than recorded: `action[t] = state[t+1]` (no
 command topic was recorded), so each episode's last frame is dropped. Loaded
 by the real `LeRobotDataset` and smoke-trained with SmolVLA on CPU; checks
-and numbers in `datasets/README.md`. A first, hand-written conversion
-(2026-10-04: 29 735 / 7 423 frames, action = state[t], wall-clock timestamps,
-a different camera key per split) did not load and was replaced.
+and numbers in `datasets/README.md`. **Correction, 2026-10-05:** this
+paragraph first gave 29 735 / 7 423 frames, from a hand-written conversion of
+2026-10-04 that did not load and was replaced. Why: action one frame early
+(`action[t] = state[t]`), wall-clock timestamps, a different camera key per
+split, and no statistics.
 
 
 ## Also observed
