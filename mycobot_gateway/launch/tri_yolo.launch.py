@@ -83,7 +83,7 @@ def write_run_yaml(path, seed, layout, cameras, urdf, piece_reach, robot):
     Path(path).write_text('\n'.join(lines) + '\n')
 
 
-def dream_nodes(seed, log_dir, model, rate):
+def dream_nodes(seed, log_dir, model, rate, dashboard):
     from mycobot_gateway.dream_fk_compare import PREFIXES
     env = {'PYTHONPATH': _dream_multicam._pythonpath_venv_dream()}
     nodes = [Node(package='mycobot_gateway', executable='dream_inference',
@@ -93,6 +93,9 @@ def dream_nodes(seed, log_dir, model, rate):
                                'model_name': model, 'output_prefix': PREFIXES[cam],
                                'publish_rate': rate, 'visualize': False}])
              for cam in CAMERAS]
+    if dashboard:
+        nodes.append(Node(package='mycobot_gateway', executable='tri_dream_dashboard',
+                          output='screen', parameters=[{'use_sim_time': True}]))
     if log_dir:
         nodes.append(Node(package='mycobot_gateway', executable='dream_fk_compare',
                           output='screen',
@@ -114,6 +117,7 @@ def launch_scene(context):
     cameras = load_cameras(urdf, {'camera_layout': 'dream50k'})
     top = cameras['synth_camera_top']
     sorting = LaunchConfiguration('scene').perform(context) == 'tri'
+    pieces = LaunchConfiguration('pieces').perform(context) == 'true'
     if sorting:
         world_name = WORLD_NAME
         layout = tri_scene.sample_tri_scene(
@@ -122,7 +126,10 @@ def launch_scene(context):
             piece_reach=float(LaunchConfiguration('piece_reach').perform(context)) or None)
         fd, world_file = tempfile.mkstemp(prefix='mycobot_tri_yolo_', suffix='.sdf')
         with os.fdopen(fd, 'w') as f:
-            f.write(tri_scene.build_world(source, layout, WORLD_NAME))
+            f.write(tri_scene.build_world(
+                source, layout if pieces else {}, WORLD_NAME,
+                drop=() if LaunchConfiguration('aruco').perform(context) == 'true'
+                else tri_scene.NEAR_MARKERS + tri_scene.FAR_MARKERS))
     else:
         # The world that rendered the 50K DREAM dataset, used as is: no pieces,
         # so no YOLO and no ground truth, DREAM only.
@@ -154,7 +161,8 @@ def launch_scene(context):
             raise RuntimeError('dream:=true requires robot_appearance:=original (protocol I8)')
         dream = dream_nodes(seed, log_dir,
                             LaunchConfiguration('dream_model').perform(context),
-                            float(LaunchConfiguration('dream_rate').perform(context)))
+                            float(LaunchConfiguration('dream_rate').perform(context)),
+                            LaunchConfiguration('dashboard').perform(context) == 'true')
 
     return dream + [
         RegisterEventHandler(OnShutdown(on_shutdown=[OpaqueFunction(function=cleanup)])),
@@ -227,6 +235,10 @@ def generate_launch_description():
         DeclareLaunchArgument('scene', default_value='tri', choices=['tri', 'dream50k'],
                               description='dream50k = the world of the 50K render (randomized.sdf), '
                                           'DREAM only'),
+        DeclareLaunchArgument('aruco', default_value='true', choices=['true', 'false'],
+                              description='false = the four markers left out (DREAM ablation)'),
+        DeclareLaunchArgument('pieces', default_value='true', choices=['true', 'false'],
+                              description='false = no pieces nor bins in the world (DREAM ablation)'),
         DeclareLaunchArgument('robot', default_value='robot_yolo_pickplace', choices=list(ROBOTS),
                               description='robot_dream_baseline = no gripper, for the DREAM '
                                           'non-regression (protocol 2.1, step 10)'),
@@ -236,6 +248,8 @@ def generate_launch_description():
                               description='checkpoints_dream/<name>; v4_mix = trained on the 50K renders'),
         DeclareLaunchArgument('dream_rate', default_value='2.0',
                               description='DREAM inferences per second and camera'),
+        DeclareLaunchArgument('dashboard', default_value='false', choices=['true', 'false'],
+                              description='YOLO + DREAM dashboard window (with dream:=true)'),
         DeclareLaunchArgument('log_dir', default_value='',
                               description='Folder for run.yaml + yolo_vs_gt.csv; empty = no log'),
         DeclareLaunchArgument('robot_appearance', default_value='original',

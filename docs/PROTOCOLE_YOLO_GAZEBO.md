@@ -1113,6 +1113,69 @@ dégradation (65,2 → 49,5 %). Pour DREAM dans la scène de tri, le levier est 
 avec le plateau et les pièces, ou randomisation de fond plus large), pas la caméra. Fichier :
 `results/yolo_gazebo/2026-10-05_monde50k_robot_dream_baseline/dream_monde50k_vs_tri_sans_pince.csv`.
 
+**Le modèle de référence du vrai banc, `vgg_montage0901_ft_e30`, ne fait pas mieux** (mêmes 14
+poses, `dream_model:=vgg_montage0901_ft_e30`, checkpoint seulement lu) :
+
+| Détection · médiane (px) | `vgg_ultimate_v4_mix_ft_e30` | `vgg_montage0901_ft_e30` |
+|---|---|---|
+| Monde du 50K, sans pince | 99,2 % · 3,0 | 99,0 % · 3,0 |
+| Scène de tri, sans pince | 65,2 % · 3,8 | 61,5 % · 5,1 |
+| Scène de tri, avec pince | 49,5 % · 11,2 | 49,8 % · 10,8 |
+
+Par caméra, sans pince, v4_mix (le détail montage0901 est dans les CSV) : avant 100 → 59 %, droite
+100 → 99 %, gauche 97 → 92 %, dessus 100 → 12 %. **Ce sont les vues de face et de dessus qui
+s'effondrent** : elles voient le plateau, les ArUco et les pièces autour du bras.
+
+montage0901 (7/7 sur le vrai banc, avec le vrai plateau) garde le synthétique du 50K (99,0 %) mais ne
+gagne rien dans la scène de tri : ce que le réel lui a appris ne se transfère pas au **rendu Gazebo** du
+plateau, de la pince et de l'éclairage. L'écart est propre à la simulation. Pour DREAM dans la scène
+de tri simulée, il faudrait des rendus synthétiques de cette scène (pince, plateau, pièces ; vues de
+face et de dessus d'abord) et un fine-tuning mixte dans un dossier neuf. Le tri n'en dépend pas
+(YOLO seul, 40/40).
+
+**Qu'est-ce qui, dans la scène de tri, fait tomber DREAM ?** Ablation, sans pince, v4_mix, mêmes 14
+poses (`aruco:=false`, `pieces:=false`, 05/10) :
+
+| Monde | Détection | Médiane | avant | droite | gauche | dessus |
+|---|---|---|---|---|---|---|
+| monde du 50K | 99,2 % | 3,0 px | 100 % | 100 % | 97 % | 100 % |
+| `real_table`, plateau seul (sans ArUco ni pièces) | 71,4 % | 4,1 px | 92 % | 99 % | 85 % | **10 %** |
+| scène de tri sans ArUco | 66,6 % | 5,2 px | 62 % | 100 % | 94 % | 10 % |
+| scène de tri complète | 65,2 % | 3,8 px | 59 % | 99 % | 92 % | 12 % |
+
+- **Les ArUco n'y sont pour rien** : les retirer fait gagner 1,4 point (65,2 → 66,6 %).
+- **Les pièces et les bacs** coûtent à la caméra avant (92 → 62 %) et à peu près rien ailleurs.
+- **Le plus gros est déjà là sur le plateau seul** : 99,2 → 71,4 %, et la caméra du dessus tombe
+  à 10 % sans aucun objet. C'est le monde `real_table` lui-même — plateau en bois, et son éclairage
+  et son environnement, que ce test ne sépare pas — qui sort DREAM de sa distribution d'entraînement.
+
+### Dashboard YOLO + DREAM (05/10)
+
+```bash
+ros2 launch mycobot_gateway tri_yolo.launch.py seed:=3 piece_reach:=0.28 dream:=true dashboard:=true
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true \
+    -p world_name:=tri_yolo -p pose_source:=perception -p max_attempts:=2
+```
+
+`tri_dream_dashboard` (validation, lit `/validation/gt/objects`) :
+
+- **YOLO trie** : objets fusionnés des 4 caméras et leur écart à Gazebo (mm), journal du tri
+  (`/pickplace/status`).
+- **DREAM estime la pose du robot vue par chaque caméra**, T_DREAM(t), comme dans DREAM : son PnP
+  prend la FK des angles **de l'instant de l'image** (`dream_inference` interpole `/joint_states` sur
+  le stamp ; au-delà de 0,2 s d'écart, les derniers angles, comme avant). Comparée à T_GT, la vraie
+  pose de la caméra (monde = base, I3).
+- **Trajectoire de la bride** (vue 3D) : vraie = FK(q(t)) ; DREAM = la même bride placée par T_DREAM au
+  lieu de T_GT. Par caméra : écarts dX/dY/dZ et |dXYZ| (mm), écart de rotation (°), keypoints
+  détectés, latence inférence / image → pose ; |dXYZ| dans le temps en échelle log (un PnP sauvage
+  monte à 10⁹ mm).
+- Calcul testé : `tests/test_dream_fk_compare.py` (T_DREAM = T_GT → bride exacte ; caméra décalée de
+  1 cm → bride décalée de 1 cm).
+
+Premier essai, graine 3, scène de tri avec pince : YOLO 0,3-2 mm sur les objets posés (35-45 mm sur
+celui tenu par la pince, localisé à hauteur de table) ; DREAM |dXYZ| de 24 à plus de 400 mm selon la
+caméra et l'instant — attendu, vu l'ablation ci-dessus.
+
 **Graine 2 complète** (`dream:=true` + tri) : 4/4 triés, mais **95 °C atteints** — la garde (88 °C
 tenus 10 s) n'a pas coupé sur des pics brefs. Désormais : arrêt immédiat à 90 °C, et 88 °C tenus 10 s ;
 la non-régression a tourné sans YOLO à 1 Hz : 78 et 81 °C.
@@ -1179,3 +1242,6 @@ taux de détection, ne garder que les lignes en pose d'observation.
 | 05/10/2026 | 11 — journalisation CSV | fait (graine 1) | `log_dir:=` → `run.yaml` (md5 des poids, masse, commit), `yolo_vs_gt.csv` (colonnes du protocole, en continu), `tri.csv` ; `vision/yolo_vs_gt.py` partagé avec `yolo26_tri_eval.py` ; 21 tests OK |
 | 05/10/2026 | 10 — DREAM en parallèle + non-régression pince | fait, **à valider par Osama** | `dream:=true`, `dream_fk_compare` ; sans → avec pince : détection 65,2 → 49,5 %, médiane 3,8 → 11,2 px, aberrant 6,6 → 22,7 % ; caméra du dessus en échec **même sans pince** ; graine 2 avec DREAM : 4/4 mais 95 °C (garde durcie) |
 | 05/10/2026 | 10 — monde du 50K contre scène de tri | fait | sans pince, mêmes poses : détection 99,2 % / 3,0 px dans le monde du 50K contre 65,2 % / 3,8 px dans la scène de tri ; caméra du dessus 100 % dans le monde du 50K → **la cause est la scène, pas la caméra ni la pince** |
+| 05/10/2026 | 10 — modèle montage0901 | fait | même balayage : 99,0 % monde du 50K, 61,5 % tri sans pince, 49,8 % tri avec pince — identique au v4_mix ; l'écart est propre au rendu Gazebo, seul un fine-tuning sur des rendus de la scène de tri le comblerait |
+| 05/10/2026 | 10 — ablation ArUco / pièces | fait | sans pince : 50K 99,2 % → plateau seul 71,4 % (dessus 10 %) → sans ArUco 66,6 % → complète 65,2 % ; ArUco négligeables, pièces = caméra avant, plateau/monde real_table = l'essentiel |
+| 05/10/2026 | 10 — dashboard YOLO + DREAM | fait, **à valider par Osama** | `dashboard:=true` → `tri_dream_dashboard` ; T_DREAM contre T_GT, trajectoire de la bride, dXYZ, rotation, latence ; PnP de `dream_inference` sur les angles de l'instant de l'image |

@@ -263,8 +263,12 @@ def sample_tri_scene(rng, footprints, board, top_camera, attempts=2000, tries_pe
 REMOVED_MODELS = ('red_cube', 'red_bin', 'table_camera')
 
 
-def build_world(source_sdf, layout, world_name):
-    """real_table.sdf with the demo leftovers removed and the eight pieces placed."""
+def build_world(source_sdf, layout, world_name, drop=()):
+    """real_table.sdf with the demo leftovers removed and the eight pieces placed.
+
+    drop: more models or includes to leave out by name (the ArUco markers for
+    the DREAM ablation, protocol step 10).
+    """
     tree = ET.parse(source_sdf)
     world = tree.getroot().find('world')
     # Gazebo serves /world/<name>/...; spawn and bridges look for this name.
@@ -273,6 +277,9 @@ def build_world(source_sdf, layout, world_name):
         model = world.find(f"model[@name='{name}']")
         if model is not None:
             world.remove(model)
+    for include in world.findall('include'):
+        if include.findtext('name') in drop:
+            world.remove(include)
     for name, (x, y) in layout.items():
         include = ET.SubElement(world, 'include')
         ET.SubElement(include, 'uri').text = f'package://mycobot_description/models/{name}'

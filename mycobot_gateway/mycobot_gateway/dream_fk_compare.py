@@ -13,8 +13,6 @@ on it), and the DREAM camera pose against the camera's true pose. World = base
 Nothing here feeds perception or planning.
 """
 
-from bisect import bisect_left
-from collections import deque
 import csv
 import os
 from pathlib import Path
@@ -29,18 +27,16 @@ from scipy.spatial.transform import Rotation
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 
+from .joint_history import JointHistory
 from .vision.sim_multicam_geometry import load_cameras
 
 # mycobot_fk holds the DREAM labels (protocol I7: imported, never edited).
 sys.path.insert(0, str(Path(os.path.realpath(__file__)).parents[2] / 'training' / 'dream'))
 from mycobot_fk import forward_kinematics, KEYPOINT_NAMES  # noqa: E402
 
-JOINTS = ('joint2_to_joint1', 'joint3_to_joint2', 'joint4_to_joint3',
-          'joint5_to_joint4', 'joint6_to_joint5', 'joint6output_to_joint6')
 # Topic suffix of each camera's DREAM instance (tri_yolo.launch.py).
 PREFIXES = {'synth_camera': '/dream_front', 'synth_camera_right': '/dream_right',
             'synth_camera_left': '/dream_left', 'synth_camera_top': '/dream_top'}
-JOINT_HISTORY_S = 10.0
 # An image farther than this from any joint sample is not compared.
 MAX_JOINT_GAP_S = 0.2
 KP_FIELDS = ('stamp_sim', 'seed', 'camera_id', 'keypoint', 'valid', 'u_dream', 'v_dream',
@@ -52,17 +48,6 @@ POSE_FIELDS = ('stamp_sim', 'seed', 'camera_id', 'n_valid', 'dx', 'dy', 'dz', 't
 
 def stamp_s(sec, nanosec):
     return sec + nanosec * 1e-9
-
-
-def interpolate(times, values, t):
-    """Joint vector at t, linear between the bracketing samples; (q, gap to nearest sample)."""
-    i = bisect_left(times, t)
-    if i == 0 or i == len(times):
-        j = min(i, len(times) - 1)
-        return values[j], abs(times[j] - t)
-    t0, t1 = times[i - 1], times[i]
-    w = (t - t0) / (t1 - t0)
-    return (1 - w) * values[i - 1] + w * values[i], min(t - t0, t1 - t)
 
 
 def pose_error(T_true, T_est):
@@ -85,7 +70,7 @@ class DreamFkCompare(Node):
             {'camera_layout': 'dream50k'})
         self.cams = list(self.get_parameter('cameras').value)
         self.cameras = {cam: cameras[cam] for cam in self.cams}
-        self.times, self.qs = deque(), deque()
+        self.joints = JointHistory()
         self.n_valid = {}
         log_dir = Path(str(self.get_parameter('log_dir').value))
         self.kp_file = open(log_dir / 'dream_vs_fk.csv', 'w', newline='')
@@ -94,7 +79,7 @@ class DreamFkCompare(Node):
         self.pose_csv = csv.DictWriter(self.pose_file, fieldnames=POSE_FIELDS)
         self.kp_csv.writeheader()
         self.pose_csv.writeheader()
-        self.create_subscription(JointState, '/joint_states', self.on_joints, 50)
+        self.create_subscription(JointState, '/joint_states', self.joints.add, 50)
         for cam in self.cams:
             self.create_subscription(Float64MultiArray, f'{PREFIXES[cam]}/keypoints',
                                      lambda m, c=cam: self.on_keypoints(c, m), 10)
@@ -102,27 +87,12 @@ class DreamFkCompare(Node):
                                      lambda m, c=cam: self.on_pose(c, m), 10)
         self.get_logger().info(f'DREAM vs FK, {self.cams} -> {log_dir} (VALIDATION ONLY)')
 
-    def on_joints(self, msg):
-        positions = dict(zip(msg.name, msg.position))
-        if not all(j in positions for j in JOINTS):
-            return
-        t = stamp_s(msg.header.stamp.sec, msg.header.stamp.nanosec)
-        if self.times and t <= self.times[-1]:
-            return
-        self.times.append(t)
-        self.qs.append(np.array([positions[j] for j in JOINTS]))
-        while self.times[-1] - self.times[0] > JOINT_HISTORY_S:
-            self.times.popleft()
-            self.qs.popleft()
-
     def on_keypoints(self, cam, msg):
         data = np.asarray(msg.data)
         uvv = data[:21].reshape(7, 3)
         t = stamp_s(int(data[21]), int(data[22]))
         self.n_valid[(cam, t)] = int(uvv[:, 2].sum())
-        if not self.times:
-            return
-        q, gap = interpolate(list(self.times), list(self.qs), t)
+        q, gap = self.joints.at(t)
         if gap > MAX_JOINT_GAP_S:
             return
         camera = self.cameras[cam]
