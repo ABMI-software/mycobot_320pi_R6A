@@ -28,11 +28,14 @@ state (`/mycobot_controller/controller_state`) and the gripper command
 contracts, so a later converter can use the commanded position instead.
 
 **Time and pairing:** `timestamp = frame_index / 30`. Each image is paired with
-the joint state nearest to it in header (simulation) time. Largest pairing
-gap: 32 ms, except the first frames of episodes 17, 20, 42 and 50, where the
-camera started up to 334 ms before the first joint-state message; the arm is
-at rest there (joints change by < 2·10⁻¹³ rad), so those frames carry the
-exact state. Per-episode values: `max_pair_gap_ms_sim` in the sidecar.
+the joint state nearest to it in header (simulation) time. Once the
+joint-state stream (100 Hz) has started, the largest pairing gap is **6 ms**.
+Larger gaps occur only on the camera frames recorded before the first
+joint-state message: 1 frame in most episodes (4–40 ms), and 4–11 frames in
+episodes 17, 20, 42 and 50 (110–334 ms). The arm is at rest there in all 60
+episodes (joints change by < 3·10⁻¹³ rad over the first 0.5 s), so those
+frames carry the exact state. Per-episode largest gap: `max_pair_gap_ms_sim`
+in the sidecar.
 
 **One camera key, two configurations.** Both splits store their image as
 `observation.images.top`; the held-out split differs in camera configuration,
