@@ -1,10 +1,54 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-> **Date de dernière mise à jour :** 4 octobre 2026 (tri quatre objets : lot 60/60, jeux de données, deux launch files)
+> **Date de dernière mise à jour :** 5 octobre 2026 (tri quatre objets : jeux de données LeRobot v3.0, test SmolVLA)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
 > **Branche :** `main` (pick-and-place + DREAM mergés via PR #9 le 09/09/2026)
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Pi réelle :** `10.10.0.221` (pas `.223`/`.225` comme certains anciens docs)
+
+---
+
+## État actuel (5 octobre 2026)
+
+### Ce qui a été accompli aujourd'hui
+
+**Les jeux de données du tri se chargent dans le vrai LeRobot, et SmolVLA s'entraîne dessus.**
+La première conversion (écrite à la main) ne se chargeait pas et portait quatre
+défauts ; elle est remplacée par `scripts/port_bag.py` réécrit sur l'écrivain de
+LeRobot, dans un venv CPU sur l'hôte WSL2 (`~/venvs/lerobot044-cpu`).
+- `action[t] = état[t+1]` (aucun topic de commande enregistré ; dernière image
+  retirée) ; horodatage = indice / 30 ; appariement sur le temps d'en-tête ;
+  une seule clé `observation.images.top`.
+- Contrôles a–f réussis hors ligne : 48 / 12 épisodes, 29 687 / 7 411 images ;
+  l'image renvoyée par le chargeur est celle du MP4 au bon indice.
+- Test d'entraînement SmolVLA sur CPU (lot de 1, 10 pas) : perte finie,
+  ~4,1 s/pas, 3,5 Go, expert d'action seul entraîné (100 M / 450 M).
+- Rapport (EN/FR, HTML + Word) : nouvelle §28 ; spécification : annexe C ;
+  `datasets/README.md`, `MEASUREMENTS.md` §10, `RUNNING.md` à jour.
+- Références au partage Rôle A / Rôle B retirées de tous les documents du
+  projet ; procédure « entrer dans le conteneur » ajoutée à la documentation.
+
+### Décisions prises
+
+- lerobot **0.4.4**, épinglage **provisoire** (un seul endroit :
+  `scripts/requirements-lerobot.txt`) en attendant la version de l'équipe.
+- `distractors_moved` et la configuration caméra dans `meta/episodes_extra.jsonl`
+  (l'écrivain 0.4.4 n'accepte pas de champ par épisode personnalisé).
+- Les prochains lots enregistrent l'état désiré du contrôleur et la commande de
+  pince (canaux `adjunct` des contrats).
+
+### Prochaines actions
+1. [ROUGE] Confirmer la version de LeRobot de l'équipe ; reconvertir si elle diffère.
+2. [JAUNE] Fusionner la PR #16, puis la PR #17.
+3. [VERT] Évaluation en boucle fermée dans Gazebo via `policy_runner_node` (rosetta) ;
+   plus d'épisodes et plus de diversité de positions.
+
+### Commande rapide de reprise
+```bash
+# hôte WSL2
+~/venvs/lerobot044-cpu/bin/python -c "import lerobot, importlib.metadata as m; print(m.version('lerobot'))"
+cd Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo && cat datasets/README.md | head -40
+```
 
 ---
 

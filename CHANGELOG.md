@@ -33,6 +33,11 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   par épisode personnalisé).
 - Contrats : l'état désiré du contrôleur et la commande de pince ajoutés en
   canaux `adjunct` pour les prochains lots ; clé caméra unifiée.
+- Documentation : rapport EN/FR (HTML + Word) avec une nouvelle §28 ;
+  spécification, annexe C ; partage Rôle A / Rôle B retiré de tous les
+  documents du projet (une seule personne, un seul portable WSL2) ; la
+  procédure d'entrée dans le conteneur (`docker exec -it gazebo_to_lerobot bash`)
+  ajoutée là où elle manquait.
 
 ### Ajouté — tri quatre objets : lot de 60 épisodes, jeux de données, deux launch files (04/10)
 
