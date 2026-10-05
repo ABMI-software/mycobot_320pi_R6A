@@ -964,7 +964,7 @@ jusqu'à 46 mm : **proposition révisée pour l'étape 8 : fusion par la médian
 | En direct, graine 3 (`tri_yolo.launch.py`, comparaison à `/validation/gt/objects`) | 8/8 | **4/4** | **0,85 mm** | — | **1,94 mm** |
 
 Objets seuls : 0,61 mm médiane, 2,07 max ; bacs : 0,67 / 1,94. Avant la fusion (caméra du dessus seule,
-rayon simple) : 2,1 / 3,5 mm. **Critère de l'étape 8 atteint, à valider par Osama.** Suite : étape 9,
+rayon simple) : 2,1 / 3,5 mm. **Critère de l'étape 8 atteint, validé par Osama le 05/10.** Suite : étape 9,
 la FSM de `sim_sorting_grasp` prend ses cibles dans `/yolo/objects_3d` via `sorting_pairs`.
 
 ## Étape 9 : la FSM de simulation trie à partir de la perception (01/10)
@@ -997,7 +997,7 @@ la FSM de `sim_sorting_grasp` prend ses cibles dans `/yolo/objects_3d` via `sort
 **Toutes les pièces à portée (6/6) sont triées.** Les 34 échecs viennent de la portée de l'outil
 vertical (0,28 m, mesurée le 29/09) : la scène place pièces et bacs entre les marqueurs, jusqu'à
 0,46 m. Avant les corrections : 5/40, dont 1 prise ratée. Température max 81 °C, Gazebo fermé après
-chaque graine. **Critère de l'étape 9 (taux et cause de chaque échec) atteint, à valider par Osama.**
+chaque graine. **Critère de l'étape 9 (taux et cause de chaque échec) atteint, validé par Osama le 05/10.**
 
 **Suite proposée** : étendre la portée comme au banc réel — dépôt pince inclinée jusqu'à 45° (validé au
 réel le 30/09 et le 01/10 jusqu'à 445 mm), puis saisie inclinée. Décision d'Osama.
@@ -1042,7 +1042,20 @@ réelle — 1 image/s, la cadence des caméras sans fenêtre) :
 controller timed out after 5 seconds », 2 lancements sur 5 le 02/10) : avec 4 caméras rendues, le pas
 Gazebo dépasse les 5 s par défaut du `spawner`. `sim_grasp.launch.py` passe `--switch-timeout 30`.
 
-**Campagne 10 graines** (même réglage) : en cours.
+**Campagne 10 graines** (même réglage, graines 1-10, 05/10) : **40/40 triés**, tous au premier essai.
+
+| Mesure | Résultat |
+|---|---|
+| ✔ trié dans le bon bac | **40 / 40** (10/10 graines à 4/4) |
+| 2ᵉ essai utilisé | 0 |
+| Lâcher | vertical 10, incliné 15° 19, incliné 30° 11, incliné 45° 0 |
+| Objet avant la remontée des doigts | z = 2 mm (au fond) pour les 40 |
+| Écart au centre du bac | médiane 7 mm, max 17 mm (graine 2, pavé jaune +17/+2) ; le bac s'ouvre à ±47 mm |
+| Température | départ ≤ 57 °C, max 86 °C (graine 6), 4 cœurs (`taskset -c 16-19`), Gazebo fermé après chaque graine |
+
+Avant (01/10, outil vertical seul, objets n'importe où entre les marqueurs) : 6/40, 34 échecs de portée.
+Depuis l'extension de portée et le lâcher au-dessus du rebord : **plus aucun échec de portée, de prise
+ou de perception**. Les écarts penchent vers +x (33 positifs, 3 nuls, 4 négatifs ; de −2 à +17 mm) ; non expliqué.
 
 ## Journal
 
@@ -1069,6 +1082,7 @@ Gazebo dépasse les 5 s par défaut du `spawner`. `sim_grasp.launch.py` passe `-
 | 01/10/2026 | réentraînement yolo26 | fait, **v6c adopté** (validé par Osama) | v6c (réelles ×10 + 1 036 Gazebo) : 4 caméras 283/283, e_3d max 3,5 mm (top) ; réel 0,990 contre 0,967 (v5) ; v6b écarté (bac rouge réel coupé). § « yolo26 réentraîné avec les images Gazebo » |
 | 01/10/2026 | localisation 3D recalée | fait (hors ligne) | `tri_scene.locate_from_box` dans `yolo_localizer` : max 3,5 → 2,3 mm (dessus), 7,2 → 2,6 (avant), 5,6 → 5,0 (gauche), 6,6 → 6,3 (droite) ; reste le −0,5 px de yolo26, à expliquer. 37 tests OK |
 | 01/10/2026 | 4 caméras ensemble | mesuré (hors ligne) | fusion par la médiane : 0,70 mm médiane, 2,92 max ; dessus seule 1,41 / 2,28 ; moyenne des 4 médianes 1,69 mm. Proposition révisée : fusion (au lieu de sélection) |
-| 01/10/2026 | 8 — tri par la perception seule | fait, **à valider par Osama** | `/yolo/objects_3d` = fusion médiane des 4 caméras, objets et bacs ; paires par la classe (`sorting_pairs`). Hors ligne 10 graines : 80/80, 40/40 paires, 0,65 / 2,07 mm ; en direct graine 3 : 8/8, 4/4, 0,85 / 1,94 mm. 40 tests OK |
-| 01/10/2026 | 9 — tri piloté par la perception | fait, **à valider par Osama** | `pose_source:=perception` : 6/40 triés, **6/6 des pièces à portée**, 0 échec de perception ou de prise ; 34 échecs de portée (outil vertical 0,28 m). Corrections : ouverture d'approche, cubes à 0/90°, dépôt résolu avant saisie |
+| 01/10/2026 | 8 — tri par la perception seule | fait, **validé par Osama (05/10)** | `/yolo/objects_3d` = fusion médiane des 4 caméras, objets et bacs ; paires par la classe (`sorting_pairs`). Hors ligne 10 graines : 80/80, 40/40 paires, 0,65 / 2,07 mm ; en direct graine 3 : 8/8, 4/4, 0,85 / 1,94 mm. 40 tests OK |
+| 01/10/2026 | 9 — tri piloté par la perception | fait, **validé par Osama (05/10)** | `pose_source:=perception` : 6/40 triés, **6/6 des pièces à portée**, 0 échec de perception ou de prise ; 34 échecs de portée (outil vertical 0,28 m). Corrections : ouverture d'approche, cubes à 0/90°, dépôt résolu avant saisie |
 | 02/10/2026 | 9 suite — portée et lâcher | fait (graine 1), campagne en cours | `piece_reach:=0.28`, lâcher incliné 15/30/45°, 2 essais ; lâcher au-dessus du rebord pour tous, doigts écartés **avant** la remontée (glissement vu par Osama). Graine 1 : **4/4**, objets au fond avant la remontée, écart max +12/−10 mm (pavé). `--switch-timeout 30` |
+| 05/10/2026 | 9 suite — campagne 10 graines | fait, **validé par Osama (05/10)** | **40/40**, 0 deuxième essai ; lâcher vertical 10 / 15° 19 / 30° 11 ; écart au centre médiane 7 mm, max 17 mm ; Tmax 86 °C |
