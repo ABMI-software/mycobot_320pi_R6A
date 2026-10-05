@@ -38,7 +38,7 @@ from launch.actions import (DeclareLaunchArgument, ExecuteProcess, IncludeLaunch
 from launch.conditions import IfCondition
 from launch.event_handlers import OnShutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 import xacro
 
@@ -83,7 +83,13 @@ def write_run_yaml(path, seed, layout, cameras, urdf, piece_reach, robot):
     Path(path).write_text('\n'.join(lines) + '\n')
 
 
-def dream_nodes(seed, log_dir, model, rate, dashboard):
+def dream_cameras(names):
+    from mycobot_gateway.dream_fk_compare import PREFIXES
+    by_name = {prefix.removeprefix('/dream_'): cam for cam, prefix in PREFIXES.items()}
+    return [by_name[n.strip()] for n in names.split(',')]
+
+
+def dream_nodes(seed, log_dir, model, rate, dashboard, gazebo_window, cams):
     from mycobot_gateway.dream_fk_compare import PREFIXES
     env = {'PYTHONPATH': _dream_multicam._pythonpath_venv_dream()}
     nodes = [Node(package='mycobot_gateway', executable='dream_inference',
@@ -92,14 +98,18 @@ def dream_nodes(seed, log_dir, model, rate, dashboard):
                   parameters=[{'use_sim_time': True, 'camera_topic': f'/{cam}/image',
                                'model_name': model, 'output_prefix': PREFIXES[cam],
                                'publish_rate': rate, 'visualize': False}])
-             for cam in CAMERAS]
+             for cam in cams]
     if dashboard:
         nodes.append(Node(package='mycobot_gateway', executable='tri_dream_dashboard',
+                          output='screen', parameters=[{'use_sim_time': True,
+                                                        'embed_gazebo': gazebo_window}]))
+    if gazebo_window:
+        nodes.append(Node(package='mycobot_gateway', executable='tri_trajectoires_gazebo',
                           output='screen', parameters=[{'use_sim_time': True}]))
     if log_dir:
         nodes.append(Node(package='mycobot_gateway', executable='dream_fk_compare',
                           output='screen',
-                          parameters=[{'use_sim_time': True, 'cameras': list(CAMERAS),
+                          parameters=[{'use_sim_time': True, 'cameras': list(cams),
                                        'seed': seed, 'log_dir': str(log_dir)}]))
     return nodes
 
@@ -136,9 +146,24 @@ def launch_scene(context):
         world_name, layout = 'randomized', {}
         world_file = os.path.join(desc_pkg, 'worlds', 'randomized.sdf')
 
+    panel = LaunchConfiguration('panel').perform(context) == 'true'
+    gui_config = os.path.join(desc_pkg, 'config', 'tri_yolo_gui.config')
+    if not panel:
+        # Same window without the YOLO vs ground-truth image panel. A gz GUI
+        # config is a list of top-level elements: wrapped to be parsed.
+        text = Path(gui_config).read_text().strip()
+        text = text[text.index('?>') + 2:] if text.startswith('<?xml') else text
+        root = ET.fromstring('<config>' + text + '</config>')
+        for plugin in root.findall("plugin[@filename='ImageDisplay']"):
+            root.remove(plugin)
+        fd, gui_config = tempfile.mkstemp(prefix='mycobot_tri_gui_', suffix='.config')
+        with os.fdopen(fd, 'w') as f:
+            f.write(''.join(ET.tostring(child, encoding='unicode') for child in root))
+
     def cleanup(_context):
-        if sorting and os.path.exists(world_file):
-            os.unlink(world_file)
+        for path, ours in ((world_file, sorting), (gui_config, not panel)):
+            if ours and os.path.exists(path):
+                os.unlink(path)
         return []
 
     placed = ', '.join(f'{n} ({x * 1000:.0f}, {y * 1000:.0f})' for n, (x, y) in layout.items())
@@ -162,7 +187,9 @@ def launch_scene(context):
         dream = dream_nodes(seed, log_dir,
                             LaunchConfiguration('dream_model').perform(context),
                             float(LaunchConfiguration('dream_rate').perform(context)),
-                            LaunchConfiguration('dashboard').perform(context) == 'true')
+                            LaunchConfiguration('dashboard').perform(context) == 'true',
+                            LaunchConfiguration('headless').perform(context) != 'true',
+                            dream_cameras(LaunchConfiguration('dream_cameras').perform(context)))
 
     return dream + [
         RegisterEventHandler(OnShutdown(on_shutdown=[OpaqueFunction(function=cleanup)])),
@@ -178,12 +205,9 @@ def launch_scene(context):
                 'headless': LaunchConfiguration('headless'),
                 'robot_appearance': LaunchConfiguration('robot_appearance'),
                 'robot_model_suffix': ROBOTS[LaunchConfiguration('robot').perform(context)],
-                'gui_config': os.path.join(
-                    desc_pkg, 'config',
-                    'tri_yolo_gui.config' if LaunchConfiguration('panel').perform(context) == 'true'
-                    else 'trajectory_gui.config'),
+                'gui_config': gui_config,
             }.items()),
-    ] + (sorting_nodes(seed, run_yaml, csv_path) if sorting else []) + [
+    ] + (sorting_nodes(seed, run_yaml, csv_path, panel) if sorting else []) + [
         TimerAction(period=12.0, condition=IfCondition(LaunchConfiguration('observe')), actions=[
             LogInfo(msg=f'observation pose {tri_scene.OBSERVATION_Q_DEG} deg'),
             ExecuteProcess(cmd=['ros2', 'topic', 'pub', '--once', '-w', '1',
@@ -193,7 +217,7 @@ def launch_scene(context):
     ]
 
 
-def sorting_nodes(seed, run_yaml, csv_path):
+def sorting_nodes(seed, run_yaml, csv_path, panel):
     return [
         # Ground truth for VALIDATION only: under /validation/gt, never read by
         # perception or planning (protocol invariant I4).
@@ -209,12 +233,16 @@ def sorting_nodes(seed, run_yaml, csv_path):
              parameters=[{'use_sim_time': True, 'cameras': list(CAMERAS)}]),
         # Validation view in a Gazebo GUI panel: the YOLO boxes, classes and
         # confidences, plus the XY error against the ground truth per piece.
+        # Needed for the panel image or for yolo_vs_gt.csv (log_dir), not otherwise.
         Node(package='mycobot_gateway', executable='yolo_gt_overlay', output='screen',
-             condition=IfCondition(LaunchConfiguration('yolo')),
+             condition=IfCondition(PythonExpression([
+                 "'", LaunchConfiguration('yolo'), "' == 'true' and ",
+                 str(panel or bool(csv_path))])),
              parameters=[{'use_sim_time': True, 'cameras': list(CAMERAS), 'seed': seed,
                           'csv_path': csv_path}]),
         Node(package='ros_gz_bridge', executable='parameter_bridge', output='screen',
-             condition=IfCondition(LaunchConfiguration('yolo')),
+             condition=IfCondition(PythonExpression([
+                 "'", LaunchConfiguration('yolo'), "' == 'true' and ", str(panel)])),
              arguments=['/validation/yolo_gt/image@sensor_msgs/msg/Image]gz.msgs.Image']),
     ]
 
@@ -246,10 +274,14 @@ def generate_launch_description():
                               description='DREAM on the four cameras (protocol step 10)'),
         DeclareLaunchArgument('dream_model', default_value='vgg_ultimate_v4_mix_ft_e30',
                               description='checkpoints_dream/<name>; v4_mix = trained on the 50K renders'),
+        DeclareLaunchArgument('dream_cameras', default_value='front,right,left,top',
+                              description='DREAM instances to run (fewer = less heat; the '
+                                          'dashboard fuses whichever publish)'),
         DeclareLaunchArgument('dream_rate', default_value='2.0',
                               description='DREAM inferences per second and camera'),
         DeclareLaunchArgument('dashboard', default_value='false', choices=['true', 'false'],
-                              description='YOLO + DREAM dashboard window (with dream:=true)'),
+                              description='YOLO + DREAM supervision (with dream:=true); with '
+                                          'the Gazebo GUI, one window: Gazebo on top, panel below'),
         DeclareLaunchArgument('log_dir', default_value='',
                               description='Folder for run.yaml + yolo_vs_gt.csv; empty = no log'),
         DeclareLaunchArgument('robot_appearance', default_value='original',

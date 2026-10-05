@@ -62,11 +62,49 @@ class FlangeEstimateTests(unittest.TestCase):
         true, est = self.flange_estimate(self.T_gt, self.T_gt, self.q)
         np.testing.assert_allclose(est, true, atol=1e-12)
 
+    def test_tip_is_the_sorter_tip(self):
+        from mycobot_gateway.sim_sorting_grasp import tool_tip
+        from mycobot_gateway.tri_dream_dashboard import encoder_tip
+        np.testing.assert_allclose(encoder_tip(self.q), tool_tip(np.degrees(self.q)))
+
     def test_camera_frame_offset_moves_estimate(self):
         shifted = self.T_gt.copy()
         shifted[:3, 3] += [0.0, 0.0, 0.01]
         true, est = self.flange_estimate(self.T_gt, shifted, self.q)
         self.assertAlmostEqual(np.linalg.norm(est - true), 0.01)
+
+
+class DreamTipsTests(unittest.TestCase):
+    def setUp(self):
+        from mycobot_gateway.tri_dream_dashboard import DreamTips
+        cameras = load_cameras(URDF, {'camera_layout': 'dream50k'})
+        self.T_gt = {c: np.linalg.inv(cameras[c].world_from_optical) for c in FK_NAMES}
+        self.tips = DreamTips(self.T_gt)
+        self.q = np.radians([20, 30, -60, 0, -30, 0])
+
+    def keypoints(self, cam, t, n):
+        msg = type('M', (), {})()
+        sec, nsec = int(t), round((t - int(t)) * 1e9)
+        msg.data = [0.0, 0.0, 1.0] * n + [0.0, 0.0, 0.0] * (7 - n) + [sec, nsec, 100.0]
+        self.tips.keypoints(cam, msg)
+
+    def test_four_keypoint_view_is_not_fused(self):
+        self.keypoints('synth_camera', 1.5, 4)
+        _, est = self.tips.pose('synth_camera', 1.5, self.T_gt['synth_camera'], self.q)
+        self.assertIsNone(est)
+        self.assertEqual(self.tips.fused(1.5)[1], 0)
+
+    def test_fused_is_median_of_usable_views(self):
+        for cam, dz in (('synth_camera', 0.0), ('synth_camera_left', 0.0),
+                        ('synth_camera_top', 0.3)):
+            self.keypoints(cam, 2.0, 7)
+            T = self.T_gt[cam].copy()
+            T[:3, 3] += [0, 0, dz]
+            self.tips.pose(cam, 2.0, T, self.q)
+        true, _ = self.tips.pose('synth_camera_right', 2.0, self.T_gt['synth_camera_right'], self.q)
+        est, views = self.tips.fused(2.0)
+        self.assertEqual(views, 3)
+        np.testing.assert_allclose(est, true, atol=1e-9)  # two exact views out of three
 
 
 if __name__ == '__main__':

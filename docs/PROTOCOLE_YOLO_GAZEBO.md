@@ -1180,6 +1180,80 @@ caméra et l'instant — attendu, vu l'ablation ci-dessus.
 tenus 10 s) n'a pas coupé sur des pics brefs. Désormais : arrêt immédiat à 90 °C, et 88 °C tenus 10 s ;
 la non-régression a tourné sans YOLO à 1 Hz : 78 et 81 °C.
 
+### Dashboard v2 : DREAM contre YOLO, une seule fenêtre avec Gazebo (05/10)
+
+Demande d'Osama : comparer **DREAM directement à YOLO, pas à Gazebo**, et une seule fenêtre.
+
+```bash
+ros2 launch mycobot_gateway tri_yolo.launch.py seed:=7 piece_reach:=0.28 dream:=true \
+    dashboard:=true dream_rate:=1.0 dream_cameras:=front,right panel:=false
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true \
+    -p world_name:=tri_yolo -p pose_source:=perception -p max_attempts:=2
+```
+
+- **Une seule fenêtre.** La fenêtre de Gazebo (son interface X11, interactive) est reparentée dans la
+  case en haut à gauche de `tri_dream_dashboard`, à la place de l'ancienne vue 3D pyqtgraph. Le reste
+  de la grille est inchangé : DREAM ↔ YOLO, journal du tri, objets YOLO. Paramètre `embed_gazebo`,
+  vrai dès que Gazebo a une interface (`headless:=false`). C'est la fenêtre cliente `gz-sim-gui`
+  qui est prise, pas le cadre du gestionnaire de fenêtres. Un plugin GUI Gazebo a été écarté : il
+  aurait fallu réécrire la supervision en C++/QML et dupliquer les calculs. Session X11 requise.
+- **Trajectoires dans Gazebo** (`tri_trajectoires_gazebo`) : pointe de la pince, une couleur par objet
+  (rouge, jaune, vert, bleu ; gris entre deux objets), et la trajectoire DREAM de l'objet en cours en
+  magenta (médiane glissante sur 5 points). Le tracé passe par `gz service /marker`.
+- **Pointe de la pince = celle du trieur** (`sim_sorting_grasp.tool_tip`). L'orientation du link6
+  de `mycobot_fk` donnait 123-244 mm d'écart « codeurs ↔ YOLO ». Avec la bonne pointe : **1,8-2,8 mm**.
+- **Tableau par saisie** : objet YOLO (x, y), pince DREAM (x, y, z), DREAM ↔ YOLO, codeurs ↔ YOLO,
+  images DREAM, tri. DREAM est pris en médiane sur l'intervalle immobile de la saisie (« pointe
+  visée » → « tenu à »). Seules les vues à ≥ 5 keypoints et à moins de 1 m de la base comptent.
+  Aucune vérité Gazebo n'est lue.
+- **`dream_cameras:=`** choisit les instances DREAM, pour limiter la chauffe. Avec 4 caméras, le run
+  s'arrête à 94 °C au 3ᵉ objet. **front + right** : 4/4 à 88 °C. front + top : 4/4 à 85 °C, mais la
+  caméra du dessus est la plus mauvaise (graine 3 : 10 vues exploitables sur 19, erreur médiane 238 mm).
+
+Graine 7, tri 4/4 dans les trois runs :
+
+| run | caméras DREAM | DREAM ↔ YOLO par saisie (images) | codeurs ↔ YOLO |
+|---|---|---|---|
+| 4 caméras, 0,5 Hz (arrêt 94 °C) | 4 | rouge 9,6 (3), jaune 37,7 (2), vert 204,5 (2) | 1,8-2,7 mm |
+| front + top, 1 Hz | 2 | vert 57,3 (1), bleu 315,5 (4) | 1,8-2,6 mm |
+| front + right, 1 Hz | 2 | rouge 44,5 (6) | 2,8 mm |
+
+### Pourquoi l'écart DREAM ↔ YOLO est large
+
+Mesuré sur la graine 7, run front + right : `dream_pose.csv` et `dream_vs_fk.csv` dans
+`results/yolo_gazebo/2026-10-05_dashboard_seed7_front_right/`.
+
+1. **YOLO n'y est pour rien.** La pince lue aux codeurs est à 1,8-2,8 mm de l'objet donné par YOLO
+   au moment du serrage. Tout l'écart vient de DREAM.
+2. **C'est la pose caméra estimée par DREAM (T_DREAM) qui est fausse** :
+
+   | caméra | vues ≥ 5 kp | erreur translation (médiane) | dont profondeur \|dz\| | \|dx\|, \|dy\| | erreur rotation (médiane) |
+   |---|---|---|---|---|---|
+   | front | 43 / 75 | 36,8 mm | 29,1 mm | 16,4 / 6,2 mm | **32,1°** |
+   | right | 80 / 81 | 46,1 mm | 42,9 mm | 6,4 / 2,8 mm | **26,5°** |
+
+   L'erreur est surtout **en profondeur** (axe optique) et **en rotation**. C'est la faiblesse
+   connue d'un PnP monoculaire quand l'objet est petit dans l'image : un robot d'environ 0,4 m vu à
+   environ 1 m, fx = 494 px.
+3. **Les keypoints sont trop imprécis pour ce PnP.** Erreur pixel médiane par keypoint : front
+   7-37 px (link1/link2 à 36,5 px), right 7-27 px (link6 à 27,4 px). Sur ses rendus d'entraînement
+   (monde du 50K) le modèle est à ~3 px. Détection de 49 à 100 % selon le keypoint (base vue par
+   la caméra right : 49 %).
+4. **Cause amont, déjà mesurée à l'étape 10** : la scène de tri n'est pas le monde du 50K
+   (détection 99,2 % → 65,2 %) et la pince n'existe pas dans les données d'entraînement
+   (65,2 → 49,5 %). Le plateau et le monde `real_table` pèsent le plus, les ArUco sont négligeables.
+5. **Trop peu d'images par saisie** : 1 à 6 images. Une seule pose aberrante suffit à fausser la
+   médiane (cylindre : 204 mm avec 2 images).
+
+**Leviers**, aucun encore appliqué :
+- fine-tuner DREAM sur des rendus de la scène de tri avec la pince, ce qui vise la cause ;
+- ajouter un keypoint sur la pince ou la bride ;
+- fusionner les caméras avant le PnP plutôt qu'après, puisqu'une seule vue ne contraint pas la
+  profondeur.
+
+Monter `dream_rate` ne donne que plus d'images, avec les mêmes erreurs. L'algorithme DREAM est
+inchangé.
+
 ## Étape 11 : journalisation CSV (05/10)
 
 ```bash
@@ -1245,3 +1319,4 @@ taux de détection, ne garder que les lignes en pose d'observation.
 | 05/10/2026 | 10 — modèle montage0901 | fait | même balayage : 99,0 % monde du 50K, 61,5 % tri sans pince, 49,8 % tri avec pince — identique au v4_mix ; l'écart est propre au rendu Gazebo, seul un fine-tuning sur des rendus de la scène de tri le comblerait |
 | 05/10/2026 | 10 — ablation ArUco / pièces | fait | sans pince : 50K 99,2 % → plateau seul 71,4 % (dessus 10 %) → sans ArUco 66,6 % → complète 65,2 % ; ArUco négligeables, pièces = caméra avant, plateau/monde real_table = l'essentiel |
 | 05/10/2026 | 10 — dashboard YOLO + DREAM | fait, **à valider par Osama** | `dashboard:=true` → `tri_dream_dashboard` ; T_DREAM contre T_GT, trajectoire de la bride, dXYZ, rotation, latence ; PnP de `dream_inference` sur les angles de l'instant de l'image |
+| 05/10/2026 | 10 — dashboard v2 DREAM ↔ YOLO, une seule fenêtre | fait, **à valider par Osama** | Gazebo reparenté dans la case 3D du dashboard (`embed_gazebo`) ; trajectoires colorées par objet + DREAM dans Gazebo ; pointe = `tool_tip` du trieur (codeurs ↔ YOLO 1,8-2,8 mm) ; `dream_cameras:=front,right` : 4/4 à 88 °C ; écart DREAM ↔ YOLO 10-315 mm, dû à T_DREAM (rotation 27-32°, profondeur 29-43 mm, keypoints 7-37 px) |

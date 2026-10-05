@@ -15,7 +15,6 @@ ALLOWED = {
     'gazebo_ground_truth.py',      # the ground-truth publisher itself
     'sim_sorting_grasp.py',        # post-grasp verification, never a target in vision mode
     'yolo_gt_overlay.py',          # draws YOLO vs ground truth in Gazebo, validation only
-    'tri_dream_dashboard.py',      # YOLO + DREAM vs ground truth dashboard, validation only
 }
 
 

@@ -80,6 +80,7 @@ setup(
             'yolo_gt_overlay = mycobot_gateway.yolo_gt_overlay:main',
             'dream_fk_compare = mycobot_gateway.dream_fk_compare:main',
             'tri_dream_dashboard = mycobot_gateway.tri_dream_dashboard:main',
+            'tri_trajectoires_gazebo = mycobot_gateway.tri_trajectoires_gazebo:main',
 
             # Hand teleoperation (trajectory → JSON bridge for real robot)
             'trajectory_to_robot_bridge = mycobot_gateway.trajectory_to_robot_bridge:main',
