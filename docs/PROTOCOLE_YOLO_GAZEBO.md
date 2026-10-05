@@ -1057,6 +1057,66 @@ Avant (01/10, outil vertical seul, objets n'importe où entre les marqueurs) : 6
 Depuis l'extension de portée et le lâcher au-dessus du rebord : **plus aucun échec de portée, de prise
 ou de perception**. Les écarts penchent vers +x (33 positifs, 3 nuls, 4 négatifs ; de −2 à +17 mm) ; non expliqué.
 
+## Étape 10 : DREAM en parallèle, et non-régression de la pince (05/10)
+
+`tri_yolo.launch.py dream:=true` : un `dream_inference` par caméra (`/dream_front`, `/dream_right`,
+`/dream_left`, `/dream_top`) sur les mêmes images que YOLO, modèle `dream_model:=vgg_ultimate_v4_mix_ft_e30`
+(entraîné sur les rendus du 50K), `dream_rate:=2.0` par caméra. Avec `log_dir`, `dream_fk_compare`
+(validation) écrit `dream_vs_fk.csv` (7 keypoints par image : DREAM contre FK aux angles Gazebo
+**interpolés sur le stamp de l'image**, invariant I5) et `dream_pose.csv` (pose caméra DREAM contre la
+vraie). `dream:=true` refuse `robot_appearance` autre que `original` (I8). Test :
+`tests/test_dream_fk_compare.py` (4) — les caméras de la scène projettent comme les étiquettes DREAM
+(`mycobot_fk`) à < 0,05 px.
+
+`robot:=robot_dream_baseline` lance la même scène avec `…_nogripper.urdf` **tel quel** (I7)
+(`sim_grasp.launch.py robot_model_suffix:=_nogripper`, pas de contrôleur de pince).
+
+**Non-régression** : `scripts/dream_balayage_pince.py` (14 poses vérifiées par FK : J5 dans [0, −60°],
+7/7 keypoints dans les 4 images, pince ≥ 0,29 m), puis `scripts/dream_pince_compare.py`. Graine 1,
+`yolo:=false`, `dream_rate:=1.0`, seules les images prises pendant la tenue (6 s par pose) comptent,
+keypoints dont la FK sort de l'image exclus. Images par caméra : 220-249 sans pince, 84 avec (le pas
+Gazebo diffère) — les taux restent comparables.
+
+| | sans pince (rendu du 50K) | avec pince |
+|---|---|---|
+| Détection (4 caméras, 7 keypoints) | **65,2 %** | **49,5 %** |
+| Erreur pixel médiane à la FK | **3,8 px** | **11,2 px** |
+| Détections aberrantes (> 20 px) | 6,6 % | 22,7 % |
+
+Par caméra (détection sans → avec, médiane px) :
+
+- **gauche** : link1/link2 100 → 21 %, link6 85 → 43 %, link5 3,4 → 12,0 px ;
+- **droite** : tous les keypoints perdent 7 à 29 points, link6 3,5 → 10,1 px ;
+- **avant** : link4 inchangé (100 %, 5 px) ; link6 94 → 64 %, base 3,7 → 27,3 px ;
+- **dessus** : **déjà hors service sans pince** (base 14 %, link1/2 0 %, link3 49 % à 140 px).
+
+**Lecture.** La pince dégrade DREAM sur les trois caméras latérales : environ 16 points de détection
+perdus, erreur médiane ×3, et ce n'est pas que le keypoint distal (base et link1 de la caméra gauche
+chutent aussi). **La caméra du dessus échoue avec ou sans pince** : ce n'est pas la pince — c'est la scène,
+voir le test dans le monde du 50K ci-dessous.
+
+**Monde du 50K contre scène de tri** (même robot sans pince, mêmes 14 poses, `scene:=dream50k` =
+`randomized.sdf` tel quel, le monde qui a rendu le dataset) :
+
+| sans pince | monde du 50K | scène de tri |
+|---|---|---|
+| Détection | **99,2 %** | 65,2 % |
+| Erreur pixel médiane | **3,0 px** | 3,8 px |
+| Aberrant (> 20 px) | **0,0 %** | 6,6 % |
+| Caméra du dessus | **100 % sur les 7 keypoints, 1,7-3,7 px** | 0-49 %, jusqu'à 140 px |
+| Caméra avant, link1/link2 | 100 %, 3,0 px | 0 % |
+
+**Tranché : ce n'est ni la caméra du dessus, ni sa géométrie, ni le robot, c'est la scène de tri.**
+Mêmes caméras, même robot, mêmes poses : DREAM est quasi parfait dans son monde d'entraînement et
+s'effondre sur le plateau en bois, les ArUco, les pièces et les bacs. La pince ajoute ensuite sa propre
+dégradation (65,2 → 49,5 %). Pour DREAM dans la scène de tri, le levier est l'entraînement (rendus
+avec le plateau et les pièces, ou randomisation de fond plus large), pas la caméra. Fichier :
+`results/yolo_gazebo/2026-10-05_monde50k_robot_dream_baseline/dream_monde50k_vs_tri_sans_pince.csv`.
+
+**Graine 2 complète** (`dream:=true` + tri) : 4/4 triés, mais **95 °C atteints** — la garde (88 °C
+tenus 10 s) n'a pas coupé sur des pics brefs. Désormais : arrêt immédiat à 90 °C, et 88 °C tenus 10 s ;
+la non-régression a tourné sans YOLO à 1 Hz : 78 et 81 °C.
+
 ## Étape 11 : journalisation CSV (05/10)
 
 ```bash
@@ -1117,3 +1177,5 @@ taux de détection, ne garder que les lignes en pose d'observation.
 | 02/10/2026 | 9 suite — portée et lâcher | fait (graine 1), campagne en cours | `piece_reach:=0.28`, lâcher incliné 15/30/45°, 2 essais ; lâcher au-dessus du rebord pour tous, doigts écartés **avant** la remontée (glissement vu par Osama). Graine 1 : **4/4**, objets au fond avant la remontée, écart max +12/−10 mm (pavé). `--switch-timeout 30` |
 | 05/10/2026 | 9 suite — campagne 10 graines | fait, **validé par Osama (05/10)** | **40/40**, 0 deuxième essai ; lâcher vertical 10 / 15° 19 / 30° 11 ; écart au centre médiane 7 mm, max 17 mm ; Tmax 86 °C |
 | 05/10/2026 | 11 — journalisation CSV | fait (graine 1) | `log_dir:=` → `run.yaml` (md5 des poids, masse, commit), `yolo_vs_gt.csv` (colonnes du protocole, en continu), `tri.csv` ; `vision/yolo_vs_gt.py` partagé avec `yolo26_tri_eval.py` ; 21 tests OK |
+| 05/10/2026 | 10 — DREAM en parallèle + non-régression pince | fait, **à valider par Osama** | `dream:=true`, `dream_fk_compare` ; sans → avec pince : détection 65,2 → 49,5 %, médiane 3,8 → 11,2 px, aberrant 6,6 → 22,7 % ; caméra du dessus en échec **même sans pince** ; graine 2 avec DREAM : 4/4 mais 95 °C (garde durcie) |
+| 05/10/2026 | 10 — monde du 50K contre scène de tri | fait | sans pince, mêmes poses : détection 99,2 % / 3,0 px dans le monde du 50K contre 65,2 % / 3,8 px dans la scène de tri ; caméra du dessus 100 % dans le monde du 50K → **la cause est la scène, pas la caméra ni la pince** |

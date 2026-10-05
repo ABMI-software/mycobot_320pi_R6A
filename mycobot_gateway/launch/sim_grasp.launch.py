@@ -30,7 +30,7 @@ from launch.actions import (
     SetEnvironmentVariable,
     TimerAction,
 )
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition, LaunchConfigurationEquals, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -44,8 +44,11 @@ def generate_launch_description():
     desc_pkg = get_package_share_directory('mycobot_description')
     gz_pkg = get_package_share_directory('ros_gz_sim')
 
-    urdf_path = os.path.join(
-        desc_pkg, 'urdf', '320_pi', 'mycobot_pro_320_pi_gazebo.urdf')
+    # nogripper = the 50K DREAM render, file used as is (protocol I7); its
+    # cameras are the dream50k ones and it has no xacro arguments.
+    urdf_path = PathJoinSubstitution([
+        desc_pkg, 'urdf', '320_pi',
+        ['mycobot_pro_320_pi_gazebo', LaunchConfiguration('robot_model_suffix'), '.urdf']])
     world_name = LaunchConfiguration('world_name')
     default_world_path = PathJoinSubstitution(
         [desc_pkg, 'worlds', [world_name, '.sdf']])
@@ -172,6 +175,8 @@ def generate_launch_description():
 
     return LaunchDescription([
         set_gz_resource,
+        DeclareLaunchArgument('robot_model_suffix', default_value='', choices=['', '_nogripper'],
+                              description="'' = with gripper; _nogripper = DREAM 50K robot"),
         DeclareLaunchArgument('arm_control_mode', default_value='position', choices=['position', 'effort']),
         DeclareLaunchArgument('controller_config', default_value=os.path.join(desc_pkg, 'config', 'controller.yaml')),
         headless_arg,
@@ -198,5 +203,6 @@ def generate_launch_description():
                        '--controller-manager', '/controller_manager', *switch_timeout],
             output='screen')]),
         TimerAction(period=5.0, actions=[spawner('mycobot_controller')]),
-        TimerAction(period=6.0, actions=[spawner('gripper_position_controller')]),
+        TimerAction(period=6.0, actions=[spawner('gripper_position_controller')],
+                    condition=LaunchConfigurationEquals('robot_model_suffix', '')),
     ])
