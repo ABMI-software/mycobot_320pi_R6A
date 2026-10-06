@@ -244,6 +244,24 @@ terminaux ci-dessus.
 
 ---
 
+## Tri piloté par yolo26 et DREAM dans Gazebo (29/09 → 06/10/2026)
+
+`ros2 launch mycobot_gateway tri_yolo.launch.py seed:=S piece_reach:=0.28` puis
+`sim_sorting_grasp -p pose_source:=perception -p world_name:=tri_yolo`. 40/40 triés
+sur 10 graines. `dream:=true dashboard:=true` ajoute DREAM et le dashboard DREAM ↔ YOLO
+(fenêtre Gazebo intégrée). Protocole : [`docs/PROTOCOLE_YOLO_GAZEBO.md`](docs/PROTOCOLE_YOLO_GAZEBO.md).
+
+- **DREAM est hors distribution dans la scène de tri** : 99,2 % de détection dans le
+  monde du 50K, 65,2 % dans la scène de tri, 49,5 % avec la pince. La cause est la
+  scène, pas la caméra. Fine-tuning `vgg_tri_mix_ft_e10` (rendus
+  `synthetic_data_collector_tri`) ; graines 2001-2003 réservées au test.
+- **Température** : « Package id 0 » est le cœur le plus chaud. Les CPU 0-15 sont
+  les cœurs P (5,3 GHz), 16-27 les cœurs E. Épingler Gazebo et les entraînements sur
+  les cœurs E (`taskset -c 16-19` / `16-27`) ; sur un cœur P, pics à 100 °C.
+  [`docs/DONNEES_ET_CONSOMMATION.md`](docs/DONNEES_ET_CONSOMMATION.md).
+
+---
+
 ## Précision — l'état du banc au 15/09/2026
 
 **La référence des marqueurs est mesurée AU ROBOT, pas par une caméra.**

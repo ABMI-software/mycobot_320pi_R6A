@@ -156,6 +156,26 @@ The live ROS graph of the pose-estimation branch, two cameras detected:
 
 ![ROS graph of the DREAM validation dashboard](docs/dream_dashboard_rosgraph.png)
 
+### Sorting in the twin — YOLO drives the arm, DREAM is measured alongside
+
+![Sorting cycle driven by YOLO (top) and DREAM pose estimation compared to the Gazebo ground truth (bottom)](docs/architecture_tri_yolo_dream.png)
+
+The four simulated cameras feed two independent branches. **YOLO** (yolo26 v6c)
+detects objects and bins, the four views are fused into a 3D target, and the
+sorting state machine grasps with the physical gripper: 40/40 objects sorted
+over 10 seeds. **DREAM** runs on the same images and is only *measured*: its
+camera pose T_DREAM is compared to the exact Gazebo pose T_GT, and its gripper
+tip to YOLO's, on the dashboard (`tri_yolo.launch.py dream:=true dashboard:=true`).
+Protocol and results: [`docs/PROTOCOLE_YOLO_GAZEBO.md`](docs/PROTOCOLE_YOLO_GAZEBO.md) (FR).
+
+DREAM itself, from one image to the camera pose:
+
+![DREAM pipeline: RGB image, VGG-19, 7 belief maps, 2D keypoints, PnP with forward kinematics and intrinsics](docs/dream_pipeline.png)
+
+The network only learns the image → belief-map step. The 3D points come from
+forward kinematics on the measured joint angles, so a PnP error is a keypoint
+error, not a kinematic one. Details: [`training/dream/README.md`](training/dream/README.md).
+
 Full node and launch inventory: [`mycobot_gateway/README.md`](mycobot_gateway/README.md) (FR) (FR).
 Topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (FR) (FR).
 

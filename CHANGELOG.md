@@ -9,6 +9,35 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — DREAM en parallele du tri, dashboard DREAM <-> YOLO, fine-tuning scene de tri (05-06/10)
+
+Protocole complet : `docs/PROTOCOLE_YOLO_GAZEBO.md`, etapes 9 a 11.
+
+- **Campagne 10 graines (etape 9)** : 40/40 tries par la perception seule,
+  aucun deuxieme essai ; ecart au centre du bac median 7 mm, max 17 mm.
+- **Journalisation CSV (etape 11)** : `log_dir:=` ecrit `run.yaml` (md5 des
+  poids, masse, commit), `yolo_vs_gt.csv` et `tri.csv`.
+- **DREAM en parallele (etape 10)** : `dream:=true`, `dream_fk_compare`,
+  `dream_cameras:=front,right` pour choisir les vues. Sans -> avec pince :
+  detection 65,2 -> 49,5 %. Monde du 50K 99,2 % contre scene de tri 65,2 %
+  aux memes poses : la cause est la scene.
+- **`tri_dream_dashboard`** (`dashboard:=true`) : DREAM contre YOLO, la
+  fenetre Gazebo integree dans la grille 2x2 (`embed_gazebo`) ;
+  `tri_trajectoires_gazebo` trace dans Gazebo la pointe de la pince, une
+  couleur par objet, et la trajectoire DREAM en magenta.
+- **`synthetic_data_collector_tri`** : rendus DREAM dans la scene de tri, AVEC
+  la pince (60 % de poses du trieur). 12 080 images d'entrainement (graines
+  1001-1016) et 1 200 de test (2001-2003). Modele de depart sur le test :
+  52,6 % detectes, 16,7 px median.
+- **`training/dream/train_dream_ultimate_v5_geo.py`** : augmentation
+  geometrique reparee, decoupage 80/10/10 a graine fixe, `DREAM_DIR` par
+  defaut `~/DREAM` (`/tmp/DREAM` est efface au redemarrage).
+- **`docs/DONNEES_ET_CONSOMMATION.md`** : repartition des donnees du
+  fine-tuning, consommation mesuree par configuration, et cause des pics a
+  90-100 °C : un seul coeur P au turbo. Entrainement sur les coeurs E 16-27 :
+  74 °C au lieu de 85-100, vitesse inchangee.
+
+
 ### Ajoute — tri des 4 pieces dans Gazebo pilote par yolo26 sur 4 cameras (29/09-02/10)
 
 Protocole complet : `docs/PROTOCOLE_YOLO_GAZEBO.md`.

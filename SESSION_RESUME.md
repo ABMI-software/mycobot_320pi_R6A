@@ -1,103 +1,51 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-## État actuel (22 septembre 2026 — mise au propre du dépôt)
+## État actuel (6 octobre 2026 — après-midi, fine-tuning DREAM sur la scène de tri)
 
-### Ce qui a été accompli aujourd'hui
+### Ce qui a été accompli (05/10 → 06/10)
 
-**La séance du 10/09 n'était documentée nulle part** — entrée ajoutée au
-CHANGELOG et ici (voir plus bas). `CLAUDE.md` décrivait encore l'état DREAM de
-juillet : ajout de deux sections de septembre (checkpoint `vgg_montage0901_ft_e30`,
-invalidation de la démo markerless, et ce que valent réellement les chiffres de
-précision et d'extrinsèque).
+**Tri YOLO** : campagne de 10 graines **40/40**, journal CSV par run
+(`log_dir:=`). Étapes 8, 9 et la campagne validées le 05/10.
 
-**PR #12 inspectée** (Gazebo→LeRobot + ROS2→RLDS→OpenVLA, mergée le 22/09). Le
-contrat OpenVLA est respecté à la lettre (`state` 8-dim ↔ `POS_QUAT`, `action`
-7-dim ↔ `EEF_POS`) et l'enregistrement est réellement testé, pas affirmé :
-`test_openvla_transform.py` stubbe `prismatic` pour importer les vrais fichiers
-sans torch. Quatre réserves relevées, aucune bloquante pour une preuve de
-tuyauterie : la vérification FK est **une pose statique affichée, non assertée**
-(l'accord à 7 décimales implique un bras immobile à cet instant) ; la convention
-de repère du delta de rotation (`R_i⁻¹·R_j` = repère **outil**) n'est écrite
-nulle part ; le signe du gripper vient d'un visionnage, pas d'une calibration ;
-le recadrage 320×240 → 224² jette ~25 % du champ horizontal.
+**DREAM en parallèle du tri (étape 10)** : DREAM s'effondre dans la scène de
+tri (65 % détectés sans pince, 49,5 % avec, contre 99,2 % dans le monde du
+50K). L'écart DREAM ↔ YOLO atteint 10-315 mm, à cause de T_DREAM (rotation
+27-32°, profondeur 29-43 mm). Dashboard DREAM ↔ YOLO avec la fenêtre Gazebo
+intégrée, et trajectoires colorées dans Gazebo.
 
-**Une seule convention de nom pour les caméras secondaires : `right/left/top`.**
-Le dépôt en portait deux et **cinq fichiers de launch s'abonnaient à des topics
-sans publieur**. Voir CHANGELOG. Le correctif du 10/09 avait aligné les liens du
-mauvais côté de la scission.
+**Fine-tuning** : 13 280 rendus de la scène de tri avec pince (collecteur
+`synthetic_data_collector_tri`). Entraînement `vgg_tri_mix_ft_e10` lancé le
+06/10 sur 104 160 images : meilleure perte de validation 0,000349 à
+l'époque 8.
 
-**Le conflit de la PR de la branche pick-and-place est résolu.** Diagnostic : la branche a été
-réécrite après la PR #9, donc **142 de ses 161 commits sont des doublons** de
-commits déjà sur `main` (identiques au patch près, SHA différents) et la base de
-fusion remonte à juin. Les 27 fichiers en conflit portaient presque tous deux
-fois la même modification. Résolu par fusion (pas de réécriture, pas de
-force-push) dont l'arbre a été obtenu en rejouant les **19 commits réellement
-nouveaux** sur `main` — apport net vérifié identique, 44 fichiers.
-
-**Le banc de préhension ne se lançait plus depuis le 10/09** :
-`sim_grasp.launch.py` échouait au chargement sur une `PathJoinSubstitution`
-contenant une liste imbriquée. Corrigé, puis les 22 autres fichiers de launch
-chargés un à un — aucun ne porte la même construction. Le défaut arrivait avec
-la branche pick-and-place, il n'a donc jamais atteint `origin/main`.
-
-**Le cycle de tri a tourné pour de vrai — 9 cycles au total — et son issue
-n'est pas déterministe.** `green_cylinder` sort du bac 4 fois sur 7 avec la
-remontée verticale, 2 fois sur 2 sans, et `blue_cube` a échoué une fois. Les six
-cycles instrumentés commandent pourtant une géométrie **identique** (φ = 120°
-partout) : la divergence est dans le solveur de contact de Gazebo, pas dans la
-planification. Deux causes mesurées puis écartées : la marge des doigts
-(2,5 mm de jeu par côté) et la flèche latérale de la remontée (7,3 mm ramenée
-à 0,33 mm par un escalier de paliers — sans effet, code annulé).
-
-**J'avais d'abord conclu à une dépendance à l'ordre de tri** sur la foi de
-φ = 120° aux échecs contre 105° à la réussite. Trois échantillons, une
-coïncidence. C'est corrigé partout, et la leçon est consignée : sur ce banc,
-trois cycles ne départagent pas deux versions du code.
+**Température** : les pics à 90-100 °C venaient d'un seul cœur P au turbo
+(CPU 14-15, capteur Core 28). Entraînement déplacé à chaud sur les cœurs E
+16-27 : 74 °C, aucune pause, vitesse inchangée. Voir
+`docs/DONNEES_ET_CONSOMMATION.md`.
 
 ### Décisions prises
 
-- **Les classeurs `.xlsx` deviennent commitables sur approbation explicite**,
-  au lieu d'être interdits. Motif : un classeur est opaque au diff, donc celui
-  qui le commite se porte garant de son contenu. `precision_campagne_2026-09-09.xlsx`
-  reste donc dans la PR de la branche pick-and-place.
-- **`right/left/top`** l'emporte sur `_1/2/3` pour les caméras.
-- **Fusion plutôt que rebase** pour la PR de la branche pick-and-place : la règle de branchement
-  interdit de réécrire une branche en relecture.
-- Sur le conflit du chemin IK, **la version de la branche l'emporte** : son
-  `_dossier_dream()` cherche le *fichier* `mycobot_ik.py` et supprime le chemin
-  absolu codé en dur vers le home d'un tiers.
+- Entraînements sur les cœurs E seulement (`taskset -c 16-27`).
+- Graines 2001-2003 réservées au test, jamais en entraînement.
+- La perte de validation sert seulement à choisir l'époque : le mélange
+  contient des doublons (réel ×5, tri ×2) des deux côtés du découpage.
 
 ### Prochaines actions
 
-1. [ROUGE] **Pousser `main`** — et rien d'autre : la tête de la PR de la branche pick-and-place
-   (`28a859d7`) est déjà accessible depuis `main`, GitHub fermera donc la PR
-   comme *merged* sans qu'on pousse sa branche.
-2. [ROUGE] **Le cylindre sort du bac 4 fois sur 7, au hasard.** La géométrie
-   étant identique d'un cycle à l'autre, chercher du côté de la **physique** :
-   paramètres de contact du cylindre et des parois dans
-   `pick_and_place_sorting.sdf`, pas du côté de la trajectoire. Les éjections
-   métriques (jusqu'à 1 132 mm) sont une signature de pénétration.
-3. [FAIT] **Rejouer le tri en simulation** — fait le 22/09, deux cycles
-   complets, résultats identiques (3/4).
-4. [FAIT] **Quel côté mérite le nom « droite »** — tranché le 22/09 en faveur
-   du point de vue de l'opérateur (debout en +X, regardant le robot) : +Y est à
-   sa droite. Les noms de joints n'avaient pas à changer ; la convention est
-   maintenant écrite dans le URDF et `README_GAZEBO.md`.
-5. [JAUNE] **Débloquer rosbridge côté système** (désalignement ABI `fastcdr`).
-6. [VERT] Reprendre les actions du 09/09, aucune n'a avancé : affaissement à
-   3 portées, cas *outil couché* du scotch, éclairage à 86 de luminance.
+1. [ROUGE] Évaluer `vgg_tri_mix_ft_e10` contre v4_mix : `synth_tri_test_ndds`,
+   `real_3cam_val_ndds`, 50K ; puis un tri graine 7 avec front+right.
+2. [JAUNE] PR #18 → `main` : conflits résolus et CI verte le 06/10 ; reste le tri
+   Gazebo graine 1 et `pytest` sur la branche fusionnée avant de fusionner.
+3. [VERT] Mesurer Gazebo, DREAM et YOLO chacun seul (protocole § 3.2 de
+   `DONNEES_ET_CONSOMMATION.md`).
 
 ### Commande rapide de reprise
 
 ```bash
-git push origin main
-
-# rejouer le tri (deux terminaux, conda desactive)
-ros2 launch mycobot_gateway sim_grasp.launch.py headless:=true
-ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
+cd ~/Osama_ws/src/mycobot_R6A/training/dream && source ~/ros_jazzy/venv_dream/bin/activate
+taskset -c 16-27 python evaluate_dream.py -s all  # sur checkpoints_dream/vgg_tri_mix_ft_e10/best_network.pth
 ```
 
----
 
 ## État actuel (2 octobre 2026 — tri des 4 pièces dans Gazebo, piloté par yolo26)
 
@@ -274,6 +222,105 @@ ros2 launch mycobot_gateway banc_realiste.launch.py
 /usr/bin/python3 scripts/lancer_pick_dashboard_final.py
 ```
 
+
+## État actuel (22 septembre 2026 — mise au propre du dépôt)
+
+### Ce qui a été accompli aujourd'hui
+
+**La séance du 10/09 n'était documentée nulle part** — entrée ajoutée au
+CHANGELOG et ici (voir plus bas). `CLAUDE.md` décrivait encore l'état DREAM de
+juillet : ajout de deux sections de septembre (checkpoint `vgg_montage0901_ft_e30`,
+invalidation de la démo markerless, et ce que valent réellement les chiffres de
+précision et d'extrinsèque).
+
+**PR #12 inspectée** (Gazebo→LeRobot + ROS2→RLDS→OpenVLA, mergée le 22/09). Le
+contrat OpenVLA est respecté à la lettre (`state` 8-dim ↔ `POS_QUAT`, `action`
+7-dim ↔ `EEF_POS`) et l'enregistrement est réellement testé, pas affirmé :
+`test_openvla_transform.py` stubbe `prismatic` pour importer les vrais fichiers
+sans torch. Quatre réserves relevées, aucune bloquante pour une preuve de
+tuyauterie : la vérification FK est **une pose statique affichée, non assertée**
+(l'accord à 7 décimales implique un bras immobile à cet instant) ; la convention
+de repère du delta de rotation (`R_i⁻¹·R_j` = repère **outil**) n'est écrite
+nulle part ; le signe du gripper vient d'un visionnage, pas d'une calibration ;
+le recadrage 320×240 → 224² jette ~25 % du champ horizontal.
+
+**Une seule convention de nom pour les caméras secondaires : `right/left/top`.**
+Le dépôt en portait deux et **cinq fichiers de launch s'abonnaient à des topics
+sans publieur**. Voir CHANGELOG. Le correctif du 10/09 avait aligné les liens du
+mauvais côté de la scission.
+
+**Le conflit de la PR de la branche pick-and-place est résolu.** Diagnostic : la branche a été
+réécrite après la PR #9, donc **142 de ses 161 commits sont des doublons** de
+commits déjà sur `main` (identiques au patch près, SHA différents) et la base de
+fusion remonte à juin. Les 27 fichiers en conflit portaient presque tous deux
+fois la même modification. Résolu par fusion (pas de réécriture, pas de
+force-push) dont l'arbre a été obtenu en rejouant les **19 commits réellement
+nouveaux** sur `main` — apport net vérifié identique, 44 fichiers.
+
+**Le banc de préhension ne se lançait plus depuis le 10/09** :
+`sim_grasp.launch.py` échouait au chargement sur une `PathJoinSubstitution`
+contenant une liste imbriquée. Corrigé, puis les 22 autres fichiers de launch
+chargés un à un — aucun ne porte la même construction. Le défaut arrivait avec
+la branche pick-and-place, il n'a donc jamais atteint `origin/main`.
+
+**Le cycle de tri a tourné pour de vrai — 9 cycles au total — et son issue
+n'est pas déterministe.** `green_cylinder` sort du bac 4 fois sur 7 avec la
+remontée verticale, 2 fois sur 2 sans, et `blue_cube` a échoué une fois. Les six
+cycles instrumentés commandent pourtant une géométrie **identique** (φ = 120°
+partout) : la divergence est dans le solveur de contact de Gazebo, pas dans la
+planification. Deux causes mesurées puis écartées : la marge des doigts
+(2,5 mm de jeu par côté) et la flèche latérale de la remontée (7,3 mm ramenée
+à 0,33 mm par un escalier de paliers — sans effet, code annulé).
+
+**J'avais d'abord conclu à une dépendance à l'ordre de tri** sur la foi de
+φ = 120° aux échecs contre 105° à la réussite. Trois échantillons, une
+coïncidence. C'est corrigé partout, et la leçon est consignée : sur ce banc,
+trois cycles ne départagent pas deux versions du code.
+
+### Décisions prises
+
+- **Les classeurs `.xlsx` deviennent commitables sur approbation explicite**,
+  au lieu d'être interdits. Motif : un classeur est opaque au diff, donc celui
+  qui le commite se porte garant de son contenu. `precision_campagne_2026-09-09.xlsx`
+  reste donc dans la PR de la branche pick-and-place.
+- **`right/left/top`** l'emporte sur `_1/2/3` pour les caméras.
+- **Fusion plutôt que rebase** pour la PR de la branche pick-and-place : la règle de branchement
+  interdit de réécrire une branche en relecture.
+- Sur le conflit du chemin IK, **la version de la branche l'emporte** : son
+  `_dossier_dream()` cherche le *fichier* `mycobot_ik.py` et supprime le chemin
+  absolu codé en dur vers le home d'un tiers.
+
+### Prochaines actions
+
+1. [ROUGE] **Pousser `main`** — et rien d'autre : la tête de la PR de la branche pick-and-place
+   (`28a859d7`) est déjà accessible depuis `main`, GitHub fermera donc la PR
+   comme *merged* sans qu'on pousse sa branche.
+2. [ROUGE] **Le cylindre sort du bac 4 fois sur 7, au hasard.** La géométrie
+   étant identique d'un cycle à l'autre, chercher du côté de la **physique** :
+   paramètres de contact du cylindre et des parois dans
+   `pick_and_place_sorting.sdf`, pas du côté de la trajectoire. Les éjections
+   métriques (jusqu'à 1 132 mm) sont une signature de pénétration.
+3. [FAIT] **Rejouer le tri en simulation** — fait le 22/09, deux cycles
+   complets, résultats identiques (3/4).
+4. [FAIT] **Quel côté mérite le nom « droite »** — tranché le 22/09 en faveur
+   du point de vue de l'opérateur (debout en +X, regardant le robot) : +Y est à
+   sa droite. Les noms de joints n'avaient pas à changer ; la convention est
+   maintenant écrite dans le URDF et `README_GAZEBO.md`.
+5. [JAUNE] **Débloquer rosbridge côté système** (désalignement ABI `fastcdr`).
+6. [VERT] Reprendre les actions du 09/09, aucune n'a avancé : affaissement à
+   3 portées, cas *outil couché* du scotch, éclairage à 86 de luminance.
+
+### Commande rapide de reprise
+
+```bash
+git push origin main
+
+# rejouer le tri (deux terminaux, conda desactive)
+ros2 launch mycobot_gateway sim_grasp.launch.py headless:=true
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
+```
+
+---
 
 ## État actuel (18 septembre 2026 — yolo26 entraîné sur les pièces peintes)
 

@@ -18,6 +18,12 @@ Image → CNN (ResNet-101 + Hourglass) → 7 Belief Maps → Peak Detection → 
 
 ## Architecture
 
+![From the camera image to the 7 keypoints: one belief map per joint, the peak gives (u, v)](../../docs/dream_cartes_croyance.png)
+
+Each of the 7 belief maps holds a Gaussian bump on its joint; its peak is the
+keypoint (u, v) in pixels and its height the confidence. A flat map means the
+joint is not detected — the "% detection" figures below count those.
+
 Two architectures were tested:
 
 ### VGG-Q (recommended)
