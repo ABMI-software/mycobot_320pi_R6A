@@ -17,7 +17,8 @@
 #
 # action := the follower's own achieved state (/joint_states), same
 # simplification as the source contracts: no leader arm exists here, so
-# action records what the arm DID, not a separately-commanded target.
+# action records what the arm DID, not a separately-commanded target. The
+# converter (scripts/port_bag.py) shifts it one frame: action[t] = state[t+1].
 #
 # simulated_attachment: recorded per-episode in episode metadata (Part 9.4),
 # not baked into this contract -- Part 3 found the reference grasp mechanism
@@ -30,7 +31,7 @@ robot_interface: ros2
 fps: 30
 
 observations:
-  observation.images.table:
+  observation.images.top:     # one key for both splits (2026-10-05): the split differs in camera configuration, not name
     channel: {topic: /camera/image_raw,
               type: sensor_msgs/msg/Image,
               qos: {reliability: best_effort, history: keep_last, depth: 10}}
@@ -55,3 +56,16 @@ actions:
              position.joint4_to_joint3, position.joint5_to_joint4,
              position.joint6_to_joint5, position.joint6output_to_joint6,
              position.gripper_controller]
+
+# Recorded for FUTURE batches (added 2026-10-05), not used as a frame key:
+# the controller's desired state and the gripper command. The 2026-10-04
+# batch recorded neither, so its datasets take action[t] = state[t+1]
+# (scripts/port_bag.py); with these in the bag, a future converter can take
+# the commanded position as the action instead. Raw passthrough into the bag.
+adjunct:
+  - channel: {topic: /mycobot_controller/controller_state,
+              type: control_msgs/msg/JointTrajectoryControllerState,
+              qos: {reliability: reliable, history: keep_last, depth: 50}}
+  - channel: {topic: /gripper_position_controller/commands,
+              type: std_msgs/msg/Float64MultiArray,
+              qos: {reliability: reliable, history: keep_last, depth: 10}}

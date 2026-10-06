@@ -9,6 +9,97 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — tri quatre objets : jeux de données au format LeRobot v3.0, chargés et testés avec SmolVLA (05/10)
+
+- `scripts/port_bag.py` réécrit sur l'écrivain de LeRobot (`LeRobotDataset.create`
+  / `add_frame` / `save_episode`). La première conversion ne se chargeait pas
+  et comportait quatre défauts : action = état au même instant (le
+  convertisseur avait décalé l'indice), horodatages en temps mural de
+  réception, clé caméra différente selon la partie, ni statistiques ni index
+  global. Désormais : **action[t] = état[t+1]** (aucun topic de commande n'a
+  été enregistré ; dernière image de chaque épisode retirée),
+  `timestamp = frame_index / 30`, appariement image–état sur l'horodatage
+  d'en-tête (temps simulé), une seule clé `observation.images.top`.
+- **Vérifié hors ligne avec lerobot 0.4.4** (épinglage provisoire, en un seul
+  endroit : `scripts/requirements-lerobot.txt`) : 48 / 12 épisodes, 29 687 /
+  7 411 images ; action[t] = état[t+1] sur chaque ligne ; l'image renvoyée par
+  le chargeur est identique à l'image décodée du MP4 au même indice ;
+  statistiques présentes.
+- **Test d'entraînement SmolVLA sur CPU** (`lerobot/smolvla_base`, lot de 1,
+  10 pas) : perte finie à chaque pas, ~4,1 s par pas, 3,5 Go de RAM au plus,
+  100 M de paramètres entraînables sur 450 M (expert d'action seul).
+- `distractors_moved` et la configuration caméra de chaque épisode dans
+  `meta/episodes_extra.jsonl` (l'écrivain 0.4.4 ne stocke pas de champ
+  par épisode personnalisé).
+- Contrats : l'état désiré du contrôleur et la commande de pince ajoutés en
+  canaux `adjunct` pour les prochains lots ; clé caméra unifiée.
+- Documentation : rapport EN/FR (HTML + Word) avec une nouvelle §28 ;
+  spécification, annexe C ; partage Rôle A / Rôle B retiré de tous les
+  documents du projet (une seule personne, un seul portable WSL2) ; la
+  procédure d'entrée dans le conteneur (`docker exec -it gazebo_to_lerobot bash`)
+  ajoutée là où elle manquait.
+
+### Ajouté — tri quatre objets : lot de 60 épisodes, jeux de données, deux launch files (04/10)
+
+- **Lot de 60 épisodes, 60/60 PASS du premier coup**, sous une seule version
+  de code (`f977d7af65dc`), sur un seul portable WSL2 : aucune reprise,
+  aucun renvoi de trajectoire, images complètes partout. Converti en
+  `mycobot_sorting_train` (48 épisodes, 29 687 images) et
+  `mycobot_sorting_heldout` (12 épisodes, 7 411 images). **Corrigé le 05/10 :
+  29 687 / 7 411** après reconversion (action en avance d'une image, horodatage
+  en temps mural, clé caméra différente selon la partie, pas de statistiques) ;
+  voir l'entrée du 05/10 ci-dessus. Détail :
+  `Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/MEASUREMENTS.md` §10.
+- **Deux launch files** dans `launch/` : `pick_and_sort_and_place_demo.launch.py`
+  (GUI Gazebo, reste ouvert) et `pick_and_sort_and_place_no_gui_demo.launch.py`
+  (headless, code de sortie 0 = PASS, 1 = échec, 2 = argument invalide),
+  `episode:=N` choisit une ligne de la matrice. Orchestrateur
+  `scripts/run_demo.py` ; `scripts/run_gui_demo.sh` lance la GUI en une
+  commande sous WSL2.
+- **Bacs : ouverture 80 mm**, parois 3 mm (86 mm hors tout), bac bleu déplacé
+  de 10 mm en −y. Les bacs de 100 mm s'interpénétraient (rouge/vert 15 mm) :
+  atterrissages inclinés et faux `WRONG_BIN`. Une ouverture de 70 mm a échoué
+  à la sonde (cubes calés sur le rebord à 28°).
+- **Dépose à lacet fixé** (`precompute_ik.py`) : en se fermant, les mors
+  mettent le cube d'équerre avec la pince, donc le cube atterrit au lacet
+  monde de la pince à la dépose (modulo 90°). Les boîtes sont lâchées
+  d'équerre avec le bac (0/90/180/270° pour les cubes, 90/270° pour la boîte
+  jaune non carrée). Avec un lacet libre, aucune géométrie de bac ne pouvait
+  convenir.
+- Placement des objets non cibles : exclusion autour des bacs calculée sur le
+  vrai carré, et non plus sur un cercle centré (`make_matrix.py`).
+- `weld.py` : la soudure est confirmée par le plugin et republiée si besoin
+  (course au chargement, cause de l'épisode 13 tenu en réserve).
+- `port_bag.py` reporte `distractors_moved` dans `meta/episodes.jsonl`.
+  L'épisode 12, qui a poussé le cylindre vert de 22,9 mm avec le mors ouvert
+  (cause vérifiée sur l'enregistrement), est conservé et étiqueté.
+- `run_pick_and_place.py` enregistre désormais le lacet et l'inclinaison à
+  l'atterrissage (pour le prochain lot).
+- Contrôleur : tolérances de but 0,026 rad, `goal_time` 1,0
+  (`Gazebo_to_LeRobot_Pipeline/overrides/.../controller.yaml`).
+
+### Ajouté — démo pick-and-place GUI regardée sous WSL2, en une commande (03/10)
+
+- La démo GUI du POC headless (`pick_and_place_demo.launch.py`, §15 du
+  rapport) a été **exécutée et regardée de bout en bout dans Gazebo** pour la
+  première fois, sur un portable WSL2, en partant d'une machine sans image ni
+  conteneur. Résultat : `motions_ok=True placed_on_plate=True grasp_held=True`.
+- Nouveau
+  [`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/scripts/run_gui_demo.sh`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/scripts/run_gui_demo.sh) :
+  `docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh` lance
+  toute la démo avec `DISPLAY=:0`, un rendu OpenGL logiciel et la caméra
+  cadrée sur le bras, et nettoie `move_group`/Gazebo à la sortie.
+- Rapport EN/FR (HTML + Word) : nouvel addendum **§16–30**, pas à pas, avec
+  pour chaque problème son symptôme à l'écran, sa cause et sa correction.
+  Cinq problèmes : démon Docker à lancer à la main (pas de systemd dans WSL),
+  **`moveit_py` absent de l'image** (signalé à tort comme « no reachable IK
+  solution »), **simulation figée** par le `DISPLAY=172.24.112.1:0` de l'hôte
+  transmis au conteneur, **fenêtre Gazebo blanche** (D3D12 = OpenGL 4.1 sans
+  compute shaders), caméra bloquée au loin par le mode Follow.
+- Non modifiés, corrections proposées : `Dockerfile` (ajouter
+  `ros-jazzy-moveit-py`), `run.sh` (`DISPLAY=:0` sous WSLg), `run_demo.py`
+  (afficher la vraie erreur de l'IK).
+
 ### Modifié — l'évaluation RoboPEPP est menée par ABMI Lyon (23/09)
 
 - Licence **open-source**, évaluation **conduite par ABMI Lyon** — qui tient
