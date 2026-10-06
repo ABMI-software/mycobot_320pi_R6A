@@ -11,6 +11,20 @@ belief maps (VGG-19) suivie d'une résolution PnP pour la pose 3D.
 
 ### Architecture DREAM
 
+![Chaîne DREAM : image RGB, VGG-19, 7 cartes de croyance, keypoints 2D, PnP avec la cinématique directe et les intrinsèques](../docs/dream_pipeline.png)
+
+Le réseau n'apprend que l'étape image → cartes de croyance. Les points 3D viennent de la
+cinématique directe sur les angles mesurés : une erreur de PnP est donc une erreur de
+keypoints, pas de cinématique.
+
+![De l'image aux 7 keypoints : une carte de croyance par articulation, le sommet donne (u, v)](../docs/dream_cartes_croyance.png)
+
+Chaque carte porte une bosse gaussienne sur son articulation ; le sommet donne (u, v) en
+pixels, sa hauteur la confiance. Une carte plate = point non détecté (c'est ce que compte
+le « % de détection »).
+
+Détail des couches :
+
 ```
 Image 640×480 RGB
        │
