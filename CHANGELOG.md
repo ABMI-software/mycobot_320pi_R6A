@@ -574,7 +574,7 @@ ici, et auraient fait conclure à une réussite.
   substitution normalise **chacun** de ses éléments et rejette une liste
   imbriquée — que `'<world_name>.sdf'` impose pourtant. Remplacé par une
   concaténation à plat déballée au point d'usage.
-- Le défaut arrivait avec la branche d'Osama, donc **il n'a jamais atteint
+- Le défaut arrivait avec la branche pick-and-place, donc **il n'a jamais atteint
   `origin/main`** : il est corrigé avant d'être publié. Les 22 autres fichiers
   de launch du paquet ont été chargés un à un pour vérifier qu'aucun ne porte
   la même construction.

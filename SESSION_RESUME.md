@@ -26,7 +26,7 @@ Le dépôt en portait deux et **cinq fichiers de launch s'abonnaient à des topi
 sans publieur**. Voir CHANGELOG. Le correctif du 10/09 avait aligné les liens du
 mauvais côté de la scission.
 
-**Le conflit de la PR d'Osama est résolu.** Diagnostic : la branche a été
+**Le conflit de la PR de la branche pick-and-place est résolu.** Diagnostic : la branche a été
 réécrite après la PR #9, donc **142 de ses 161 commits sont des doublons** de
 commits déjà sur `main` (identiques au patch près, SHA différents) et la base de
 fusion remonte à juin. Les 27 fichiers en conflit portaient presque tous deux
@@ -38,7 +38,7 @@ nouveaux** sur `main` — apport net vérifié identique, 44 fichiers.
 `sim_grasp.launch.py` échouait au chargement sur une `PathJoinSubstitution`
 contenant une liste imbriquée. Corrigé, puis les 22 autres fichiers de launch
 chargés un à un — aucun ne porte la même construction. Le défaut arrivait avec
-la branche d'Osama, il n'a donc jamais atteint `origin/main`.
+la branche pick-and-place, il n'a donc jamais atteint `origin/main`.
 
 **Le cycle de tri a tourné pour de vrai — 9 cycles au total — et son issue
 n'est pas déterministe.** `green_cylinder` sort du bac 4 fois sur 7 avec la
@@ -59,17 +59,17 @@ trois cycles ne départagent pas deux versions du code.
 - **Les classeurs `.xlsx` deviennent commitables sur approbation explicite**,
   au lieu d'être interdits. Motif : un classeur est opaque au diff, donc celui
   qui le commite se porte garant de son contenu. `precision_campagne_2026-09-09.xlsx`
-  reste donc dans la PR d'Osama.
+  reste donc dans la PR de la branche pick-and-place.
 - **`right/left/top`** l'emporte sur `_1/2/3` pour les caméras.
-- **Fusion plutôt que rebase** pour la PR d'Osama : la règle de branchement
+- **Fusion plutôt que rebase** pour la PR de la branche pick-and-place : la règle de branchement
   interdit de réécrire une branche en relecture.
-- Sur le conflit du chemin IK, **la version d'Osama l'emporte** : son
+- Sur le conflit du chemin IK, **la version de la branche l'emporte** : son
   `_dossier_dream()` cherche le *fichier* `mycobot_ik.py` et supprime le chemin
   absolu codé en dur vers le home d'un tiers.
 
 ### Prochaines actions
 
-1. [ROUGE] **Pousser `main`** — et rien d'autre : la tête de la PR d'Osama
+1. [ROUGE] **Pousser `main`** — et rien d'autre : la tête de la PR de la branche pick-and-place
    (`28a859d7`) est déjà accessible depuis `main`, GitHub fermera donc la PR
    comme *merged* sans qu'on pousse sa branche.
 2. [ROUGE] **Le cylindre sort du bac 4 fois sur 7, au hasard.** La géométrie
@@ -109,7 +109,7 @@ ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
 **4/4 triés**, chaque objet au fond de son bac. Vidéo 4 vues :
 `~/Downloads/tri_simulation/tri_4_objets_4vues_graine1_lacher.mp4`.
 
-**Lâcher corrigé** (vu par Osama sur la vidéo) : l'objet glissait entre les
+**Lâcher corrigé** (vu sur la vidéo) : l'objet glissait entre les
 doigts à la remontée ; il est maintenant lâché 5 mm au-dessus du rebord, doigts
 écartés, avant de remonter.
 
@@ -128,7 +128,7 @@ les 4 caméras, mAP50 réel 0,990.
 
 1. [ROUGE] Campagne de 10 graines avec le nouveau lâcher (arrêtée 2 fois sur
    la température), puis taux et causes dans le protocole et le Word.
-2. [JAUNE] Validation par Osama des étapes 8 et 9.
+2. [JAUNE] Validation des étapes 8 et 9.
 3. [VERT] Saisie inclinée, pour des objets au-delà de 0,28 m.
 
 ### Commande rapide de reprise

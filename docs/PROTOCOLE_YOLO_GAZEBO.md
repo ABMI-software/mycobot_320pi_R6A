@@ -3,7 +3,7 @@
 *Protocole de travail de Claude pour l'intégration YOLO → localisation 3D →
 tri dans Gazebo Harmonic, avec DREAM en parallèle plus tard. On avance **une
 étape à la fois**. Chaque étape a un critère de sortie, et on ne passe à la
-suivante qu'une fois ce critère atteint et **validé par Osama**. L'état de chaque étape
+suivante qu'une fois ce critère atteint et **validé**. L'état de chaque étape
 est tenu dans le [journal](#journal) en fin de fichier.*
 
 Créé le 29/09/2026 · branche `feature/pick-and-place-osama`
@@ -203,7 +203,7 @@ z = 0, dans le monde DREAM comme dans `real_table`. DREAM ne dépend que de
 Si un jour on veut le robot au bord de la table, on déplace **la table et les
 objets**, pas le robot, et T_cam←base reste intact.
 
-### 2.3 Décisions ouvertes (à trancher par Osama avant l'étape indiquée)
+### 2.3 Décisions ouvertes (à trancher avant l'étape indiquée)
 
 | # | Question | Recommandation | Avant l'étape |
 |---|---|---|---|
@@ -482,7 +482,7 @@ Lecture :
 4. **Fausses détections** : le socle gris clair du robot est lu `bac_bleu` à 0,10–0,13 dans la vue gauche,
    à chaque graine, juste au-dessus du seuil de 0,10.
 
-## Correction des modèles Gazebo (29/09, validée par Osama)
+## Correction des modèles Gazebo (29/09, validée)
 
 Faite dans le **générateur** `scripts/generer_pieces_gazebo.py`, puis régénération des 8 modèles.
 Les `model.sdf` ne sont jamais édités à la main.
@@ -567,9 +567,9 @@ cylindre_vert 16 → 19/35, pave_jaune 18 → 20/34, bac_jaune 3 → 6/36, le re
 3. **Prochain levier possible, non appliqué** : caler aussi S et V rendus sur les images réelles.
    Pour les 8 pièces, ce serait un matériau plus sombre et plus saturé. Pour tout le banc, un éclairage
    ou une exposition de scène plus proche de l'arducam à 75. Cela touche aussi rouge et bleu,
-   qui marchent : **à décider par Osama.**
+   qui marchent : **à décider.**
 
-### Campagne v3 : vert assombri (d'après les photos d'Osama, 29/09)
+### Campagne v3 : vert assombri (d'après les photos du banc, 29/09)
 
 Les photos des vraies pièces et le jeu arducam s'accordent sur un point : **le vert est nettement plus
 sombre que le jaune** (V ~105 contre 160-220 sur photo, 107 contre 132 sur arducam). Dans Gazebo, les deux
@@ -581,7 +581,7 @@ Correction conservée, car elle rapproche le rapport jaune/vert de la réalité 
 **Arrêt des retouches de couleur** : ce n'est plus le levier. La confusion restante bac_jaune → bac_vert
 tient au modèle (appris sur du jaune arducam très saturé et sombre) face à un rendu Gazebo pâle et clair.
 Pour la supprimer, il faudrait soit ajouter des images Gazebo au jeu yolo26, soit caler l'éclairage
-de la scène sur l'exposition 75. **Décision réservée à Osama.**
+de la scène sur l'exposition 75. **Décision à prendre.**
 
 ## Étapes 3, 4 et 6 en ROS (29/09)
 
@@ -650,7 +650,7 @@ Autrement dit, les boîtes YOLO sont décalées de **−1,7 px en v**, vers le h
 
 ## Étape 5 en nœud : YOLO contre la vérité, affiché dans Gazebo (29/09)
 
-Demande d'Osama : voir **dans Gazebo** ce qu'on voit au banc réel (boîte, classe, score sur
+Demande : voir **dans Gazebo** ce qu'on voit au banc réel (boîte, classe, score sur
 chaque objet et chaque bac), **plus l'erreur** par rapport à la vérité Gazebo.
 
 ![Panneau YOLO vs vérité dans Gazebo, graine 2](protocole_yolo_gazebo/etape5_panneau_gazebo_seed2.png)
@@ -746,7 +746,7 @@ synth_camera_top     TOTAL            73/80                               4.2   
 - **pave_jaune, cylindre_vert, bac_bleu** : confiance 0,17-0,43 de côté, souvent sous le seuil.
 - Les nombres de détections 2D sont **identiques** à la campagne v3 (même graine, même rendu,
   même modèle) : la scène et yolo26 sont déterministes, ce qui rend ces campagnes comparables.
-- **Décision proposée pour la suite** (à trancher par Osama) : **sélection, pas fusion** — la top
+- **Décision proposée pour la suite** (à trancher) : **sélection, pas fusion** — la top
   pour localiser ; les côtés seulement en secours, quand la top ne voit pas une pièce (bras
   devant). Une fusion moyenne dégraderait la top (4 mm) avec des côtés à 6-46 mm.
 
@@ -828,7 +828,7 @@ ce pré-étiquetage avantage v5 sur la forme des boîtes).
 8. **Campagne Gazebo** graines 1 à 10, 4 caméras, une scène par graine évaluée avec v5, v6b et v6c
    (`yolo26_tri_eval.py --poids`, chemins de poids **absolus** : le service les résout depuis son
    propre dossier) ; départ de chaque graine sous 60 °C, arrêt à 88 °C.
-9. **Adoption** de v6c (validée par Osama le 01/10) : `yolo26_service.POIDS_DEFAUT`.
+9. **Adoption** de v6c (validée le 01/10) : `yolo26_service.POIDS_DEFAUT`.
 
 **Comment les images d'entraînement sont produites dans la simulation**
 (`scripts/yolo26_dataset_gazebo.py`, une seule session Gazebo) :
@@ -929,7 +929,7 @@ Une fois la géométrie corrigée, les erreurs des caméras partent dans des dir
 se compensent : **la fusion par la médiane divise l'erreur médiane par deux** par rapport à la
 caméra du dessus seule, au prix d'un max un peu plus haut (2,9 contre 2,3 mm). La décision de
 l'étape 7 (« sélection, pas fusion ») datait d'avant la correction, quand les côtés allaient
-jusqu'à 46 mm : **proposition révisée pour l'étape 8 : fusion par la médiane** (décision d'Osama).
+jusqu'à 46 mm : **proposition révisée pour l'étape 8 : fusion par la médiane** (décision prise).
 
 - Ce qui reste est l'erreur de yolo26 : centres de boîte décalés de **−0,47 px (u) et −0,51 px (v)**,
   dispersion ±0,2 px (1 px = 1,92 mm au sol vue du dessus). Piste : convention centre/coin de pixel
@@ -964,7 +964,7 @@ jusqu'à 46 mm : **proposition révisée pour l'étape 8 : fusion par la médian
 | En direct, graine 3 (`tri_yolo.launch.py`, comparaison à `/validation/gt/objects`) | 8/8 | **4/4** | **0,85 mm** | — | **1,94 mm** |
 
 Objets seuls : 0,61 mm médiane, 2,07 max ; bacs : 0,67 / 1,94. Avant la fusion (caméra du dessus seule,
-rayon simple) : 2,1 / 3,5 mm. **Critère de l'étape 8 atteint, validé par Osama le 05/10.** Suite : étape 9,
+rayon simple) : 2,1 / 3,5 mm. **Critère de l'étape 8 atteint, validé le 05/10.** Suite : étape 9,
 la FSM de `sim_sorting_grasp` prend ses cibles dans `/yolo/objects_3d` via `sorting_pairs`.
 
 ## Étape 9 : la FSM de simulation trie à partir de la perception (01/10)
@@ -997,22 +997,22 @@ la FSM de `sim_sorting_grasp` prend ses cibles dans `/yolo/objects_3d` via `sort
 **Toutes les pièces à portée (6/6) sont triées.** Les 34 échecs viennent de la portée de l'outil
 vertical (0,28 m, mesurée le 29/09) : la scène place pièces et bacs entre les marqueurs, jusqu'à
 0,46 m. Avant les corrections : 5/40, dont 1 prise ratée. Température max 81 °C, Gazebo fermé après
-chaque graine. **Critère de l'étape 9 (taux et cause de chaque échec) atteint, validé par Osama le 05/10.**
+chaque graine. **Critère de l'étape 9 (taux et cause de chaque échec) atteint, validé le 05/10.**
 
 **Suite proposée** : étendre la portée comme au banc réel — dépôt pince inclinée jusqu'à 45° (validé au
-réel le 30/09 et le 01/10 jusqu'à 445 mm), puis saisie inclinée. Décision d'Osama.
+réel le 30/09 et le 01/10 jusqu'à 445 mm), puis saisie inclinée. Décision prise.
 
 ## Étape 9, suite : portée étendue et lâcher au-dessus du bac (01-02/10)
 
 Les 34 échecs de la campagne précédente venaient de la portée de l'outil vertical. Trois changements,
-puis un défaut de lâcher repéré par Osama sur la vidéo :
+puis un défaut de lâcher repéré sur la vidéo :
 
 | Changement | Pourquoi | Où |
 |---|---|---|
 | `piece_reach:=0.28` (option de `tri_yolo.launch.py`) : les 4 **objets** tirés à moins de 0,28 m de la base, les bacs toujours entre les marqueurs | comme au banc réel, l'objet est posé là où la pince le saisit ; le défaut (`0.0`) garde l'ancienne scène | `tri_scene.sample_tri_scene`, `item_errors` |
 | **Lâcher incliné** si le bac est hors de portée verticale : pince inclinée de 15, 30 ou 45° vers l'extérieur | IK hors ligne : vertical jusqu'à 0,28 m, 15° de 0,30 à 0,36 m, 30° de 0,39 à 0,42 m, 45° à 0,45 m | `tilted_drop`, `DROP_TILTS_DEG` |
 | **2 essais** par objet, seulement après une prise à vide | prise ratée du cylindre, intermittente ; un autre échec laisse l'objet dans un état inconnu et n'est pas retenté | `max_attempts:=2` |
-| **Lâcher au-dessus du rebord pour TOUS les objets**, doigts écartés de 20 mm, 2 s d'attente, **puis** remontée lente (2 s) | vu par Osama sur la vidéo du 02/10 : la pince ne s'ouvrait qu'à la largeur de l'objet puis remontait — l'objet **glissait** entre les doigts. Pire pour le cube bleu (bac à portée verticale) : doigts **dans** le bac, la paroi (95 mm) les empêchait de s'ouvrir plus que le cube (50 mm) | `sort_one`, `RELEASE_ABOVE_RIM_EXTRA_MM`, `RELEASE_SETTLE_S` |
+| **Lâcher au-dessus du rebord pour TOUS les objets**, doigts écartés de 20 mm, 2 s d'attente, **puis** remontée lente (2 s) | vu sur la vidéo du 02/10 : la pince ne s'ouvrait qu'à la largeur de l'objet puis remontait — l'objet **glissait** entre les doigts. Pire pour le cube bleu (bac à portée verticale) : doigts **dans** le bac, la paroi (95 mm) les empêchait de s'ouvrir plus que le cube (50 mm) | `sort_one`, `RELEASE_ABOVE_RIM_EXTRA_MM`, `RELEASE_SETTLE_S` |
 
 Le lâcher, dans les deux cas (vertical ou incliné) :
 
@@ -1182,7 +1182,7 @@ la non-régression a tourné sans YOLO à 1 Hz : 78 et 81 °C.
 
 ### Dashboard v2 : DREAM contre YOLO, une seule fenêtre avec Gazebo (05/10)
 
-Demande d'Osama : comparer **DREAM directement à YOLO, pas à Gazebo**, et une seule fenêtre.
+Demande : comparer **DREAM directement à YOLO, pas à Gazebo**, et une seule fenêtre.
 
 ```bash
 ros2 launch mycobot_gateway tri_yolo.launch.py seed:=7 piece_reach:=0.28 dream:=true \
@@ -1256,7 +1256,7 @@ inchangé.
 
 ### Fine-tuning DREAM sur la scène de tri (05-06/10, en cours)
 
-Décidé par Osama le 05/10 : la cause de l'écart DREAM ↔ YOLO est la scène, hors du domaine
+Décidé le 05/10 : la cause de l'écart DREAM ↔ YOLO est la scène, hors du domaine
 d'entraînement. On rend donc des images de la scène de tri avec la pince, puis on fine-tune.
 
 **1. Rendus** : `synthetic_data_collector_tri`, qui hérite du collecteur v4 pince. Les caméras
@@ -1352,10 +1352,10 @@ taux de détection, ne garder que les lignes en pose d'observation.
 | 29/09/2026 | 0 — masses | fait | défauts 1,58 / 0,22 ; xacro contre HEAD : 18 liens, 0 écart, 1,840 kg |
 | 29/09/2026 | 0 — `load_cameras` | fait | lit l'URDF après xacro ; `tests/test_sim_multicam.py` 7/7 (0/7 avant) ; `real_table` headless graine 1 : cube vu par les 4 caméras, localisé à **2,2 mm** de la position tirée |
 | 29/09/2026 | 1 — caméras du 50K | fait | `camera_layout:=dream50k` ; `legacy` produit un URDF identique à l'ancien ; `tests/test_cameras_dream50k.py` 7/7, et il échoue bien si la top est décalée de 1 cm ; Gazebo : TF 0,800/0,950 m, K = 493,7925 ; images : `protocole_yolo_gazebo/etape1_cameras_dream50k.png` |
-| 29/09/2026 | 2 — scène (en cours) | premier essai OK, **en attente de l'observation d'Osama** | `tri_yolo.launch.py` + `vision/tri_scene.py`. Le monde est reconstruit à chaque lancement depuis `real_table.sdf` (pas de `tri_yolo.sdf` figé qui pourrait diverger). Graine 1 : les 8 pièces sont en place à ≤ 0,5 mm du tirage, z = 0, rien n'a bougé ; images : `protocole_yolo_gazebo/etape2_seed1.png` |
+| 29/09/2026 | 2 — scène (en cours) | premier essai OK, **en attente d'observation** | `tri_yolo.launch.py` + `vision/tri_scene.py`. Le monde est reconstruit à chaque lancement depuis `real_table.sdf` (pas de `tri_yolo.sdf` figé qui pourrait diverger). Graine 1 : les 8 pièces sont en place à ≤ 0,5 mm du tirage, z = 0, rien n'a bougé ; images : `protocole_yolo_gazebo/etape2_seed1.png` |
 | 29/09/2026 | 2 — mesures | fait | **portée** : colonne de prise (110 mm → prise → levée) et colonne de dépôt atteignables jusqu'à r = 0,28 m, pas à 0,30 m, quel que soit l'azimut (0, ±50, ±100°) → `REACH_MAX = 0,28`. **Place disponible** : avec 30 mm entre bacs, seuls 3 bacs tiennent dans la bande atteignable ; d'où 10 mm entre bacs et 30 mm autour des objets. Tirage : ~1 s médian, 5 s au pire. **Pose d'observation** q = (0, 60, −70, 0, 0, 0)° : 4,3 % du plateau masqué dans la vue top (13,4 % à q = 0), ombre du bras à x ≈ −0,15 m, hors plateau |
-| 29/09/2026 | 2 — zone de travail | fait (consigne d'Osama) | objets et bacs **entre les marqueurs, devant 19/23**, comme sur le banc réel : bande x ∈ [0,146 ; 0,494] m, calculée depuis les poses des marqueurs dans le monde. La portée 0,28 m n'est **plus imposée** ; elle est **signalée** au lancement (en moyenne 4,9 pièces sur 8 au-delà) → l'IK outil vertical devra être étendue à l'étape 9, puisque le vrai bras atteint ~0,39 m avec l'outil incliné. Tirage : 134 ms médian. `tests/test_tri_scene.py` : 6 tests, dont 300 tirages vérifiés contrainte par contrainte |
-| — | 2 — plus tard | demandé par Osama | bouton **« Randomiser »** qui redéplace objets et bacs sans relancer Gazebo (sur le modèle de `sim_scene_panel` et du service `/real_table/randomize`) |
+| 29/09/2026 | 2 — zone de travail | fait (consigne) | objets et bacs **entre les marqueurs, devant 19/23**, comme sur le banc réel : bande x ∈ [0,146 ; 0,494] m, calculée depuis les poses des marqueurs dans le monde. La portée 0,28 m n'est **plus imposée** ; elle est **signalée** au lancement (en moyenne 4,9 pièces sur 8 au-delà) → l'IK outil vertical devra être étendue à l'étape 9, puisque le vrai bras atteint ~0,39 m avec l'outil incliné. Tirage : 134 ms médian. `tests/test_tri_scene.py` : 6 tests, dont 300 tirages vérifiés contrainte par contrainte |
+| — | 2 — plus tard | demandé | bouton **« Randomiser »** qui redéplace objets et bacs sans relancer Gazebo (sur le modèle de `sim_scene_panel` et du service `/real_table/randomize`) |
 | 29/09/2026 | 4-5 (version rapide) — yolo26 contre la GT | fait | `scripts/yolo26_tri_eval.py` (outil de VALIDATION : il lit la GT). yolo26 `pieces_v5_yolo26s`, seuil 0,10, service inchangé. Boîtes GT = boîte 3D du `model.sdf` projetée (amodale, rognée au bord de l'image ; « cachée » si > 50 % couverte par une pièce plus proche). 10 graines, CSV : `protocole_yolo_gazebo/campagne_10_graines/` |
 | 29/09/2026 | modèles Gazebo | fait | bacs aux cotes du plan (parois 5 mm, ouverture 95, retraits d'angle) ; teinte du matériau vert 39 → 47, jaune 21 → 22, pour que le rendu tombe sur les teintes réelles mesurées ; graine 1 caméra top : 7/8 → 8/8. Détail : § « Correction des modèles Gazebo » |
 | 29/09/2026 | campagne v3 (vert assombri) | fait | aucun changement (top 73/80, bac_jaune 4/10) ; arrêt des retouches de couleur |
@@ -1366,18 +1366,18 @@ taux de détection, ne garder que les lignes en pose d'observation.
 | 29/09/2026 | campagne yolo26 après correction | fait | top 71 → 73/80 ; bac_vert 0,89 → 0,97 ; bac_jaune 2 → 4/10 (teinte juste, reste S/V) ; gauche 53 → 62 % |
 | 29/09/2026 | 7 — quatre caméras sans fusion | fait | 10 graines : top 73/80 (4,2 / 6,3 mm), avant 33/47, droite 42/78, gauche 48/78 (max 46 mm) ; tableau caméra × classe § « Étape 7 » ; campagne bridée `taskset -c 16-23`, 70-76 °C. Décision sélection / fusion : à trancher |
 | — | 2 — pour l'étape 9 | à retenir | `sort_one` ouvre la pince en grand (±81 mm de demi-encombrement) avant de descendre à 18 mm, sous le rebord des bacs (30 mm). Avec 30 mm d'écart autour des objets, les doigts peuvent toucher un bac voisin : il faudra une ouverture juste suffisante, ou un écart plus grand, à mesurer |
-| 01/10/2026 | réentraînement yolo26 | fait, **v6c adopté** (validé par Osama) | v6c (réelles ×10 + 1 036 Gazebo) : 4 caméras 283/283, e_3d max 3,5 mm (top) ; réel 0,990 contre 0,967 (v5) ; v6b écarté (bac rouge réel coupé). § « yolo26 réentraîné avec les images Gazebo » |
+| 01/10/2026 | réentraînement yolo26 | fait, **v6c adopté** (validé) | v6c (réelles ×10 + 1 036 Gazebo) : 4 caméras 283/283, e_3d max 3,5 mm (top) ; réel 0,990 contre 0,967 (v5) ; v6b écarté (bac rouge réel coupé). § « yolo26 réentraîné avec les images Gazebo » |
 | 01/10/2026 | localisation 3D recalée | fait (hors ligne) | `tri_scene.locate_from_box` dans `yolo_localizer` : max 3,5 → 2,3 mm (dessus), 7,2 → 2,6 (avant), 5,6 → 5,0 (gauche), 6,6 → 6,3 (droite) ; reste le −0,5 px de yolo26, à expliquer. 37 tests OK |
 | 01/10/2026 | 4 caméras ensemble | mesuré (hors ligne) | fusion par la médiane : 0,70 mm médiane, 2,92 max ; dessus seule 1,41 / 2,28 ; moyenne des 4 médianes 1,69 mm. Proposition révisée : fusion (au lieu de sélection) |
-| 01/10/2026 | 8 — tri par la perception seule | fait, **validé par Osama (05/10)** | `/yolo/objects_3d` = fusion médiane des 4 caméras, objets et bacs ; paires par la classe (`sorting_pairs`). Hors ligne 10 graines : 80/80, 40/40 paires, 0,65 / 2,07 mm ; en direct graine 3 : 8/8, 4/4, 0,85 / 1,94 mm. 40 tests OK |
-| 01/10/2026 | 9 — tri piloté par la perception | fait, **validé par Osama (05/10)** | `pose_source:=perception` : 6/40 triés, **6/6 des pièces à portée**, 0 échec de perception ou de prise ; 34 échecs de portée (outil vertical 0,28 m). Corrections : ouverture d'approche, cubes à 0/90°, dépôt résolu avant saisie |
-| 02/10/2026 | 9 suite — portée et lâcher | fait (graine 1), campagne en cours | `piece_reach:=0.28`, lâcher incliné 15/30/45°, 2 essais ; lâcher au-dessus du rebord pour tous, doigts écartés **avant** la remontée (glissement vu par Osama). Graine 1 : **4/4**, objets au fond avant la remontée, écart max +12/−10 mm (pavé). `--switch-timeout 30` |
-| 05/10/2026 | 9 suite — campagne 10 graines | fait, **validé par Osama (05/10)** | **40/40**, 0 deuxième essai ; lâcher vertical 10 / 15° 19 / 30° 11 ; écart au centre médiane 7 mm, max 17 mm ; Tmax 86 °C |
+| 01/10/2026 | 8 — tri par la perception seule | fait, **validé (05/10)** | `/yolo/objects_3d` = fusion médiane des 4 caméras, objets et bacs ; paires par la classe (`sorting_pairs`). Hors ligne 10 graines : 80/80, 40/40 paires, 0,65 / 2,07 mm ; en direct graine 3 : 8/8, 4/4, 0,85 / 1,94 mm. 40 tests OK |
+| 01/10/2026 | 9 — tri piloté par la perception | fait, **validé (05/10)** | `pose_source:=perception` : 6/40 triés, **6/6 des pièces à portée**, 0 échec de perception ou de prise ; 34 échecs de portée (outil vertical 0,28 m). Corrections : ouverture d'approche, cubes à 0/90°, dépôt résolu avant saisie |
+| 02/10/2026 | 9 suite — portée et lâcher | fait (graine 1), campagne en cours | `piece_reach:=0.28`, lâcher incliné 15/30/45°, 2 essais ; lâcher au-dessus du rebord pour tous, doigts écartés **avant** la remontée (glissement vu). Graine 1 : **4/4**, objets au fond avant la remontée, écart max +12/−10 mm (pavé). `--switch-timeout 30` |
+| 05/10/2026 | 9 suite — campagne 10 graines | fait, **validé (05/10)** | **40/40**, 0 deuxième essai ; lâcher vertical 10 / 15° 19 / 30° 11 ; écart au centre médiane 7 mm, max 17 mm ; Tmax 86 °C |
 | 05/10/2026 | 11 — journalisation CSV | fait (graine 1) | `log_dir:=` → `run.yaml` (md5 des poids, masse, commit), `yolo_vs_gt.csv` (colonnes du protocole, en continu), `tri.csv` ; `vision/yolo_vs_gt.py` partagé avec `yolo26_tri_eval.py` ; 21 tests OK |
-| 05/10/2026 | 10 — DREAM en parallèle + non-régression pince | fait, **à valider par Osama** | `dream:=true`, `dream_fk_compare` ; sans → avec pince : détection 65,2 → 49,5 %, médiane 3,8 → 11,2 px, aberrant 6,6 → 22,7 % ; caméra du dessus en échec **même sans pince** ; graine 2 avec DREAM : 4/4 mais 95 °C (garde durcie) |
+| 05/10/2026 | 10 — DREAM en parallèle + non-régression pince | fait, **à valider** | `dream:=true`, `dream_fk_compare` ; sans → avec pince : détection 65,2 → 49,5 %, médiane 3,8 → 11,2 px, aberrant 6,6 → 22,7 % ; caméra du dessus en échec **même sans pince** ; graine 2 avec DREAM : 4/4 mais 95 °C (garde durcie) |
 | 05/10/2026 | 10 — monde du 50K contre scène de tri | fait | sans pince, mêmes poses : détection 99,2 % / 3,0 px dans le monde du 50K contre 65,2 % / 3,8 px dans la scène de tri ; caméra du dessus 100 % dans le monde du 50K → **la cause est la scène, pas la caméra ni la pince** |
 | 05/10/2026 | 10 — modèle montage0901 | fait | même balayage : 99,0 % monde du 50K, 61,5 % tri sans pince, 49,8 % tri avec pince — identique au v4_mix ; l'écart est propre au rendu Gazebo, seul un fine-tuning sur des rendus de la scène de tri le comblerait |
 | 05/10/2026 | 10 — ablation ArUco / pièces | fait | sans pince : 50K 99,2 % → plateau seul 71,4 % (dessus 10 %) → sans ArUco 66,6 % → complète 65,2 % ; ArUco négligeables, pièces = caméra avant, plateau/monde real_table = l'essentiel |
-| 05/10/2026 | 10 — dashboard YOLO + DREAM | fait, **à valider par Osama** | `dashboard:=true` → `tri_dream_dashboard` ; T_DREAM contre T_GT, trajectoire de la bride, dXYZ, rotation, latence ; PnP de `dream_inference` sur les angles de l'instant de l'image |
-| 05/10/2026 | 10 — dashboard v2 DREAM ↔ YOLO, une seule fenêtre | fait, **à valider par Osama** | Gazebo reparenté dans la case 3D du dashboard (`embed_gazebo`) ; trajectoires colorées par objet + DREAM dans Gazebo ; pointe = `tool_tip` du trieur (codeurs ↔ YOLO 1,8-2,8 mm) ; `dream_cameras:=front,right` : 4/4 à 88 °C ; écart DREAM ↔ YOLO 10-315 mm, dû à T_DREAM (rotation 27-32°, profondeur 29-43 mm, keypoints 7-37 px) |
+| 05/10/2026 | 10 — dashboard YOLO + DREAM | fait, **à valider** | `dashboard:=true` → `tri_dream_dashboard` ; T_DREAM contre T_GT, trajectoire de la bride, dXYZ, rotation, latence ; PnP de `dream_inference` sur les angles de l'instant de l'image |
+| 05/10/2026 | 10 — dashboard v2 DREAM ↔ YOLO, une seule fenêtre | fait, **à valider** | Gazebo reparenté dans la case 3D du dashboard (`embed_gazebo`) ; trajectoires colorées par objet + DREAM dans Gazebo ; pointe = `tool_tip` du trieur (codeurs ↔ YOLO 1,8-2,8 mm) ; `dream_cameras:=front,right` : 4/4 à 88 °C ; écart DREAM ↔ YOLO 10-315 mm, dû à T_DREAM (rotation 27-32°, profondeur 29-43 mm, keypoints 7-37 px) |
 | 05-06/10/2026 | 10 — fine-tuning DREAM scène de tri | rendus faits, entraînement en cours | `synthetic_data_collector_tri` : 12 080 images train (1001-1016) + 1 200 test (2001-2003), Tmax 84 °C ; v4_mix sur le test : 52,6 % / 16,7 px ; `v5_geo` depuis v4_mix sur 104 160 images, 10 époques → `vgg_tri_mix_ft_e10` |
