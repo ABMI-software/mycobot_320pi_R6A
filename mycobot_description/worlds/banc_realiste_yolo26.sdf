@@ -1,0 +1,283 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf version="1.9">
+  <world name="banc_realiste_yolo26">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics" />
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands" />
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster" />
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre</render_engine>
+    </plugin>
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <scene>
+      <ambient>0.5000 0.5000 0.5000 1.0000</ambient>
+      <background>0.8 0.82 0.85 1</background>
+    </scene>
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9000 0.9000 0.8500 1.0000</diffuse>
+      <specular>0.3000 0.3000 0.3000 1.0000</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.3 -0.9</direction>
+    </light>
+    <light type="directional" name="fill_light">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 8 0 0 0</pose>
+      <diffuse>0.4000 0.4000 0.5000 1.0000</diffuse>
+      <specular>0.1000 0.1000 0.1000 1.0000</specular>
+      <direction>0.5 -0.3 -0.7</direction>
+    </light>
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.55 0.55 0.52 1</ambient>
+            <diffuse>0.6 0.6 0.57 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <pose>0 0 -0.0085 0 0 0</pose>
+    </model>
+    <model name="table">
+      <static>true</static>
+      <pose>0.261 0.017 -0.00425 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <mesh>
+              <uri>package://mycobot_description/models/wood_table/meshes/tabletop.dae</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.08 0.08 0.08 1</specular>
+            <pbr>
+              <metal>
+                <albedo_map>package://mycobot_description/models/wood_table/materials/textures/wood_albedo.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>0.65</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.622 0.449 0.0085</size>
+            </box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.9</mu>
+                <mu2>0.9</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+    </model>
+    <include>
+      <uri>package://mycobot_description/models/aruco_19</uri>
+      <name>aruco_19</name>
+      <pose>0.0968 0.2034 0 0 0 -1.549547177458</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/aruco_23</uri>
+      <name>aruco_23</name>
+      <pose>0.11 -0.179 0 0 0 -1.550472159638</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/aruco_25</uri>
+      <name>aruco_25</name>
+      <pose>0.535 0.215 0 0 0 -1.567821028086</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/aruco_26</uri>
+      <name>aruco_26</name>
+      <pose>0.53 -0.176 0 0 0 -0.053626108386</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/bac_rouge</uri>
+      <name>bac_rouge</name>
+      <pose>0.300000 0.170000 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/cube_rouge</uri>
+      <name>cube_rouge</name>
+      <pose>0.200000 0.120000 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/bac_jaune</uri>
+      <name>bac_jaune</name>
+      <pose>0.395000 0.060000 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/pave_jaune</uri>
+      <name>pave_jaune</name>
+      <pose>0.250000 0.055000 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/bac_vert</uri>
+      <name>bac_vert</name>
+      <pose>0.395000 -0.060000 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/cylindre_vert</uri>
+      <name>cylindre_vert</name>
+      <pose>0.250000 -0.035000 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/bac_bleu</uri>
+      <name>bac_bleu</name>
+      <pose>0.300000 -0.170000 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://mycobot_description/models/cube_bleu</uri>
+      <name>cube_bleu</name>
+      <pose>0.200000 -0.120000 0 0 0 0</pose>
+    </include>
+    <model name="arducam">
+      <static>true</static>
+      <pose>0.007071 -0.128254 1.069888 -0.046957 1.405347 0.119569</pose>
+      <link name="camera_link">
+        <visual name="boitier">
+          <pose>-0.02 0 0 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.04 0.075 0.03</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.15 0.15 0.17 1</ambient>
+            <diffuse>0.2 0.2 0.22 1</diffuse>
+          </material>
+        </visual>
+        <visual name="objectif">
+          <pose>0.008 0 0 0 1.5707963 0</pose>
+          <geometry>
+            <cylinder>
+              <radius>0.011</radius>
+              <length>0.022</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.05 0.05 0.06 1</ambient>
+            <diffuse>0.08 0.08 0.1 1</diffuse>
+            <specular>0.6 0.6 0.6 1</specular>
+          </material>
+        </visual>
+        <sensor name="arducam" type="camera">
+          <always_on>true</always_on>
+          <update_rate>10</update_rate>
+          <topic>/arducam/image_raw</topic>
+          <camera>
+            <camera_info_topic>/arducam/camera_info</camera_info_topic>
+            <horizontal_fov>1.145367686</horizontal_fov>
+            <image>
+              <width>640</width>
+              <height>480</height>
+              <format>R8G8B8</format>
+            </image>
+            <lens>
+              <intrinsics>
+                <fx>496.307503</fx>
+                <fy>494.142967</fy>
+                <cx>313.373811</cx>
+                <cy>248.005662</cy>
+                <s>0</s>
+              </intrinsics>
+            </lens>
+            <clip>
+              <near>0.02</near>
+              <far>4.0</far>
+            </clip>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+    <model name="svpro">
+      <static>true</static>
+      <pose>0.370684 0.457849 0.781242 -0.181539 0.898533 -1.722805</pose>
+      <link name="camera_link">
+        <visual name="boitier">
+          <pose>-0.02 0 0 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.04 0.075 0.03</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.15 0.15 0.17 1</ambient>
+            <diffuse>0.2 0.2 0.22 1</diffuse>
+          </material>
+        </visual>
+        <visual name="objectif">
+          <pose>0.008 0 0 0 1.5707963 0</pose>
+          <geometry>
+            <cylinder>
+              <radius>0.011</radius>
+              <length>0.022</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.05 0.05 0.06 1</ambient>
+            <diffuse>0.08 0.08 0.1 1</diffuse>
+            <specular>0.6 0.6 0.6 1</specular>
+          </material>
+        </visual>
+        <sensor name="svpro" type="camera">
+          <always_on>true</always_on>
+          <update_rate>10</update_rate>
+          <topic>/svpro/image_raw</topic>
+          <camera>
+            <camera_info_topic>/svpro/camera_info</camera_info_topic>
+            <horizontal_fov>1.241009780</horizontal_fov>
+            <image>
+              <width>640</width>
+              <height>480</height>
+              <format>R8G8B8</format>
+            </image>
+            <lens>
+              <intrinsics>
+                <fx>447.758168</fx>
+                <fy>446.544127</fy>
+                <cx>333.179135</cx>
+                <cy>267.295929</cy>
+                <s>0</s>
+              </intrinsics>
+            </lens>
+            <clip>
+              <near>0.02</near>
+              <far>4.0</far>
+            </clip>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

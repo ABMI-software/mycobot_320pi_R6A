@@ -11,6 +11,45 @@
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mycobot_320_pi">
 
+  <!-- Bare arm mass including the fixed base, excluding the gripper.
+       Default 1.58 kg keeps the original inertials, bit for bit — the model
+       the DREAM synthetic campaigns and the pick-and-place were built on.
+       arm_mass_kg:=3.0 (320 Pi 2022 datasheet) is an explicit opt-in for the
+       precision campaign only: per-link weights/COMs are not measured, every
+       inertia is scaled at fixed geometry. -->
+  <!-- Experimental torque-driven arm: parameters are hypotheses, not identified servos. -->
+  <xacro:arg name="arm_control_mode" default="position"/>
+  <xacro:arg name="controller_config" default="$(find mycobot_description)/config/controller.yaml"/>
+  <xacro:property name="effort_arm" value="${'$(arg arm_control_mode)' == 'effort'}"/>
+  <xacro:arg name="arm_mass_kg" default="1.58"/>
+  <xacro:property name="arm_mass_scale" value="${float('$(arg arm_mass_kg)') / 1.58}"/>
+  <xacro:macro name="arm_inertial" params="reference_mass reference_inertia xyz:='0 0 0'">
+    <inertial>
+      <mass value="${reference_mass * arm_mass_scale}"/>
+      <origin xyz="${xyz}" rpy="0 0 0"/>
+      <inertia ixx="${reference_inertia * arm_mass_scale}" ixy="0" ixz="0"
+               iyy="${reference_inertia * arm_mass_scale}" iyz="0"
+               izz="${reference_inertia * arm_mass_scale}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- Gripper mass. Default 0.22 kg keeps the original inertial model.
+       gripper_mass_kg:=0.34 (Pro force-controlled gripper datasheet) is an
+       explicit opt-in: COMs and geometry still come from the adaptive-gripper
+       model, inertia is scaled with mass at fixed geometry. -->
+  <xacro:arg name="gripper_mass_kg" default="0.22"/>
+  <xacro:arg name="enable_cameras" default="true"/>
+  <xacro:property name="gripper_mass_scale" value="${float('$(arg gripper_mass_kg)') / 0.22}"/>
+  <xacro:macro name="gripper_inertial" params="reference_mass reference_inertia">
+    <inertial>
+      <mass value="${reference_mass * gripper_mass_scale}"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="${reference_inertia * gripper_mass_scale}" ixy="0" ixz="0"
+               iyy="${reference_inertia * gripper_mass_scale}" iyz="0"
+               izz="${reference_inertia * gripper_mass_scale}"/>
+    </inertial>
+  </xacro:macro>
+
   <!-- Appearance is opt-in: the original training render stays available.
        These macros affect visuals only; all meshes, visual origins, joints,
        collisions, inertias and controller parameters are shared unchanged. -->
@@ -90,11 +129,7 @@
       </geometry>
       <origin xyz="0.0 0 0" rpy="0 0 3.1415926"/>
     </collision>
-    <inertial>
-      <mass value="0.5"/>
-      <origin xyz="0 0 0.05" rpy="0 0 0"/>
-      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
-    </inertial>
+    <xacro:arm_inertial reference_mass="0.5" reference_inertia="0.001" xyz="0 0 0.05"/>
   </link>
 
   <link name="link1">
@@ -114,11 +149,7 @@
       </geometry>
       <origin xyz="0.115 -0.172 -0.09" rpy="0 0 3.1415926"/>
     </collision>
-    <inertial>
-      <mass value="0.3"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005"/>
-    </inertial>
+    <xacro:arm_inertial reference_mass="0.3" reference_inertia="0.0005" xyz="0 0 0"/>
   </link>
 
   <link name="link2">
@@ -136,11 +167,7 @@
       </geometry>
       <origin xyz="-0.075 -0.115 -0.022" rpy="1.5708 0 1.5708"/>
     </collision>
-    <inertial>
-      <mass value="0.25"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0004" ixy="0" ixz="0" iyy="0.0004" iyz="0" izz="0.0004"/>
-    </inertial>
+    <xacro:arm_inertial reference_mass="0.25" reference_inertia="0.0004" xyz="0 0 0"/>
   </link>
 
   <link name="link3">
@@ -158,11 +185,7 @@
       </geometry>
       <origin xyz="-0.22 -0.115 0.142" rpy="1.5708 0 1.5708"/>
     </collision>
-    <inertial>
-      <mass value="0.2"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0003" ixy="0" ixz="0" iyy="0.0003" iyz="0" izz="0.0003"/>
-    </inertial>
+    <xacro:arm_inertial reference_mass="0.2" reference_inertia="0.0003" xyz="0 0 0"/>
   </link>
 
   <link name="link4">
@@ -180,11 +203,7 @@
       </geometry>
       <origin xyz="-0.115 0.338 -0.1435" rpy="1.5708 0 0"/>
     </collision>
-    <inertial>
-      <mass value="0.15"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002"/>
-    </inertial>
+    <xacro:arm_inertial reference_mass="0.15" reference_inertia="0.0002" xyz="0 0 0"/>
   </link>
 
   <link name="link5">
@@ -202,11 +221,7 @@
       </geometry>
       <origin xyz="-0.1149 -0.0322 -0.482" rpy="0 0 0"/>
     </collision>
-    <inertial>
-      <mass value="0.1"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
-    </inertial>
+    <xacro:arm_inertial reference_mass="0.1" reference_inertia="0.0001" xyz="0 0 0"/>
   </link>
 
   <link name="link6">
@@ -224,11 +239,7 @@
       </geometry>
       <origin xyz="0.0 0.0 -0.0115" rpy="1.5708 1.5708 0"/>
     </collision>
-    <inertial>
-      <mass value="0.08"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00008" ixy="0" ixz="0" iyy="0.00008" iyz="0" izz="0.00008"/>
-    </inertial>
+    <xacro:arm_inertial reference_mass="0.08" reference_inertia="0.00008" xyz="0 0 0"/>
   </link>
 
   <!-- ==================== ADAPTIVE GRIPPER LINKS ==================== -->
@@ -246,11 +257,7 @@
       </geometry>
       <origin xyz="-0.02 0.012 -0.018" rpy="1.5708 0 1.5708"/>
     </collision>
-    <inertial>
-      <mass value="0.1"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
-    </inertial>
+    <xacro:gripper_inertial reference_mass="0.1" reference_inertia="0.0001"/>
   </link>
 
   <link name="gripper_left1">
@@ -267,11 +274,7 @@
       </geometry>
       <origin xyz="0.048 -0.035 -0.003" rpy="1.5708 0 1.5708"/>
     </collision>
-    <inertial>
-      <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
-    </inertial>
+    <xacro:gripper_inertial reference_mass="0.02" reference_inertia="0.00001"/>
   </link>
 
   <link name="gripper_left2">
@@ -288,11 +291,7 @@
       </geometry>
       <origin xyz="0.026 0.022 -0.018" rpy="1.5708 0 1.5708"/>
     </collision>
-    <inertial>
-      <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
-    </inertial>
+    <xacro:gripper_inertial reference_mass="0.02" reference_inertia="0.00001"/>
   </link>
 
   <link name="gripper_left3">
@@ -309,11 +308,7 @@
       </geometry>
       <origin xyz="0.0 0.0 -0.018" rpy="1.5708 0 1.5708"/>
     </collision>
-    <inertial>
-      <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
-    </inertial>
+    <xacro:gripper_inertial reference_mass="0.02" reference_inertia="0.00001"/>
   </link>
 
   <link name="gripper_right1">
@@ -330,11 +325,7 @@
       </geometry>
       <origin xyz="-0.086 -0.036 -0.003" rpy="1.5708 0 1.5708"/>
     </collision>
-    <inertial>
-      <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
-    </inertial>
+    <xacro:gripper_inertial reference_mass="0.02" reference_inertia="0.00001"/>
   </link>
 
   <link name="gripper_right2">
@@ -351,11 +342,7 @@
       </geometry>
       <origin xyz="-0.062 0.0224 -0.018" rpy="1.5708 0 1.5708"/>
     </collision>
-    <inertial>
-      <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
-    </inertial>
+    <xacro:gripper_inertial reference_mass="0.02" reference_inertia="0.00001"/>
   </link>
 
   <link name="gripper_right3">
@@ -372,18 +359,14 @@
       </geometry>
       <origin xyz="-0.034 0.0 -0.018" rpy="1.5708 0 1.5708"/>
     </collision>
-    <inertial>
-      <mass value="0.02"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
-    </inertial>
+    <xacro:gripper_inertial reference_mass="0.02" reference_inertia="0.00001"/>
   </link>
 
   <!-- ==================== JOINTS ==================== -->
 
   <joint name="joint2_to_joint1" type="revolute">
     <axis xyz="0 0 1"/>
-    <limit effort="1000.0" lower="-2.93" upper="2.93" velocity="3.14"/>
+    <limit effort="${12.0 if effort_arm else 1000.0}" lower="-2.93215" upper="2.93215" velocity="3.14"/>
     <parent link="base"/>
     <child link="link1"/>
     <origin xyz="0 0 0.162" rpy="0 0 0"/>
@@ -392,7 +375,7 @@
 
   <joint name="joint3_to_joint2" type="revolute">
     <axis xyz="0 0 1"/>
-    <limit effort="1000.0" lower="-2.35" upper="2.35" velocity="3.14"/>
+    <limit effort="${12.0 if effort_arm else 1000.0}" lower="-2.35619" upper="2.35619" velocity="3.14"/>
     <parent link="link1"/>
     <child link="link2"/>
     <origin xyz="0 0 0" rpy="0 -1.5708 1.5708"/>
@@ -401,7 +384,7 @@
 
   <joint name="joint4_to_joint3" type="revolute">
     <axis xyz="0 0 1"/>
-    <limit effort="1000.0" lower="-2.53" upper="2.53" velocity="3.14"/>
+    <limit effort="${10.0 if effort_arm else 1000.0}" lower="-2.61799" upper="2.61799" velocity="3.14"/>
     <parent link="link2"/>
     <child link="link3"/>
     <origin xyz="0.13635 0 0" rpy="0 0 0"/>
@@ -410,7 +393,7 @@
 
   <joint name="joint5_to_joint4" type="revolute">
     <axis xyz="0 0 1"/>
-    <limit effort="1000.0" lower="-2.53" upper="2.53" velocity="3.14"/>
+    <limit effort="${5.0 if effort_arm else 1000.0}" lower="-2.53073" upper="2.53073" velocity="3.14"/>
     <parent link="link3"/>
     <child link="link4"/>
     <origin xyz="0.1205 0 0.082" rpy="0 0 1.57080"/>
@@ -419,7 +402,7 @@
 
   <joint name="joint6_to_joint5" type="revolute">
     <axis xyz="0 0 1"/>
-    <limit effort="1000.0" lower="-2.93" upper="2.93" velocity="3.14"/>
+    <limit effort="${4.0 if effort_arm else 1000.0}" lower="-2.87979" upper="2.87979" velocity="3.14"/>
     <parent link="link4"/>
     <child link="link5"/>
     <origin xyz="0 -0.084 0" rpy="1.5708 0 0"/>
@@ -428,7 +411,7 @@
 
   <joint name="joint6output_to_joint6" type="revolute">
     <axis xyz="0 0 1"/>
-    <limit effort="1000.0" lower="-3.14" upper="3.14" velocity="3.14"/>
+    <limit effort="${3.0 if effort_arm else 1000.0}" lower="-3.14159" upper="3.14159" velocity="3.14"/>
     <parent link="link5"/>
     <child link="link6"/>
     <origin xyz="0 0.06635 0" rpy="-1.5708 0 0"/>
@@ -533,26 +516,23 @@
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
-  <!-- ==================== 4 CAMERAS FOR SYNTHETIC DATA ==================== -->
-  <!--                                                                               -->
-  <!-- Intrinsics from ChArUco calibration (feature/calibration-cam, 28/04/2026)    -->
-  <!--   cam_0 intrinsics: fx=525.671 fy=529.700 cx=317.729 cy=226.003  RMS=0.674   -->
-  <!--   cam_3 intrinsics: fx=496.308 fy=494.143 cx=313.374 cy=248.006  RMS=0.678   -->
-  <!--                                                                               -->
-  <!-- Distribution: cam_0 and cam_2 use cam_0 intrinsics                           -->
-  <!--               cam_1 and cam_3 use cam_3 intrinsics                           -->
-  <!--                                                                               -->
-  <!-- Placement (90-degree symmetric ring at z=0.4 m):                             -->
-  <!--   cam_0: (  0.8,  0.0, 0.4) front  — rpy=(0,  0.30,  3.1416)               -->
-  <!--   cam_1: (  0.0,  0.8, 0.4) left   — rpy=(0,  0.30, -1.5708)               -->
-  <!--   cam_2: ( -0.7,  0.0, 0.4) back   — rpy=(0,  0.50,  0.0   )               -->
-  <!--   cam_3: (  0.0, -0.8, 0.4) right  — rpy=(0,  0.30,  1.5708)               -->
+  <!-- ==================== CAMERA FOR SYNTHETIC DATA ==================== -->
+  <!-- camera_layout:=dream50k puts the four cameras exactly where they rendered
+       the 50K DREAM dataset (mycobot_pro_320_pi_gazebo_nogripper.urdf and
+       training/dream/mycobot_fk.GAZEBO_CAMERAS; guarded by
+       tests/test_cameras_dream50k.py). legacy keeps the real_table mounts.
+       Intrinsics are identical in both layouts. -->
+  <xacro:arg name="camera_layout" default="legacy"/>
+  <xacro:property name="camera_side_distance"
+                  value="${dict(legacy=1.1, dream50k=0.8)['$(arg camera_layout)']}"/>
+  <xacro:property name="camera_top_height"
+                  value="${dict(legacy=1.0, dream50k=0.95)['$(arg camera_layout)']}"/>
+  <xacro:if value="$(arg enable_cameras)">
 
   <!-- Camera mount (fixed in the world, looking at the robot).
        Visual is shaped like a real CCTV/IP camera so it doesn't look
        like one of the colored sort cubes: a dark-gray body box plus a
        black lens cylinder protruding along the optical axis (+X). -->
-  <!-- cam_0: front view, cam_0 intrinsics -->
   <link name="camera_link">
     <visual name="body">
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -582,28 +562,32 @@
       </material>
     </visual>
     <inertial>
-      <mass value="0.01"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
     </inertial>
   </link>
+
   <!-- « droite » et « gauche » sont celles de l'operateur, debout du cote de
        la camera frontale (+X) et regardant le robot : +Y est alors a sa
        droite, -Y a sa gauche. Ce sont donc les cotes opposes a ceux du robot
        lui-meme, tourne vers +X. Ecrit ici parce que les deux lectures sont
        defendables et que le collecteur v1 avait pris l'autre. -->
-  <!-- ===== CAMERA 1 (front) — cam_0 intrinsics ===== -->
+  <!-- ===== CAMERA 1 (front) — original position ===== -->
   <joint name="world_to_camera" type="fixed">
     <parent link="world"/>
     <child link="camera_link"/>
     <!-- x=0.8 forward, z=0.4 height, pitched down toward robot -->
-    <origin xyz="1.1 0.0 0.4" rpy="0 0.3 3.1416"/>
+    <origin xyz="${camera_side_distance} 0.0 0.4" rpy="0 0.3 3.1416"/>
   </joint>
+
   <gazebo reference="camera_link">
     <sensor name="synth_camera" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
       <visualize>true</visualize>
       <camera>
+        <camera_info_topic>/synth_camera/camera_info</camera_info_topic>
         <horizontal_fov>1.15</horizontal_fov>
         <image>
           <width>640</width>
@@ -619,14 +603,26 @@
     </sensor>
   </gazebo>
 
-  <!-- cam_1: left view, cam_3 intrinsics -->
+  <!-- ===== CAMERA 2 (right side, 90° from front) ===== -->
   <link name="camera_link_right">
-    <visual>
-      <geometry><box size="0.03 0.03 0.03"/></geometry>
-      <material name="cam1_green"><color rgba="0.2 0.8 0.2 1.0"/></material>
+    <visual name="body">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.06 0.04 0.04"/></geometry>
+      <material name="camera_body_dark2"><color rgba="0.15 0.15 0.18 1.0"/></material>
+    </visual>
+    <visual name="lens">
+      <origin xyz="0.035 0 0" rpy="0 1.5708 0"/>
+      <geometry><cylinder radius="0.013" length="0.025"/></geometry>
+      <material name="camera_lens_black2"><color rgba="0.05 0.05 0.05 1.0"/></material>
+    </visual>
+    <visual name="led">
+      <origin xyz="0.030 0.013 0.013" rpy="0 0 0"/>
+      <geometry><sphere radius="0.0025"/></geometry>
+      <material name="camera_led_red2"><color rgba="0.9 0.05 0.05 1.0"/></material>
     </visual>
     <inertial>
-      <mass value="0.01"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
     </inertial>
   </link>
@@ -634,36 +630,44 @@
   <joint name="world_to_camera_right" type="fixed">
     <parent link="world"/>
     <child link="camera_link_right"/>
-    <origin xyz="0.0 1.1 0.4" rpy="0 0.3 -1.5708"/>
+    <origin xyz="0.0 ${camera_side_distance} 0.4" rpy="0 0.3 -1.5708"/>
   </joint>
+
   <gazebo reference="camera_link_right">
     <sensor name="synth_camera_right" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
-      <visualize>true</visualize>
+      <visualize>false</visualize>
       <camera>
+        <camera_info_topic>/synth_camera_right/camera_info</camera_info_topic>
         <horizontal_fov>1.15</horizontal_fov>
         <image><width>640</width><height>480</height><format>R8G8B8</format></image>
         <clip><near>0.05</near><far>10.0</far></clip>
-        <intrinsics>
-          <fx>496.308</fx><fy>494.143</fy>
-          <cx>313.374</cx><cy>248.006</cy>
-          <s>0</s>
-        </intrinsics>
       </camera>
       <topic>synth_camera_right/image</topic>
     </sensor>
   </gazebo>
 
-  <!-- cam_2: back view, cam_0 intrinsics -->
-  <!-- Steeper pitch (0.50 rad) because distance is 0.7 m vs 0.8 m for front cam   -->
+  <!-- ===== CAMERA 3 (left side, -90° from front) ===== -->
   <link name="camera_link_left">
-    <visual>
-      <geometry><box size="0.03 0.03 0.03"/></geometry>
-      <material name="cam2_red"><color rgba="0.8 0.2 0.2 1.0"/></material>
+    <visual name="body">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.06 0.04 0.04"/></geometry>
+      <material name="camera_body_dark3"><color rgba="0.15 0.15 0.18 1.0"/></material>
+    </visual>
+    <visual name="lens">
+      <origin xyz="0.035 0 0" rpy="0 1.5708 0"/>
+      <geometry><cylinder radius="0.013" length="0.025"/></geometry>
+      <material name="camera_lens_black3"><color rgba="0.05 0.05 0.05 1.0"/></material>
+    </visual>
+    <visual name="led">
+      <origin xyz="0.030 0.013 0.013" rpy="0 0 0"/>
+      <geometry><sphere radius="0.0025"/></geometry>
+      <material name="camera_led_red3"><color rgba="0.9 0.05 0.05 1.0"/></material>
     </visual>
     <inertial>
-      <mass value="0.01"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
     </inertial>
   </link>
@@ -671,35 +675,44 @@
   <joint name="world_to_camera_left" type="fixed">
     <parent link="world"/>
     <child link="camera_link_left"/>
-    <origin xyz="0.0 -1.1 0.4" rpy="0 0.3 1.5708"/>
+    <origin xyz="0.0 ${-camera_side_distance} 0.4" rpy="0 0.3 1.5708"/>
   </joint>
+
   <gazebo reference="camera_link_left">
     <sensor name="synth_camera_left" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
-      <visualize>true</visualize>
+      <visualize>false</visualize>
       <camera>
+        <camera_info_topic>/synth_camera_left/camera_info</camera_info_topic>
         <horizontal_fov>1.15</horizontal_fov>
         <image><width>640</width><height>480</height><format>R8G8B8</format></image>
         <clip><near>0.05</near><far>10.0</far></clip>
-        <intrinsics>
-          <fx>525.671</fx><fy>529.700</fy>
-          <cx>317.729</cx><cy>226.003</cy>
-          <s>0</s>
-        </intrinsics>
       </camera>
       <topic>synth_camera_left/image</topic>
     </sensor>
   </gazebo>
 
-  <!-- cam_3: right view, cam_3 intrinsics -->
+  <!-- ===== CAMERA 4 (overhead, looking straight down) ===== -->
   <link name="camera_link_top">
-    <visual>
-      <geometry><box size="0.03 0.03 0.03"/></geometry>
-      <material name="cam3_yellow"><color rgba="0.8 0.8 0.2 1.0"/></material>
+    <visual name="body">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.06 0.04 0.04"/></geometry>
+      <material name="camera_body_dark4"><color rgba="0.15 0.15 0.18 1.0"/></material>
+    </visual>
+    <visual name="lens">
+      <origin xyz="0.035 0 0" rpy="0 1.5708 0"/>
+      <geometry><cylinder radius="0.013" length="0.025"/></geometry>
+      <material name="camera_lens_black4"><color rgba="0.05 0.05 0.05 1.0"/></material>
+    </visual>
+    <visual name="led">
+      <origin xyz="0.030 0.013 0.013" rpy="0 0 0"/>
+      <geometry><sphere radius="0.0025"/></geometry>
+      <material name="camera_led_red4"><color rgba="0.9 0.05 0.05 1.0"/></material>
     </visual>
     <inertial>
-      <mass value="0.01"/><origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
     </inertial>
   </link>
@@ -707,26 +720,25 @@
   <joint name="world_to_camera_top" type="fixed">
     <parent link="world"/>
     <child link="camera_link_top"/>
-    <origin xyz="0.0 0.0 1.0" rpy="0 1.5708 0"/>
+    <origin xyz="0.0 0.0 ${camera_top_height}" rpy="0 1.5708 0"/>
   </joint>
+
   <gazebo reference="camera_link_top">
     <sensor name="synth_camera_top" type="camera">
       <always_on>true</always_on>
       <update_rate>10</update_rate>
-      <visualize>true</visualize>
+      <visualize>false</visualize>
       <camera>
+        <camera_info_topic>/synth_camera_top/camera_info</camera_info_topic>
         <horizontal_fov>1.15</horizontal_fov>
         <image><width>640</width><height>480</height><format>R8G8B8</format></image>
         <clip><near>0.05</near><far>10.0</far></clip>
-        <intrinsics>
-          <fx>496.308</fx><fy>494.143</fy>
-          <cx>313.374</cx><cy>248.006</cy>
-          <s>0</s>
-        </intrinsics>
       </camera>
       <topic>synth_camera_top/image</topic>
     </sensor>
   </gazebo>
+
+  </xacro:if>
 
   <!-- ros2_control hardware interface (Gazebo sim) -->
   <ros2_control name="MyCobotSystem" type="system">
@@ -735,50 +747,68 @@
       <param name="use_sim_time">true</param>
     </hardware>
     <joint name="joint2_to_joint1">
-      <command_interface name="position">
+      <xacro:if value="${effort_arm}">
+        <command_interface name="effort"><param name="min">-12</param><param name="max">12</param></command_interface>
+      </xacro:if>
+      <xacro:unless value="${effort_arm}"><command_interface name="position">
         <param name="min">-2.93</param>
         <param name="max">2.93</param>
-      </command_interface>
+      </command_interface></xacro:unless>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
     </joint>
     <joint name="joint3_to_joint2">
-      <command_interface name="position">
+      <xacro:if value="${effort_arm}">
+        <command_interface name="effort"><param name="min">-12</param><param name="max">12</param></command_interface>
+      </xacro:if>
+      <xacro:unless value="${effort_arm}"><command_interface name="position">
         <param name="min">-2.35</param>
         <param name="max">2.35</param>
-      </command_interface>
+      </command_interface></xacro:unless>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
     </joint>
     <joint name="joint4_to_joint3">
-      <command_interface name="position">
+      <xacro:if value="${effort_arm}">
+        <command_interface name="effort"><param name="min">-10</param><param name="max">10</param></command_interface>
+      </xacro:if>
+      <xacro:unless value="${effort_arm}"><command_interface name="position">
         <param name="min">-2.53</param>
         <param name="max">2.53</param>
-      </command_interface>
+      </command_interface></xacro:unless>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
     </joint>
     <joint name="joint5_to_joint4">
-      <command_interface name="position">
+      <xacro:if value="${effort_arm}">
+        <command_interface name="effort"><param name="min">-5</param><param name="max">5</param></command_interface>
+      </xacro:if>
+      <xacro:unless value="${effort_arm}"><command_interface name="position">
         <param name="min">-2.53</param>
         <param name="max">2.53</param>
-      </command_interface>
+      </command_interface></xacro:unless>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
     </joint>
     <joint name="joint6_to_joint5">
-      <command_interface name="position">
+      <xacro:if value="${effort_arm}">
+        <command_interface name="effort"><param name="min">-4</param><param name="max">4</param></command_interface>
+      </xacro:if>
+      <xacro:unless value="${effort_arm}"><command_interface name="position">
         <param name="min">-2.93</param>
         <param name="max">2.93</param>
-      </command_interface>
+      </command_interface></xacro:unless>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
     </joint>
     <joint name="joint6output_to_joint6">
-      <command_interface name="position">
+      <xacro:if value="${effort_arm}">
+        <command_interface name="effort"><param name="min">-3</param><param name="max">3</param></command_interface>
+      </xacro:if>
+      <xacro:unless value="${effort_arm}"><command_interface name="position">
         <param name="min">-3.14</param>
         <param name="max">3.14</param>
-      </command_interface>
+      </command_interface></xacro:unless>
       <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
       <state_interface name="velocity"/>
     </joint>
@@ -872,7 +902,7 @@
   <gazebo>
     <plugin filename="libgz_ros2_control-system.so"
             name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-      <parameters>$(find mycobot_description)/config/controller.yaml</parameters>
+      <parameters>$(arg controller_config)</parameters>
       <controller_manager_name>controller_manager</controller_manager_name>
       <robot_param>robot_description</robot_param>
       <robot_param_node>robot_state_publisher</robot_param_node>
@@ -893,12 +923,14 @@
   </gazebo>
 
   <!-- Gazebo sensors system (required for camera) -->
+  <xacro:if value="$(arg enable_cameras)">
   <gazebo>
     <plugin filename="gz-sim-sensors-system"
             name="gz::sim::systems::Sensors">
       <render_engine>ogre2</render_engine>
     </plugin>
   </gazebo>
+  </xacro:if>
 
   <!-- PAS de `gz-sim-joint-position-controller-system` ici. Il a ete restaure
        le 28/08 pour ranimer les topics cmd_pos ; mesure le 31/08, il faisait

@@ -244,19 +244,60 @@ terminaux ci-dessus.
 
 ---
 
-## Précision — l'état du banc au 10/09/2026
+## Tri piloté par yolo26 et DREAM dans Gazebo (29/09 → 06/10/2026)
 
-**La planche a bougé** : rotation **−1,750°**, translation **(18,8 · −6,5) mm**,
-mesuré sur les 4 marqueurs, résidu 0,39 mm, distances entre centres conservées
-à 0,14 %. **La caméra, elle, n'a pas bougé** — le trépied du fond n'a été
-déplacé que de 0,2 px dans l'image. Deux conséquences **opposées**, à ne pas
-confondre :
+`ros2 launch mycobot_gateway tri_yolo.launch.py seed:=S piece_reach:=0.28` puis
+`sim_sorting_grasp -p pose_source:=perception -p world_name:=tri_yolo`. 40/40 triés
+sur 10 graines. `dream:=true dashboard:=true` ajoute DREAM et le dashboard DREAM ↔ YOLO
+(fenêtre Gazebo intégrée). Protocole : [`docs/PROTOCOLE_YOLO_GAZEBO.md`](docs/PROTOCOLE_YOLO_GAZEBO.md).
 
-- **`arducam_extrinsic_pick.yaml` reste VALABLE.** Le lien caméra ↔ base robot
-  est intact. **Ne pas la recalibrer** : la refaire contre des positions
-  nominales périmées y injecterait les 19 mm.
-- **`workspace_markers.yaml` est PÉRIMÉ.** Toute calibration qui s'appuie
-  dessus sera fausse de 12 à 28 mm selon le marqueur.
+- **DREAM est hors distribution dans la scène de tri** : 99,2 % de détection dans le
+  monde du 50K, 65,2 % dans la scène de tri, 49,5 % avec la pince. La cause est la
+  scène, pas la caméra. Fine-tuning `vgg_tri_mix_ft_e10` (rendus
+  `synthetic_data_collector_tri`) ; graines 2001-2003 réservées au test.
+- **Température** : « Package id 0 » est le cœur le plus chaud. Les CPU 0-15 sont
+  les cœurs P (5,3 GHz), 16-27 les cœurs E. Épingler Gazebo et les entraînements sur
+  les cœurs E (`taskset -c 16-19` / `16-27`) ; sur un cœur P, pics à 100 °C.
+  [`docs/DONNEES_ET_CONSOMMATION.md`](docs/DONNEES_ET_CONSOMMATION.md).
+
+---
+
+## Précision — l'état du banc au 15/09/2026
+
+**La référence des marqueurs est mesurée AU ROBOT, pas par une caméra.**
+Le 15/09, la pince a été placée à la main sur les marqueurs 19 et 23, et on a lu
+les codeurs sans aucun ordre moteur : 19 = (87,1 ; 212,4), 23 = (110,9 ; −163,0).
+Le 25 et le 26 sont hors de portée du bras. On les a déduits de la forme de la
+planche vue par l'arducam, posée sur ces deux points. Le tout est écrit dans
+**`training/calibration/planche_actuelle.yaml`**.
+
+- **`arducam_extrinsic_pick.yaml` a été recalibrée contre cette référence**, le
+  15/09 à 14:35 et sans `--force` : leave-one-out 1,4-2,7 mm, contrôle 0,22 mm.
+  **La balle a été saisie du premier coup** (descente à 0,5 mm en XY).
+- **Avant, la calibration tournait en rond.** `planche_actuelle.yaml` avait été
+  relevé *à travers* une extrinsèque déjà fausse. Le contrôle affichait 0,3 mm,
+  alors que l'arducam voyait les marqueurs à 40-100 mm de leur place, d'où la
+  pince 5-10 cm à côté de la balle. La note du 10/09 (« extrinsèque valable, ne
+  pas recalibrer ») est **fausse** et remplacée par celle-ci.
+- **Si la caméra bouge, recalibrer, c'est sûr** : la référence ne dépend
+  d'aucune caméra. **Ne jamais utiliser « Relever la planche » (`--reference`)**,
+  qui relève les marqueurs à travers l'extrinsèque et recrée le cercle. **Si la
+  planche bouge**, remesurer le 19 et le 23 au robot.
+- **`workspace_markers.yaml` n'est pas la référence** : au robot, le 19 et le 23
+  sont à 13-16 mm de ses valeurs.
+- **SVPRO (`svpro_extrinsic_servo.yaml`) recalibrée contre la même référence**
+  le 15/09 à 15:20, après avoir incliné la caméra (ses marqueurs du bas étaient à
+  5-8 px du bord). Le leave-one-out donne 2,4-5,9 mm, au-dessus du seuil : elle
+  a été validée par la balle sur deux emplacements : à 3,3 et 7,9 mm de
+  l'arducam, rayons écartés de 2,1 et 6,4 mm, hauteur du centre triangulée à
+  29,8 et 26,6 mm pour 32 attendus. Avant, elle était
+  fausse de 62-97 mm et rejetait la balle hors de sa planche.
+- **Déplacement de caméra testé** : arducam bougée volontairement puis
+  recalibrée (10,2 mm détectés, leave-one-out ≤ 1,2 mm), balle saisie du premier
+  coup.
+
+Méthode, et essais refusés : [`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md)
+§ « Calibration contre le robot ».
 
 **Les marqueurs font bien 50 mm.** Le −2,6 % qu'on mesure sur leurs côtés à
 l'image est un **biais de détection** lié à l'obliquité (r = −0,920), pas une

@@ -156,6 +156,26 @@ The live ROS graph of the pose-estimation branch, two cameras detected:
 
 ![ROS graph of the DREAM validation dashboard](docs/dream_dashboard_rosgraph.png)
 
+### Sorting in the twin — YOLO drives the arm, DREAM is measured alongside
+
+![Sorting cycle driven by YOLO (top) and DREAM pose estimation compared to the Gazebo ground truth (bottom)](docs/architecture_tri_yolo_dream.png)
+
+The four simulated cameras feed two independent branches. **YOLO** (yolo26 v6c)
+detects objects and bins, the four views are fused into a 3D target, and the
+sorting state machine grasps with the physical gripper: 40/40 objects sorted
+over 10 seeds. **DREAM** runs on the same images and is only *measured*: its
+camera pose T_DREAM is compared to the exact Gazebo pose T_GT, and its gripper
+tip to YOLO's, on the dashboard (`tri_yolo.launch.py dream:=true dashboard:=true`).
+Protocol and results: [`docs/PROTOCOLE_YOLO_GAZEBO.md`](docs/PROTOCOLE_YOLO_GAZEBO.md) (FR).
+
+DREAM itself, from one image to the camera pose:
+
+![DREAM pipeline: RGB image, VGG-19, 7 belief maps, 2D keypoints, PnP with forward kinematics and intrinsics](docs/dream_pipeline.png)
+
+The network only learns the image → belief-map step. The 3D points come from
+forward kinematics on the measured joint angles, so a PnP error is a keypoint
+error, not a kinematic one. Details: [`training/dream/README.md`](training/dream/README.md).
+
 Full node and launch inventory: [`mycobot_gateway/README.md`](mycobot_gateway/README.md) (FR) (FR).
 Topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (FR) (FR).
 
@@ -276,6 +296,14 @@ ros2 launch mycobot_gateway precision_benchmark.launch.py
 # Hand teleoperation (simulation target; four terminals in all)
 ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim
 
+# Sorting driven by yolo26 on 4 cameras — two terminals
+ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1 piece_reach:=0.28   # dream:=true dashboard:=true for DREAM alongside
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true \
+    -p pose_source:=perception -p world_name:=tri_yolo -p max_attempts:=2
+
+# Real bench — sorting the 4 painted pieces (bridge on the Pi first)
+/usr/bin/python3 scripts/lancer_pick_dashboard_final.py
+
 # Before any physical session
 bash scripts/real_robot_preflight.sh
 ```
@@ -358,7 +386,7 @@ is [`INDEX.md`](INDEX.md) (FR).
 | Pose estimation | [`training/dream/README.md`](training/dream/README.md) — training and evaluation · [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md) (FR) · [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md) (FR) · [`docs/DREAM_DIAGNOSTIC_BIAIS.md`](docs/DREAM_DIAGNOSTIC_BIAIS.md) (FR) |
 | Calibration and metrology | [`training/calibration/PROTOCOLE_ESSAIS_PRECISION.md`](training/calibration/PROTOCOLE_ESSAIS_PRECISION.md) (FR) · [`training/calibration/METHODOLOGIE_PRECISION.md`](training/calibration/METHODOLOGIE_PRECISION.md) (FR) · [`docs/CAMERA_CALIBRATION.md`](docs/CAMERA_CALIBRATION.md) (FR) |
 | Simulation and data | [`docs/SYNTHETIC_DATA.md`](docs/SYNTHETIC_DATA.md) (FR) · [`docs/GAZEBO_REAL_TABLE.md`](docs/GAZEBO_REAL_TABLE.md) (FR) · [`mycobot_description/README.md`](mycobot_description/README.md) (FR) |
-| Pick-and-place | [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) · [`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md) (FR) · [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) |
+| Pick-and-place | [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) · [`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md) (FR) · [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) · [`docs/PROTOCOLE_YOLO_GAZEBO.md`](docs/PROTOCOLE_YOLO_GAZEBO.md) (FR) |
 | Deployment and diagnosis | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (FR) · [`docs/DEBUG_CONNECTION_GUIDE.md`](docs/DEBUG_CONNECTION_GUIDE.md) (FR) · [`docs/BRIDGE_PI_UPGRADE_GUIDE.md`](docs/BRIDGE_PI_UPGRADE_GUIDE.md) (FR) |
 | VLA data pipelines | [`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/MEASUREMENTS.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/MEASUREMENTS.md) — what was measured, with per-item confidence · [`.../doc/headless_pick_and_place_specification.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/doc/headless_pick_and_place_specification.md) · [`.../datasets/README.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/datasets/README.md) — the two LeRobot datasets and why the split holds out a camera. Each of `Gazebo_to_LeRobot_Pipeline/` and `ROS2_to_RLDS_Conversion_OpenVLA/` carries its own `docs/PIPELINE.html` |
 | Evaluating a candidate technology | [`docs/SPEC_VALIDATION_BRIQUES.md`](docs/SPEC_VALIDATION_BRIQUES.md) (FR) — how two interchangeable components are compared: the pluggable pose port, the four use cases, the error budget the bench can resolve, and the anti-circularity test that already invalidated one demonstration |

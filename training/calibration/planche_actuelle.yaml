@@ -1,0 +1,36 @@
+source: '15/09/2026 — 19 et 23 MESURES AU ROBOT (pince placee a la main, marqueur
+  au milieu des doigts, codeurs lus sans ordre moteur) : 19 (87,1 ; 212,4), 23 (110,9
+  ; -163,0). Forme de la planche = positions relatives des 4 centres vues par l arducam
+  (distances entre centres justes a 0,04 %), posee rigidement sur ces deux points
+  (residu 3,3 mm). 25 et 26 hors de portee du bras : deduits de cette forme. La forme
+  au ruban (workspace_markers.yaml) donnait 9,1 mm en leave-one-out sur le 25 et a
+  ete refusee.'
+pourquoi: 'Les deux cameras voyaient les marqueurs a 40-100 mm (arducam) et 62-97
+  mm (SVPRO) de leur position mesuree au robot. Le robot ne passe pas par la camera
+  : il est la reference. Releve precedent (14/09, a travers une extrinseque fausse)
+  : planche_actuelle.avant_1509_verif_robot.yaml.'
+a_refaire_si: la planche bouge — et alors la verifier AU ROBOT, jamais par --reference
+  a travers une extrinseque dont on n est pas sur.
+frame_id: base_link
+units: mm
+marker_size_mm: 50.0
+marker_size_NE_PAS_CORRIGER: Les marqueurs font 50 mm. Le cote mesure a l'image vaut
+  ~48,7 mm par biais de detection (correlation -0,920 avec l'obliquite) ; les distances
+  entre centres sont justes a -0,044 %.
+markers:
+  19:
+  - 86.9
+  - 215.8
+  - 0.0
+  23:
+  - 111.1
+  - -166.3
+  - 0.0
+  25:
+  - 523.0
+  - 240.3
+  - 0.0
+  26:
+  - 528.7
+  - -147.9
+  - 0.0

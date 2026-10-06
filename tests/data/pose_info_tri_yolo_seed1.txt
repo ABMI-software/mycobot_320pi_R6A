@@ -1,0 +1,1708 @@
+header {
+  stamp {
+    sec: 14
+    nsec: 983000000
+  }
+}
+pose {
+  name: "ground_plane"
+  id: 4
+  position {
+    z: -0.0085
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "table"
+  id: 8
+  position {
+    x: 0.261
+    y: 0.017
+    z: -0.00425
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "aruco_19"
+  id: 12
+  position {
+    x: 0.0968
+    y: 0.2034
+  }
+  orientation {
+    z: -0.699554304439191
+    w: 0.714579439349188
+  }
+}
+pose {
+  name: "aruco_23"
+  id: 27
+  position {
+    x: 0.11
+    y: -0.179
+  }
+  orientation {
+    z: -0.69988471623457049
+    w: 0.71425582530438969
+  }
+}
+pose {
+  name: "aruco_25"
+  id: 39
+  position {
+    x: 0.535
+    y: 0.215
+  }
+  orientation {
+    z: -0.70605407217891558
+    w: 0.708157925296025
+  }
+}
+pose {
+  name: "aruco_26"
+  id: 50
+  position {
+    x: 0.53
+    y: -0.176
+  }
+  orientation {
+    z: -0.026809841479517225
+    w: 0.99964055159834486
+  }
+}
+pose {
+  name: "cube_rouge"
+  id: 62
+  position {
+    x: 0.171505
+    y: 0.131495
+    z: -5.7938186256989432e-07
+  }
+  orientation {
+    x: 5.1352970286896368e-18
+    y: 2.4148999367267577e-18
+    z: 5.6999122690283658e-19
+    w: 1
+  }
+}
+pose {
+  name: "pave_jaune"
+  id: 66
+  position {
+    x: 0.175151
+    y: -0.136226
+    z: -9.5776137021275076e-11
+  }
+  orientation {
+    x: 1.857497860373406e-20
+    y: -5.0968761375733852e-21
+    z: -8.75415205885961e-21
+    w: 1
+  }
+}
+pose {
+  name: "cylindre_vert"
+  id: 70
+  position {
+    x: 0.403045
+    y: 0.193764
+    z: -5.732882102857384e-07
+  }
+  orientation {
+    x: 2.3148391579568654e-18
+    y: -6.0196860256822956e-19
+    z: -3.0268224605574616e-19
+    w: 1
+  }
+}
+pose {
+  name: "cube_bleu"
+  id: 74
+  position {
+    x: 0.402282
+    y: -0.117608
+    z: -9.7998078402161681e-11
+  }
+  orientation {
+    x: -3.45327154623407e-20
+    y: 1.4750126339185298e-20
+    z: 1.2278477053881276e-21
+    w: 1
+  }
+}
+pose {
+  name: "bac_rouge"
+  id: 78
+  position {
+    x: 0.296407
+    y: 0.14085
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "bac_jaune"
+  id: 90
+  position {
+    x: 0.286726
+    y: -0.141927
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "bac_vert"
+  id: 102
+  position {
+    x: 0.336253
+    y: -0.004084
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "bac_bleu"
+  id: 114
+  position {
+    x: 0.216088
+    y: -0.003776
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "mycobot_320"
+  id: 130
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "link"
+  id: 5
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "link"
+  id: 9
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "marker"
+  id: 13
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "marker"
+  id: 28
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "marker"
+  id: 40
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "marker"
+  id: 51
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "corps"
+  id: 63
+  position {
+    z: 0.02
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "corps"
+  id: 67
+  position {
+    z: 0.02
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "corps"
+  id: 71
+  position {
+    z: 0.025
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "corps"
+  id: 75
+  position {
+    z: 0.025
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "corps"
+  id: 79
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "corps"
+  id: 91
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "corps"
+  id: 103
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "corps"
+  id: 115
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "base"
+  id: 131
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "link1"
+  id: 134
+  position {
+    z: 0.162
+  }
+  orientation {
+    z: 9.3984810710899536e-18
+    w: 1
+  }
+}
+pose {
+  name: "link2"
+  id: 137
+  position {
+    x: -5.6556324602243068e-33
+    y: -1.2325951644078286e-32
+    z: 0.162
+  }
+  orientation {
+    x: -0.18301485367954767
+    y: 0.68301346979925492
+    z: -0.68301163320991176
+    w: -0.18301167259321047
+  }
+}
+pose {
+  name: "link3"
+  id: 140
+  position {
+    x: -0.11808218531727684
+    y: -6.8416195816374154e-07
+    z: 0.23017565555407726
+  }
+  orientation {
+    x: 0.54167661249114685
+    y: -0.45451983903310339
+    z: 0.45452015917682276
+    w: 0.54167295327283094
+  }
+}
+pose {
+  name: "link4"
+  id: 143
+  position {
+    x: -0.09715767882209364
+    y: -0.082001043195463016
+    z: 0.34884429771385961
+  }
+  orientation {
+    x: -0.06162805999526029
+    y: 0.70441736123961618
+    z: -0.70441500015298786
+    w: -0.061625246165016273
+  }
+}
+pose {
+  name: "link5"
+  id: 146
+  position {
+    x: -0.082571641656807623
+    y: -0.082001293478660628
+    z: 0.43156823801987154
+  }
+  orientation {
+    x: 0.0871532378642717
+    y: 1.6007370457473654e-07
+    z: 0.99619491723513665
+    w: -2.1497446982456439e-06
+  }
+}
+pose {
+  name: "link6"
+  id: 149
+  position {
+    x: -0.082571355619876108
+    y: -0.14835129347804291
+    z: 0.4315682343185242
+  }
+  orientation {
+    x: -0.061628052414431804
+    y: 0.70441736190289728
+    z: -0.70441500081618125
+    w: -0.061625238583628887
+  }
+}
+pose {
+  name: "gripper_left2"
+  id: 154
+  position {
+    x: -0.03506958691457443
+    y: -0.19435111433961849
+    z: 0.43030082964609789
+  }
+  orientation {
+    x: 0.087153003974182131
+    y: 1.6007327059901475e-07
+    z: 0.99619493769723955
+    w: -2.1497439203942104e-06
+  }
+}
+pose {
+  name: "gripper_right2"
+  id: 157
+  position {
+    x: -0.12468716000893651
+    y: -0.19435150156538805
+    z: 0.44610239124876522
+  }
+  orientation {
+    x: 0.087152954160769264
+    y: 1.6007317907899159e-07
+    z: 0.9961949420552092
+    w: -2.1497437455817161e-06
+  }
+}
+pose {
+  name: "gripper_right3"
+  id: 160
+  position {
+    x: -0.097112529271457165
+    y: -0.21835138241768576
+    z: 0.44123996412355809
+  }
+  orientation {
+    x: 0.087153248586009438
+    y: 1.6007370543198476e-07
+    z: 0.99619491629712509
+    w: -2.1497449457572252e-06
+  }
+}
+pose {
+  name: "gripper_right1"
+  id: 163
+  position {
+    x: -0.15092705590703603
+    y: -0.25335161409404211
+    z: 0.43549734646085958
+  }
+  orientation {
+    x: 0.087153200802441586
+    y: 1.6007361405531812e-07
+    z: 0.99619492047751279
+    w: -2.1497448120440595e-06
+  }
+}
+pose {
+  name: "gripper_left3"
+  id: 166
+  position {
+    x: -0.063628940840571288
+    y: -0.21935123774085236
+    z: 0.43533643403534428
+  }
+  orientation {
+    x: 0.087153026390217922
+    y: 1.6007329858643069e-07
+    z: 0.99619493573615236
+    w: -2.1497441499054485e-06
+  }
+}
+pose {
+  name: "gripper_left1"
+  id: 169
+  position {
+    x: -0.016993107776519155
+    y: -0.25435103538277815
+    z: 0.41188176697313872
+  }
+  orientation {
+    x: 0.087153268956896693
+    y: 1.6007374013679785e-07
+    z: 0.99619491451494346
+    w: -2.1497450414967922e-06
+  }
+}
+pose {
+  name: "camera_link"
+  id: 172
+  position {
+    x: 0.8
+    y: 6.0257706110728479e-23
+    z: 0.4
+  }
+  orientation {
+    x: -0.14943813247259119
+    y: -5.489169107885434e-07
+    z: 0.988771077929372
+    w: -3.6319589691835146e-06
+  }
+}
+pose {
+  name: "camera_link_left"
+  id: 177
+  position {
+    x: 9.8607613152626476e-32
+    y: -0.8
+    z: 0.4
+  }
+  orientation {
+    x: -0.10566891091119246
+    y: 0.10566852276832246
+    z: 0.69916801833993736
+    w: 0.69916545015712028
+  }
+}
+pose {
+  name: "camera_link_right"
+  id: 182
+  position {
+    x: 9.8607613152626476e-32
+    y: 0.8
+    z: 0.4
+  }
+  orientation {
+    x: 0.10566891091119246
+    y: 0.10566852276832246
+    z: -0.69916801833993736
+    w: 0.69916545015712028
+  }
+}
+pose {
+  name: "camera_link_top"
+  id: 187
+  position {
+    z: 0.95
+  }
+  orientation {
+    x: 1.5903970989690694e-22
+    y: 0.7071080798431395
+    z: 1.5903970989690694e-22
+    w: 0.70710548252757044
+  }
+}
+pose {
+  name: "visual"
+  id: 6
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "visual"
+  id: 10
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_backing"
+  id: 14
+  position {
+    z: 5e-05
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "black_square"
+  id: 15
+  position {
+    z: 0.00011
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_1_2"
+  id: 16
+  position {
+    x: -0.004166666667
+    y: 0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_1_3"
+  id: 17
+  position {
+    x: 0.004166666667
+    y: 0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_1_4"
+  id: 18
+  position {
+    x: 0.0125
+    y: 0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_2_2"
+  id: 19
+  position {
+    x: -0.004166666667
+    y: 0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_2_3"
+  id: 20
+  position {
+    x: 0.004166666667
+    y: 0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_3_1"
+  id: 21
+  position {
+    x: -0.0125
+    y: -0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_3_3"
+  id: 22
+  position {
+    x: 0.004166666667
+    y: -0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_4_1"
+  id: 23
+  position {
+    x: -0.0125
+    y: -0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_4_2"
+  id: 24
+  position {
+    x: -0.004166666667
+    y: -0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_4_3"
+  id: 25
+  position {
+    x: 0.004166666667
+    y: -0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_4_4"
+  id: 26
+  position {
+    x: 0.0125
+    y: -0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_backing"
+  id: 29
+  position {
+    z: 5e-05
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "black_square"
+  id: 30
+  position {
+    z: 0.00011
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_1_1"
+  id: 31
+  position {
+    x: -0.0125
+    y: 0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_1_2"
+  id: 32
+  position {
+    x: -0.004166666667
+    y: 0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_1_4"
+  id: 33
+  position {
+    x: 0.0125
+    y: 0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_2_1"
+  id: 34
+  position {
+    x: -0.0125
+    y: 0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_2_2"
+  id: 35
+  position {
+    x: -0.004166666667
+    y: 0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_2_4"
+  id: 36
+  position {
+    x: 0.0125
+    y: 0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_3_1"
+  id: 37
+  position {
+    x: -0.0125
+    y: -0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_4_3"
+  id: 38
+  position {
+    x: 0.004166666667
+    y: -0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_backing"
+  id: 41
+  position {
+    z: 5e-05
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "black_square"
+  id: 42
+  position {
+    z: 0.00011
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_1_1"
+  id: 43
+  position {
+    x: -0.0125
+    y: 0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_1_4"
+  id: 44
+  position {
+    x: 0.0125
+    y: 0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_2_2"
+  id: 45
+  position {
+    x: -0.004166666667
+    y: 0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_3_2"
+  id: 46
+  position {
+    x: -0.004166666667
+    y: -0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_3_3"
+  id: 47
+  position {
+    x: 0.004166666667
+    y: -0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_3_4"
+  id: 48
+  position {
+    x: 0.0125
+    y: -0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_4_4"
+  id: 49
+  position {
+    x: 0.0125
+    y: -0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_backing"
+  id: 52
+  position {
+    z: 5e-05
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "black_square"
+  id: 53
+  position {
+    z: 0.00011
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_1_1"
+  id: 54
+  position {
+    x: -0.0125
+    y: 0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_1_3"
+  id: 55
+  position {
+    x: 0.004166666667
+    y: 0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_2_1"
+  id: 56
+  position {
+    x: -0.0125
+    y: 0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_2_2"
+  id: 57
+  position {
+    x: -0.004166666667
+    y: 0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_3_1"
+  id: 58
+  position {
+    x: -0.0125
+    y: -0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_3_2"
+  id: 59
+  position {
+    x: -0.004166666667
+    y: -0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_3_3"
+  id: 60
+  position {
+    x: 0.004166666667
+    y: -0.004166666667
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "white_cell_4_2"
+  id: 61
+  position {
+    x: -0.004166666667
+    y: -0.0125
+    z: 0.000125
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "visual"
+  id: 64
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "visual"
+  id: 68
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "visual"
+  id: 72
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "visual"
+  id: 76
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "fond"
+  id: 80
+  position {
+    z: 0.001
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_x_plus"
+  id: 81
+  position {
+    x: 0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_x_moins"
+  id: 82
+  position {
+    x: -0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_y_plus"
+  id: 83
+  position {
+    y: 0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_y_moins"
+  id: 84
+  position {
+    y: -0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "fond"
+  id: 92
+  position {
+    z: 0.001
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_x_plus"
+  id: 93
+  position {
+    x: 0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_x_moins"
+  id: 94
+  position {
+    x: -0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_y_plus"
+  id: 95
+  position {
+    y: 0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_y_moins"
+  id: 96
+  position {
+    y: -0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "fond"
+  id: 104
+  position {
+    z: 0.001
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_x_plus"
+  id: 105
+  position {
+    x: 0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_x_moins"
+  id: 106
+  position {
+    x: -0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_y_plus"
+  id: 107
+  position {
+    y: 0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_y_moins"
+  id: 108
+  position {
+    y: -0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "fond"
+  id: 116
+  position {
+    z: 0.001
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_x_plus"
+  id: 117
+  position {
+    x: 0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_x_moins"
+  id: 118
+  position {
+    x: -0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_y_plus"
+  id: 119
+  position {
+    y: 0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "paroi_y_moins"
+  id: 120
+  position {
+    y: -0.05
+    z: 0.015
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "sunVisual"
+  id: 127
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "fill_lightVisual"
+  id: 129
+  position {
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "base_visual"
+  id: 132
+  position {
+  }
+  orientation {
+    z: 0.99999999999999967
+    w: 2.6794896585028633e-08
+  }
+}
+pose {
+  name: "link1_visual"
+  id: 135
+  position {
+    x: 0.115
+    y: -0.172
+    z: -0.086
+  }
+  orientation {
+    z: 0.99999999999999967
+    w: 2.6794896585028633e-08
+  }
+}
+pose {
+  name: "link2_visual"
+  id: 138
+  position {
+    x: -0.075
+    y: -0.115
+    z: -0.021999999999999964
+  }
+  orientation {
+    x: 0.49999999999662686
+    y: 0.5000018366025516
+    z: 0.49999999999662686
+    w: 0.49999816339744829
+  }
+}
+pose {
+  name: "link3_visual"
+  id: 141
+  position {
+    x: -0.22
+    y: -0.11499999999999999
+    z: 0.14200000000000007
+  }
+  orientation {
+    x: 0.49999999999662686
+    y: 0.5000018366025516
+    z: 0.49999999999662686
+    w: 0.49999816339744829
+  }
+}
+pose {
+  name: "link4_visual"
+  id: 144
+  position {
+    x: -0.115
+    y: 0.33799999999999991
+    z: -0.14350000000000021
+  }
+  orientation {
+    x: 0.70710807985947366
+    y: 3.7389513522396235e-23
+    z: -3.7389650862000355e-23
+    w: 0.70710548251123639
+  }
+}
+pose {
+  name: "link5_visual"
+  id: 147
+  position {
+    x: -0.1149
+    y: -0.0321999999999999
+    z: -0.482
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "link6_visual"
+  id: 150
+  position {
+    x: -4.2473264127438864e-22
+    z: -0.011500000000000222
+  }
+  orientation {
+    x: 0.50000000000000022
+    y: 0.5
+    z: -0.5
+    w: 0.49999999999999978
+  }
+}
+pose {
+  name: "link6_fixed_joint_lump__gripper_base_visual_1"
+  id: 151
+  position {
+    x: -0.02
+    y: 0.01099995592141733
+    z: 0.0680000661176107
+  }
+  orientation {
+    x: 0.70710678118654768
+    y: -4.3297802811774677e-17
+    z: 0.70710678118654735
+    w: 4.3297802811774652e-17
+  }
+}
+pose {
+  name: "gripper_left2_visual"
+  id: 155
+  position {
+    x: 0.025999999999999922
+    y: 0.022000000000000332
+    z: -0.017999999999999888
+  }
+  orientation {
+    x: 0.49999999999662686
+    y: 0.5000018366025516
+    z: 0.49999999999662686
+    w: 0.49999816339744829
+  }
+}
+pose {
+  name: "gripper_right2_visual"
+  id: 158
+  position {
+    x: -0.061999999999999909
+    y: 0.022400000000000333
+    z: -0.018
+  }
+  orientation {
+    x: 0.49999999999662686
+    y: 0.5000018366025516
+    z: 0.49999999999662686
+    w: 0.49999816339744829
+  }
+}
+pose {
+  name: "gripper_right3_visual"
+  id: 161
+  position {
+    x: -0.033999999999999982
+    y: 3.6082248300317588e-16
+    z: -0.017999999999999888
+  }
+  orientation {
+    x: 0.49999999999662686
+    y: 0.5000018366025516
+    z: 0.49999999999662686
+    w: 0.49999816339744829
+  }
+}
+pose {
+  name: "gripper_right1_visual"
+  id: 164
+  position {
+    x: -0.08599999999999984
+    y: -0.035999999999999553
+    z: -0.0029999999999999446
+  }
+  orientation {
+    x: 0.49999999999662686
+    y: 0.5000018366025516
+    z: 0.49999999999662686
+    w: 0.49999816339744829
+  }
+}
+pose {
+  name: "gripper_left3_visual"
+  id: 167
+  position {
+    x: -3.8163916471489756e-17
+    y: 3.8857805861880479e-16
+    z: -0.018
+  }
+  orientation {
+    x: 0.49999999999662686
+    y: 0.5000018366025516
+    z: 0.49999999999662686
+    w: 0.49999816339744829
+  }
+}
+pose {
+  name: "gripper_left1_visual"
+  id: 170
+  position {
+    x: 0.047999999999999904
+    y: -0.034999999999999615
+    z: -0.0029999999999999446
+  }
+  orientation {
+    x: 0.49999999999662686
+    y: 0.5000018366025516
+    z: 0.49999999999662686
+    w: 0.49999816339744829
+  }
+}
+pose {
+  name: "camera_link_fixed_joint_lump__body_visual"
+  id: 173
+  position {
+    z: -2.7755575615628914e-17
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "camera_link_fixed_joint_lump__lens_visual_1"
+  id: 174
+  position {
+    x: 0.035
+    z: -2.7755575615628914e-17
+  }
+  orientation {
+    y: 0.70710678118654768
+    w: 0.70710678118654735
+  }
+}
+pose {
+  name: "camera_link_fixed_joint_lump__led_visual_2"
+  id: 175
+  position {
+    x: 0.03
+    y: 0.013
+    z: 0.012999999999999972
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "camera_link_left_fixed_joint_lump__body_visual"
+  id: 178
+  position {
+    x: -2.2204460492503131e-16
+    y: 2.2204460492503131e-16
+    z: -8.3266726846886741e-17
+  }
+  orientation {
+    y: 2.7755575615628914e-17
+    w: 1
+  }
+}
+pose {
+  name: "camera_link_left_fixed_joint_lump__lens_visual_1"
+  id: 179
+  position {
+    x: 0.034999999999999781
+    y: 2.2204460492503131e-16
+    z: -8.520961713998076e-17
+  }
+  orientation {
+    y: 0.70710678118654768
+    w: 0.70710678118654735
+  }
+}
+pose {
+  name: "camera_link_left_fixed_joint_lump__led_visual_2"
+  id: 180
+  position {
+    x: 0.029999999999999777
+    y: 0.013000000000000221
+    z: 0.012999999999999916
+  }
+  orientation {
+    y: 2.7755575615628914e-17
+    w: 1
+  }
+}
+pose {
+  name: "camera_link_right_fixed_joint_lump__body_visual"
+  id: 183
+  position {
+    x: -2.2204460492503131e-16
+    y: -2.2204460492503131e-16
+    z: -8.3266726846886741e-17
+  }
+  orientation {
+    y: 2.7755575615628914e-17
+    w: 1
+  }
+}
+pose {
+  name: "camera_link_right_fixed_joint_lump__lens_visual_1"
+  id: 184
+  position {
+    x: 0.034999999999999781
+    y: -2.2204460492503131e-16
+    z: -8.520961713998076e-17
+  }
+  orientation {
+    y: 0.70710678118654768
+    w: 0.70710678118654735
+  }
+}
+pose {
+  name: "camera_link_right_fixed_joint_lump__led_visual_2"
+  id: 185
+  position {
+    x: 0.029999999999999777
+    y: 0.012999999999999777
+    z: 0.012999999999999916
+  }
+  orientation {
+    y: 2.7755575615628914e-17
+    w: 1
+  }
+}
+pose {
+  name: "camera_link_top_fixed_joint_lump__body_visual"
+  id: 188
+  position {
+    y: 9.4039548065783e-38
+    z: 5.5511151231257827e-17
+  }
+  orientation {
+    y: -2.5293629324092306e-44
+    w: 1
+  }
+}
+pose {
+  name: "camera_link_top_fixed_joint_lump__lens_visual_1"
+  id: 189
+  position {
+    x: 0.035
+    y: 9.4039548065783e-38
+    z: 5.5511151231257827e-17
+  }
+  orientation {
+    y: 0.70710678118654768
+    w: 0.70710678118654735
+  }
+}
+pose {
+  name: "camera_link_top_fixed_joint_lump__led_visual_2"
+  id: 190
+  position {
+    x: 0.03
+    y: 0.013
+    z: 0.013000000000000055
+  }
+  orientation {
+    y: -2.5293629324092306e-44
+    w: 1
+  }
+}
+pose {
+  name: "sun"
+  id: 126
+  position {
+    z: 10
+  }
+  orientation {
+    w: 1
+  }
+}
+pose {
+  name: "fill_light"
+  id: 128
+  position {
+    z: 8
+  }
+  orientation {
+    w: 1
+  }
+}
+
