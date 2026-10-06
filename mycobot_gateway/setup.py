@@ -81,6 +81,7 @@ setup(
             'dream_fk_compare = mycobot_gateway.dream_fk_compare:main',
             'tri_dream_dashboard = mycobot_gateway.tri_dream_dashboard:main',
             'tri_trajectoires_gazebo = mycobot_gateway.tri_trajectoires_gazebo:main',
+            'synthetic_data_collector_tri = mycobot_gateway.synthetic_data_collector_tri:main',
 
             # Hand teleoperation (trajectory → JSON bridge for real robot)
             'trajectory_to_robot_bridge = mycobot_gateway.trajectory_to_robot_bridge:main',

@@ -1254,6 +1254,66 @@ Mesuré sur la graine 7, run front + right : `dream_pose.csv` et `dream_vs_fk.cs
 Monter `dream_rate` ne donne que plus d'images, avec les mêmes erreurs. L'algorithme DREAM est
 inchangé.
 
+### Fine-tuning DREAM sur la scène de tri (05-06/10, en cours)
+
+Décidé par Osama le 05/10 : la cause de l'écart DREAM ↔ YOLO est la scène, hors du domaine
+d'entraînement. On rend donc des images de la scène de tri avec la pince, puis on fine-tune.
+
+**1. Rendus** : `synthetic_data_collector_tri`, qui hérite du collecteur v4 pince. Les caméras
+(dream50k) et les étiquettes sont celles du 50K ; seule la scène change (plateau, bacs, pièces, ArUco,
+robot avec pince).
+
+```bash
+ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1002 piece_reach:=0.28 yolo:=false headless:=true observe:=false
+ros2 run mycobot_gateway synthetic_data_collector_tri --ros-args -p use_sim_time:=true \
+    -p output_dir:=training/dream/dream_data/synth_tri_raw/seed_1002 -p num_samples:=200 -p seed:=1002
+```
+
+- **Poses** :
+  - 60 % viennent de l'IK du trieur : pointe entre 10 et 160 mm au-dessus de la table, rayon
+    0,10-0,42 m, azimut ±70°, outil vers le bas ou incliné jusqu'à 45°, bruit de ±3° par
+    articulation ;
+  - les 40 % restants sont uniformes, avec une garde au sol à 50 mm (130 mm dans le v3, ce qui
+    rejetait toutes les poses de saisie).
+- **Pince** : ouverture tirée à chaque pose.
+- **Randomisation de domaine** : coupée, puisque la scène de tri est le domaine visé.
+- **Contrôle des étiquettes** : vérifiées visuellement sur la graine 1001 ; les keypoints FK tombent
+  sur le bras rendu.
+- **Campagne, 05/10 de 17:07 à 02:03, sans aucun arrêt thermique (Tmax 84 °C)** :
+  - entraînement : graines 1001-1016, **12 080 images** (`dream_data/synth_tri_raw`) ;
+  - test : graines **2001-2003**, jamais utilisées à l'entraînement, **1 200 images**
+    (`dream_data/synth_tri_raw_test`).
+- **Conversion** : `convert_to_ndds.py --source synth`, puis `synth_tri_ndds_parts/` et
+  `synth_tri_test_ndds/`.
+
+**2. Référence avant fine-tuning** : `v4_mix`, mesuré sur `synth_tri_test_ndds` (1 200 images) :
+
+| modèle | détection | erreur moyenne | erreur médiane | < 5 px | < 10 px | < 20 px |
+|---|---|---|---|---|---|---|
+| vgg_ultimate_v4_mix_ft_e30 | **52,6 %** | 30,1 px | **16,7 px** | 12,2 % | 31,0 % | 58,9 % |
+
+Par keypoint, détection et erreur médiane : base 42 % / 11,9 px, link1-2 41 % / 35,7 px,
+link3 50 % / 18,7 px, link4 67 % / 12,3 px, link5 66 % / 13,9 px, link6 61 % / 18,5 px.
+
+**3. Fine-tuning, lancé le 06/10 à 10:00** :
+- **Script** : `train_dream_ultimate_v5_geo.py`. Le v4 avait un bug d'augmentation : l'image était
+  déplacée mais pas ses cibles. Le v5 le corrige et refuse d'écrire dans un dossier qui contient
+  déjà des `.pth`.
+- **Départ** : `vgg_ultimate_v4_mix_ft_e30`.
+- **Données** : `mix_tri_synth50k_real3camx5_ndds`, soit **104 160 images** : 50K synthétique
+  + réel ×5 (30K) + scène de tri ×2 (24K).
+- **Durée** : 10 époques d'environ 36 min.
+- **Sortie** : `checkpoints_dream/vgg_tri_mix_ft_e10`, un dossier neuf.
+- **Température** : l'entraînement est mis en pause (SIGSTOP) à 90 °C et repris sous 80 °C.
+- `DREAM_DIR` vaut maintenant `~/DREAM` par défaut : `/tmp/DREAM` a disparu au redémarrage.
+
+**4. Évaluation prévue** :
+- le même jeu de test, avant et après ;
+- le run de tri sur la graine 7, avec l'erreur de T_DREAM et l'écart DREAM ↔ YOLO ;
+- la non-régression sur le 50K et le réel.
+
+Critères proposés : détection > 90 %, erreur médiane < 5 px, rotation de T_DREAM < 5°.
+
 ## Étape 11 : journalisation CSV (05/10)
 
 ```bash
@@ -1320,3 +1380,4 @@ taux de détection, ne garder que les lignes en pose d'observation.
 | 05/10/2026 | 10 — ablation ArUco / pièces | fait | sans pince : 50K 99,2 % → plateau seul 71,4 % (dessus 10 %) → sans ArUco 66,6 % → complète 65,2 % ; ArUco négligeables, pièces = caméra avant, plateau/monde real_table = l'essentiel |
 | 05/10/2026 | 10 — dashboard YOLO + DREAM | fait, **à valider par Osama** | `dashboard:=true` → `tri_dream_dashboard` ; T_DREAM contre T_GT, trajectoire de la bride, dXYZ, rotation, latence ; PnP de `dream_inference` sur les angles de l'instant de l'image |
 | 05/10/2026 | 10 — dashboard v2 DREAM ↔ YOLO, une seule fenêtre | fait, **à valider par Osama** | Gazebo reparenté dans la case 3D du dashboard (`embed_gazebo`) ; trajectoires colorées par objet + DREAM dans Gazebo ; pointe = `tool_tip` du trieur (codeurs ↔ YOLO 1,8-2,8 mm) ; `dream_cameras:=front,right` : 4/4 à 88 °C ; écart DREAM ↔ YOLO 10-315 mm, dû à T_DREAM (rotation 27-32°, profondeur 29-43 mm, keypoints 7-37 px) |
+| 05-06/10/2026 | 10 — fine-tuning DREAM scène de tri | rendus faits, entraînement en cours | `synthetic_data_collector_tri` : 12 080 images train (1001-1016) + 1 200 test (2001-2003), Tmax 84 °C ; v4_mix sur le test : 52,6 % / 16,7 px ; `v5_geo` depuis v4_mix sur 104 160 images, 10 époques → `vgg_tri_mix_ft_e10` |
