@@ -1254,7 +1254,7 @@ Mesuré sur la graine 7, run front + right : `dream_pose.csv` et `dream_vs_fk.cs
 Monter `dream_rate` ne donne que plus d'images, avec les mêmes erreurs. L'algorithme DREAM est
 inchangé.
 
-### Fine-tuning DREAM sur la scène de tri (05-06/10, en cours)
+### Fine-tuning DREAM sur la scène de tri (05-06/10)
 
 Décidé le 05/10 : la cause de l'écart DREAM ↔ YOLO est la scène, hors du domaine
 d'entraînement. On rend donc des images de la scène de tri avec la pince, puis on fine-tune.
@@ -1307,12 +1307,62 @@ link3 50 % / 18,7 px, link4 67 % / 12,3 px, link5 66 % / 13,9 px, link6 61 % / 1
 - **Température** : l'entraînement est mis en pause (SIGSTOP) à 90 °C et repris sous 80 °C.
 - `DREAM_DIR` vaut maintenant `~/DREAM` par défaut : `/tmp/DREAM` a disparu au redémarrage.
 
-**4. Évaluation prévue** :
-- le même jeu de test, avant et après ;
-- le run de tri sur la graine 7, avec l'erreur de T_DREAM et l'écart DREAM ↔ YOLO ;
-- la non-régression sur le 50K et le réel.
+**4. Résultats (06/10)** : entraînement terminé à 16:35, en 405,8 min. Meilleure perte de
+validation : 0,000329, à l'époque 10. La validation est optimiste : le réel ×5 et la scène de tri ×2
+sont dupliqués, donc des copies tombent des deux côtés du découpage 80/10/10.
 
-Critères proposés : détection > 90 %, erreur médiane < 5 px, rotation de T_DREAM < 5°.
+`evaluate_dream.py`, sur les mêmes images avant et après (sous-échantillon régulier de 500 images,
+2 000 pour le 50K) :
+
+| jeu | modèle | détection | médiane | < 5 px | erreur moyenne par image |
+|---|---|---|---|---|---|
+| scène de tri, test 2001-2003 | v4_mix (avant) | 53,6 % | 15,38 px | 13,1 % | 35,00 px |
+| scène de tri, test 2001-2003 | **tri_mix_ft_e10** | **99,7 %** | **3,00 px** | **96,0 %** | 2,95 px |
+| réel | v4_mix (avant) | 87,6 % | 2,43 px | 54,9 % | 13,89 px |
+| réel | tri_mix_ft_e10 | 88,5 % | 3,18 px | 54,0 % | 14,32 px |
+| 50K synthétique | v4_mix (avant) | 99,4 % | 2,94 px | — | 2,77 px |
+| 50K synthétique | tri_mix_ft_e10 | 99,4 % | 2,91 px | — | 2,74 px |
+
+Le 87,6 % réel n'est pas le 91,6 % du rapport : ce n'est pas le même protocole, ici un
+sous-échantillon de 500 images. Réel : détection +0,9 point, médiane +0,75 px. Aucun test réel
+hors échantillon n'existe pour ce modèle.
+
+**Tri sur la graine 7** : caméras front et right, 1 Hz, dashboard. Mêmes réglages que le run du
+05/10, seul le modèle change (`dream_model:=vgg_tri_mix_ft_e10`). Résultats dans
+`results/yolo_gazebo/2026-10-06_dashboard_seed7_front_right_tri_mix_ft_e10/`.
+Tri **4/4**, avec des écarts au centre du bac de +7/−3, +8/−3, +1/−0 et +14/+7 mm. Tmax 86 °C.
+
+T_DREAM contre la vérité, médianes sur les vues à ≥ 5 keypoints, calculées comme le tableau du 05/10 :
+
+| caméra | modèle | vues ≥ 5 kp | translation | \|dz\| | \|dx\| / \|dy\| | rotation |
+|---|---|---|---|---|---|---|
+| front | v4_mix (05/10) | 43 / 75 | 36,8 mm | 29,1 mm | 16,4 / 6,2 mm | 32,1° |
+| front | **tri_mix_ft_e10** | **83 / 83** | **8,4 mm** | 6,0 mm | 4,1 / 3,2 mm | **1,6°** |
+| right | v4_mix (05/10) | 80 / 81 | 46,1 mm | 42,9 mm | 6,4 / 2,8 mm | 26,5° |
+| right | **tri_mix_ft_e10** | **86 / 86** | **12,2 mm** | 10,5 mm | 5,5 / 3,3 mm | **2,6°** |
+
+Sur toutes les vues, la rotation maximale passe de 179,6° à 7,4° (front) et de 158,7° à 8,4° (right).
+
+Keypoints contre la FK (`dream_vs_fk.csv`, keypoints dans l'image) :
+
+| caméra | modèle | détection | médiane | p90 | < 5 px |
+|---|---|---|---|---|---|
+| front | v4_mix (05/10) | 71,9 % | 17,45 px | 37,94 px | 19,9 % |
+| front | **tri_mix_ft_e10** | **99,3 %** | **2,81 px** | 3,38 px | **98,1 %** |
+| right | v4_mix (05/10) | 84,7 % | 12,26 px | 30,33 px | 15,7 % |
+| right | **tri_mix_ft_e10** | **100 %** | **3,01 px** | 3,76 px | **98,5 %** |
+
+Par keypoint, les deux caméras réunies, le nouveau modèle détecte 167 à 169 keypoints sur 169, avec
+une médiane de 1,5 à 3,7 px. Le pire est la base, à 3,74 px. L'ancien modèle détectait 112 à 149
+keypoints sur 167, avec une médiane de 6,6 à 20,9 px.
+
+**Critères proposés** : détection > 90 %, médiane < 5 px, rotation de T_DREAM < 5°. Ils sont
+**atteints dans la scène de tri**, puisque la rotation médiane est de 1,6 et 2,6°. Ils ne le sont
+**pas sur toutes les vues**, où le maximum atteint 8,4°.
+
+**Non mesuré** : l'écart DREAM ↔ YOLO par saisie. Il n'est affiché que dans le tableau du
+dashboard et n'est écrit dans aucun CSV, et les captures automatiques ont saisi une autre fenêtre.
+Pour l'avoir, il faut relancer le run et relever le tableau, ou journaliser ce tableau.
 
 ## Étape 11 : journalisation CSV (05/10)
 
@@ -1380,4 +1430,5 @@ taux de détection, ne garder que les lignes en pose d'observation.
 | 05/10/2026 | 10 — ablation ArUco / pièces | fait | sans pince : 50K 99,2 % → plateau seul 71,4 % (dessus 10 %) → sans ArUco 66,6 % → complète 65,2 % ; ArUco négligeables, pièces = caméra avant, plateau/monde real_table = l'essentiel |
 | 05/10/2026 | 10 — dashboard YOLO + DREAM | fait, **à valider** | `dashboard:=true` → `tri_dream_dashboard` ; T_DREAM contre T_GT, trajectoire de la bride, dXYZ, rotation, latence ; PnP de `dream_inference` sur les angles de l'instant de l'image |
 | 05/10/2026 | 10 — dashboard v2 DREAM ↔ YOLO, une seule fenêtre | fait, **à valider** | Gazebo reparenté dans la case 3D du dashboard (`embed_gazebo`) ; trajectoires colorées par objet + DREAM dans Gazebo ; pointe = `tool_tip` du trieur (codeurs ↔ YOLO 1,8-2,8 mm) ; `dream_cameras:=front,right` : 4/4 à 88 °C ; écart DREAM ↔ YOLO 10-315 mm, dû à T_DREAM (rotation 27-32°, profondeur 29-43 mm, keypoints 7-37 px) |
-| 05-06/10/2026 | 10 — fine-tuning DREAM scène de tri | rendus faits, entraînement en cours | `synthetic_data_collector_tri` : 12 080 images train (1001-1016) + 1 200 test (2001-2003), Tmax 84 °C ; v4_mix sur le test : 52,6 % / 16,7 px ; `v5_geo` depuis v4_mix sur 104 160 images, 10 époques → `vgg_tri_mix_ft_e10` |
+| 05-06/10/2026 | 10 — fine-tuning DREAM scène de tri | fait | `synthetic_data_collector_tri` : 12 080 images train (1001-1016) + 1 200 test (2001-2003), Tmax 84 °C ; v4_mix sur le test : 52,6 % / 16,7 px ; `v5_geo` depuis v4_mix sur 104 160 images, 10 époques → `vgg_tri_mix_ft_e10` |
+| 06/10/2026 | 10 — évaluation de `vgg_tri_mix_ft_e10` | fait, **à valider** | test tri 2001-2003 : 53,6 → 99,7 %, 15,4 → 3,0 px ; réel 87,6 → 88,5 %, 2,43 → 3,18 px ; 50K inchangé (99,4 %) ; graine 7 front + right : 4/4, rotation de T_DREAM 32,1 / 26,5° → 1,6 / 2,6°, translation 36,8 / 46,1 → 8,4 / 12,2 mm, keypoints 17,5 / 12,3 → 2,8 / 3,0 px ; DREAM ↔ YOLO par saisie non relevé |
