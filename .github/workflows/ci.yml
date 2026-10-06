@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    name: Static checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false          # datasets/**/*.png pese plusieurs Go, inutile ici
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Every tracked Python file compiles
+        run: git ls-files '*.py' | xargs -r python -m py_compile
+
+      - name: Every package.xml is well-formed
+        run: |
+          for f in $(git ls-files '*package.xml'); do
+            python -c "import xml.etree.ElementTree as E; E.parse('$f')"
+          done
+
+      - name: CITATION.cff is valid YAML with its required fields
+        run: |
+          pip install --quiet pyyaml
+          python - <<'PY'
+          import sys, yaml
+          d = yaml.safe_load(open('CITATION.cff'))
+          missing = [k for k in ('cff-version', 'message', 'title', 'authors') if k not in d]
+          sys.exit(f'CITATION.cff: champs manquants {missing}' if missing else 0)
+          PY
+
+      - name: Internal Markdown links resolve
+        run: |
+          python - <<'PY'
+          import re, sys, subprocess
+          from pathlib import Path
+
+          tolerees = {l.strip() for l in
+                      Path('.github/known-broken-links.txt').read_text().splitlines()
+                      if l.strip() and not l.startswith('#')}
+          suivis = set(subprocess.run(['git', 'ls-files'], capture_output=True,
+                                      text=True).stdout.split())
+          casses = set()
+          for f in subprocess.run(['git', 'ls-files', '*.md'], capture_output=True,
+                                  text=True).stdout.split():
+              p = Path(f)
+              for m in re.finditer(r'\[[^\]]*\]\(([^)#]+)\)', p.read_text(errors='ignore')):
+                  t = m.group(1)
+                  if t.startswith(('http', 'mailto', '#')):
+                      continue
+                  try:
+                      cible = str((p.parent / t).resolve().relative_to(Path.cwd()))
+                  except ValueError:                 # sort de l'arborescence
+                      cible = t.lstrip('./').replace('../', '')
+                  if cible in tolerees:
+                      continue
+                  if cible not in suivis and not Path(cible).exists():
+                      casses.add(f'{f} -> {t}')
+          if casses:
+              print('\n'.join(sorted(casses)))
+              sys.exit(f'{len(casses)} lien(s) interne(s) casse(s). Corriger le lien ; '
+                       f'n ajouter a .github/known-broken-links.txt que si le fichier '
+                       f'manque reellement.')
+          print(f'liens internes : tous resolvent ({len(tolerees)} absences connues tolerees)')
+          PY
+
+  build:
+    name: colcon build + launch files load
+    runs-on: ubuntu-24.04
+    container: ros:jazzy-ros-base
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src/mycobot_320pi_R6A
+          lfs: false
+
+      - name: Install declared dependencies
+        shell: bash
+        run: |
+          apt-get update
+          rosdep update --rosdistro jazzy
+          rosdep install --from-paths src --ignore-src -y -r \
+            --rosdistro jazzy || true
+
+      - name: colcon build
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --packages-select mycobot_gateway mycobot_description \
+                       --symlink-install --event-handlers console_direct+
+
+      # Le test qui manquait : sim_grasp.launch.py est reste inchargeable douze
+      # jours parce que rien n'appelait generate_launch_description().
+      - name: Every launch file builds its description
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          source install/setup.bash
+          python3 -m pytest src/mycobot_320pi_R6A/tests/test_launch_files.py -v

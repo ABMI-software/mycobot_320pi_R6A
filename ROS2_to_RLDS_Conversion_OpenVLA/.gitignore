@@ -1,0 +1,20 @@
+# Cloned upstream repos -- each has its own git history (moojink/
+# rlds_dataset_builder, openvla/openvla), so they're re-cloned rather than
+# tracked here, never committed as nested repos. Our own additions/edits
+# inside them are tracked separately under overrides/ -- see docs/PIPELINE.md
+# (or the HTML/docx docs) for the exact clone + override steps to
+# reconstruct these directories, plus the two .npy episode files that go
+# under rlds_dataset_builder/gazebo_to_lerobot_mycobot/data/train/.
+/rlds_dataset_builder/
+/openvla/
+
+# Derived output pulled out of the gazebo_to_lerobot container for inspection
+# (sample frames, visualization PNGs) -- regeneratable via
+# extraction/extract_episodes.py + extraction/run_visualize_headless.py,
+# not source.
+rlds_extraction_out/
+
+# Editor/OS noise
+__pycache__/
+*.pyc
+.vscode/

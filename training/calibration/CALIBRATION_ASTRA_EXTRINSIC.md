@@ -50,7 +50,7 @@ la profondeur, et les aligne (Kabsch) sur leurs positions connues en repère bas
 
 ```bash
 SDK=~/Downloads/Orbbec_OpenNI_v2.3.0.86-beta6_linux_release/OpenNI_2.3.0.86_202210111154_4c8f5aa4_beta6_linux_x64/OpenNI_2.3.0.86_202210111154_4c8f5aa4_beta6_linux/sdk
-cd ~/Osama_ws/src/mycobot_R6A/training/calibration
+cd <your_ws>/src/mycobot_320pi_R6A/training/calibration
 g++ oni_grabber_rgbd.cpp -o oni_grabber_rgbd -I$SDK/Include -L$SDK/libs -lOpenNI2 -Wl,-rpath,$SDK/libs
 ./oni_grabber_rgbd            # laisser tourner (terminal A)
 ```
@@ -70,7 +70,7 @@ cat /dev/shm/oni_info.txt    # doit contenir CHFOV=.../CVFOV=...  (= nouveau gra
 
 ```bash
 source ~/ros_jazzy/venv_dream/bin/activate
-cd ~/Osama_ws/src/mycobot_R6A/training/calibration
+cd <your_ws>/src/mycobot_320pi_R6A/training/calibration
 python3 check_astra_markers.py       # boucle ; ouvre astra_markers_preview.png
 ```
 

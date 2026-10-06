@@ -4,8 +4,8 @@
   <name>mycobot_description</name>
   <version>1.0.0</version>
   <description>MyCobot 320 Pi URDF description and meshes for RViz visualization</description>
-  <maintainer email="genji@todo.todo">genji</maintainer>
-  <license>MIT</license>
+  <maintainer email="jo.bernardo@abmi-groupe.com">Jose Bernardo</maintainer>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   

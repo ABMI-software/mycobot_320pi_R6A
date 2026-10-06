@@ -43,7 +43,10 @@ from launch.actions import (
     TimerAction,
 )
 from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.launch_description_sources import (
+    AnyLaunchDescriptionSource,
+    PythonLaunchDescriptionSource,
+)
 from launch.substitutions import (
     Command,
     LaunchConfiguration,
@@ -138,7 +141,7 @@ def generate_launch_description():
 
     # --------------------------- rosbridge_server ---------------------------- #
     rosbridge_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
+        AnyLaunchDescriptionSource(
             os.path.join(
                 get_package_share_directory("rosbridge_server"),
                 "launch", "rosbridge_websocket_launch.xml",

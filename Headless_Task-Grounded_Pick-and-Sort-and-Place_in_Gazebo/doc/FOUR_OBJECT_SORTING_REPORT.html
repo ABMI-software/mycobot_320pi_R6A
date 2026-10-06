@@ -1,0 +1,864 @@
+<!doctype html>
+<title>Four-Object Sorting Report</title>
+<meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --paper: #E9ECEA;
+  --surface: #FFFFFF;
+  --surface-sunk: #DEE3E0;
+  --ink: #172422;
+  --ink-soft: #4B5B57;
+  --ink-faint: #7C8985;
+  --line: #C4CBC7;
+  --accent: #146356;
+  --accent-ink: #0E4A40;
+  --accent-soft: #DBEAE6;
+  --verify: #8A5A12;
+  --verify-soft: #F1E6D3;
+  --bug: #9C3B23;
+  --bug-soft: #F3E1DA;
+  --code-bg: #10201D;
+  --code-text: #D9EDE8;
+  --code-accent: #7FD9C4;
+  --code-comment: #7C978F;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101615;
+    --surface: #171F1D;
+    --surface-sunk: #0C1312;
+    --ink: #E7EDEA;
+    --ink-soft: #9FB0AB;
+    --ink-faint: #6C7C77;
+    --line: #2A3532;
+    --accent: #57C4AE;
+    --accent-ink: #7FD9C4;
+    --accent-soft: #14322C;
+    --verify: #D6A44B;
+    --verify-soft: #33270F;
+    --bug: #E08468;
+    --bug-soft: #3A1D15;
+    --code-bg: #0A1513;
+    --code-text: #CFEAE3;
+    --code-accent: #7FD9C4;
+    --code-comment: #5D766F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #101615;
+  --surface: #171F1D;
+  --surface-sunk: #0C1312;
+  --ink: #E7EDEA;
+  --ink-soft: #9FB0AB;
+  --ink-faint: #6C7C77;
+  --line: #2A3532;
+  --accent: #57C4AE;
+  --accent-ink: #7FD9C4;
+  --accent-soft: #14322C;
+  --verify: #D6A44B;
+  --verify-soft: #33270F;
+  --bug: #E08468;
+  --bug-soft: #3A1D15;
+  --code-bg: #0A1513;
+  --code-text: #CFEAE3;
+  --code-accent: #7FD9C4;
+  --code-comment: #5D766F;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding-inline: 20px;
+}
+
+h1, h2, h3, h4 { font-family: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif; text-wrap: balance; color: var(--ink); }
+
+.shell {
+  max-width: 1180px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 40px;
+  padding-block: 32px 80px;
+}
+
+.rail {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.rail-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+}
+.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail a {
+  display: flex;
+  gap: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+  line-height: 1.35;
+}
+.rail a:hover, .rail a:focus-visible { background: var(--surface-sunk); color: var(--ink); outline: none; }
+.rail a .n { color: var(--accent); font-weight: 600; flex-shrink: 0; }
+.rail .rail-group-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 16px 0 4px 8px;
+}
+.rail .rail-group-label:first-child { margin-top: 0; }
+
+main { min-width: 0; }
+
+.cover {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 28px;
+  margin-bottom: 36px;
+}
+.cover .eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+.cover h1 { font-size: 2.55rem; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
+.cover .dek { font-family: "IBM Plex Serif", serif; font-style: italic; font-size: 1.1rem; color: var(--ink-soft); max-width: 62ch; margin: 0 0 20px; }
+.cover .meta {
+  display: flex; flex-wrap: wrap; gap: 22px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+.cover .meta b { color: var(--ink-soft); font-weight: 600; }
+
+section.block { margin-bottom: 44px; }
+section.block > h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  scroll-margin-top: 20px;
+}
+section.block > .block-dek {
+  color: var(--ink-soft);
+  max-width: 68ch;
+  margin: 0 0 20px;
+}
+p { max-width: 70ch; }
+.prose { max-width: 70ch; }
+
+code, .mono { font-family: "IBM Plex Mono", monospace; }
+p code, li code, td code, dd code, h4 code { background: var(--surface-sunk); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.88em; color: var(--accent-ink); }
+
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 14px 0;
+}
+pre .c { color: var(--code-comment); }
+pre .k { color: var(--code-accent); }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; background: var(--surface); }
+thead th {
+  text-align: left;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--surface-sunk);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody td:first-child { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--accent-ink); white-space: nowrap; }
+
+.step {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 22px 24px 24px;
+  margin-bottom: 18px;
+}
+.step-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.step-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+.step-head h3 { margin: 0; font-size: 1.18rem; font-weight: 600; }
+.step-purpose { color: var(--ink-soft); margin: 2px 0 16px; font-size: 0.95rem; }
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) { .panels { grid-template-columns: 1fr; } }
+.panel { border-radius: var(--radius); padding: 14px 16px 16px; }
+.panel.procedure { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+.panel.verify { background: var(--verify-soft); border: 1px solid color-mix(in srgb, var(--verify) 35%, transparent); }
+.panel-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin: 0 0 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.panel.procedure .panel-tag { color: var(--accent-ink); }
+.panel.verify .panel-tag { color: var(--verify); }
+.panel p, .panel ul, .panel pre { margin-top: 8px; margin-bottom: 8px; }
+.panel p:first-of-type { margin-top: 0; }
+.panel ul { padding-left: 18px; margin: 8px 0; }
+.panel li { margin-bottom: 4px; font-size: 0.94rem; }
+.panel pre { font-size: 12px; }
+
+.bugcard {
+  border: 1px solid color-mix(in srgb, var(--bug) 35%, var(--line));
+  background: var(--bug-soft);
+  border-radius: 12px;
+  padding: 20px 22px 22px;
+  margin-bottom: 18px;
+}
+.bugcard h4 { margin: 0 0 4px; font-size: 1.08rem; color: var(--ink); }
+.bugcard .repo {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--bug);
+  margin: 0 0 14px;
+}
+.bugcard dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.bugcard dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 3px;
+  white-space: nowrap;
+}
+.bugcard dd { margin: 0; max-width: 62ch; }
+.bugcard pre { margin-top: 4px; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 3px 9px; border-radius: 999px;
+  margin-left: 8px;
+}
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+  padding: 12px 18px;
+  margin: 16px 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.callout b { color: var(--ink); }
+.callout.warn { border-left-color: var(--verify); }
+.callout.bug { border-left-color: var(--bug); }
+
+.ladder { display: flex; flex-direction: column; gap: 0; margin: 18px 0; }
+.rung {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.rung:first-child { border-top: none; }
+.rung .level {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+.rung.reached .level { color: var(--accent-ink); font-weight: 600; }
+.rung.stopped .level { color: var(--verify); font-weight: 600; }
+.rung h5 { margin: 0 0 4px; font-size: 1rem; }
+.rung p { margin: 0 0 6px; color: var(--ink-soft); font-size: 0.94rem; }
+.rung .tag {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 999px;
+  margin-bottom: 6px;
+}
+.rung.reached .tag { background: var(--accent-soft); color: var(--accent-ink); }
+.rung.stopped .tag { background: var(--verify-soft); color: var(--verify); }
+
+.manifest-tree {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+.manifest-tree .c { color: var(--code-comment); }
+.manifest-tree .k { color: var(--code-accent); }
+
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+  padding-top: 18px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { position: static; max-height: none; }
+  .cover h1 { font-size: 1.9rem; }
+}
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <p class="rail-eyebrow">Contents</p>
+    <nav>
+      <a href="#overview"><span class="n">&sect;</span>Overview</a>
+      <a href="#comparison"><span class="n">&sect;</span>Spec vs. implemented</a>
+      <p class="rail-group-label">Implementation</p>
+      <a href="#s1"><span class="n">01</span>Assumption register</a>
+      <a href="#s2"><span class="n">02</span>World identification</a>
+      <a href="#s3"><span class="n">03</span>Grasp decision gate</a>
+      <a href="#s4"><span class="n">04</span>Object &amp; bin manifest</a>
+      <a href="#s5"><span class="n">05</span>Task definition</a>
+      <a href="#s6"><span class="n">06</span>Reachability &amp; matrix</a>
+      <a href="#s7"><span class="n">07</span>Waypoint precompute</a>
+      <a href="#s8"><span class="n">08</span>Spawn &amp; sequence scripts</a>
+      <a href="#s9"><span class="n">09</span>Verification logic</a>
+      <a href="#s10"><span class="n">10</span>Contracts &amp; recorder wiring</a>
+      <a href="#s11"><span class="n">11</span>Preflight &amp; handover package</a>
+      <a href="#s12"><span class="n">12</span>The shm-size root cause</a>
+      <a href="#s13"><span class="n">13</span>The recorder lifecycle hang</a>
+      <a href="#s14"><span class="n">14</span>Reach-map regeneration</a>
+      <a href="#s15"><span class="n">15</span>Closing the handover</a>
+      <a href="#ladder"><span class="n">&sect;</span>Verification ladder</a>
+      <p class="rail-group-label">Reference</p>
+      <a href="#bugs-env"><span class="n">&sect;</span>Bugs fixed &mdash; session</a>
+      <a href="#bugs-upstream"><span class="n">&sect;</span>Bugs worth reporting</a>
+      <a href="#limits"><span class="n">&sect;</span>What this does not prove</a>
+      <a href="#manual"><span class="n">&sect;</span>Manual execution, start to finish</a>
+      <a href="#manifest"><span class="n">&sect;</span>File manifest</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="cover">
+      <p class="eyebrow">Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo &mdash; implementation report</p>
+      <h1>Four-object task-grounded sorting, headless, from specification to a diagnosed hardware ceiling</h1>
+      <p class="dek">What was built against <code>doc/FOUR_OBJECT_SORTING_SPECIFICATION.docx</code>, part by part, with the verification used at each step, every bug found along the way &mdash; fixed or still open &mdash; and exactly where this delivery stops short of a completed live episode, and why. The short version: everything that does not step physics is built, verified, and handed over; the one thing that does step physics could not be proven on this hardware, for two independently diagnosed reasons neither of which is a defect in this project's own code.</p>
+      <div class="meta">
+        <span><b>Sandbox</b> ~/tomislav/robotics/Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo</span>
+        <span><b>Host</b> Ubuntu WSL2, <code>.wslconfig memory=4GB</code> (~3.8&nbsp;GB usable in the VM), CPU-only</span>
+        <span><b>Reproduced via</b> the <code>gazebo_to_lerobot</code> Docker container (Ubuntu 24.04, ROS2 Jazzy, Gazebo Harmonic)</span>
+        <span><b>Commit</b> 3319973 on <code>main</code></span>
+        <span><b>Written</b> 2026-09-23</span>
+      </div>
+    </div>
+
+    <section class="block" id="overview">
+      <h2>Overview</h2>
+      <p class="block-dek">This document is the implementation report for <code>FOUR_OBJECT_SORTING_SPECIFICATION.docx</code> &mdash; the file in this same directory, treated throughout as "Role A — integration engineer (constrained workstation)" against the specification's own Part&nbsp;0 scope and Part&nbsp;11 role split. Every one of the specification's thirteen parts and two appendices was walked in order; this report follows that same order.</p>
+      <p class="prose">The short version: everything Appendix A assigns to Role A that does not step physics &mdash; the assumption register, world identification, the grasp decision, object/bin geometry, task definitions, the reachability sweep and episode matrix, waypoint precomputation, the spawn/sequence/verification scripts, the contracts, and the full handover package &mdash; is built, self-consistent, and independently verified (<code>preflight.sh</code> reports <code>PREFLIGHT PASSED</code>). The one step that does step physics &mdash; Appendix A row&nbsp;10, a smoke test of one episode per object &mdash; was not completed, for two reasons diagnosed to their root this session: a hardware memory ceiling under a full Gazebo bring-up, and a separate, genuine, still-unresolved hang in the recorder package's own lifecycle service, reproduced independently of Gazebo entirely. Both are documented in enough detail that Role B's hardware, or whoever picks this up next, does not have to re-diagnose them from scratch.</p>
+    </section>
+
+    <section class="block" id="comparison">
+      <h2>Spec vs. implemented, part by part</h2>
+      <p class="block-dek">The specification's own part numbers, what each asked for, and exactly what was delivered against it. This is the section to read first if the only question is "did it do what the document said."</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Spec part</th><th>Asked for</th><th>Delivered</th></tr></thead>
+          <tbody>
+            <tr><td>Part 0</td><td>Scope, roles ("Role A — constrained workstation" / Role B), reading guide.</td><td>Followed as the governing frame for this entire project and this report; every part below is read against Role A's own scope.</td></tr>
+            <tr><td>Part 1</td><td>Walk every assumption in the register, confirm or fail each in writing.</td><td><code>doc/ASSUMPTIONS.md</code> — 12 assumptions, each with its actual, checked outcome, not an assertion.</td></tr>
+            <tr><td>Part 2</td><td>Identify the target world; record <code>WORLD_PATH</code> and a content hash.</td><td><code>doc/WORLD_SELECTION.md</code> &mdash; <code>real_table.sdf</code> chosen and <code>sha256</code>-hashed; <code>config/WORLD_PATH</code> set. Caveat stated in that same file: the hash is only valid for the file as committed, and this project's own uncommitted edits to it (&sect;15) mean a fresh clone would need a fresh hash.</td></tr>
+            <tr><td>Part 3</td><td>One bounded run of the grasp decision gate; escalate rather than iterate past one day.</td><td><code>doc/GRASP_DECISION.md</code> with CSV evidence: the reference pipeline's grasp mechanism is confirmed genuinely physical, but two bounded live attempts both failed to lift the target for a diagnosed timing reason unrelated to the mechanism. Verdict: keep the simulated attachment (A8) as the adopted floor, escalate the physical-grasp question to the robotics team (Appendix&nbsp;B item&nbsp;2) rather than iterate further on constrained hardware.</td></tr>
+            <tr><td>Part 4</td><td>Object manifest from real SDF values; four objects, four bins.</td><td><code>config/objects.yaml</code>, traced to <code>real_table.sdf</code>'s actual values, not the specification's illustrative placeholders (<code>doc/OBJECTS_MANIFEST.md</code>); <code>validate_objects.py</code> exits 0. Three of four bins (blue/green/yellow) had to be <em>repositioned</em> from the specification's suggested coordinates after offline IK proved those positions (r=0.343&ndash;0.371&nbsp;m) unreachable on any branch, at any height &mdash; see &sect;4's bugcard and <code>doc/BIN_REPOSITIONING.md</code>.</td></tr>
+            <tr><td>Part 5</td><td>Four instructions, generated from the object/bin data, not hand-typed.</td><td><code>config/tasks.jsonl</code>, 4 tasks, confirmed present by <code>preflight.sh</code>.</td></tr>
+            <tr><td>Part 6</td><td>A reachability sweep (the spec's own sketch: <code>moveit_py</code> + robot model, no physics stepping) and a 60-row episode matrix; confirm a second camera for the held-out split.</td><td>Swept with pure analytical IK (<code>scripts/mycobot_ik.py</code>) instead of <code>moveit_py</code> &mdash; a deliberate substitution, since <code>moveit_py</code> cannot share a process with a plain <code>rclpy</code> node (a defect this project's own predecessor already hit and documented, &sect;bugs-upstream). <code>config/episode_matrix.csv</code>: 60 rows, all valid, confirmed by <code>preflight.sh</code>. <code>synth_camera_right</code> confirmed present in the world for the held-out contract. The sweep's own raw output (<code>config/reach_map.csv</code>) was never persisted the first time; regenerated this pass at reduced fidelity, honestly caveated &mdash; &sect;14.</td></tr>
+            <tr><td>Part 7</td><td>Pre-solved waypoints for every episode; the specification's own Part&nbsp;7.4 states "420" (60&times;7).</td><td>360 (60&times;6): HOME is a fixed joint-space constant needing no IK solve, so only six of the seven named waypoints per episode are actually precomputed. Confirmed directly with the specification's author that 420 was the spec's own arithmetic error, not a deviation here. <code>check_waypoints.py</code> exits 0 &mdash; after generalizing a continuity check that was only coincidentally correct for one case, &sect;7's bugcard.</td></tr>
+            <tr><td>Part 8</td><td><code>spawn_scene.py</code> (four objects, four bins, collision-checked) and <code>run_pick_and_place.py</code>; a smoke test of four episodes, one per object, cylinder included.</td><td>Both scripts written and support all four objects (episode-matrix-driven, not hardcoded to one object). <b>The four-episode smoke test itself was not completed</b> &mdash; no episode, of any object, has reached a PASS/FAIL/WRONG_BIN verdict on this hardware. This is the one specification goal genuinely not met; see &sect;ladder and &sect;limits for the full, diagnosed reason.</td></tr>
+            <tr><td>Part 9</td><td>PASS/FAIL/WRONG_BIN verification logic; three deliberate failures must be correctly rejected.</td><td><code>verify_episode.py</code> + <code>test_verifier.py</code>: four synthetic cases (wrong-bin&rarr;<code>WRONG_BIN</code>, no-lift&rarr;<code>FAIL</code>, disturbed-distractor&rarr;<code>PASS</code>-but-flagged, clean&rarr;<code>PASS</code>), all classified correctly. Confirmed by <code>preflight.sh</code>'s self-test check.</td></tr>
+            <tr><td>Part 10</td><td>Two contracts (train/held-out); wire the <code>rosetta</code> episode recorder's lifecycle into the sequence; <code>port_bag.py</code> for dataset assembly, no <code>torch</code>.</td><td>Both contracts written and verified against the object/bin data (<code>doc/CONTRACT_VERIFICATION.md</code>). Recorder lifecycle wiring added to <code>episode.sh</code> and confirmed reaching "recording started" once, live, under full Gazebo load. <code>port_bag.py</code> fixed (verdict-file path, bag-path lookup) but never exercised against real data, because no episode has produced any &mdash; see &sect;13's bugcard for why.</td></tr>
+            <tr><td>Part 11</td><td><code>preflight.sh</code>, <code>RUNNING.md</code>, and the exact package tree of &sect;11.4; the single &sect;11.7 sentence on what the smoke test proved.</td><td><code>PREFLIGHT PASSED</code>, all 15 checks; <code>RUNNING.md</code> restructured to lead with the four smoke episodes and carry that one sentence, unhedged, at the top; package matches &sect;11.4 with <code>reach_map.csv</code> now present (caveated, &sect;14). <code>doc/HANDOVER.md</code> adds the Appendix-A-by-row accounting this report's comparison table above is itself built from.</td></tr>
+            <tr><td>Part 12</td><td>State the limits honestly &mdash; the weld-not-grasp caveat, domain gap, scripted selection, approach-direction and frame-corruption findings, dataset size.</td><td><code>doc/LIMITATIONS.md</code> restates every one of the specification's own caveats unchanged. This report's own &sect;limits adds the two new, session-specific limits the specification could not have anticipated: the hardware memory ceiling, untested on Role B, and the unresolved recorder hang.</td></tr>
+            <tr><td>Part 13</td><td>The metric set for this dataset; why correct-bin rate, not raw success rate, is the headline.</td><td><code>doc/METRICS.md</code> restates the metric set and the reasoning. Not yet measurable on any real data &mdash; every metric needs completed episodes, which do not exist yet (Part&nbsp;8).</td></tr>
+            <tr><td>Appendix A</td><td>13-step order of work with effort estimates and an explicit "done when" per step.</td><td>Mapped item by item in <code>doc/HANDOVER.md</code>: 10 of 13 rows fully done, row&nbsp;6 done for the matrix itself with a caveated sweep artifact, row&nbsp;8 marked <em>partial</em> to match row&nbsp;10 (the same underlying claim at two strictness levels), row&nbsp;10 genuinely not done, row&nbsp;13 correctly deferred until after Role B returns data, per &sect;11.7's own sequencing &mdash; not a handover blocker.</td></tr>
+            <tr><td>Appendix B</td><td>Six items needing a robotics-team decision, not an engineering one.</td><td>All six logged in <code>doc/ROBOTICS_TEAM_REFERRALS.md</code>, including the physical-grasp escalation from &sect;3 and the bin-repositioning question from &sect;4.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="callout"><b>The one sentence that matters most:</b> every part of this pipeline that does not require a running simulator is built, self-consistent, and verified &mdash; but no episode has ever completed against real physics on this machine, for reasons now diagnosed precisely enough that Role B should not have to rediscover them.</p>
+    </section>
+
+    <!-- ===================================================== IMPLEMENTATION ===================================================== -->
+    <section class="block" id="pipeline-head">
+      <h2>The implementation, step by step</h2>
+      <p class="block-dek">Fifteen steps, in the order they actually happened across the session. Each pairs what was done with the check that proves it, and calls out where a bug was found &mdash; fixed, or still open &mdash; along the way.</p>
+    </section>
+
+    <article class="step" id="s1">
+      <div class="step-head"><span class="step-num">01</span><h3>Assumption register</h3></div>
+      <p class="step-purpose">Part 1 — walk every stated assumption and record its real outcome, not its hoped-for one.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>Each of the specification's twelve assumptions (world identity, camera availability, gripper model, IK reachability, and others) was checked directly against the actual repository state &mdash; file existence, <code>grep</code>, <code>find</code>, <code>sha256sum</code> &mdash; never assumed true because the spec asserted it.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p><code>doc/ASSUMPTIONS.md</code> — every assumption annotated with its actual, checked outcome. Several assumptions did not hold as stated (notably the world-file identity question in &sect;2 and the bin-reachability question in &sect;4) and are flagged, not silently corrected.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s2">
+      <div class="step-head"><span class="step-num">02</span><h3>World identification</h3></div>
+      <p class="step-purpose">Part 2 — confirm which world file is the real target and hash it for reproducibility.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>real_table.sdf</code> confirmed as the target: the world that already reproduces the physical bench (measured tabletop, four ArUco tags, table camera) from a prior related project, extended here with the fourth object and its bin rather than started from scratch.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>sha256sum mycobot_description/worlds/real_table.sdf</pre>
+          <p>Recorded in <code>doc/WORLD_SELECTION.md</code>. Caveat stated in the same file: the world file was subsequently edited to add three objects and three bins (&sect;4, &sect;15) and, at the time of writing, those edits are uncommitted in the shared team repository &mdash; the recorded hash will not match a fresh clone until that commit lands.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s3">
+      <div class="step-head"><span class="step-num">03</span><h3>Grasp decision gate</h3></div>
+      <p class="step-purpose">Part 3 — one bounded attempt at a real physical grasp; escalate, don't iterate, past the cap.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>The reference pipeline's grasp mechanism was checked both statically (reading its own implementation) and at runtime, twice, live. Two bounded attempts to lift <code>red_cube</code> both failed, for a timing reason diagnosed as unrelated to whether the mechanism itself is physical.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p><code>doc/GRASP_DECISION.md</code>, CSV evidence attached. Per the specification's own decision table ("cannot be made to work within one day &rarr; keep the weld; report exactly where it stopped"), this is exactly that row: A8 (simulated attachment) is the adopted floor for Role A hardware, and the physical-grasp question is escalated to the robotics team rather than iterated on further here (Appendix&nbsp;B item&nbsp;2).</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s4">
+      <div class="step-head"><span class="step-num">04</span><h3>Object &amp; bin manifest</h3></div>
+      <p class="step-purpose">Part 4 — four objects, four bins, geometry traced to the real world file, not the spec's placeholders.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>red_cube</code>, <code>blue_cube</code>, <code>green_cylinder</code>, <code>yellow_box</code> and their four matching bins, added to <code>real_table.sdf</code> and extracted into <code>config/objects.yaml</code> from the SDF's own committed values (mass, size, friction, pose) &mdash; never copied from the specification's illustrative numbers.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>python3 scripts/validate_objects.py</pre>
+          <p>Exits 0. Cross-checked in <code>doc/OBJECTS_MANIFEST.md</code> against the raw SDF text.</p>
+        </div>
+      </div>
+      <div class="callout bug"><b>Bug found and fixed:</b> the specification's suggested positions for the blue, green, and yellow bins (radius 0.343&ndash;0.371&nbsp;m from the base) were confirmed <b>unreachable on any IK branch, at any height</b>, by direct offline solving &mdash; not a near-miss, a hard boundary violation. Repositioned to r&asymp;0.241&nbsp;m, matching <code>red_bin</code>'s own already-proven-reachable radius. Full numeric evidence in <code>doc/BIN_REPOSITIONING.md</code>; escalated to the robotics team as Appendix&nbsp;B item&nbsp;4 in case a dynamic-bin assumption elsewhere depends on the original placement.</div>
+    </article>
+
+    <article class="step" id="s5">
+      <div class="step-head"><span class="step-num">05</span><h3>Task definition</h3></div>
+      <p class="step-purpose">Part 5 — four instructions, generated from the object/bin data, load-bearing language.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>config/tasks.jsonl</code> generated programmatically from the object/bin manifest (&sect;4), one instruction per target object, so the language and the geometry can never drift apart.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>wc -l config/tasks.jsonl   <span class="c"># 4</span></pre>
+          <p>Confirmed by <code>preflight.sh</code>'s own check.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s6">
+      <div class="step-head"><span class="step-num">06</span><h3>Reachability sweep &amp; episode matrix</h3></div>
+      <p class="step-purpose">Part 6 — which (x, y) positions are actually reachable, and 60 valid episode layouts built from that envelope.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>The specification's own sketch (<code>moveit_py</code> + robot model, no physics stepping) was deliberately replaced with pure analytical IK (<code>scripts/mycobot_ik.py</code>, numpy-only, no <code>rclpy</code>, no simulator) &mdash; the same substitution this project's predecessor already had to make after finding <code>moveit_py</code> cannot share a process with a plain <code>rclpy</code> node (&sect;bugs-upstream). The sweep's usable rectangle (<code>config/safe_rect.txt</code>) fed <code>scripts/make_matrix.py</code>, which built the 60-row episode matrix with distractor placement and camera/split assignment.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>bash -c '[ $(($(wc -l &lt; config/episode_matrix.csv)-1)) -eq 60 ]'</pre>
+          <p>60 rows, confirmed by <code>preflight.sh</code>. <code>synth_camera_right</code> confirmed present in <code>real_table.sdf</code> for the held-out contract (<code>grep -c "synth_camera_right" ...sdf</code> &rarr; nonzero).</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s7">
+      <div class="step-head"><span class="step-num">07</span><h3>Waypoint precompute</h3></div>
+      <p class="step-purpose">Part 7 — solve every episode's motion waypoints offline, with zero discontinuities between consecutive poses.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>precompute_ik.py</code> solves six waypoints per episode (APPROACH, DESCEND, LIFT, TRANSPORT, RELEASE, RETREAT &mdash; HOME is a fixed joint-space constant, not solved) into <code>config/waypoints.json</code>, 360 entries total.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>python3 scripts/check_waypoints.py
+<span class="c">$ 60 episodes: all waypoints OK</span></pre>
+          <p>Exits 0 for real &mdash; not "59 clean plus one accepted exception."</p>
+        </div>
+      </div>
+      <div class="callout bug"><b>Bug found and fixed:</b> the continuity checker originally verified <code>J3+J4</code> as the invariant sum for a fixed tool pose &mdash; correct for one test case (<code>red_cube</code>, where <code>J2</code> happened to barely move) purely by coincidence, and wrong for another (a waypoint near the base, where <code>J2</code> also swings substantially). The true general invariant is <code>J2+J3+J4</code>; generalizing the check found and fixed a real discontinuity, not just a false alarm.</div>
+      <div class="callout"><b>Not a bug, corrected by the spec's author:</b> Part&nbsp;7.4 states "420 pre-solved waypoints" (60&times;7). 360 is correct &mdash; the "420" double-counted HOME, a fixed constant, as if it needed solving. Confirmed directly and closed.</div>
+    </article>
+
+    <article class="step" id="s8">
+      <div class="step-head"><span class="step-num">08</span><h3>Spawn &amp; sequence scripts</h3></div>
+      <p class="step-purpose">Part 8 — bring up the scene and run the per-object pick-and-sort sequence, for any of the four objects.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>spawn_scene.py</code> spawns all four objects and all four bins, collision-checked, from the episode matrix's own row. <code>run_pick_and_place.py</code> reads <code>--target</code> from that same matrix and drives the six-waypoint sequence generically &mdash; nothing in either script is specific to one object.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>Static: both scripts accept any of the four object names from <code>episode_matrix.csv</code> without a code change. <b>Live: not verified.</b> No episode, of any object, has completed against a running simulator &mdash; see &sect;ladder.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s9">
+      <div class="step-head"><span class="step-num">09</span><h3>Verification logic</h3></div>
+      <p class="step-purpose">Part 9 — PASS / FAIL / WRONG_BIN, with three deliberate failure cases that must be caught, not just the happy path.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>verify_episode.py</code> implements the pass/fail/wrong-bin logic against a completed episode's logged trajectory; <code>test_verifier.py</code> exercises it against four synthetic cases without needing a simulator at all.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>python3 scripts/test_verifier.py
+<span class="c">wrong-bin &rarr; WRONG_BIN
+no-lift &rarr; FAIL
+disturbed-distractor &rarr; PASS (flagged)
+clean episode &rarr; PASS</span></pre>
+          <p>All four classified correctly; confirmed by <code>preflight.sh</code>'s self-test check.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s10">
+      <div class="step-head"><span class="step-num">10</span><h3>Contracts &amp; recorder lifecycle wiring</h3></div>
+      <p class="step-purpose">Part 10 — the two data contracts, and getting the <code>rosetta</code> episode recorder to actually record.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>contracts/mycobot_sorting.yaml</code> (train, table camera) and <code>contracts/mycobot_sorting_heldout.yaml</code> (held-out, <code>synth_camera_right</code>) written and cross-checked against the object/bin manifest for topic and dimension consistency. <code>episode.sh</code> extended to bring the recorder's ROS2 lifecycle node through <code>configure</code>&rarr;<code>activate</code> before <code>run_pick_and_place.py</code>'s <code>RecordEpisode</code> goal is sent.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p><code>doc/CONTRACT_VERIFICATION.md</code> — no ground-truth pose fields leak into either contract (per A5), grep-verified. Recorder wiring itself: confirmed reaching "recording started" exactly <b>once</b>, live, under full Gazebo load, with a real prompt and an accepted <code>RecordEpisode</code> goal. Every attempt since has hit the lifecycle hang documented in &sect;13.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s11">
+      <div class="step-head"><span class="step-num">11</span><h3>Preflight &amp; handover package</h3></div>
+      <p class="step-purpose">Part 11 — the exact handover tree, a read-only environment check, and the one honest sentence Role B needs first.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>preflight.sh</code> built to the specification's own 15-check sketch, then corrected twice (below); <code>RUNNING.md</code> restructured so the robotics team's first action is the four smoke episodes, not the full batch, with an explicit stop-and-report instruction and the single &sect;11.7 sentence at the very top.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>bash preflight.sh
+<span class="c">... 15 checks ...
+PREFLIGHT PASSED</span></pre>
+          <p>Run for real inside the <code>gazebo_to_lerobot</code> container, not asserted.</p>
+        </div>
+      </div>
+      <div class="callout bug"><b>Two bugs found and fixed in <code>preflight.sh</code> itself:</b> its "container image present" check is self-contradictory when run from <em>inside</em> the very container it asks about &mdash; now skipped, not failed, when <code>docker</code> isn't on <code>PATH</code>. Its "target world file exists" check used a path relative to the wrong working directory &mdash; fixed to resolve against the installed ROS2 package share directory, the same path every launch file in the project actually uses.</div>
+    </article>
+
+    <article class="step" id="s12">
+      <div class="step-head"><span class="step-num">12</span><h3>The shm-size root cause</h3></div>
+      <p class="step-purpose">Diagnosing and fixing the container's <code>RTPS_TRANSPORT_SHM</code> failures &mdash; the first of two hardware-ceiling findings this session.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>A live episode attempt hit <code>RTPS_TRANSPORT_SHM Error: Failed init_port ... open_and_lock_file failed</code> roughly 20 minutes into a Gazebo instance's uptime. Checked directly rather than guessed at: Fast DDS's shared-memory transport lives in <code>/dev/shm</code>, and Docker's default <code>--shm-size</code> is 64&nbsp;MB for the <em>whole container</em>.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>df -h /dev/shm            <span class="c"># 64M, confirmed the hypothesis</span>
+docker inspect ... ShmSize <span class="c"># 67108864 bytes, unmodified default</span></pre>
+          <p>Fixed at the source: <code>docker/run.sh</code> (in the sibling <code>Gazebo_to_LeRobot_Pipeline</code> repo) now passes <code>--shm-size=2g</code>. Container recreated, <code>df -h /dev/shm</code> confirmed <code>2.0G</code>. <code>episode.sh</code>'s teardown also now clears any leaked <code>fastrtps_*</code> segments every episode, since the script restarts the sim stack but not the container itself.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s13">
+      <div class="step-head"><span class="step-num">13</span><h3>The recorder lifecycle hang</h3></div>
+      <p class="step-purpose">A second, independent, still-unresolved hardware/software ceiling &mdash; found by deliberately isolating it from Gazebo entirely.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>Rather than keep retrying a full episode, a minimal test ("3a-minimal") isolated the recorder from Gazebo entirely: a throwaway <code>rclpy</code> publisher faked <code>/joint_states</code> and a camera topic at 30&nbsp;Hz, no controllers, no arm motion. Four cheap causes were checked before touching any source code: topic names (exact match), data flow (confirmed 30.0&nbsp;Hz via <code>ros2 topic hz</code>), bag-directory writability (confirmed), and QoS (the check that mattered: <code>Subscription count: 0</code> on both topics even after <code>configure</code> was called &mdash; the recorder never gets far enough to subscribe at all).</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>All four harness-side explanations are clear; this rules out the test setup as the cause. Static reading of <code>episode_recorder_node.py</code> and its shared lifecycle base class, done directly on the host (the package is bind-mounted, no container needed), ruled out the specific hypothesis of a blocking call under a single-threaded executor &mdash; it is actually a <code>MultiThreadedExecutor(num_threads=4)</code> &mdash; and a related mutually-exclusive-callback-group mechanism. <b>No line-level defect was pinpointed.</b> Corroborating evidence the hang is real: a separate, read-only <code>ros2 lifecycle get</code> call also hangs, while <code>ros2 node list</code> answers instantly &mdash; consistent with the node's own internal transition lock being held, not a lost CLI response.</p>
+        </div>
+      </div>
+      <div class="callout bug"><b>Open, not fixed:</b> resolving this needs a live Python stack trace (<code>py-spy dump</code>) on the hung process. Attempted this session; blocked by the container lacking <code>CAP_SYS_PTRACE</code>, and a container recreation to add it was not pursued a third time after the decision to stop all hardware-bound work for the night. See &sect;bugs-upstream for the write-up aimed at whoever can actually run that trace.</div>
+    </article>
+
+    <article class="step" id="s14">
+      <div class="step-head"><span class="step-num">14</span><h3>Reach-map regeneration</h3></div>
+      <p class="step-purpose">Completing the handover package's file tree &mdash; honestly, including where the completion falls short.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>config/reach_map.csv</code> (&sect;6's raw sweep output) was found missing from disk &mdash; only its derivative, <code>safe_rect.txt</code>, had survived. A new <code>scripts/sweep_reach.py</code> (pure analytical IK, no simulator) regenerates it. A first attempt at a fine grid (0.01&nbsp;m, full seed count) did not finish in a reasonable session; reduced twice, to 0.04&nbsp;m and 6 seeds, to get a result at all.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <pre>python3 scripts/summarise_reach.py
+<span class="c">this run:      x -0.10..0.34, y -0.25..0.31
+safe_rect.txt: x -0.03..0.55, y -0.19..0.22</span></pre>
+          <p><b>Does not closely match.</b> Three of the four boundary values from this run land exactly on this run's own search-grid edge, meaning the reduced sweep didn't even bracket the true envelope. <code>safe_rect.txt</code> &mdash; the file <code>episode_matrix.csv</code> actually depends on &mdash; was left untouched and remains authoritative. Reported as a caveat, not glossed over, in both the script's own docstring and <code>doc/HANDOVER.md</code>.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s15">
+      <div class="step-head"><span class="step-num">15</span><h3>Closing the handover</h3></div>
+      <p class="step-purpose">The final documentation pass: one honest sentence, an Appendix-A accounting, and the git discipline to match.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>RUNNING.md</code> now opens with the single &sect;11.7 sentence &mdash; what's proven, what isn't, why &mdash; before any command. <code>doc/HANDOVER.md</code> (new) maps every Appendix A row to its real status, with the full memory arithmetic behind the hardware boundary and exactly what's needed back from Role B if a smoke episode fails.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>All of the above committed to the project's own git history (commit 3319973 and its immediate predecessors). The two files this work also touched in the separate, shared <code>mycobot_320pi_R6A</code> team repository were deliberately <em>not</em> committed by this process &mdash; shown as a diff for direct review and commit by the repository's own maintainer instead.</p>
+        </div>
+      </div>
+    </article>
+
+    <section class="block" id="ladder">
+      <h2>Verification ladder</h2>
+      <p class="block-dek">Each rung strictly depends on the one below it. The pipeline reaches every rung that does not require a running simulator; the rungs above that are the ones this report is most honest about not reaching.</p>
+      <div class="ladder">
+        <div class="rung reached">
+          <div class="level">Level&nbsp;0</div>
+          <div><span class="tag">Passed</span><h5>Specification and environment are self-consistent</h5><p><code>preflight.sh</code> passes all 15 checks; every static artifact (matrix, waypoints, contracts, tasks) validates independently (&sect;1&ndash;11).</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Level&nbsp;1</div>
+          <div><span class="tag">Passed</span><h5>Offline logic is correct</h5><p>Waypoint continuity (<code>check_waypoints.py</code>) and the verifier's own correctness against synthetic failure cases (<code>test_verifier.py</code>) both check out with zero exceptions (&sect;7, &sect;9).</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Level&nbsp;2</div>
+          <div><span class="tag">Passed, once</span><h5>Recorder wiring functions under real load</h5><p>Reached "recording started" live, once, under full Gazebo bring-up (&sect;10). Not yet reliable &mdash; see Level&nbsp;3.</p></div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Level&nbsp;3</div>
+          <div><span class="tag">Stopped here</span><h5>Recorder reliably reaches "configured," Gazebo or not</h5><p>A real, reproducible hang in the recorder's own lifecycle service, isolated from Gazebo entirely and still unresolved at the source level (&sect;13). This is the harder of the two ceilings, because it isn't explained by the memory arithmetic below.</p></div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Level&nbsp;4</div>
+          <div><span class="tag">Stopped here</span><h5>One full episode reaches a PASS/FAIL/WRONG_BIN verdict</h5><p>Not achieved, on any object. This machine's WSL2 VM has ~3.8&nbsp;GB total RAM; <code>gz sim</code> alone holds ~1&nbsp;GB RSS once <code>real_table.sdf</code>'s four objects, four bins, ArUco markers, and camera are loaded, leaving too little headroom for the recorder and DDS to run alongside it reliably (&sect;12, &sect;limits).</p></div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Level&nbsp;5</div>
+          <div><span class="tag">Blocked, not attempted</span><h5>Sixty-episode batch and dataset conversion</h5><p>Explicitly Role B's, by the specification's own design (Appendix&nbsp;A row&nbsp;12) &mdash; not attempted here, and dataset conversion has nothing to convert until Level&nbsp;4 is reached somewhere.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== BUGS ===================================================== -->
+    <section class="block" id="bugs-env">
+      <h2>Bugs fixed &mdash; session-specific</h2>
+      <p class="block-dek">Symptoms of this exact environment (a memory-capped WSL2 VM running one long-lived container), not defects in any upstream project. Listed so a re-run hits the same wall for a shorter time.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Symptom</th><th>Root cause</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td><code>AMENT_TRACE_SETUP_FILES: unbound variable</code> on every <code>episode.sh</code> run</td><td><code>set -u</code> (this script's own safety) collides with ROS2's <code>setup.bash</code>, which legitimately references unset variables in a fresh shell</td><td>Wrap the two <code>source</code> lines in <code>set +u ... set -u</code></td></tr>
+            <tr><td>Real-time factor collapsed to &asymp;0.0006 (a stall, not a slowdown) the first time recording was attempted</td><td>The recorder's <code>record_all</code> default (<code>true</code>) auto-discovered 28 topics, including high-rate controller-introspection topics the contract never asked for, pushing CPU past what the container could sustain on top of <code>gz sim</code>'s own load</td><td><code>-p record_all:=false</code>, limiting recording to the contract's own two declared topics</td></tr>
+            <tr><td><code>RTPS_TRANSPORT_SHM</code> port-lock failures, roughly 20&nbsp;minutes into a Gazebo instance's uptime</td><td>Docker's default <code>--shm-size</code> (64&nbsp;MB, whole-container) exhausted by Fast DDS's shared-memory transport, worse with uptime as segments accumulate</td><td><code>--shm-size=2g</code> in <code>docker/run.sh</code>; <code>episode.sh</code>'s teardown now also clears leaked <code>fastrtps_*</code> segments every episode</td></tr>
+            <tr><td><code>check_waypoints.py</code> flagged one episode (a waypoint near the base) as a discontinuity while 59 others passed</td><td>The continuity invariant checked (<code>J3+J4</code>) was only coincidentally correct when <code>J2</code> happens to barely move; the true invariant is <code>J2+J3+J4</code></td><td>Generalized the check; now exits 0 on all 60 episodes, for real</td></tr>
+            <tr><td><code>preflight.sh</code>'s "container image present" check always fails</td><td>Self-contradictory when run from inside the very container it's asking whether it exists &mdash; the question only makes sense from the host</td><td>Skip (not fail) when <code>docker</code> isn't on <code>PATH</code></td></tr>
+            <tr><td><code>preflight.sh</code>'s "target world file exists" check always fails despite the file genuinely existing</td><td><code>config/WORLD_PATH</code>'s contents are relative to the wrong working directory for where this project actually runs from</td><td>Resolve against the installed ROS2 package share directory instead &mdash; the path every launch file already uses</td></tr>
+            <tr><td>A manual controller respawn logged "Failed to configure controller" for <code>joint_state_broadcaster</code> while a final state check showed all three controllers genuinely active</td><td>A timing/reporting artifact in the <code>controller_manager</code> spawner CLI, not a real failure</td><td>Never trust the spawner's own success/failure report alone; always confirm with a direct <code>ros2 control list_controllers</code> afterward</td></tr>
+            <tr><td>Blue/green/yellow bins, as the specification suggested placing them, are unreachable by IK on any branch</td><td>Suggested radii (0.343&ndash;0.371&nbsp;m) exceed this arm's measured &asymp;0.39&nbsp;m envelope once the elbow-up constraint and tool offset are both applied</td><td>Repositioned to r&asymp;0.241&nbsp;m, matching <code>red_bin</code>'s already-proven radius; escalated to the robotics team in case this affects an assumption elsewhere</td></tr>
+            <tr><td><code>pyarrow</code>/<code>ffmpeg</code> disappeared after a necessary container recreation</td><td>Both were installed ad hoc (<code>pip</code>/<code>apt</code>) into a previous container instance's writable layer, not the image &mdash; lost the moment that instance was replaced</td><td>Baked into <code>docker/Dockerfile</code> directly, so a future recreation doesn't lose them again</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block" id="bugs-upstream">
+      <h2>Bugs worth reporting upstream</h2>
+      <p class="block-dek">Defects in dependencies this project does not own, reproduced independently of this specific machine where that could be confirmed. <b>Filing the actual issues has not been done</b> and needs a separate explicit go-ahead.</p>
+
+      <div class="bugcard">
+        <h4><code>episode_recorder_node</code>'s <code>on_configure</code> hangs, root cause not yet isolated<span class="status-pill">Not yet filed &mdash; needs a live trace first</span></h4>
+        <p class="repo">Candidate recipient: the <code>rosetta</code> package's maintainer (not a known public repository this project can find &mdash; direct contact, not a GitHub issue)</p>
+        <dl>
+          <dt>Symptom</dt>
+          <dd>Calling <code>ros2 lifecycle set /episode_recorder configure</code> against a freshly started <code>episode_recorder_node</code> hangs indefinitely on some runs, with the node's own log stuck at "Node created (unconfigured)" and never reaching "Configured". A separate, read-only <code>ros2 lifecycle get</code> call against the same node also hangs, while <code>ros2 node list</code> in the same shell answers instantly &mdash; the DDS graph is healthy; something inside the node's own transition handling is not.</dd>
+          <dt>Ruled out, not the cause</dt>
+          <dd>A single-threaded executor (it's a 4-thread <code>MultiThreadedExecutor</code>); a mutually-exclusive-callback-group self-contention (every subscription/service/action-server/client the configure step creates uses its own <code>ReentrantCallbackGroup</code>, distinct from the lifecycle transition's own group); blocking file/network I/O in contract parsing (pure, bounded YAML/dataclass work); the bag writer (confirmed constructed only at record-start, never at configure); QoS mismatch (no subscription is ever created before the hang, so there is nothing to mismatch); and the obvious harness-side explanations (topic names, data flow, bag-directory writability &mdash; all independently confirmed clean).</dd>
+          <dt>Fix used here</dt>
+          <dd>None &mdash; still open. The concrete next step is a live Python stack trace (<code>py-spy dump</code>) on the hung process, which needs a container with <code>CAP_SYS_PTRACE</code> and was not completed this session.</dd>
+          <dt>Why it matters</dt>
+          <dd>This blocks reliable use of the recorder for anything beyond a single lucky run, and the failure is silent &mdash; no exception, no error log, just a stuck transition that every caller (this project's own scripts, the <code>ros2</code> CLI) can only detect via a timeout.</dd>
+        </dl>
+      </div>
+
+      <div class="bugcard">
+        <h4><code>ros2 lifecycle</code>/<code>ros2 action</code> CLI can report a running, configured node as absent<span class="status-pill">Not yet filed</span></h4>
+        <p class="repo">Candidate repo: ros2/ros2cli</p>
+        <dl>
+          <dt>Symptom</dt>
+          <dd>The daemon-backed default discovery path for <code>ros2 lifecycle</code>/<code>ros2 action</code> subcommands has, on this project's predecessor, reported a genuinely running, configured node as not found &mdash; a stale-cache class of failure, previously documented in that sibling project's own report.</dd>
+          <dt>Fix used here</dt>
+          <dd>Adopted proactively, before hitting it again: every lifecycle call in <code>episode.sh</code> uses <code>ros2 lifecycle set --no-daemon --spin-time 15 ...</code>, forcing fresh discovery instead of the background daemon's cache.</dd>
+          <dt>Why it matters</dt>
+          <dd>Cost real debugging time on the sibling project before the daemon-cache explanation was found; adopting <code>--no-daemon</code> everywhere here avoided repeating that cost, but the underlying CLI behavior is still worth reporting so other teams don't have to rediscover it independently.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="block" id="limits">
+      <h2>What this does not prove</h2>
+      <p class="block-dek">Restating specification Part&nbsp;12 in full, and adding what this session changed.</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)">
+        <li><b>No episode has completed against real physics, on any object.</b> New this session, and the dominant limitation: not because the pipeline's own logic is wrong (every offline check passes), but because of two independently diagnosed hardware/software ceilings &mdash; a ~3.8&nbsp;GB VM memory cap that <code>gz sim</code> alone consumes most of, and a separate, unresolved recorder-lifecycle hang reproduced even without Gazebo running at all.</li>
+        <li><b>If the simulated attachment is retained: the carry is not a grasp.</b> Unchanged from the specification &mdash; a policy trained on this data learns approach, close near the object, carry, open, not the physics of grasping.</li>
+        <li><b>Ground-truth poses, scripted object selection.</b> Unchanged from the specification: the dataset (once it exists) will contain no perception failures and no examples of a demonstrator disambiguating between objects, because none occurred.</li>
+        <li><b>Approach-direction and frame-corruption sensitivity.</b> Unchanged from the specification's own first-party measurements: mixing approach directions costs roughly seven times the worst single-side repeatability, and one corrupted camera frame in sixty reports a position 17.5&nbsp;mm wrong before median filtering. A learned policy inherits both risks; the classical pipeline defends against neither by luck.</li>
+        <li><b>Sim-trained data carries a visual domain gap.</b> Unchanged from the specification, evidenced by this project's own DREAM pose-estimation result (10.9%&rarr;91.6% real-image detection, only after mixing in real data).</li>
+        <li><b>Sixty episodes is not a training set.</b> Unchanged from the specification &mdash; and, given no episode has completed, not yet even a populated smoke test.</li>
+        <li><b><code>config/reach_map.csv</code> is a low-fidelity approximation.</b> New this session: regenerated to complete the handover package's file tree, but at a resolution and seed count that does not closely reproduce the trusted, untouched <code>safe_rect.txt</code> the episode matrix actually depends on.</li>
+      </ul>
+      <p class="prose"><b>What this does prove, precisely:</b> that every part of this pipeline not requiring a running simulator &mdash; the world, the geometry, the IK and waypoints, the task language, the verifier's correctness, the contracts, and the full handover package &mdash; is built and independently checkable by anyone, on any machine, without needing Gazebo at all; and that the two things standing between this and a completed episode are now precisely characterized rather than mysterious.</p>
+    </section>
+
+    <!-- ===================================================== MANUAL ===================================================== -->
+    <section class="block" id="manual">
+      <h2>Manual execution, start to finish</h2>
+      <p class="block-dek">What <code>RUNNING.md</code> asks Role B to run, restated here for a reader who wants the whole path in one place.</p>
+      <div class="panels" style="grid-template-columns:1fr">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>bash preflight.sh                       <span class="c"># expect PREFLIGHT PASSED</span>
+
+<span class="c"># first action on new hardware -- not the full batch</span>
+bash scripts/episode.sh 1               <span class="c"># red_cube</span>
+bash scripts/episode.sh 2               <span class="c"># blue_cube</span>
+bash scripts/episode.sh 3               <span class="c"># green_cylinder -- do not skip</span>
+bash scripts/episode.sh 4               <span class="c"># yellow_box</span>
+
+<span class="c"># only once all four above pass:</span>
+bash scripts/batch.sh 1 60              <span class="c"># ~5-8h on Role B hardware</span>
+bash scripts/status.sh                  <span class="c"># any time, separate terminal</span>
+
+python3 scripts/port_bag.py --out datasets/mycobot_sorting_train --split train
+python3 scripts/port_bag.py --out datasets/mycobot_sorting_heldout --split heldout</pre>
+        </div>
+      </div>
+      <p class="callout warn"><b>Stop and report if any of the four smoke episodes fails</b> &mdash; per <code>RUNNING.md</code>, this is not a formality. Send back the failing episode's <code>stage_&lt;idx&gt;.log</code>, whether it failed during bring-up or during recording, and &mdash; if it's the recorder hang &mdash; a <code>py-spy dump</code> of the stuck process if at all possible.</p>
+    </section>
+
+    <section class="block" id="manifest">
+      <h2>File manifest</h2>
+      <p class="block-dek">What's actually tracked in this project's own git history, and what each piece is for.</p>
+      <div class="manifest-tree">Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/<br>
+&#9500;&#9472;&#9472; RUNNING.md<span class="c">                          # &sect;11, &sect;15 -- the one sentence, then three commands</span><br>
+&#9500;&#9472;&#9472; preflight.sh<span class="c">                        # &sect;11 -- read-only environment check</span><br>
+&#9500;&#9472;&#9472; doc/<br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; FOUR_OBJECT_SORTING_SPECIFICATION.docx<span class="c">  # the binding spec</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; FOUR_OBJECT_SORTING_REPORT.{html,docx} / _FR.{html,docx}<span class="c">  # this document, EN/FR</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; ASSUMPTIONS.md, WORLD_SELECTION.md, GRASP_DECISION.md<span class="c">  # &sect;1-3</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; OBJECTS_MANIFEST.md, BIN_REPOSITIONING.md<span class="c">          # &sect;4</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; WAYPOINT_CONTINUITY.md<span class="c">                        # &sect;7</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; CONTRACT_VERIFICATION.md<span class="c">                      # &sect;10</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; SMOKE_TEST.md<span class="c">                                  # &sect;12-13, the full forensic record</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; HANDOVER.md<span class="c">                                    # &sect;15, Appendix-A-by-row accounting</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; LIMITATIONS.md, METRICS.md<span class="c">                    # Part 12-13</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; ROBOTICS_TEAM_REFERRALS.md<span class="c">                    # Appendix B</span><br>
+&#9500;&#9472;&#9472; config/<span class="c">                              # &sect;4-7, every generated/precomputed artifact</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; objects.yaml, tasks.jsonl, episode_matrix.csv<br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; waypoints.json, safe_rect.txt<span class="c">  # trusted</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; reach_map.csv<span class="c">  # &sect;14, regenerated at low fidelity</span><br>
+&#9500;&#9472;&#9472; contracts/<span class="c">                           # &sect;10</span><br>
+&#9500;&#9472;&#9472; models/<span class="c">                              # &sect;4, four objects + four bins</span><br>
+&#9500;&#9472;&#9472; scripts/<br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; mycobot_ik.py, sweep_reach.py<span class="c">           # &sect;6, &sect;14, pure analytical IK</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; precompute_ik.py, check_waypoints.py<span class="c">    # &sect;7</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; spawn_scene.py, run_pick_and_place.py<span class="c">   # &sect;8</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; verify_episode.py, test_verifier.py<span class="c">     # &sect;9</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; episode.sh, batch.sh, status.sh<span class="c">         # &sect;10, &sect;12, recorder + batch driver</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; port_bag.py<span class="c">                              # &sect;10, dataset conversion, no torch</span><br>
+&#9500;&#9472;&#9472; datasets/<span class="c">                            # meta/README tracked; payload not (empty until Level 4)</span><br>
+&#9492;&#9472;&#9472; worlds/<span class="c">                              # local copy of real_table.sdf</span></div>
+      <p class="prose">The recorded episode bags (none yet exist) would live only in the <code>gazebo_to_lerobot</code> container under <code>/workspace/htgspp/episodes/</code>, not in this repository &mdash; regenerable via <code>batch.sh</code>, not something to version-control. The two files this work also touched in the separate, shared <code>mycobot_320pi_R6A</code> team repository (<code>real_table.sdf</code>, <code>real_table.launch.py</code>) are not part of this project's own manifest and were left for that repository's maintainer to review and commit directly.</p>
+    </section>
+
+    <footer>Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo report &middot; written 2026-09-23 &middot; commit 3319973 on main &middot; Tomislav Ilic</footer>
+  </main>
+</div>

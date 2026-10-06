@@ -1,0 +1,35 @@
+# Copied verbatim from the team's mycobot_320pi_R6A repo (mycobot_description
+# has ~130MB of mesh files) then hand-modified in 3 files. Those 3 modified
+# files are tracked separately under overrides/ instead of duplicating the
+# whole tree here. See docs/PIPELINE.md (or the HTML/docx docs) for the exact
+# copy + override steps to reconstruct this directory.
+src/mycobot_R6A/
+
+# The 5 rosetta/lerobot-bridge repos are cloned via `vcs import src <
+# src/rosetta.repos` (see that file) -- pinned upstream code, not ours to
+# track. Re-clone with vcstool instead of committing it here.
+src/action/
+
+# Runtime/build state -- lives inside the Docker container's own filesystem
+# layer (only src/ is bind-mounted from the host per docker/run.sh), so none
+# of this should ever actually appear on the host, but excluded defensively.
+build/
+install/
+log/
+venv_lerobot/
+datasets/
+
+# Safety-net copy of the container's own datasets/bags/contracts, pulled
+# out via docker cp while recreating the container after the directory
+# rename (try_gazebo -> Gazebo_to_LeRobot_Pipeline) broke its bind mount.
+# Same content as datasets/ above, not source.
+container_backup/
+
+# Personal screen recordings dropped in this folder during the session --
+# not part of the pipeline.
+*.mp4
+
+# Editor/OS noise
+__pycache__/
+*.pyc
+.vscode/

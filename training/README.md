@@ -196,11 +196,13 @@ python training/dream/convert_to_ndds.py \
 | `dream/mycobot_ik.py` | Inverse kinematics (Jacobien) |
 | `dream/infer_dream.py` | Inférence : keypoints + PnP |
 | `dream/finetune_real.py` | Fine-tuning expérimental (⚠️ ne fonctionne pas) |
-| `model.py` | Legacy: PoseResNet (abandonné) |
+| `model.py` | Legacy: PoseResNet / MultiViewPoseResNet (abandonné) |
 | `train.py` | Legacy: régression directe (abandonné) |
-| `capture_real.py` | Capture données réelles depuis Pi |
-
-## Leçons apprises
+| `dataset.py` | Legacy: datasets single/multi-view pour `train.py` |
+| `predict.py` | Legacy: inférence régression directe (abandonné) |
+| `capture_real.py` | Capture données réelles depuis Pi (2 caméras, format legacy) |
+| `capture_real_3cam.py` | Capture réelle synchronisée 3 caméras (ArduCam + SVPRO + Astra) — utilisée pour `real_3cam`, voir [`CAPTURE_3CAM.md`](CAPTURE_3CAM.md) |
+| `preview_cameras.py` | Prévisualisation rapide des flux caméras avant capture |
 
 ## Leçons apprises
 

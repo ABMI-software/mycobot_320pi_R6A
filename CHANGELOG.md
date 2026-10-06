@@ -407,6 +407,285 @@ terminal, `ctx.echecs` n'augmente plus, et la boucle tourne sans fin. Passe
 - Tests : `tests/test_correction_vision.py` 23/23. **Pas encore essaye sur le
   robot.**
 
+### Modifié — l'évaluation RoboPEPP est menée par ABMI Lyon (23/09)
+
+- Licence **open-source**, évaluation **conduite par ABMI Lyon** — qui tient
+  aussi le banc définissant la baseline métrologique. UC3 et UC4 peuvent donc
+  être menés par les mêmes mains, sur le même banc, dans une seule campagne :
+  c'est la plus grosse source d'incomparabilité entre deux évaluations qui
+  disparaît.
+- Deux points restent à verrouiller, consignés dans la spécification : le
+  **lien du dépôt** (sans lui, personne ne saura que l'évaluation existe) et la
+  **licence exacte**. Ce dépôt est sous Apache-2.0 ; MIT, BSD ou Apache
+  s'intègrent sans difficulté, mais **GPL ou AGPL imposeraient leurs conditions
+  à ce qui embarque la brique**. À trancher avant d'écrire `pepp_localizer`,
+  pas après.
+
+### Ajouté — spécification d'évaluation des briques interchangeables (22/09)
+
+- [`docs/SPEC_VALIDATION_BRIQUES.md`](docs/SPEC_VALIDATION_BRIQUES.md) définit
+  **comment on tranche entre deux technologies concurrentes**, DREAM contre
+  RoboPEPP pour la première. Point d'appui : `pick_and_place_aruco_node` ne
+  connaît pas sa source de pose — `/aruco/object_pose` + `/aruco/workspace_valid`
+  est **déjà un port enfichable**, avec deux fournisseurs interchangeables en
+  service. Une brique candidate s'y branche sans qu'un seul élément en aval
+  change, ce qui est la condition d'une comparaison honnête.
+- Quatre cas d'usage dont **deux témoins** (simulation sur vérité terrain,
+  banc réel sur ArUco), le budget d'erreur que le banc de Lyon peut réellement
+  résoudre, et trois épreuves obligatoires — anti-circularité, point de vue
+  tenu à l'écart, observabilité déclarée.
+- Cinq décisions sont explicitement laissées à l'équipe, dont le seuil
+  d'acceptation et le nombre d'essais, fixé avant de commencer.
+- **RoboPEPP est en cours de test et de validation**, hors de ce dépôt — aucune
+  branche, aucune PR, aucun fichier n'en porte trace ici. La spécification
+  énonce donc les cinq mesures que cette évaluation doit produire pour être
+  **opposable** à DREAM, à commencer par l'épreuve d'anti-circularité. Menée
+  hors de ce cadre, elle risque de produire des chiffres incomparables et de
+  devoir être refaite.
+
+### Corrigé — `aruco_localizer` envoyait un modèle 3D deux fois trop petit (22/09)
+
+- `workspace_markers.yaml` écrit `marker_size_mm: 50.0` ; le chargeur ne lisait
+  que la clé `marker_size_m`, absente, et se repliait **silencieusement** sur le
+  défaut du nœud, **0,025 m**. Les coins envoyés à `solvePnP` faisaient donc
+  ±12,5 mm pour des marqueurs de 50 mm, alors que les centres étaient justes —
+  un système géométriquement incohérent.
+- Le chargeur accepte désormais les deux clés, `marker_size_mm` étant converti.
+- **Toute mesure de localisation ArUco antérieure est suspecte** et doit être
+  reprise. Trouvé en instrumentant la spécification ci-dessus, pas par un essai.
+
+### Ajouté — trois briques VLA, mergées sans jamais passer par ce fichier (22/09)
+
+Les PR #12 et #13 ont ajouté **trois répertoires de premier niveau** et leur
+documentation propre, sans qu'aucune entrée n'apparaisse ici ni dans
+`INDEX.md`. Rattrapé. Les portées diffèrent nettement et ne doivent pas être
+confondues.
+
+**`Gazebo_to_LeRobot_Pipeline/` et `ROS2_to_RLDS_Conversion_OpenVLA/` (PR #12)
+sont des preuves de tuyauterie, pas des entraînements.** Épisodes ROS2 →
+LeRobot v3.0, puis → RLDS/TFDS, le format d'Open X-Embodiment, via un fork du
+convertisseur maintenu par le premier auteur d'OpenVLA. Le contrat est respecté
+à la lettre — `state` 8-dim ↔ `POS_QUAT`, `action` 7-dim ↔ `EEF_POS` — et
+l'enregistrement dans les configs, transforms et mixtures d'OpenVLA est
+réellement testé : `test_openvla_transform.py` stubbe `prismatic` pour importer
+les vrais fichiers sans torch. **Deux épisodes de mouvements scriptés, aucune
+tâche réelle.** Quatre réserves relevées à l'audit, aucune bloquante pour une
+preuve de tuyauterie : la vérification FK est une pose statique affichée et non
+assertée ; la convention de repère du delta de rotation (`R_i⁻¹·R_j` = repère
+**outil**) n'est écrite nulle part ; le signe du gripper vient d'un visionnage ;
+le recadrage 320×240 → 224² jette ~25 % du champ horizontal.
+Documentation : `docs/PIPELINE.html` et `.docx` dans chacun des deux.
+
+**`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/` (PR #13) va plus loin** :
+**20 épisodes** enregistrés en Gazebo headless, portés en deux jeux au format
+LeRobot — `mycobot_pick_place_train` (épisodes 1-15, caméra frontale, 2670
+images) et `mycobot_pick_place_heldout` (16-20, `/synth_camera_right`, 927
+images). **La coupure tient un point de vue à l'écart, pas seulement des
+images** : c'est exactement la lacune que `CLAUDE.md` reproche au jeu de
+validation DREAM, dont les 800 images venaient toutes d'une seule vue.
+- **La saisie est une attache simulée, pas une préhension physique**, et le
+  document le dit en titre de section. Le problème de saisie n'est pas résolu.
+- Mesures honnêtes et chiffrées : facteur temps réel **0,082** (un trajet de
+  6-8 s de simulation coûte 60-80 s de temps réel, un cycle complet 5 à 7 min),
+  décalage des doigts **~0,10 m** sous `gripper_base`, et un blocage de ~2,9 h
+  observé dans une trajectoire dont la cause n'est pas isolée — d'où la
+  consigne de superviser les runs.
+- Documentation : `MEASUREMENTS.md` (runs 1-18, confiance annoncée par item),
+  `doc/headless_pick_and_place_specification.md` et les rapports HTML/Word.
+
+### Ajouté — intégration continue, et le test qui manquait (22/09)
+
+- **`.github/workflows/ci.yml`.** Deux travaux : contrôles statiques (chaque
+  `.py` suivi compile, chaque `package.xml` est du XML valide, `CITATION.cff`
+  porte ses champs obligatoires, tous les liens internes résolvent) et une
+  construction `colcon` réelle dans un conteneur `ros:jazzy-ros-base`.
+- **`tests/test_launch_files.py`** appelle `generate_launch_description()` sur
+  les 23 fichiers de launch. C'est le test qui manquait : `sim_grasp.launch.py`
+  est resté inchargeable douze jours sans que rien ne le signale. Vérifié en
+  réintroduisant le bug d'origine — le test le rattrape.
+- `.github/known-broken-links.txt` recense 9 cibles de liens jamais commitées.
+  C'est une **dette explicite**, pas une exception : la CI échoue sur tout lien
+  cassé qui n'y figure pas.
+- Gabarits d'issue et de pull request, `SECURITY.md`, et
+  `mycobot_description/README.md` — la convention ROS veut un `README.md` par
+  paquet, celui-ci n'en avait pas.
+
+### Supprimé — `bridge_pi_debug.py`, jamais exécutable (22/09)
+
+- Le fichier avait **un seul commit dans son histoire, en mars 2026, et il y
+  était déjà corrompu** : quatre shebangs concaténés sur la première ligne,
+  en-tête et corps entrelacés, 157 lignes de plus de 120 caractères, et des
+  renvois à ROS *galactic*. Il n'a jamais pu démarrer.
+- Personne ne l'a vu parce que rien ne compilait les fichiers Python du dépôt.
+  C'est le premier contrôle de la CI qui l'a fait tomber.
+- `docs/TEST_COMPLET.md` et `docs/DEBUG_CONNECTION_GUIDE.md` disaient pourtant
+  de le lancer sur la Pi. Les deux portent désormais un avertissement et
+  renvoient vers `scripts/gripper_bridge.py`.
+
+## [1.17.0] - 2026-09-22
+
+Première version taguée du dépôt. Le CHANGELOG annonçait suivre le *Semantic
+Versioning* depuis ses débuts et numérotait ses sections, mais **aucune version
+n'avait jamais été taguée dans git** : les numéros ne renvoyaient à rien
+d'accessible. `v1.17.0` marque l'état qui suit, et les sections ci-dessous
+couvrent tout ce qui séparait cette version de la 1.16.0 du 13/07.
+
+### Mesuré — la remontée verticale ne corrige pas le cylindre, qui échoue au hasard (22/09)
+
+Hypothèse testée puis **rejetée**, code annulé, rien n'est conservé dans l'arbre.
+
+`move_to` interpole en **articulaire** : entre deux poses verticalement
+alignées la pointe décrit un arc. Mesuré sur la remontée du bac vert, 28 → 110 mm
+en un seul segment : **7,3 mm de flèche latérale**, pour 2,5 mm de jeu seulement
+autour du cylindre au dégagement — le doigt revient donc le pousser. Remplacer ce
+segment unique par un escalier de paliers de 20 mm (`solve_column` sur les
+hauteurs intermédiaires, φ figé) ramène la flèche à **0,33 mm**, vérifié hors
+ligne, sans saut de branche, par bonds articulaires de 8 à 11°.
+
+**Sept cycles plus tard, le cylindre échoue toujours 4 fois sur 7.** Et les six
+cycles instrumentés commandent une géométrie **identique** — φ = 120° à la
+saisie comme au bac, mêmes hauteurs — pour trois réussites et trois échecs. La
+divergence n'est donc pas dans la planification.
+
+- Les écarts d'échec vont de **24 mm à 1 132 mm**, l'objet finissant tantôt au
+  sol (z = 0,022) tantôt perché sur un rebord (z = 0,052). Une éjection
+  métrique est une signature de pénétration de contact, pas de roulement.
+- **`blue_cube` a échoué lui aussi** une fois (+142/−89 mm), ce qui n'était
+  jamais arrivé. Sa garde latérale au dépôt n'est que de 1,5 mm.
+- La descente `q_over_bin → q_place` a bien la même flèche de 7,3 mm, mais elle
+  **ne peut pas être en cause** : elle culmine à z = 69 mm, au-dessus du rebord
+  à 30 mm, et l'encombrement des doigts serrés sur l'objet (40,0 mm) plus la
+  flèche donne 47,3 mm pour une paroi à 47,5.
+
+**Conséquence sur la lecture de tous les chiffres de ce banc** : les relevés
+« 4/4 » et « 12/12 » du 31/08 comme le « 3/4 » du 22/09 sont des tirages d'un
+processus bruité, pas des états déterministes. Toute comparaison entre deux
+versions du code demande plusieurs cycles de chaque côté — trois n'ont pas suffi
+ici, et auraient fait conclure à une réussite.
+
+
+### Corrigé — `sim_grasp.launch.py` ne se lançait plus du tout (22/09)
+
+- **Le banc de préhension physique était injoignable depuis le 10/09.** Le
+  fichier levait `TypeError: Failed to normalize given item of type '<class
+  'list'>'` au chargement, avant même d'ouvrir Gazebo : la paramétrisation du
+  monde (`ed486171`) avait écrit
+  `PathJoinSubstitution([desc_pkg, 'worlds', [world_name, '.sdf']])`, or cette
+  substitution normalise **chacun** de ses éléments et rejette une liste
+  imbriquée — que `'<world_name>.sdf'` impose pourtant. Remplacé par une
+  concaténation à plat déballée au point d'usage.
+- Le défaut arrivait avec la branche d'Osama, donc **il n'a jamais atteint
+  `origin/main`** : il est corrigé avant d'être publié. Les 22 autres fichiers
+  de launch du paquet ont été chargés un à un pour vérifier qu'aucun ne porte
+  la même construction.
+
+### Mesuré — le dégagement des doigts ne sauve pas le cylindre (22/09)
+
+Premier passage réel du cycle de tri depuis le correctif `aeb39dfc`, en
+`headless`, sur `pick_and_place_sorting.sdf`. Deux cycles complets, résultats
+identiques : **3 objets sur 4**.
+
+| Objet | Cycle 1 | Cycle 2 | Écart au centre du bac |
+|-------|---------|---------|------------------------|
+| `red_cube` | ✔ | ✔ | −1/−2 · −0/−2 mm |
+| `blue_cube` | ✔ | ✔ | −11/+10 · −13/+11 mm |
+| `green_cylinder` | ✘ | ✘ | −81/−122 · −35/−102 mm |
+| `yellow_box` | ✔ | ✔ | +0/+0 · +3/+15 mm |
+
+- **La prédiction du correctif est confirmée, dans le mauvais sens** : les
+  2,3 mm par doigt gagnés sur le cylindre ne suffisent pas. Il finit à 10 cm du
+  bac, poussé vers −Y, une fois au sol (z = 0,025) une fois perché (z = 0,051).
+- **Le même cylindre, trié SEUL, réussit** (écart −11/−23 mm). ⚠ L'explication
+  d'abord avancée — le poignet à φ = 120° aux échecs contre 105° à la réussite,
+  donc une dépendance à l'ordre de tri — **est réfutée plus bas** : sur six
+  cycles commandant tous φ = 120°, le cylindre réussit trois fois et échoue
+  trois fois. Trois échantillons avaient fait passer une coïncidence pour une
+  cause.
+- La marge et l'encombrement des doigts sont hors de cause : ils laissent déjà
+  2,5 mm de jeu par côté autour du cylindre à l'ouverture.
+
+
+### Corrigé — le cylindre roulait hors du bac au relâcher (sim de tri, 22/09)
+
+- **`sim_sorting_grasp` écarte les doigts avant de remonter**, au lieu de
+  remonter à la largeur exacte de l'objet. À cette largeur les doigts restent
+  au contact : sur un cylindre, la remontée glisse sur la surface courbe, fait
+  basculer l'objet et le pousse par-dessus la paroi. Nouvelle constante
+  `CLEAR_MARGIN_MM = 2.0` et fonction `angle_for_footprint()`, qui inverse
+  `_FOOTPRINT_TABLE` pour rendre l'angle le plus ouvert dont l'encombrement
+  reste sous `BIN_INNER_HALF_MM − marge`.
+- Le dégagement est borné par `min(release, …)` : les doigts ne se referment
+  jamais plus que le relâchement, et ne s'ouvrent jamais au-delà de la marge.
+  L'encombrement au dégagement reste donc sous les 47,5 mm que la garde
+  existante vérifie déjà.
+- **Le gain est géométrique, calculé sur `_FOOTPRINT_TABLE`, pas observé**, et
+  il dépend fortement de l'objet — demi-encombrement au relâcher → après
+  dégagement : `yellow_box` 35,8 → 45,5 mm, `red_cube` 41,0 → 45,5,
+  `green_cylinder` 43,2 → 45,5, `blue_cube` **inchangé** (déjà plus ouvert que
+  la marge n'autorise). Le cylindre, cas qui motive le correctif, ne gagne que
+  **2,3 mm par doigt** : si le basculement persiste, le levier n'est pas la
+  marge — la réduire à 1 mm n'en rendrait qu'un de plus — mais la hauteur de
+  dépose ou l'ordre remontée/ouverture.
+
+### Corrigé — cinq fichiers de launch pontaient des topics caméra inexistants (22/09)
+
+- **Les 3 caméras secondaires du URDF sont renommées `camera_link_right` /
+  `_left` / `_top`, et leurs topics `/synth_camera_right|left|top/image`.**
+  Le dépôt vivait avec deux conventions : le URDF publiait `synth_camera_1/2/3`
+  quand `pick_and_place.launch.py`, `pick_and_place_sorting.launch.py`,
+  `synthetic_data_v2.launch.py`, `synthetic_data_v3.launch.py`,
+  `color_object_detector.py` et `synthetic_data_collector_v2.py` s'abonnaient
+  déjà à `right/left/top` — **sur rien**, aucun world `.sdf` ne définissant de
+  caméra. Les noms de joints (`world_to_camera_right/left/top`) et
+  `README_GAZEBO.md` étaient eux aussi du côté `right/left/top` : c'est le
+  `_1/2/3` qui était l'exception, tranchée ici en sa défaveur.
+  Le correctif du 10/09 avait aligné les liens sur `_1/2/3`, c'est-à-dire du
+  mauvais côté — il réparait le parsing URDF sans voir la scission.
+- **Recâblés en conséquence** : `synthetic_data.launch.py`,
+  `synthetic_data_preview.launch.py` et `synthetic_data_collector.py` (chemin
+  v1), seuls utilisateurs de l'ancienne convention.
+- ⚠ **Le câblage physique de `synthetic_data_collector.py` est inchangé** :
+  `cam_1` reste la caméra du côté +Y, `cam_2` celle du côté −Y, `cam_3` la
+  zénithale. Seuls les noms de topics changent. Le commentaire qui appelait
+  `cam_1` « left » contredisait le nom du joint (`world_to_camera_right`) et
+  le collecteur v2 ; il est remplacé par la position géométrique (+Y / −Y /
+  zénith). **Convention tranchée le 22/09 : droite et gauche sont celles de
+  l'opérateur**, debout du côté de la caméra frontale (+X) et regardant le
+  robot — +Y est donc à sa droite, soit les côtés opposés à ceux du robot,
+  tourné vers +X. Les noms de joints existants étaient déjà les bons ; c'est
+  le commentaire du collecteur v1 qui avait pris l'autre lecture. La
+  convention est désormais écrite dans le URDF, à côté des joints, et dans
+  `README_GAZEBO.md`.
+
+### Corrigé — trois régressions d'intégration de la PR #9 (10/09)
+
+Aucune mesure dans cette séance : trois lancements cassés par le merge, chacun
+réparé à sa cause.
+
+- **7 nœuds ne trouvaient plus `training/dream`.** Ils remontaient 4 niveaux
+  depuis `os.path.abspath(__file__)`, ce qui pointe **hors du dépôt**, et sans
+  `realpath` ne suivaient pas le symlink de `colcon --symlink-install` —
+  `ModuleNotFoundError` (`mycobot_ik`, `mycobot_fk`) au lancement de
+  `sorting_orchestrator`, `pick_and_place_aruco`, `precision_benchmark`,
+  `calibrate_hand_eye`, `fk_ee_pose`, `pick_and_place`, `reach_target_aruco`.
+  Alignés sur le motif déjà correct de `dream_inference_node.py` :
+  `os.path.realpath(__file__)` + remontée de 2 niveaux.
+- **Le robot ne se chargeait plus dans Gazebo.** Les joints
+  `world_to_camera_right/left/top` de `mycobot_pro_320_pi_gazebo.urdf`
+  référençaient des liens `camera_link_right/left/top` **inexistants** (les
+  liens définis sont `camera_link_1/2/3`) : `robot_state_publisher` échouait au
+  parsing (« child link [camera_link_left] not found »). Résidu de la
+  résolution de conflit de la PR #9, où la version des joints a été gardée sans
+  aligner les noms de liens.
+- **Toute la stack sim tombait au lancement.** `bc5ddbe6` avait ré-écrasé
+  l'include rosbridge de `mycobot_teleop.launch.py` avec
+  `PythonLaunchDescriptionSource`, qui ne sait pas parser un `.xml`
+  (« invalid syntax (rosbridge_websocket_launch.xml, line 1) »).
+  `AnyLaunchDescriptionSource` restauré (correctif d'origine `2e57bb18`) pour
+  rosbridge, `PythonLaunchDescriptionSource` gardé pour `gz_sim.launch.py`.
+  ⚠ **rosbridge lui-même reste bloqué** par un désalignement ABI `fastcdr` au
+  niveau de `/opt/ros/jazzy` (`symbol lookup error`) : à corriger côté système
+  (apt), indépendant de ce correctif de launch.
 ### Modifié — le tri de reference est celui a saisie physique (10/09)
 
 - **`sim_sorting_grasp` devient le pipeline de tri documente.** La pince se
@@ -1926,40 +2205,40 @@ d'écart par joint** (angles estimés vs encodeurs réels) comme livrable
 d'évaluation, puis **visual servoing** pour le pick-and-place. Maillons manquants
 identifiés : calibration extrinsèque `T_base_camera` de la caméra fixe, puis
 brique glue keypoints → angles (reprojection-min sur la FK existante
-[`training/dream/mycobot_fk.py`](../training/dream/mycobot_fk.py) /
-[`training/dream/mycobot_ik.py`](../training/dream/mycobot_ik.py)).
+[`training/dream/mycobot_fk.py`](training/dream/mycobot_fk.py) /
+[`training/dream/mycobot_ik.py`](training/dream/mycobot_ik.py)).
 
 ### Ajouté — outillage pose estimation eye-to-hand (astra RGB-D)
 
 Pipeline complet keypoints → angles → courbe d'écart par joint, caméra astra
 fixe devant le bras. Validé en simulation ; premier run réel en cours.
 
-- [`training/dream/estimate_angles_from_keypoints.py`](../training/dream/estimate_angles_from_keypoints.py)
+- [`training/dream/estimate_angles_from_keypoints.py`](training/dream/estimate_angles_from_keypoints.py)
   — remonte des keypoints DREAM aux angles j1..j6. Mode 2D (reprojection, `cv2`)
   et **mode 3D** (depth → correspondance 3D). Self-tests : le 3D récupère
   j1–j4 à <2° **sans amorçage** (la profondeur supprime la fragilité mono) ;
   j5 faible, **j6 non observable** (keypoint sur l'axe de j6 — limite structurelle).
-- [`training/calibration/oni_grabber_rgbd.cpp`](../training/calibration/oni_grabber_rgbd.cpp)
+- [`training/calibration/oni_grabber_rgbd.cpp`](training/calibration/oni_grabber_rgbd.cpp)
   — grabber OpenNI Astra : couleur + depth aligné couleur (D2C) + FOV (intrinsèques)
   vers `/dev/shm`. Extension du grabber couleur existant.
-- [`training/calibration/calibrate_astra_extrinsic_shm.py`](../training/calibration/calibrate_astra_extrinsic_shm.py)
+- [`training/calibration/calibrate_astra_extrinsic_shm.py`](training/calibration/calibrate_astra_extrinsic_shm.py)
   — extrinsèque `T_base_camera` par recalage 3D (Kabsch) sur les marqueurs sol,
   sans ChArUco. Sort `astra_extrinsic.yaml` + `cam_astra.npz`.
-- [`training/calibration/check_astra_markers.py`](../training/calibration/check_astra_markers.py),
-  [`training/calibration/astra_preview.py`](../training/calibration/astra_preview.py)
+- [`training/calibration/check_astra_markers.py`](training/calibration/check_astra_markers.py),
+  [`training/calibration/astra_preview.py`](training/calibration/astra_preview.py)
   — aide au cadrage / preview live couleur+depth.
-- [`training/dream/capture_astra_rgbd.py`](../training/dream/capture_astra_rgbd.py)
+- [`training/dream/capture_astra_rgbd.py`](training/dream/capture_astra_rgbd.py)
   — dataset RGB-D + encodeurs (mouvement calqué sur `capture_real_3cam` :
   home d'abord, `speed=25`, `settle=3s`). Réutilise le bridge TCP validé.
-- [`training/dream/plot_angle_error_curve.py`](../training/dream/plot_angle_error_curve.py)
+- [`training/dream/plot_angle_error_curve.py`](training/dream/plot_angle_error_curve.py)
   — le livrable : DREAM → depth → angles vs encodeurs → courbe d'écart par joint.
-- [`training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md`](../training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md)
+- [`training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md`](training/calibration/CALIBRATION_ASTRA_EXTRINSIC.md)
   — procédure de calibration extrinsèque.
 
 ### Modifié — Documentation
 
-- [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) — historique modèles DREAM : `vgg_ultimate_v4_mix_ft_e30` finalisé (91,6% réel), date à jour.
-- [`SESSION_RESUME.md`](../SESSION_RESUME.md) — entrée datée 8 juillet 2026 (état pose estimation + direction eye-to-hand).
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — historique modèles DREAM : `vgg_ultimate_v4_mix_ft_e30` finalisé (91,6% réel), date à jour.
+- [`SESSION_RESUME.md`](SESSION_RESUME.md) — entrée datée 8 juillet 2026 (état pose estimation + direction eye-to-hand).
 
 ---
 
@@ -1969,7 +2248,7 @@ fixe devant le bras. Validé en simulation ; premier run réel en cours.
 
 `vgg_ultimate_v4_e50` (50K synthétique, intrinsèques caméra corrigées) évalué à
 **99.4% de détection** (2.61px erreur moyenne), dépassant le précédent record
-v2 (97.7%). Voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](../training/dream/VGG_ULTIMATE_V4_50K.md).
+v2 (97.7%). Voir [`training/dream/VGG_ULTIMATE_V4_50K.md`](training/dream/VGG_ULTIMATE_V4_50K.md).
 
 Le transfert sim-to-real reste bloqué à ≈27% sur `real_3cam_ndds` malgré ce
 gain. Un fine-tune depuis `best_network.pth` sur un mix synthétique 50K + réel
@@ -1979,8 +2258,8 @@ est en cours pour combler l'écart — voir
 
 ### Modifié — Documentation
 
-- [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) — historique modèles DREAM à jour (v4, mix fine-tune)
-- [`training/README.md`](../training/README.md), [`training/dream/README.md`](../training/dream/README.md) — tableaux de résultats à jour
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — historique modèles DREAM à jour (v4, mix fine-tune)
+- [`training/README.md`](training/README.md), [`training/dream/README.md`](training/dream/README.md) — tableaux de résultats à jour
 ## [1.15.2-pre] - 2026-06-09 — branche `feature/pick-and-place`
 
 ### Calibration main-œil robot réel — pipeline complet + nœuds caméra
@@ -2152,10 +2431,10 @@ Calibration ChArUco des deux Arducams Pi (cam_0, cam_3) avec un nouvel outil `tr
 
 ### Ajouté — `training/calibration/`
 
-- [`calibrate_camera.py`](../training/calibration/calibrate_camera.py) — calibrateur ChArUco unifié (UVC `--source v4l2` + Astra `--source astra` via OpenNI wrapper). Quality gating (markers / sharpness / coverage grid / diversité temporelle), rejet outliers per-view-error, **auto-save** quand `target_samples` atteint, fallback save-on-quit ≥ 12 vues, CLAHE optionnel pour capteurs bruités. Presets caméra auto-appliqués via `--name` (cam_* → arducam, astra* → astra_rgb).
-- [`generate_board.py`](../training/calibration/generate_board.py) — génère un PNG ChArUco à imprimer aux dimensions exactes (DPI configurable).
-- [`probe_charuco.py`](../training/calibration/probe_charuco.py) — probe single-frame (a servi à débusquer 2 régressions OpenCV 4.6 : `DetectorParameters()` et `CharucoBoard((sx,sy),…)` qui segfault sur access aux propriétés — fix par fallback legacy `_create()`).
-- [`probe_astra.py`](../training/calibration/probe_astra.py) — probe Astra 15 s, 4 modes (raw / CLAHE / swap-RB / swap-RB+CLAHE).
+- [`calibrate_camera.py`](training/calibration/calibrate_camera.py) — calibrateur ChArUco unifié (UVC `--source v4l2` + Astra `--source astra` via OpenNI wrapper). Quality gating (markers / sharpness / coverage grid / diversité temporelle), rejet outliers per-view-error, **auto-save** quand `target_samples` atteint, fallback save-on-quit ≥ 12 vues, CLAHE optionnel pour capteurs bruités. Presets caméra auto-appliqués via `--name` (cam_* → arducam, astra* → astra_rgb).
+- [`generate_board.py`](training/calibration/generate_board.py) — génère un PNG ChArUco à imprimer aux dimensions exactes (DPI configurable).
+- [`probe_charuco.py`](training/calibration/probe_charuco.py) — probe single-frame (a servi à débusquer 2 régressions OpenCV 4.6 : `DetectorParameters()` et `CharucoBoard((sx,sy),…)` qui segfault sur access aux propriétés — fix par fallback legacy `_create()`).
+- [`probe_astra.py`](training/calibration/probe_astra.py) — probe Astra 15 s, 4 modes (raw / CLAHE / swap-RB / swap-RB+CLAHE).
 
 ### Mesuré
 
@@ -2173,7 +2452,7 @@ Calibration ChArUco des deux Arducams Pi (cam_0, cam_3) avec un nouvel outil `tr
 | cx | 320 | 317.73 | −0.7 % |
 | cy | 240 | 226.00 | **−5.8 %** |
 
-**Implication** : les `projected_location` GT du dataset ont été calculées avec un `fx=610` qui ne correspond à aucune caméra physique. Pour un point 3D à distance D, l'erreur sur le pixel projeté est ~14 % et **croît avec la distance au centre image**. Cohérent avec les link4-6 (loin du centre quand le bras est étendu) à 3-36 % de détection en 1.12.0. Le réseau a entraîné sur des GT erronés sur les distal — convergence impossible.
+**Implication** : les `projected_location` GT du dataset ont été calculées avec un `fx=610` qui ne correspond à aucune caméra physique. Pour un point 3D à distance D, l'erreur sur le pixel projeté est ~14 % et **croît avec la distance au centre image**. Cohérent avec les link4-6 (loin du centre quand le bras est étendu) à 3-36 % de détection en 1.12.0-pre. Le réseau a entraîné sur des GT erronés sur les distal — convergence impossible.
 
 ### Différé — calibration Astra
 
@@ -2193,7 +2472,7 @@ Tentatives infructueuses (cf. SESSION_RESUME.md) :
 
 ---
 
-## [1.13.0] - 2026-04-28 (après-midi)
+## [1.13.0-pre] - 2026-04-28 (après-midi) — branche `feature/calibration-cam`
 
 ### 🧪 DREAM — test cheap d'ajout de cam3 dans le mix (extrinsèques approximatives)
 
@@ -2265,7 +2544,7 @@ Plan v3 (post-calibration) :
 
 ---
 
-## [1.12.0] - 2026-04-28
+## [1.12.0-pre] - 2026-04-28 — branche `feature/calibration-cam`
 
 ### 🧪 DREAM — évaluation finale du modèle mixte sur tous les splits
 
@@ -2321,20 +2600,20 @@ Session dédiée à débloquer la **pose estimation DREAM** (bloqué ~26 % déte
 
 ### Ajouté — Tooling DREAM
 
-- [`training/dream/evaluate_dream_relaxed.py`](../training/dream/evaluate_dream_relaxed.py) — wrapper de `evaluate_dream.py` qui monkey-patch les seuils de peak detection sans toucher la lib vendored `/tmp/DREAM/`. CLI : `--peak-thresh` (défaut 0.001 vs lib 0.01) et `--next-best-score` (défaut 0.05 vs lib 0.25).
+- [`training/dream/evaluate_dream_relaxed.py`](training/dream/evaluate_dream_relaxed.py) — wrapper de `evaluate_dream.py` qui monkey-patch les seuils de peak detection sans toucher la lib vendored `/tmp/DREAM/`. CLI : `--peak-thresh` (défaut 0.001 vs lib 0.01) et `--next-best-score` (défaut 0.05 vs lib 0.25).
 - Backup du checkpoint pré-resume : `training/checkpoints_dream/vgg_mixed_real_synth/best_network.e25.{pth,yaml}`.
 
 ### Ajouté — Claude Code project structure
 
 Structure complète pour que les sessions Claude aient le contexte projet dès le démarrage :
 
-- [`CLAUDE.md`](../CLAUDE.md) à la racine — project overview, 3 envs Python, branch map, POC scope (digital twin · AI physics · VLA · pose estimation)
-- [`.claude/settings.json`](../.claude/settings.json) — permissions partagées projet-wide
-- [`.claude/rules/`](../.claude/rules/) (5) — `python-environments` · `ros2-conventions` · `real-robot-safety` · `git-branching` · `documentation`
-- [`.claude/commands/`](../.claude/commands/) (5) — `launch-sim` · `launch-teleop` · `real-robot-preflight` · `train-dream` · `collect-synthetic`
-- [`.claude/skills/`](../.claude/skills/) (6) — `teleop-troubleshoot` · `dream-workflow` · `gazebo-setup` · `real-robot-session` · `isaac-sim-integration` · `lerobot-dataset`
-- [`.claude/agents/`](../.claude/agents/) (6) — `ros2-debugger` · `dream-trainer` · `teleop-tuner` · `urdf-surgeon` · `digital-twin-engineer` · `vla-integrator`
-- [`.claude/hooks/validate-ros2-build.sh`](../.claude/hooks/validate-ros2-build.sh) — inactif par défaut (à câbler dans settings si désiré)
+- [`CLAUDE.md`](CLAUDE.md) à la racine — project overview, 3 envs Python, branch map, POC scope (digital twin · AI physics · VLA · pose estimation)
+- [`.claude/settings.json`](.claude/settings.json) — permissions partagées projet-wide
+- [`.claude/rules/`](.claude/rules/) (5) — `python-environments` · `ros2-conventions` · `real-robot-safety` · `git-branching` · `documentation`
+- [`.claude/commands/`](.claude/commands/) (5) — `launch-sim` · `launch-teleop` · `real-robot-preflight` · `train-dream` · `collect-synthetic`
+- [`.claude/skills/`](.claude/skills/) (6) — `teleop-troubleshoot` · `dream-workflow` · `gazebo-setup` · `real-robot-session` · `isaac-sim-integration` · `lerobot-dataset`
+- [`.claude/agents/`](.claude/agents/) (6) — `ros2-debugger` · `dream-trainer` · `teleop-tuner` · `urdf-surgeon` · `digital-twin-engineer` · `vla-integrator`
+- [`.claude/hooks/validate-ros2-build.sh`](.claude/hooks/validate-ros2-build.sh) — inactif par défaut (à câbler dans settings si désiré)
 
 La skill `isaac-sim-integration` contient la roadmap 5-phases pour Isaac Sim (USD conversion → ROS2 bridge → synth data DREAM → Isaac Lab parallel envs → real-robot validation). **Aucune migration démarrée** — uniquement la planification. Gazebo reste sur `main`.
 
@@ -2365,7 +2644,7 @@ La skill `isaac-sim-integration` contient la roadmap 5-phases pour Isaac Sim (US
 
 ### 🎨 Dashboard ABMI + boutons dynamiques
 
-Refonte complète de la GUI [`teleop/teleop_dashboard.py`](../teleop/teleop_dashboard.py) sur la charte **ABMI** (navy `#1B1A3E` + pink `#E6417A`) avec logo intégré. Trois onglets, KPI cards, caméra opérateur inline, comparaison sim ↔ réel côte à côte et ActionButton dynamiques avec feedback visuel.
+Refonte complète de la GUI [`teleop/teleop_dashboard.py`](teleop/teleop_dashboard.py) sur la charte **ABMI** (navy `#1B1A3E` + pink `#E6417A`) avec logo intégré. Trois onglets, KPI cards, caméra opérateur inline, comparaison sim ↔ réel côte à côte et ActionButton dynamiques avec feedback visuel.
 
 ### Ajouté
 
@@ -2382,13 +2661,13 @@ Refonte complète de la GUI [`teleop/teleop_dashboard.py`](../teleop/teleop_dash
   - Toast horodaté dans la status bar Home (`✓ Send robot home · 14:23:05`)
 - **Presets de gains** — 🐢 Safe start (0.6/0.6/0.6/0.3) · ⚙️ Nominal (1.2/1.2/1.6/0.25) · ⚡ Reactive (1.6/1.6/2.0/0.15). Le preset actif reste highlighted en SUCCESS solide.
 - **Polling passif** de `get_angles` (0.3 s) pour remonter les angles réels quand `/joint_states` n'est pas là
-- [`teleop/assets/abmi_logo.png`](../teleop/assets/) — logo chargé automatiquement
+- [`teleop/assets/abmi_logo.png`](teleop/assets/) — logo chargé automatiquement
 
 ### Modifié
 
-- [`docs/TELEOP_DASHBOARD.md`](TELEOP_DASHBOARD.md) — **réécrit** pour l'UI 3-tabs, sections par onglet, tableau topics in/out, troubleshooting mis à jour
-- [`docs/TELEOPERATION.md`](TELEOPERATION.md) — section dashboard regénérée + topic `/teleop/camera/image` ajouté dans le listing des publications de Stage 4
-- [`README.md`](../README.md) — ligne dashboard dans le tableau outils, commentaire T4 rafraîchi
+- [`docs/TELEOP_DASHBOARD.md`](docs/TELEOP_DASHBOARD.md) — **réécrit** pour l'UI 3-tabs, sections par onglet, tableau topics in/out, troubleshooting mis à jour
+- [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) — section dashboard regénérée + topic `/teleop/camera/image` ajouté dans le listing des publications de Stage 4
+- [`README.md`](README.md) — ligne dashboard dans le tableau outils, commentaire T4 rafraîchi
 
 ### Non changé
 

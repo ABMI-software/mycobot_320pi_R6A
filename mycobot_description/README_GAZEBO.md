@@ -40,6 +40,7 @@ sudo apt install ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
 | `worlds/randomized_v2.sdf` | 6 lumières, 12 objets clutter (cubes/cylindres/sphères), 3 murs — domain randomization avancée |
 | `worlds/pick_and_place.sdf` | Table 0.8×0.8 m + cube cible rouge + zone de dépose verte (mono-objet) |
 | `worlds/pick_and_place_sorting.sdf` | Table 1.0×0.6 m + 4 objets dynamiques (cube R, cube B, cylindre G, boîte Y) côté +X + 4 bacs colorés à parois côté −X (multi-objet par couleur) |
+| `worlds/precision_benchmark.sdf` | Robot + cube cible rouge + marqueurs ArUco workspace — utilisé par `precision_benchmark.launch.py` et `pick_and_place_aruco.launch.py` |
 | `worlds/real_table.sdf` | Plateau mesuré 622×449×8,5 mm + ArUco 19/23/25/26 de 50 mm + caméra de dessus + cube et bac |
 | `worlds/banc_realiste_yolo26.sdf` | **Banc réaliste** — même plateau, marqueurs aux positions relevées AU ROBOT, les 4 pièces peintes et leurs 4 bacs, et les caméras **arducam et SVPRO à leur pose extrinsèque calibrée** (généré par `scripts/generer_banc_realiste.py`) |
 
@@ -168,6 +169,12 @@ l'objet. `sorting_orchestrator` fait le même parcours mais **téléporte** l'ob
 via `set_pose` — d'où l'objet qui saute. Il est antérieur à la pince modélisée
 et conservé pour sa partie perception.
 
+**L'issue n'est pas déterministe** (mesuré 22/09/2026 sur 7 cycles) :
+`green_cylinder` sort du bac 4 fois sur 7 et `blue_cube` une fois, alors que la
+géométrie commandée est identique d'un cycle à l'autre. Ne conclure sur aucun
+essai unique. Chiffres et diagnostic dans
+[`docs/PICK_AND_PLACE_SIMULATION.md`](../docs/PICK_AND_PLACE_SIMULATION.md).
+
 ## Visuels caméra (URDF Gazebo)
 
 Les 4 caméras embarquées dans le URDF (`mycobot_pro_320_pi_gazebo.urdf` —
@@ -177,6 +184,12 @@ un objectif noir cylindrique aligné sur l'axe optique (+X) + une LED rouge.
 Cette forme « caméra de surveillance » les rend visuellement distinctes des
 objets colorés à trier — important pour le pipeline `color_object_detector`
 qui segmente la scène par couleur.
+
+**Droite et gauche sont celles de l'opérateur**, debout du côté de la caméra
+frontale (+X) et regardant le robot : `camera_link_right` est en **+Y**,
+`camera_link_left` en **−Y**. Ce sont les côtés opposés à ceux du robot,
+tourné vers +X — les deux lectures étant défendables, c'est celle de
+l'opérateur qui fait foi dans ce dépôt.
 
 ## Gripper adaptatif
 

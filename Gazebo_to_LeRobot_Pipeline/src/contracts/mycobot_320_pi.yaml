@@ -1,0 +1,57 @@
+# Rosetta contract for the Gazebo_to_LeRobot_Pipeline mycobot_320_pi sandbox.
+# Modeled on rosetta's own contracts/so_101.yaml, adapted for this setup.
+#
+# IMPORTANT DEVIATION from the so_101/leader-follower pattern: rosetta's
+# examples all define `action` from a physically separate LEADER arm's own
+# /leader_arm/joint_states (what the human moved the leader to becomes the
+# recorded action for the follower). This sandbox has no leader arm -- input
+# is direct keyboard/scripted commands to the sim, not a physical teleop rig.
+# Simplification used here: action := the follower's own achieved state
+# (/joint_states), same topic as observation.state. This is a common,
+# legitimate simplification for non-leader/follower behavior-cloning setups,
+# but it means "action" records what the arm DID, not what was COMMANDED an
+# instant earlier -- fine for smooth position-controlled motion, but if you
+# later want a true command signal, the correct fix is a small ROS2 node
+# that republishes /mycobot_controller/joint_trajectory's target point as a
+# flat sensor_msgs/msg/JointState (mirroring the leader-arm pattern), and
+# point `actions.action.channel.topic` at that instead. Not built yet.
+#
+# fps: 30 to match the target episode spec (150 frames / 5s demo), but note:
+# /synth_camera/image's Gazebo sensor update_rate is 30Hz of SIM time, and
+# this VM's real-time-factor is well below 1.0 even in headless mode -- a
+# "5-second" episode will take noticeably longer than 5 real seconds to
+# perform. See the session's earlier discussion of this before recording.
+
+robot_type: mycobot_320_pi
+robot_interface: ros2
+fps: 30
+
+observations:
+  observation.images.front:
+    # rosetta's per-camera auto-recording prefers a compressed stream over
+    # raw when one is advertised (confirmed empirically: a test recording
+    # captured /synth_camera/image/compressed but never /synth_camera/image
+    # itself, even though the contract at the time named the raw topic).
+    # Pointing the contract at the stream that's actually in the bag.
+    channel: {topic: /synth_camera/image/compressed,
+              type: sensor_msgs/msg/CompressedImage,
+              qos: {reliability: best_effort, history: keep_last, depth: 10}}
+    align: {strategy: hold, timeline: header}
+    apply: [resize: [224, 224]]
+
+  observation.state:
+    channel: {topic: /joint_states, type: sensor_msgs/msg/JointState,
+              qos: {reliability: best_effort, history: keep_last, depth: 50}}
+    align: {strategy: hold, timeline: header}
+    select: [position.joint2_to_joint1, position.joint3_to_joint2,
+             position.joint4_to_joint3, position.joint5_to_joint4,
+             position.joint6_to_joint5, position.joint6output_to_joint6]
+
+actions:
+  action:
+    channel: {topic: /joint_states, type: sensor_msgs/msg/JointState,
+              qos: {reliability: best_effort, history: keep_last, depth: 50}}
+    align: {strategy: hold, timeline: header}
+    select: [position.joint2_to_joint1, position.joint3_to_joint2,
+             position.joint4_to_joint3, position.joint5_to_joint4,
+             position.joint6_to_joint5, position.joint6output_to_joint6]

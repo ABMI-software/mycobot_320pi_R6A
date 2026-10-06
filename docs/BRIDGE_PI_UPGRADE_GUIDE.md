@@ -39,7 +39,7 @@ J'ai créé un fichier **`bridge_pi_example.py`** dans votre workspace qui conti
 ### Localisation
 
 ```
-/home/genji/ros_jazzy/src/mycobot_R6A/bridge_pi_example.py
+<your_ws>/src/mycobot_320pi_R6A/bridge_pi_example.py
 ```
 
 ---
@@ -57,7 +57,7 @@ cp bridge_pi.py bridge_pi_old.py
 
 # Copier le nouveau (vous devrez transférer bridge_pi_example.py vers la Pi)
 # Méthode 1 : scp depuis le PC Tour
-scp genji@10.10.0.115:/home/genji/ros_jazzy/src/mycobot_R6A/bridge_pi_example.py bridge_pi.py
+scp genji@10.10.0.115:<your_ws>/src/mycobot_320pi_R6A/bridge_pi_example.py bridge_pi.py
 
 # OU Méthode 2 : copier le contenu manuellement
 nano bridge_pi.py
@@ -184,7 +184,7 @@ python3 bridge_pi.py
 ### 2. Depuis le PC Tour, relancer les tests
 
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 ./robot_test_interactive.sh
 ```
 

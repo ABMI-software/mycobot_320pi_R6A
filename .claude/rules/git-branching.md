@@ -1,5 +1,9 @@
 # Rule — Git branching
 
+> **`CONTRIBUTING.md` (repository root) is the source of truth for this project's
+> conventions.** This file restates them for tooling. If the two disagree, fix
+> this one.
+
 ## Branch map
 
 | Branch | Role | Notes |
@@ -30,11 +34,14 @@ feat(dream): ...
 docs: ...       # cross-cutting
 ```
 
-Include a `Co-Authored-By:` trailer when Claude helped write the code.
+N'ajouter **aucune ligne d'attribution** — ni `Co-Authored-By`, ni mention d'un
+assistant. Les commits de ce dépôt portent le seul nom de leur auteur humain.
+Le réglage `includeCoAuthoredBy: false` le garantit côté outil ; cette règle le
+garantit côté rédaction manuelle.
 
 ## Before pushing
 
-- `git status` — no stray files (`*.bak*`, `*.xlsx` reports, `__pycache__`)
+- `git status` — no stray files (`*.bak*`, `__pycache__`); an `*.xlsx` workbook only if the user approved it
 - Check `.gitignore` covers `results/`, `build/`, `install/`, `log/`
 - If you pushed *then* realize you forgot a file — make a new commit, not `--amend` + `--force`
 

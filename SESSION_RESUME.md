@@ -1,5 +1,104 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (22 septembre 2026 — mise au propre du dépôt)
+
+### Ce qui a été accompli aujourd'hui
+
+**La séance du 10/09 n'était documentée nulle part** — entrée ajoutée au
+CHANGELOG et ici (voir plus bas). `CLAUDE.md` décrivait encore l'état DREAM de
+juillet : ajout de deux sections de septembre (checkpoint `vgg_montage0901_ft_e30`,
+invalidation de la démo markerless, et ce que valent réellement les chiffres de
+précision et d'extrinsèque).
+
+**PR #12 inspectée** (Gazebo→LeRobot + ROS2→RLDS→OpenVLA, mergée le 22/09). Le
+contrat OpenVLA est respecté à la lettre (`state` 8-dim ↔ `POS_QUAT`, `action`
+7-dim ↔ `EEF_POS`) et l'enregistrement est réellement testé, pas affirmé :
+`test_openvla_transform.py` stubbe `prismatic` pour importer les vrais fichiers
+sans torch. Quatre réserves relevées, aucune bloquante pour une preuve de
+tuyauterie : la vérification FK est **une pose statique affichée, non assertée**
+(l'accord à 7 décimales implique un bras immobile à cet instant) ; la convention
+de repère du delta de rotation (`R_i⁻¹·R_j` = repère **outil**) n'est écrite
+nulle part ; le signe du gripper vient d'un visionnage, pas d'une calibration ;
+le recadrage 320×240 → 224² jette ~25 % du champ horizontal.
+
+**Une seule convention de nom pour les caméras secondaires : `right/left/top`.**
+Le dépôt en portait deux et **cinq fichiers de launch s'abonnaient à des topics
+sans publieur**. Voir CHANGELOG. Le correctif du 10/09 avait aligné les liens du
+mauvais côté de la scission.
+
+**Le conflit de la PR d'Osama est résolu.** Diagnostic : la branche a été
+réécrite après la PR #9, donc **142 de ses 161 commits sont des doublons** de
+commits déjà sur `main` (identiques au patch près, SHA différents) et la base de
+fusion remonte à juin. Les 27 fichiers en conflit portaient presque tous deux
+fois la même modification. Résolu par fusion (pas de réécriture, pas de
+force-push) dont l'arbre a été obtenu en rejouant les **19 commits réellement
+nouveaux** sur `main` — apport net vérifié identique, 44 fichiers.
+
+**Le banc de préhension ne se lançait plus depuis le 10/09** :
+`sim_grasp.launch.py` échouait au chargement sur une `PathJoinSubstitution`
+contenant une liste imbriquée. Corrigé, puis les 22 autres fichiers de launch
+chargés un à un — aucun ne porte la même construction. Le défaut arrivait avec
+la branche d'Osama, il n'a donc jamais atteint `origin/main`.
+
+**Le cycle de tri a tourné pour de vrai — 9 cycles au total — et son issue
+n'est pas déterministe.** `green_cylinder` sort du bac 4 fois sur 7 avec la
+remontée verticale, 2 fois sur 2 sans, et `blue_cube` a échoué une fois. Les six
+cycles instrumentés commandent pourtant une géométrie **identique** (φ = 120°
+partout) : la divergence est dans le solveur de contact de Gazebo, pas dans la
+planification. Deux causes mesurées puis écartées : la marge des doigts
+(2,5 mm de jeu par côté) et la flèche latérale de la remontée (7,3 mm ramenée
+à 0,33 mm par un escalier de paliers — sans effet, code annulé).
+
+**J'avais d'abord conclu à une dépendance à l'ordre de tri** sur la foi de
+φ = 120° aux échecs contre 105° à la réussite. Trois échantillons, une
+coïncidence. C'est corrigé partout, et la leçon est consignée : sur ce banc,
+trois cycles ne départagent pas deux versions du code.
+
+### Décisions prises
+
+- **Les classeurs `.xlsx` deviennent commitables sur approbation explicite**,
+  au lieu d'être interdits. Motif : un classeur est opaque au diff, donc celui
+  qui le commite se porte garant de son contenu. `precision_campagne_2026-09-09.xlsx`
+  reste donc dans la PR d'Osama.
+- **`right/left/top`** l'emporte sur `_1/2/3` pour les caméras.
+- **Fusion plutôt que rebase** pour la PR d'Osama : la règle de branchement
+  interdit de réécrire une branche en relecture.
+- Sur le conflit du chemin IK, **la version d'Osama l'emporte** : son
+  `_dossier_dream()` cherche le *fichier* `mycobot_ik.py` et supprime le chemin
+  absolu codé en dur vers le home d'un tiers.
+
+### Prochaines actions
+
+1. [ROUGE] **Pousser `main`** — et rien d'autre : la tête de la PR d'Osama
+   (`28a859d7`) est déjà accessible depuis `main`, GitHub fermera donc la PR
+   comme *merged* sans qu'on pousse sa branche.
+2. [ROUGE] **Le cylindre sort du bac 4 fois sur 7, au hasard.** La géométrie
+   étant identique d'un cycle à l'autre, chercher du côté de la **physique** :
+   paramètres de contact du cylindre et des parois dans
+   `pick_and_place_sorting.sdf`, pas du côté de la trajectoire. Les éjections
+   métriques (jusqu'à 1 132 mm) sont une signature de pénétration.
+3. [FAIT] **Rejouer le tri en simulation** — fait le 22/09, deux cycles
+   complets, résultats identiques (3/4).
+4. [FAIT] **Quel côté mérite le nom « droite »** — tranché le 22/09 en faveur
+   du point de vue de l'opérateur (debout en +X, regardant le robot) : +Y est à
+   sa droite. Les noms de joints n'avaient pas à changer ; la convention est
+   maintenant écrite dans le URDF et `README_GAZEBO.md`.
+5. [JAUNE] **Débloquer rosbridge côté système** (désalignement ABI `fastcdr`).
+6. [VERT] Reprendre les actions du 09/09, aucune n'a avancé : affaissement à
+   3 portées, cas *outil couché* du scotch, éclairage à 86 de luminance.
+
+### Commande rapide de reprise
+
+```bash
+git push origin main
+
+# rejouer le tri (deux terminaux, conda desactive)
+ros2 launch mycobot_gateway sim_grasp.launch.py headless:=true
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true
+```
+
+---
+
 ## État actuel (2 octobre 2026 — tri des 4 pièces dans Gazebo, piloté par yolo26)
 
 ### Ce qui a été accompli (29/09 → 02/10)
@@ -467,6 +566,60 @@ conda deactivate
 cd ~/ros_jazzy && colcon build --packages-select mycobot_description mycobot_gateway --symlink-install
 source install/setup.bash
 ros2 launch mycobot_gateway real_table.launch.py robot_appearance:=realistic
+```
+
+---
+
+## État précédent (10 septembre 2026 — remise en marche du dépôt après la PR #9)
+
+*Entrée écrite le 22/09 : la séance du 10/09 n'avait été documentée nulle part,
+ni ici ni dans le CHANGELOG. Elle ne contient aucune mesure — uniquement la
+réparation de trois régressions d'intégration introduites par le merge.*
+
+### Ce qui a été accompli
+
+**Trois régressions post-PR #9 corrigées, chacune empêchait un lancement.**
+
+1. **7 nœuds ne trouvaient plus `training/dream`.** Ils remontaient 4 niveaux
+   depuis `os.path.abspath(__file__)` — donc hors du dépôt — et sans `realpath`
+   ne suivaient pas le symlink de `colcon --symlink-install`. Résultat :
+   `ModuleNotFoundError` (`mycobot_ik`, `mycobot_fk`) au lancement de
+   `sorting_orchestrator`, `pick_and_place_aruco`, `precision_benchmark`…
+   Alignés sur le motif déjà correct de `dream_inference_node.py`.
+2. **Le robot ne se chargeait plus dans Gazebo.** Les joints
+   `world_to_camera_right/left/top` référençaient des liens
+   `camera_link_right/left/top` inexistants (les liens définis sont
+   `camera_link_1/2/3`) : `robot_state_publisher` échouait au parsing URDF.
+   Résidu de la résolution de conflit de la PR #9, où la version des joints a
+   été gardée sans aligner les noms de liens.
+3. **Toute la stack sim tombait au lancement.** Le commit `bc5ddbe6` avait
+   ré-écrasé l'include rosbridge avec `PythonLaunchDescriptionSource`, qui ne
+   sait pas parser un `.xml`. `AnyLaunchDescriptionSource` restauré pour
+   rosbridge, `PythonLaunchDescriptionSource` gardé pour `gz_sim.launch.py`.
+
+### Décisions prises
+
+- **Ne pas traiter le blocage rosbridge dans le dépôt.** Le désalignement ABI
+  `fastcdr` (`symbol lookup error`) est au niveau de `/opt/ros/jazzy` : il se
+  corrige côté système (apt), pas par un correctif de launch.
+
+### Prochaines actions
+
+1. [ROUGE] **Débloquer rosbridge côté système** (ABI `fastcdr`) — sans lui, la
+   chaîne de téléop reste inutilisable même avec le launch réparé.
+2. [ROUGE] **Reprendre les prochaines actions du 09/09**, aucune n'a avancé
+   depuis : affaissement à 3 portées, cas *outil couché* du scotch, éclairage
+   remonté à 86 de luminance avant toute calibration visant 0,12 mm.
+3. [JAUNE] **Mettre à jour les supports de présentation** avec les verdicts
+   révisés du 09/09 (retrait du bloc échelle, répétabilité en RP ISO 9283).
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/ros_jazzy && colcon build --packages-select mycobot_gateway mycobot_description --symlink-install
+source install/setup.bash
+ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim
 ```
 
 ---

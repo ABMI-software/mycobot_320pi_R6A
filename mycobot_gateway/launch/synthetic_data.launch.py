@@ -126,9 +126,9 @@ def generate_launch_description():
     # ---------- ros_gz_image bridges — one per camera ----------
     camera_topics = [
         '/synth_camera/image',
-        '/synth_camera_1/image',
-        '/synth_camera_2/image',
-        '/synth_camera_3/image',
+        '/synth_camera_right/image',
+        '/synth_camera_left/image',
+        '/synth_camera_top/image',
     ]
     gz_image_bridge = Node(
         package='ros_gz_image',

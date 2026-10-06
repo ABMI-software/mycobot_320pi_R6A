@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Conventions du projet
+    url: https://github.com/ABMI-software/mycobot_320pi_R6A/blob/main/CONTRIBUTING.md
+    about: Environnements Python, branches, commits, sécurité robot — à lire avant de contribuer.

@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>gazebo_to_lerobot_bringup</name>
+  <version>1.0.0</version>
+  <description>Sim bring-up launch (Gazebo + controllers + camera bridges) and a direct joint-trajectory test script for the Gazebo_to_LeRobot_Pipeline sandbox, built on top of mycobot_gateway/mycobot_teleop.launch.py target:=sim.</description>
+  <maintainer email="tomislav_tole_ilic@yahoo.com">Tomislav Ilic</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>mycobot_description</exec_depend>
+  <exec_depend>mycobot_gateway</exec_depend>
+  <exec_depend>ros_gz_image</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
+  <exec_depend>moveit_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

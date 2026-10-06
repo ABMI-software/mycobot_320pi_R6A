@@ -137,7 +137,13 @@ def _load_workspace_positions(yaml_path: str) -> tuple[dict[int, np.ndarray], fl
                 int(mid): np.asarray(xyz, dtype=np.float64)
                 for mid, xyz in raw.items()
             }
+            # workspace_markers.yaml ecrit `marker_size_mm` ; ne lire que
+            # `marker_size_m` rendait None, donc repli silencieux sur le defaut
+            # de 0.025 m pour des marqueurs qui font 50 mm — soit un modele 3D
+            # deux fois trop petit envoye a solvePnP.
             size = data.get("marker_size_m")
+            if size is None and data.get("marker_size_mm") is not None:
+                size = float(data["marker_size_mm"]) / 1000.0
             if positions:
                 return positions, (float(size) if size is not None else None), yaml_path
     except Exception:

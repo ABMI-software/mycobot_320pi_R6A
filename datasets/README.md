@@ -1,6 +1,12 @@
 # 📦 Datasets - MyCobot 320 Pi Pose Estimation
 
-Ce dossier contient les données d'entraînement pour le pipeline de pose estimation CNN.
+Ce dossier contient le dataset **legacy** (régression directe ResNet, 5K synth
++ 2K réel) utilisé par `training/train.py`.
+
+> ℹ️ Le pipeline actif (DREAM, format NDDS) utilise des données bien plus
+> volumineuses qui ne vivent **pas** ici mais dans `training/dream/dream_data/`
+> (50K synthétique v3 + `real_3cam`) — voir [`../training/dream/README.md`](../training/dream/README.md)
+> et [`../README.md` § Datasets](../README.md#-datasets).
 
 > ⚠️ **Les images PNG sont stockées via [Git LFS](https://git-lfs.github.com/).**  
 > Après `git clone`, exécutez `git lfs pull` pour télécharger les images.
@@ -77,12 +83,12 @@ ds = MyCobotMultiViewDataset("datasets/real_dataset", split="train",
 Pour l'entraînement :
 ```bash
 # Multi-view synthétique
-/home/genji/miniconda/bin/python3 training/train.py \
+<miniconda>/bin/python3 training/train.py \
   --dataset datasets/synthetic_dataset \
   --multi-view --backbone resnet50 --epochs 150
 
 # Multi-view réel
-/home/genji/miniconda/bin/python3 training/train.py \
+<miniconda>/bin/python3 training/train.py \
   --dataset datasets/real_dataset \
   --multi-view --views cam0 cam3 --backbone resnet50 --epochs 300
 ```

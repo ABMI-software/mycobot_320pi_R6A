@@ -1,5 +1,9 @@
 # Rule — Python environments
 
+> **`CONTRIBUTING.md` (repository root) is the source of truth for this project's
+> conventions.** This file restates them for tooling. If the two disagree, fix
+> this one.
+
 Three Python environments coexist on this machine. Mixing them breaks everything. **Always check before running code.**
 
 ## The three envs
