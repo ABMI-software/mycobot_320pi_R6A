@@ -1,6 +1,6 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-> **Date de dernière mise à jour :** 23 septembre 2026 (déport d'outil, butées articulaires, suite de tests remise en marche ; revue de la PR #14)
+> **Date de dernière mise à jour :** 5 octobre 2026 (essai des PR #14 et #15 sous Gazebo, analyse du dataset de la PR #15)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
 > **Branche :** `fix/tool-offset-and-test-collection`, issue de `main`
 > **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
@@ -8,7 +8,88 @@
 
 ---
 
-## État actuel (23 septembre 2026 — inventaire avant le `workspace_safety_checker`)
+## État actuel (2–5 octobre 2026 — essai des PR #14 et #15 sous Gazebo)
+
+### Ce qui a été accompli aujourd'hui
+
+Essai, interface graphique ouverte, des deux dernières PR fusionnées dans
+`main` (02577857), dans le conteneur `Gazebo_to_LeRobot_Pipeline`
+(`docker/Dockerfile`, transmission graphique WSLg, `--shm-size=2g`). Le
+dépôt de travail n'a pas été touché : `origin/main` est extrait dans
+`~/mycobot_ws/pr_test` (worktree), l'espace monté dans le conteneur est
+`~/mycobot_ws/pr_ws` (tous deux portent un `COLCON_IGNORE`).
+
+**PR #14 (lanceur unique du pick-and-place) : PASS** —
+`motions_ok=True placed_on_plate=True grasp_held=True`, environ 4 min. Deux
+défauts : `ros-jazzy-moveit-py` manque au Dockerfile, et `run_demo.py`
+traduit ce plantage en « no reachable IK solution » ; Ctrl+C sur le lancement
+graphique laisse Gazebo tourner (`ros2 launch` tue l'orchestrateur à 10 s,
+avant son nettoyage de 15 s + pkill).
+
+**PR #15 (tri de quatre objets) : 0 / 4, trois séries, dont une propre**
+(épisodes 1, 16, 31, 46 — un par objet ; `RUNNING.md` propose 1 à 4, qui
+sont tous le cube rouge). Résultat déterministe, poses finales identiques à
+quelques mm près d'une série à l'autre. Causes mesurées :
+- l'attache simulée ne fait rien : `/htgspp/attach` n'a aucun abonné, le
+  `DetachableJoint` n'est que dans `models/*.sdf`, jamais chargés ; les
+  métadonnées affichent pourtant `simulated_attachment: true` et
+  `grasp_held: true` partout ;
+- `episode.sh` n'appelle jamais `spawn_scene.py` : objets toujours à leur
+  pose du monde, 44 des 60 lignes de la matrice et toutes les positions de
+  distracteurs ne sont jamais appliquées ;
+- le bac rouge chevauche le bleu (85 × 25 mm) et le vert (65 × 15 mm) ; sa
+  paroi traverse le bac bleu, et c'est contre elle que le cube bleu reste
+  penché (z = 37 mm, au-dessus du bord de 30 mm) ;
+- `episode.sh` tue `ros2 launch` en `kill -9` : un `robot_state_publisher`
+  et deux `parameter_bridge` (dont `/clock`) restent orphelins à chaque
+  épisode. Ce n'est pas la cause des échecs (la série propre donne le même
+  résultat) ;
+- postures : butées respectées sur les 360 waypoints (domaine pratique et
+  URDF Gazebo, tous coude haut), mais les objets à 10 cm de l'axe replient
+  le bras jusqu'à mettre le coude derrière la base, sans contrôle
+  d'auto-collision ;
+- lenteur : RTF 0,11–0,18 avec l'interface graphique (cinq caméras à 10 Hz),
+  pas un défaut de commande.
+
+**Dataset de la PR #15 : vide (aucun PASS), et inexploitable en l'état même
+avec des PASS** (conversion de diagnostic de l'épisode 16 hors dataset) :
+`action` est une copie de `observation.state` sur 100 % des images ; la
+colonne `timestamp` (185,7 s, temps mural) contredit la vidéo (139 images à
+30 fps = 4,6 s) et la durée simulée (27 s) ; ~5 images/s en temps simulé ;
+le `resize: [224, 224]` du contrat n'est pas appliqué (vidéo 1280 × 960) ;
+~500 Mo par épisode.
+
+Constats publiés en commentaires sur les PR #14 et #15 (le commentaire de la
+#15 a été corrigé : le cube bleu n'est pas lâché hors du bac).
+
+### Décisions prises
+
+- Ne rien corriger dans le code des PR : les constats vont à leur auteur.
+- Le conteneur `gazebo_to_lerobot` reste en place pour réessayer après un
+  correctif.
+
+### Prochaines actions
+1. [ROUGE] Attendre le correctif de la PR #15 (attache, `spawn_scene`,
+   bacs), puis relancer les épisodes 1 / 16 / 31 / 46 avec nettoyage complet
+   entre chaque.
+2. [JAUNE] Faire corriger le dataset avant tout lot de 60 épisodes :
+   `action[t] = state[t+1]` au minimum, horodatage en temps simulé
+   cohérent avec le fps, redimensionnement du contrat.
+3. [VERT] Ajouter `ros-jazzy-moveit-py`, `ffmpeg` et `pyarrow` au Dockerfile
+   du pipeline.
+
+### Commande rapide de reprise
+```bash
+docker start gazebo_to_lerobot
+docker exec -it gazebo_to_lerobot bash
+# dans le conteneur :
+cd /workspace/htgspp && bash scripts/episode_gui.sh 16     # copie d'episode.sh, headless:=false
+cd /workspace/htgpp  && ros2 launch launch/pick_and_place_demo.launch.py
+```
+
+---
+
+## État précédent (23 septembre 2026 — inventaire avant le `workspace_safety_checker`)
 
 ### Ce qui a été accompli aujourd'hui
 
