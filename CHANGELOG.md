@@ -94,6 +94,432 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   échecs sont préexistants et hors de ce lot — dérive d'API entre les tests et
   `pick_fsm` (`releve_les_doigts` renommé `cale_les_doigts`, signatures à 2
   contre 3 valeurs).
+### Ajoute — DREAM en parallele du tri, dashboard DREAM <-> YOLO, fine-tuning scene de tri (05-06/10)
+
+Protocole complet : `docs/PROTOCOLE_YOLO_GAZEBO.md`, etapes 9 a 11.
+
+- **Campagne 10 graines (etape 9)** : 40/40 tries par la perception seule,
+  aucun deuxieme essai ; ecart au centre du bac median 7 mm, max 17 mm.
+- **Journalisation CSV (etape 11)** : `log_dir:=` ecrit `run.yaml` (md5 des
+  poids, masse, commit), `yolo_vs_gt.csv` et `tri.csv`.
+- **DREAM en parallele (etape 10)** : `dream:=true`, `dream_fk_compare`,
+  `dream_cameras:=front,right` pour choisir les vues. Sans -> avec pince :
+  detection 65,2 -> 49,5 %. Monde du 50K 99,2 % contre scene de tri 65,2 %
+  aux memes poses : la cause est la scene.
+- **`tri_dream_dashboard`** (`dashboard:=true`) : DREAM contre YOLO, la
+  fenetre Gazebo integree dans la grille 2x2 (`embed_gazebo`) ;
+  `tri_trajectoires_gazebo` trace dans Gazebo la pointe de la pince, une
+  couleur par objet, et la trajectoire DREAM en magenta.
+- **`synthetic_data_collector_tri`** : rendus DREAM dans la scene de tri, AVEC
+  la pince (60 % de poses du trieur). 12 080 images d'entrainement (graines
+  1001-1016) et 1 200 de test (2001-2003). Modele de depart sur le test :
+  52,6 % detectes, 16,7 px median.
+- **`training/dream/train_dream_ultimate_v5_geo.py`** : augmentation
+  geometrique reparee, decoupage 80/10/10 a graine fixe, `DREAM_DIR` par
+  defaut `~/DREAM` (`/tmp/DREAM` est efface au redemarrage).
+- **`docs/DONNEES_ET_CONSOMMATION.md`** : repartition des donnees du
+  fine-tuning, consommation mesuree par configuration, et cause des pics a
+  90-100 °C : un seul coeur P au turbo. Entrainement sur les coeurs E 16-27 :
+  74 °C au lieu de 85-100, vitesse inchangee.
+
+
+### Ajoute — tri des 4 pieces dans Gazebo pilote par yolo26 sur 4 cameras (29/09-02/10)
+
+Protocole complet : `docs/PROTOCOLE_YOLO_GAZEBO.md`.
+
+- **Scene `tri_yolo.launch.py`** — 4 pieces et 4 bacs tires au hasard sur la
+  replique du banc, cameras aux poses du jeu DREAM 50K (`camera_layout:=dream50k`).
+  `piece_reach:=0.28` place les objets a portee de saisie comme au banc reel.
+- **Perception seule** — `yolo_gazebo_node` (yolo26 sur chaque camera),
+  `yolo_localizer` : boite 3D de la classe recalee sur la boite 2D
+  (`tri_scene.locate_from_box`), puis **fusion par la mediane des 4 cameras**
+  sur `/yolo/objects_3d` (0,65 mm median, 2,07 mm au pire, 10 scenes).
+  `gazebo_ground_truth` et `yolo_gt_overlay` servent a la validation seulement.
+- **yolo26 v6c** (`pieces_v6c_gazebo_yolo26s`, 74 images reelles x10 +
+  1 036 Gazebo) devient le modele par defaut de `scripts/yolo26_service.py` :
+  283/283 pieces sur les 4 cameras, mAP50 reel 0,990 (v5 : 0,967).
+- **`sim_sorting_grasp pose_source:=perception`** — objets ET bacs lus sur
+  `/yolo/objects_3d`, appaires par la classe. Depot resolu avant la saisie,
+  ouverture d'approche = largeur + 24 mm, cubes pinces a 0 ou 90°, largage
+  incline 15/30/45° pour les bacs hors de portee verticale, 2 essais apres
+  une prise a vide. Graine 1 : 4/4 tries.
+
+### Corrige — l'objet glissait entre les doigts au lacher (02/10)
+
+- **`sim_sorting_grasp`** : la pince ne s'ouvrait qu'a la largeur de l'objet
+  puis remontait ; pour le cube bleu, doigts dans le bac, la paroi les
+  empechait de s'ouvrir. Desormais, pour tous les objets : lacher 5 mm
+  au-dessus du rebord, doigts ecartes de 20 mm, 2 s, puis remontee lente.
+  Verifie : chaque objet est au fond du bac avant la remontee.
+- **`sim_grasp.launch.py`** : `--switch-timeout 30` sur les spawners ; avec 4
+  cameras rendues, l'activation depassait les 5 s par defaut (2 lancements
+  sur 5) et le bras restait immobile.
+
+### Ajoute — pince montee sur support, dans l'axe de J6 (30/09)
+
+- **`scripts/cycle_pince_axe_j6.py`** — un cycle saisie -> bac en boucle
+  ouverte pour la pince sur support : survol vertical (J5 ~ 90), descente en
+  deux segments enchaines, fermeture confirmee par le statut, remontee et
+  trajet vers le bac sans arret, largage pince inclinee de 15 a 30 deg.
+  `--essai` calcule et verifie tout sans rien envoyer. Gardes : hauteur
+  minimale du trajet, derive XY <= 6 mm, ecart codeurs <= 2,8 deg.
+  Les quatre pieces peintes triees sur le banc reel.
+- **`docs/PINCE_SUPPORT_AXE_J6.md`** — geometrie mesuree (centre de prise
+  ~[-24, 0, +146] mm repere bride), recalibration arducam (controle 0,12 mm),
+  resultats des essais et plan de reprise de `pick_fsm.py`, dont
+  l'orientation imposee `Q_REFERENCE` ne vaut plus avec ce montage.
+
+### Ajoute — le banc reel en simulation, vu par yolo26 (23/09)
+
+- **`ros2 launch mycobot_gateway banc_realiste.launch.py`** — variante REALISTE
+  de `real_table.launch.py` : les 4 pieces peintes et leurs 4 bacs sur le plateau
+  mesure, les marqueurs aux positions relevees AU ROBOT, et les deux cameras du
+  banc a **leur pose extrinseque calibree, avec leurs intrinseques**. Masses de la
+  fiche 320 Pi 2022 (bras 3 kg, pince 0,340 kg) et butees mesurees
+  (J1 168, J2 135, J3 150, J4 145, J5 165, J6 180 deg), deja portees par l'URDF.
+- **`/usr/bin/python3 scripts/yolo26_gazebo.py`** — yolo26 sur les cameras de
+  Gazebo, en millimetres robot, avec les deux vues annotees (`--sans-fenetre`
+  pour le texte seul, `--une-passe` pour un controle rapide).
+- **`scripts/generer_pieces_gazebo.py`** — les 8 modeles Gazebo (4 pieces, 4 bacs)
+  GENERES DEPUIS `tri_couleur.py`. Les cotes ne sont pas recopiees : une piece
+  redimensionnee dans le dossier de fabrication se propage par regeneration.
+- **`scripts/generer_banc_realiste.py`** — le monde
+  `mycobot_description/worlds/banc_realiste_yolo26.sdf`, genere depuis
+  `real_table.sdf` + `planche_actuelle.yaml` + les deux extrinseques.
+- **Extrinseques SIMULEES** `arducam_extrinsic_sim.yaml`, `svpro_extrinsic_sim.yaml`
+  et leurs `sim_*.meta.json` : meme `T_cam_world` et memes fx/fy/cx/cy que le banc,
+  mais **distorsion nulle**. Gazebo rend une projection pinhole pure ; appliquer a
+  ces images le modele rationnel du vrai objectif (k1 = 5,4, k3 = -48,2) decalerait
+  chaque point de plusieurs millimetres sans rien signaler.
+
+**Mesure — la simulation retrouve la hierarchie du banc.** Les objets sont poses a
+des millimetres connus, la detection est comparee a la verite :
+
+| | arducam | SVPRO |
+|---|---:|---:|
+| Classes detectees | 7/8 | 7/8 |
+| Ecart median | **3,5 mm** | 9,0 mm |
+| Pire ecart | 7,1 mm | 18,4 mm |
+
+La camera quasi verticale est precise, l'oblique deux a trois fois plus grossiere
+— exactement leurs roles au banc, sans aucun reglage pour l'obtenir.
+
+**Non resolu : `bac_jaune` n'est detecte par aucune des deux vues** alors qu'il
+l'est en reel. Ni la teinte (ecart 0 apres correction) ni l'exposition (75,5 contre
+76,6) ne l'expliquent. Le jaune partage la teinte du bois — 19 contre 21, dans la
+bande de +/-8 — et le bac simule n'a pas le reflet de rebord du vrai.
+
+### Corrige — trois pannes muettes de la chaine Gazebo (23/09)
+
+- **`real_table.sdf` n'a pas de systeme de capteurs.** Sa `table_camera` declare
+  `/camera/image_raw`, mais aucun greffon ne l'anime : la scene se charge, le
+  capteur existe, et le sujet reste **muet sans le moindre message**. L'option
+  `bridge_camera:=true` ne peut donc rien donner. Ajoute dans le monde realiste ;
+  `real_table.sdf` garde le defaut.
+- **Le rendu des capteurs segfaute sur NVIDIA.** libEGL prend Mesa
+  (« egl: failed to create dri2 screen ») au lieu du fournisseur NVIDIA et le fil
+  de rendu meurt : la scene tourne, les sujets image restent vides. Le lancement
+  pose desormais `__EGL_VENDOR_LIBRARY_FILENAMES` et `__GLX_VENDOR_LIBRARY_NAME`.
+- **Ogre2 casse sur une collision de materiaux** (« HLMS Datablock [Hash
+  0x64f0b670] already exists ») — les quatre ArUco portent des visuels de memes
+  noms. Le monde realiste rend les capteurs avec **Ogre v1**.
+- **Le nom du monde doit valoir celui du fichier** : Gazebo sert ses services sous
+  `/world/<nom>/...` et `ros_gz_sim create` les y cherche. Un monde nomme
+  `real_table` dans un fichier `banc_realiste_yolo26.sdf` se charge sans erreur et
+  le robot n'apparait jamais, sur une attente muette.
+
+### Documente — la commande de reference du banc, et la methode (23/09)
+
+- **`/usr/bin/python3 scripts/lancer_pick_dashboard_final.py`** etait la commande
+  du banc au quotidien et n'apparaissait dans **aucune** documentation. Ajoutee au
+  README et a `docs/PICK_AND_PLACE_REAL.md`, avec ses prerequis verifiables
+  (aller-retour TCP 5005, aucune autre camera ouverte, aucun `bridge_tour`
+  residuel) et le piege de `fsm.ACTIONS`, qui capture les fonctions a l'import.
+- **Les sept etapes qui rendent le banc simule realiste** sont ecrites dans
+  `mycobot_description/README_GAZEBO.md`, dans l'ordre et avec leurs mesures :
+  generation depuis le dossier de fabrication, marqueurs remis a la reference
+  robot, cameras a leur pose calibree, extrinseques simulees sans distorsion,
+  teintes de la peinture et non du trace, valeur du materiau baissee pour ne pas
+  ecreter, eclairage.
+
+### Corrige — une descente refusee change de ROULIS, pas de millimetres (23/09)
+
+`scripts/yolo26_dashboard.py` : `_saisie` enregistrait deja le couple
+(inclinaison, roulis) qui avait ferme la pince a vide ; `_descente` ne le faisait
+pas. Un refus de branche renvoyait vers RECALAGE, qui affine le XY et redescend
+avec **le meme roulis**. Journal du 22/09 sur le cylindre vert : neuf descentes,
+neuf fois « palier Z=113 exige 71 deg — changement de branche refuse », avec des
+recalages de 2,92 puis 0,87 puis 0,26 puis 0,12 mm. Le XY n'etait pas le probleme.
+
+Borne **obligatoire** : `DETECTION` appelle `repart_a_zero`, qui efface
+`ctx.essais`. Sans borne, le `_descente` d'origine ne rend plus jamais son `ECHEC`
+terminal, `ctx.echecs` n'augmente plus, et la boucle tourne sans fin. Passe
+`ROULIS_REFUSES_MAX = 4` angles, la reponse d'origine repasse.
+
+
+### Ajoute — yolo26 entraine sur les 8 pieces peintes, et vue deux cameras (18/09)
+
+- **`.venv/bin/python scripts/yolo26_visualisation.py [--camera arducam|svpro]
+  [--modele <best.pt>]`** — vue en direct des deux cameras avec les 8 pieces du
+  dossier nommees par yolo26, compte sur 8 et temps d'inference par camera.
+  Aucun mouvement du robot. L'exposition de l'arducam est **surveillee** (relue
+  toutes les 4 s, reecrite seulement si le driver l'a relachee) et son etat
+  affiche : `expo 75` en vert, `AUTO (157)` en rouge avec le nombre de remises.
+- **`scripts/tri_couleur.py`** — chaine couleur et taille, successeur de
+  `tri_taille.py` pour les pieces peintes. Nouvelles options `--extrinseque`
+  (travailler sur une autre camera que l'arducam) et `--par-aire` (vue rasante).
+- **8 classes aux noms du dossier de fabrication**, indices **figes** 0-7 :
+  `bac_rouge` `bac_jaune` `bac_vert` `bac_bleu` `cube_rouge` `pave_jaune`
+  `cylindre_vert` `cube_bleu`.
+- **Pourquoi entrainer** : yolo26 COCO est aveugle a ces pieces — 3 detections
+  sur toute la scene (clavier x2, ciseaux), **zero sur la planche**.
+- **Teintes MESUREES sur la peinture**, pas tirees du SDF (qui donne bleu 116 et
+  vert 62 au lieu de 98 et 39). La teinte nomme ; la saturation ne tranche que
+  le jaune, seule couleur dont le bois partage la teinte (bois H 16, jaune 21).
+- **`SATURATION_JAUNE` 230 -> 220**, mesure sur les deux cameras : bois arducam
+  218 au q99,9, pave jaune SVPRO 226. A 230 le pave SVPRO etait rejete a trois
+  unites pres — cause du `pave_jaune` absent de toutes les trames SVPRO.
+- **`range_par_aire()`** — en vue rasante le controle dimensionnel est faux (un
+  cube de 50 sort a 79 x 48 mm) ; l'aire en pixels separe le bac de son objet
+  d'un facteur 2,2 a 4,9. Une couleur qui ne donne pas exactement deux taches
+  sur la planche est abandonnee : on ne devine pas.
+- **La boite etiquetee suit l'obliquite** : contour en vue plongeante, boite du
+  detecteur en vue rasante (ou le contour vaut 60 a 151 % de celle-ci).
+  **L'apercu trace desormais la boite reellement ecrite**, sans quoi la
+  relecture ne garantit plus rien.
+- Resultat (`pieces_v3_yolo26s`, 17 images) : arducam **8/8 hors echantillon**
+  (conf. moy. 0,82, minimum 0,44), SVPRO **6/8 -> 8/8**.
+
+### Mesure — regler les augmentations de yolo26 ne sert a rien sur 17 images (18/09)
+
+- Quatre recettes comparees, puis **la meme recette relancee avec trois
+  graines** : l'ecart du seul tirage vaut **0,186** en moyenne quand l'ecart
+  attribue a la recette vaut **0,035**. Le bruit est cinq fois l'effet.
+- Consequence : **aucune recette n'est validable** sur ce jeu, et celle qui
+  semblait gagner avait eu de la chance avec sa graine. Le seul levier est un
+  jeu d'images aux dispositions variees, sur les deux cameras.
+- L'ajout d'obliquite (`degrees`, `shear`, `perspective`) est nuisible ici
+  (moyenne 0,559 contre 0,816) : sur des images quasi identiques elle ajoute du
+  bruit au lieu de remplacer de vraies vues.
+- **La mAP des runs ne veut rien dire** : `train` et `val` pointent sur le meme
+  dossier. Juger au comptage sur des trames hors echantillon.
+
+### Ajoute — tri par taille des pieces noires, vision seule (15/09)
+
+- **`.venv/bin/python scripts/tri_taille.py [--image photo.png] [--ordre cube_50 cube_40 pave]`**
+  classe bacs et objets du dossier `pick_and_place_sorting.sdf` (bac 105 x 105 x 30,
+  cube 50, cube 40, pave 50 x 30 x 40), tous imprimes en noir. Aucun mouvement du
+  robot : classe, centre en mm, cotes, angle du grand cote, hauteur de prise et bac
+  vise (bacs numerotes de gauche a droite dans l'image arducam).
+- Chaine : boite YOLOE-26l (ou chercher) -> pixels plus sombres qu'un seuil mesure
+  sur le bois (ce qui est noir) -> rectangle d'aire minimale de la tache la plus
+  proche du centre -> passage en mm a la hauteur de chaque hypothese (dessus de la
+  piece), pave teste sur ses trois faces -> debord des contours mesure sur les bacs
+  (105 mm connus) et retire.
+- Pourquoi ce seuil : pieces a 13-23 en niveau de gris, bois a 45-50, Otsu a 38-42
+  prenait les ombres (bacs a 140 mm). Seuil = 5e centile + 0,35 x (mediane - 5e).
+- Resultat sur le banc (luminance 60) : 6/6 pieces classees comme l'operateur les
+  a posees. Pieces a espacer d'environ 2 cm (un pave colle a un bac se soudait a
+  lui) ; cube 50 / cube 40 / pave ne different que de 10 mm.
+
+### Modifie — la fenetre de calibration ouvre l'apercu des marqueurs des deux cameras (15/09)
+
+- Au lancement de `lancer_pick_dashboard.py`, la question « Voulez-vous faire la
+  calibration extrinseque ? » ouvre `apercu_marqueurs.py --camera les-deux` : les
+  croix de l'extrinseque en service et l'ecart en mm disent s'il faut calibrer.
+- L'apercu tient les cameras. Il s'ouvre apres le controle de depart et se ferme
+  avant tout ce qui les lit : « Oui » (calibration), « Relever la planche »,
+  « Apprendre la pose », puis « Ouvrir le dashboard » ou la croix de la fenetre.
+  Il revient apres la calibration pour verifier les croix.
+- Pause de 1,5 s apres chaque fermeture : une camera rouverte trop tot s'ouvre sans
+  image (dashboard « en attente de flux », 15/09).
+- Verifie hors camera : ouverture, refus pendant un controle, fermeture a la sortie,
+  aucune reouverture apres. `pick_dashboard.py` non modifie.
+
+### Ajoute — apercu des 4 marqueurs, arducam et SVPRO, avec controle de l'extrinseque (15/09)
+
+- **`.venv/bin/python scripts/apercu_marqueurs.py [--camera arducam|svpro|les-deux]`**
+  (defaut : les deux, cote a cote). Pour 19/23/25/26 : cadre colore selon la
+  distance au bord de l'image, croix a l'endroit ou l'extrinseque EN SERVICE
+  attend le marqueur, ecart en mm a la reference `planche_actuelle.yaml`
+  (mesuree au robot), meme verdict que la fenetre de calibration (< 2 mm rien a
+  faire, < 20 conseillee), luminance comparee aux calibrations acceptees (83-85).
+- `--image photo.png --camera ...` : meme controle sur une photo, apercu annote
+  ecrit a cote. Aucun mouvement du robot.
+- Remplace l'usage de `svpro_regler_4_marqueurs.py` (SVPRO seule, sans controle
+  de l'extrinseque). Sur les photos du 15/09 : SVPRO 1,6-4,6 mm ; arducam 8,5-9,5 mm
+  environ 20 min apres sa calibration de 15:03, ecart presque uniforme, donc
+  camera probablement effleuree avant le deplacement volontaire de 27 mm.
+
+### Ajoute — classe `main` dans le jeu d'images YOLO, annotee par MediaPipe (15/09)
+
+- Premiere etape de la remise de balle dans la main. `yolo_capture.py` ajoute la
+  classe `main` (`hand` sur YOLOE-26l, seuil 0,15), en derniere position pour que
+  les etiquettes deja enregistrees gardent leurs numeros.
+- **`/usr/bin/python3 scripts/yolo_capture.py annote-mains`** reecrit les boites
+  `main` de tout le dossier avec MediaPipe Hands (reperes + marge de 10 %), garde
+  les autres classes, retire un `objet` pose sur la main et liste les images sans
+  main a verifier. MediaPipe sert seulement a annoter : le detecteur reste YOLO.
+- Mesure sur 5 prises : YOLOE `hand` 0/5 arducam et 1/5 SVPRO ; MediaPipe 3/5 et
+  5/5 (confiance 0,96-1,0). Il rate la main vue de profil depuis le dessus.
+- Fenetre de test hors depot : quand les deux cameras voient la main, la
+  triangulation donne des rayons a 1-13 mm et des hauteurs credibles (82-314 mm),
+  sur 28 positions.
+
+### Corrige — extrinseque arducam calibree contre des marqueurs mesures AU ROBOT (15/09)
+
+- **Cause des 5 a 10 cm d'ecart pince-balle** : `planche_actuelle.yaml` avait ete
+  releve a travers une extrinseque deja fausse ; chaque recalibration recopiait
+  l'erreur et le controle (camera contre elle-meme) affichait 0,3 mm. Mesure au
+  robot : l'arducam voyait les marqueurs a 40-100 mm de leur place, la SVPRO a
+  62-97 mm, en sens opposes.
+- **`training/calibration/planche_actuelle.yaml`** : 19 et 23 mesures au robot
+  (pince placee a la main, codeurs lus sans ordre moteur), 25 et 26 deduits de la
+  forme vue par l'arducam posee sur ces deux points.
+- **`training/calibration/arducam_extrinsic_pick.yaml`** (desormais versionnee) :
+  recalibree sans `--force`, leave-one-out 1,4-2,7 mm, RMS 0,42 px, controle
+  0,22 mm.
+- **Balle saisie du premier coup** : descente a 0,5 mm en XY, statut 2 angle 53.
+  Un essai.
+- SVPRO non recalibree (marqueur 25 au bord de l'image). Methode et essais
+  refuses : `docs/PICK_AND_PLACE_REAL.md`, « Calibration contre le robot ».
+
+### Ajoute — YOLOE-26 dans pick_dashboard (15/09)
+
+- **`/usr/bin/python3 scripts/lancer_pick_dashboard.py --yolo [--inventaire robot=4 scotch=2]`.**
+  `pick_dashboard.py` n'est pas modifie : `scripts/yolo_dashboard.py` remplace
+  `Vision.objets` de l'ARDUCAM, `scripts/yolo_service.py` fait tourner YOLOE-26
+  dans le `.venv` (GPU) et recoit les images par un tube, comme `aruco_service.py`.
+- **Classes.** Cylindre (26l par le nom `tape roll`/`bottle cap`) -> `scotch`,
+  petit carton ; tout autre objet (26l sans consigne, image a 960 px) -> `robot`,
+  grand carton, avec les hauteurs de prise et le couple du robot. Le nom du mode
+  sans consigne ne suffit pas pour le cylindre (`adhesive tape` 3/5, puis
+  `beeper`, `opal`). La SVPRO garde les heuristiques (ses taches heritent du
+  nom arducam).
+- **Balle : le jaune d'abord, YOLO quand il ne la voit pas** (26s `tennis ball`,
+  cercle englobant de la silhouette, sur la planche, image de moins de 0,5 s).
+  Sur les 6 photos : YOLO la trouve 6/6, a 0,6-3,2 mm du centre jaune. Proche
+  mais pas identique : la carte de correction a appris sur le jaune et
+  `_detecte_balle` refuse des echantillons ecartes de plus de 3 mm, d'ou le jaune
+  en premier. Dans la pince, seul le jaune la voit. La balle YOLO n'entre jamais
+  dans la liste des objets.
+- **Jugement par les fonctions du dashboard** : planche (>= 50 %), marqueurs
+  DETECTES (>= 50 % hors carre ; le 19 sortait `keycard` 0,91 et passait le
+  masque de planche, projete par l'extrinseque decalee), dernier carre des
+  marqueurs de planche retenu quand une main les cache, silhouette du bras
+  depuis les angles (<= 40 %), jaune <= 60 % (balle 90 %, cylindre vert
+  13-32 % : le seuil 0,25 d'origine le jetait), grand cote <= 200 mm, rien a
+  moins de 130 mm d'un marqueur de carton (choisi, non mesure), doublons.
+- **YOLO en tache de fond** : 59-76 ms par image, plus que les 60 ms du
+  rafraichissement. `objets()` soumet l'image et juge le dernier resultat sur
+  sa propre image : 4-7 ms par appel, une image de retard. Service arrete ->
+  retour au detecteur couleur/forme, annonce une fois.
+- **Degagement puis « rien vu » : jamais sur une image d'avant.** Le cycle
+  degage deja le bras (balayage J1 a la pose d'observation) quand la vue de
+  dessus ne voit pas l'objet, et l'oublie s'il reste invisible partout. Or
+  `_detecte_objet` lit la liste de la derniere image traitee sans attendre :
+  avec une image de retard, un objet que le bras venait de decouvrir aurait ete
+  declare invisible, puis oublie. Depuis le fil du robot, `_detecte_objet`
+  attend donc un resultat YOLO pris apres son appel (210-245 ms mesures, 1 s au
+  plus), mais seulement pour CHOISIR une cible (degagement, aucune classe en
+  cours) : `cible_a_bouge` interroge aussi pendant l'approche, ou une image de
+  retard ne coute rien. Depuis le fil graphique, jamais.
+- **`--inventaire`** : sans lui une categorie est « finie » des le premier depot
+  (`robot` 1, `scotch` 2).
+- Sur les 6 photos arducam du 15/09, vraie `Vision` et vrais marqueurs :
+  cylindre 5/5, aucun faux objet (marqueur 19 ecarte, y compris cache par la
+  main). Tests : `tests/test_yolo_dashboard.py` 26/26, `test_correction_vision`
+  23/23. **Non teste sur le robot.**
+
+### Ajoute — jeu d'images YOLO du pick, pre-annote (15/09)
+
+- **`scripts/yolo_capture.py`.** `capture` prend l'arducam puis la SVPRO
+  (une camera ouverte a la fois) a chaque Entree, sans mouvement du robot ni
+  commande de pince, et ecrit images brutes, labels YOLO, apercus et
+  `data.yaml` sous `training/yolo/captures/`. `preannote DOSSIER` fait la meme
+  pre-annotation sur des images existantes. Classes : balle, scotch, robot,
+  mors.
+- **Pre-annotation a relire.** `balle` (seuil HSV du dashboard) est juste sur
+  les 14 vues SVPRO du 14/09. `mors` (zones sombres autour de la balle) ne
+  l'est pas : base du robot et cable pris pour des mors, mors loin de la balle
+  ignores. `scotch` et `robot` sont a annoter a la main.
+- **YOLO-World (`yolov8s-worldv2.pt`) ne remplace pas l'annotation** : balle a
+  0,67 degagee sur l'arducam, perdue sous la pince et sur la SVPRO, mors jamais
+  detectes.
+- **YOLO26 COCO non plus** (`yolo26s/m`) : balle 0,76 sur la SVPRO, absente
+  sur l'arducam. **YOLOE-26 par le nom** est le meilleur point de depart :
+  `tennis ball` 0,45 et `robot arm` 0,78 sur l'arducam, `tennis ball` 0,19 sur
+  la SVPRO, pince ratee. Une seule photo testee.
+- **YOLOE-26 branche dans la fenetre de capture** (`.venv/bin/python`,
+  detecteur par defaut ; `--detecteur hsv` sous `/usr/bin/python3` sans torch).
+  Classes : balle, cylindre, cube, mors. Deux modeles combines, un seuil par
+  objet : balle `tennis ball` sur 26s (seuil 0,10), cylindre `tape roll` /
+  `bottle cap` sur 26l (seuil 0,40), cube par la couche `objet` ci-dessous
+  (jamais trouve par son nom en direct). Sur les 12 photos du 15/09 : balle
+  12/12, cylindre 5/5 arducam et 2/2 SVPRO quand son dessus est visible, aucun
+  faux positif (la base du robot a 0,12 et la balle vue `bottle cap` a 0,33
+  sont sous le seuil). 14 ms par vue sur la RTX 4000 Ada.
+- Poids sous `weights/yoloe/` (yoloe-26s/26l-seg.pt, encodeur de texte
+  mobileclip2_b.ts, 360 Mo), non versionnes.
+- **Balle dans la pince : YOLOE a 0 de confiance** (26s comme 26l) sur 11 des
+  14 vues SVPRO des saisies du 14/09. Le seuil jaune du dashboard la complete
+  quand YOLOE ne la trouve pas (« balle couleur ») : 14/14.
+- Mors pre-annotes : boites d'objets detectes retirees (le dessus noir du
+  cylindre passait pour un mors) et deux zones exigees (une zone seule etait
+  toujours cable, pied d'ecran ou base), et silhouette du bras exigee dans la
+  zone (le cable au bord de la planche passait pour une paire, scene chargee du
+  15/09). Resultat : mors sur 11 des 12 vues pince autour de la balle (pas
+  `remontee`, pince deja remontee), sur aucune des 2 pince loin, aucun faux mors sur les 6
+  photos du 15/09.
+- **Classe `objet` : tout ce qui est pose sur la planche.** YOLOE-26l sans
+  consigne (`yoloe-26l-seg-pf.pt`, 4 585 noms) ; noms approximatifs (balle =
+  `opal`, cylindre = `adhesive tape`) mais boites justes, et il trouve le
+  cylindre vu de cote que le nom ratait (3/3). Filtres : point de contact
+  converti en mm par les marqueurs 19/23/25/26 (homographie a 4 marqueurs
+  gardee une fois obtenue, derniere transformation gardee si une main les
+  cache), dans la table (X -50..575, Y -212..246 mm), hors base (120 mm) et
+  hors marqueurs (45 mm), boite <= 5 % de l'image, confiance >= 0,35 (pince et
+  cable a 0,25-0,29), et hors silhouette du bras (`white robot arm` sur 26s,
+  0,79-0,98). Sur les 14 vues de saisie du 14/09 : plus aucun faux objet
+  (marqueur 23 cache et corps de pince souleve ecartes). Limite : un objet
+  inconnu tenu dans la pince est ecarte avec le bras. 43 ms par vue.
+
+### Modifie — la carte de correction survit a un deplacement de camera (14/09)
+
+- **`scripts/correction_vision.py` passe a deux couches.** L'ecart
+  vision -> reel est separe en une couche **camera** (4 parametres par
+  extrinseque : translation, rotation, hauteur) et une couche **robot**
+  (affine + Shepard sur le residu) commune a toutes les extrinseques. Chaque
+  echantillon porte l'empreinte de l'extrinseque sous laquelle il a ete vu.
+  Apres une recalibration la couche camera repart de zero, la couche robot est
+  gardee ; l'extrinseque est relue a chaque trame, la bascule est automatique.
+- **L'apprentissage sur prise confirmee est retire : il n'apprenait rien.** La
+  descente est asservie sur la cible et la pince adaptative recentre la balle
+  en se fermant : (cible, pointe) recopiait la correction deja appliquee.
+- **Test de saisie apres la calibration.** `pick_dashboard.py` pose, apres la
+  question de calibration, « Faire le test de saisie ? » (Oui par defaut apres
+  une extrinseque neuve). Rien ne demarre seul : une fois la boucle lancee
+  comme d'habitude, la premiere prise confirmee de **chaque objet** (balle,
+  scotch, robot) est **relachee sur place**, le bras se degage, l'arducam le
+  relit (8 vues, dispersion <= 3 mm), et l'ecart position reelle - vision de
+  cette extrinseque entre dans la carte. Ensuite le pick and place tourne
+  normalement avec la correction. Le cycle
+  s'arrete en mode pas a pas ; en automatique la boucle reprend la balle,
+  corrigee. Balle qui roule, extrinseque changee ou ecart hors borne : rien
+  n'est appris.
+- **La correction s'applique enfin a la cible reellement visee.** Elle ne
+  touchait que l'arducam seule : des que la SVPRO voyait aussi la balle, la
+  fusion repartait du pixel brut et le bras descendait sans correction. Elle
+  est desormais posee sur `Fenetre._detecte_balle` (toutes sources ; sans terme
+  de hauteur quand la fusion a mesure la hauteur), et sur les **autres objets**
+  vus par l'arducam (scotch, robot), toujours sans modifier `pick_dashboard.py`.
+- **Tournee des 4 coins** (`lancer_pick_dashboard.py --tournee`) : le meme
+  geste en quatre points fixes de la zone de prise — pas les marqueurs, 25 et
+  26 sont hors d'atteinte (643 et 609 mm) — dessines dans la vue arducam.
+- `--valider` ajoute la **validation par transfert** : chaque extrinseque
+  predite par les autres seules, soit la situation juste apres recalibration.
+- Tests : `tests/test_correction_vision.py` 23/23. **Pas encore essaye sur le
+  robot.**
 
 ### Modifié — l'évaluation RoboPEPP est menée par ABMI Lyon (23/09)
 
@@ -262,7 +688,7 @@ ici, et auraient fait conclure à une réussite.
   substitution normalise **chacun** de ses éléments et rejette une liste
   imbriquée — que `'<world_name>.sdf'` impose pourtant. Remplacé par une
   concaténation à plat déballée au point d'usage.
-- Le défaut arrivait avec la branche d'Osama, donc **il n'a jamais atteint
+- Le défaut arrivait avec la branche pick-and-place, donc **il n'a jamais atteint
   `origin/main`** : il est corrigé avant d'être publié. Les 22 autres fichiers
   de launch du paquet ont été chargés un à un pour vérifier qu'aucun ne porte
   la même construction.

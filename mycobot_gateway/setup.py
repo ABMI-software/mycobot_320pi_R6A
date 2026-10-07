@@ -68,6 +68,20 @@ setup(
             'color_object_detector = mycobot_gateway.color_object_detector:main',
             'sorting_orchestrator = mycobot_gateway.sorting_orchestrator:main',
             'sim_sorting_grasp = mycobot_gateway.sim_sorting_grasp:main',
+            'sim_multicam_detector = mycobot_gateway.sim_multicam_detector:main',
+            'sim_scene_control = mycobot_gateway.sim_scene_control:main',
+            'sim_scene_panel = mycobot_gateway.sim_scene_panel:main',
+            'sim_trajectory_preview = mycobot_gateway.sim_trajectory_preview:main',
+
+            # YOLO / DREAM validation in Gazebo (docs/PROTOCOLE_YOLO_GAZEBO.md)
+            'gazebo_ground_truth = mycobot_gateway.gazebo_ground_truth:main',
+            'yolo_gazebo_node = mycobot_gateway.yolo_gazebo_node:main',
+            'yolo_localizer = mycobot_gateway.yolo_localizer:main',
+            'yolo_gt_overlay = mycobot_gateway.yolo_gt_overlay:main',
+            'dream_fk_compare = mycobot_gateway.dream_fk_compare:main',
+            'tri_dream_dashboard = mycobot_gateway.tri_dream_dashboard:main',
+            'tri_trajectoires_gazebo = mycobot_gateway.tri_trajectoires_gazebo:main',
+            'synthetic_data_collector_tri = mycobot_gateway.synthetic_data_collector_tri:main',
 
             # Hand teleoperation (trajectory → JSON bridge for real robot)
             'trajectory_to_robot_bridge = mycobot_gateway.trajectory_to_robot_bridge:main',

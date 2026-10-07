@@ -11,7 +11,7 @@ Package ROS2 central du projet MyCobot 320 Pi R6A. Fournit le bridge TCP vers la
 
 ```
 ┌──────────────────────────────┐    TCP:5005    ┌────────────────────────────┐
-│      PC Tour (10.10.0.115)   │◄──────────────►│  Raspberry Pi (10.10.0.221)│
+│      PC Tour (10.10.0.115)   │◄──────────────►│  Raspberry Pi (10.10.0.224)│
 │                              │                │                            │
 │  bridge_tour (ROS2 node)     │                │  bridge_pi_simple.py       │
 │  Sub: /to_robot (JSON)       │                │  → pymycobot /dev/ttyAMA0  │
@@ -128,6 +128,7 @@ Package ROS2 central du projet MyCobot 320 Pi R6A. Fournit le bridge TCP vers la
 | `mycobot_teleop.launch.py` | **Téléop par la main** — orchestre Gazebo + controllers + rosbridge + bridge_tour + trajectory_to_robot_bridge (target sim/real/both) |
 | `pick_and_place.launch.py` | Cycle pick & place mono-objet (cube rouge → zone verte) |
 | `pick_and_place_sorting.launch.py` | Pick & place multi-objets par couleur (4 objets → 4 bacs) |
+| `banc_realiste.launch.py` | **Banc réaliste** — plateau mesuré, 4 pièces peintes + 4 bacs, arducam et SVPRO à leur pose extrinsèque calibrée (`/arducam/image_raw`, `/svpro/image_raw`) ; masses fiche 2022 et butées mesurées |
 | `pick_and_place_aruco.launch.py` | Pick-and-place ArUco en simulation (`precision_benchmark.sdf` + `gz_sim_localizer` + `fk_ee_pose` + `pick_and_place_aruco`) |
 | `pick_and_place_aruco_real.launch.py` | Pick-and-place ArUco sur robot réel (`bridge_tour` + `aruco_localizer` + `fk_ee_pose` + `pick_and_place_aruco` mode=real) |
 | `sim_grasp.launch.py` | Banc de saisie **physique** Gazebo (JTC + `gripper_position_controller`, pas de téléportation) — `headless:=true` disponible |
@@ -161,7 +162,7 @@ source install/setup.bash
 ### Démarrer la Raspberry Pi
 
 ```bash
-ssh er@10.10.0.221
+ssh er@10.10.0.224
 
 # Terminal 1 : bridge robot
 python3 bridge_pi_simple.py
@@ -304,9 +305,9 @@ conda deactivate
 
 ### "Impossible de se connecter à la Pi"
 ```bash
-ping 10.10.0.221
-nc -zv 10.10.0.221 5005   # bridge robot
-nc -zv 10.10.0.221 5006   # camera server
+ping 10.10.0.224
+nc -zv 10.10.0.224 5005   # bridge robot
+nc -zv 10.10.0.224 5006   # camera server
 ```
 
 ### "No executable found"

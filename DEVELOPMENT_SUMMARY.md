@@ -1,6 +1,6 @@
 # 🤖 MyCobot 320 Pi - Résumé de Développement
 
-> **Date de dernière mise à jour:** 24 août 2026
+> **Date de dernière mise à jour:** 6 octobre 2026
 > **Version:** 2.1.0
 > **Repository GitHub:** https://github.com/ABMI-software/mycobot_320pi_R6A
 > **Branche:** `main` (pick-and-place + DREAM mergés via PR #9 le 09/09/2026)
@@ -10,6 +10,23 @@
 ## 📌 Point de Départ Rapide
 
 👉 **Pour démarrer une nouvelle session, consultez [`SESSION_RESUME.md`](SESSION_RESUME.md)**
+
+---
+
+## 🗂️ Tri en simulation piloté par yolo26, DREAM mesuré en parallèle (29/09 → 06/10/2026)
+
+![Architecture](docs/architecture_tri_yolo_dream.png)
+
+- **Tri par la perception seule** : yolo26 v6c sur les 4 caméras du jeu DREAM 50K, fusion
+  par la médiane (0,65 mm médian), saisie physique : **40/40 triés sur 10 graines**.
+- **DREAM en parallèle** : 99,2 % de détection dans le monde du 50K contre 65,2 % dans la
+  scène de tri, 49,5 % avec la pince ; écart DREAM ↔ YOLO 10-315 mm, dû à T_DREAM.
+- **Fine-tuning** : 13 280 rendus de la scène de tri avec la pince, `vgg_tri_mix_ft_e10`
+  sur 104 160 images (évaluation en cours).
+- **PC** : les pics à 90-100 °C viennent d'un cœur P au turbo ; entraînements et campagnes
+  épinglés sur les cœurs E. Détail : [`docs/DONNEES_ET_CONSOMMATION.md`](docs/DONNEES_ET_CONSOMMATION.md).
+
+Protocole : [`docs/PROTOCOLE_YOLO_GAZEBO.md`](docs/PROTOCOLE_YOLO_GAZEBO.md).
 
 ---
 

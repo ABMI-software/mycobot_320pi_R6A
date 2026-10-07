@@ -69,8 +69,18 @@ _WORKSPACE_DREAM = '/home/genji/ros_jazzy/src/mycobot_R6A/training/dream'
 if os.path.isdir(_WORKSPACE_DREAM) and _WORKSPACE_DREAM not in sys.path:
     sys.path.insert(0, _WORKSPACE_DREAM)
 
-DREAM_REPO = '/tmp/DREAM'
-if os.path.isdir(DREAM_REPO):
+# La bibliotheque NVlabs. `/tmp` est vide au redemarrage : pointer la seule
+# copie qui s'y trouve, c'est une panne programmee — le 23/09 la colonne DREAM
+# du dashboard est restee vide toute une session pour cette raison, sur un
+# simple « DREAM library not found ». On cherche donc plusieurs emplacements, le
+# durable d'abord, et `MYCOBOT_DREAM_REPO` passe devant tous.
+DREAM_REPOS = [os.environ.get('MYCOBOT_DREAM_REPO'),
+               os.path.expanduser('~/DREAM'),
+               os.path.expanduser('~/ros_jazzy/DREAM'),
+               '/opt/DREAM',
+               '/tmp/DREAM']
+DREAM_REPO = next((d for d in DREAM_REPOS if d and os.path.isdir(d)), None)
+if DREAM_REPO:
     sys.path.insert(0, DREAM_REPO)
 
 # Import DREAM library
@@ -79,6 +89,14 @@ try:
     DREAM_AVAILABLE = True
 except ImportError:
     DREAM_AVAILABLE = False
+
+from mycobot_gateway.joint_history import JointHistory
+
+# PnP on the joint angles of the IMAGE instant, not the latest ones: during a
+# move they differ and the difference would read as DREAM error. Farther than
+# this from any /joint_states sample (clocks of another epoch, a slow joint
+# publisher), the latest angles are used, as before.
+MAX_JOINT_GAP_S = 0.2
 
 from mycobot_fk import (
     forward_kinematics,
@@ -139,6 +157,7 @@ class DreamInferenceNode(Node):
         # ── Live joint state → FK 3D keypoints for PnP ──
         # DREAM needs FK at the ACTUAL joint config, not the home pose.
         self.latest_joint_q = None
+        self.joint_history = JointHistory()
 
         # ── State ──
         self.last_inference_time = 0.0
@@ -184,7 +203,10 @@ class DreamInferenceNode(Node):
     def _load_model(self):
         """Load DREAM network from checkpoint."""
         if not DREAM_AVAILABLE:
-            self.get_logger().error('DREAM library not found! Install from /tmp/DREAM')
+            self.get_logger().error(
+                'Bibliotheque DREAM introuvable — cherchee dans : '
+                + ', '.join(d for d in DREAM_REPOS if d)
+                + '. Poser MYCOBOT_DREAM_REPO sur le bon dossier.')
             return
 
         if not os.path.isfile(self.model_path):
@@ -240,6 +262,7 @@ class DreamInferenceNode(Node):
 
     def _joint_callback(self, msg: JointState):
         """Cache the current joint configuration (radians, [j1..j6])."""
+        self.joint_history.add(msg)
         name_to_pos = dict(zip(msg.name, msg.position))
         try:
             self.latest_joint_q = np.array(
@@ -247,11 +270,14 @@ class DreamInferenceNode(Node):
         except KeyError:
             pass  # partial /joint_states (e.g. gripper-only) — keep last good q
 
-    def _current_keypoints_3d(self) -> Optional[np.ndarray]:
-        """FK 3D keypoints at the CURRENT joint config, or None if unknown."""
-        if self.latest_joint_q is None:
+    def _current_keypoints_3d(self, stamp) -> Optional[np.ndarray]:
+        """FK 3D keypoints at the image's joint config, or None if unknown."""
+        q, gap = self.joint_history.at(stamp.sec + stamp.nanosec * 1e-9)
+        if gap > MAX_JOINT_GAP_S:
+            q = self.latest_joint_q
+        if q is None:
             return None
-        positions, _ = forward_kinematics(self.latest_joint_q)
+        positions, _ = forward_kinematics(q)
         return np.array([positions[name] for name in KEYPOINT_NAMES],
                         dtype=np.float64)
 
@@ -361,7 +387,7 @@ class DreamInferenceNode(Node):
             status_msg = String()
 
             # Solve PnP if enough keypoints AND we know the joint config
-            kp_3d = self._current_keypoints_3d()
+            kp_3d = self._current_keypoints_3d(msg.header.stamp)
             if kp_3d is None:
                 status_msg.data = f'NO_JOINTS|kp={n_detected}/7'
             elif n_detected >= self.min_kp_pnp:

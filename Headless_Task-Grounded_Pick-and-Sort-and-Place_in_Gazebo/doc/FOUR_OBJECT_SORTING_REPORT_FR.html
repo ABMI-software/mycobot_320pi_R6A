@@ -1,0 +1,864 @@
+<!doctype html>
+<title>Rapport de tri &agrave; quatre objets</title>
+<meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --paper: #E9ECEA;
+  --surface: #FFFFFF;
+  --surface-sunk: #DEE3E0;
+  --ink: #172422;
+  --ink-soft: #4B5B57;
+  --ink-faint: #7C8985;
+  --line: #C4CBC7;
+  --accent: #146356;
+  --accent-ink: #0E4A40;
+  --accent-soft: #DBEAE6;
+  --verify: #8A5A12;
+  --verify-soft: #F1E6D3;
+  --bug: #9C3B23;
+  --bug-soft: #F3E1DA;
+  --code-bg: #10201D;
+  --code-text: #D9EDE8;
+  --code-accent: #7FD9C4;
+  --code-comment: #7C978F;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101615;
+    --surface: #171F1D;
+    --surface-sunk: #0C1312;
+    --ink: #E7EDEA;
+    --ink-soft: #9FB0AB;
+    --ink-faint: #6C7C77;
+    --line: #2A3532;
+    --accent: #57C4AE;
+    --accent-ink: #7FD9C4;
+    --accent-soft: #14322C;
+    --verify: #D6A44B;
+    --verify-soft: #33270F;
+    --bug: #E08468;
+    --bug-soft: #3A1D15;
+    --code-bg: #0A1513;
+    --code-text: #CFEAE3;
+    --code-accent: #7FD9C4;
+    --code-comment: #5D766F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #101615;
+  --surface: #171F1D;
+  --surface-sunk: #0C1312;
+  --ink: #E7EDEA;
+  --ink-soft: #9FB0AB;
+  --ink-faint: #6C7C77;
+  --line: #2A3532;
+  --accent: #57C4AE;
+  --accent-ink: #7FD9C4;
+  --accent-soft: #14322C;
+  --verify: #D6A44B;
+  --verify-soft: #33270F;
+  --bug: #E08468;
+  --bug-soft: #3A1D15;
+  --code-bg: #0A1513;
+  --code-text: #CFEAE3;
+  --code-accent: #7FD9C4;
+  --code-comment: #5D766F;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding-inline: 20px;
+}
+
+h1, h2, h3, h4 { font-family: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif; text-wrap: balance; color: var(--ink); }
+
+.shell {
+  max-width: 1180px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 40px;
+  padding-block: 32px 80px;
+}
+
+.rail {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.rail-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+}
+.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail a {
+  display: flex;
+  gap: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+  line-height: 1.35;
+}
+.rail a:hover, .rail a:focus-visible { background: var(--surface-sunk); color: var(--ink); outline: none; }
+.rail a .n { color: var(--accent); font-weight: 600; flex-shrink: 0; }
+.rail .rail-group-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 16px 0 4px 8px;
+}
+.rail .rail-group-label:first-child { margin-top: 0; }
+
+main { min-width: 0; }
+
+.cover {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 28px;
+  margin-bottom: 36px;
+}
+.cover .eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+.cover h1 { font-size: 2.55rem; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
+.cover .dek { font-family: "IBM Plex Serif", serif; font-style: italic; font-size: 1.1rem; color: var(--ink-soft); max-width: 62ch; margin: 0 0 20px; }
+.cover .meta {
+  display: flex; flex-wrap: wrap; gap: 22px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+.cover .meta b { color: var(--ink-soft); font-weight: 600; }
+
+section.block { margin-bottom: 44px; }
+section.block > h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  scroll-margin-top: 20px;
+}
+section.block > .block-dek {
+  color: var(--ink-soft);
+  max-width: 68ch;
+  margin: 0 0 20px;
+}
+p { max-width: 70ch; }
+.prose { max-width: 70ch; }
+
+code, .mono { font-family: "IBM Plex Mono", monospace; }
+p code, li code, td code, dd code, h4 code { background: var(--surface-sunk); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.88em; color: var(--accent-ink); }
+
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 14px 0;
+}
+pre .c { color: var(--code-comment); }
+pre .k { color: var(--code-accent); }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; background: var(--surface); }
+thead th {
+  text-align: left;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--surface-sunk);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody td:first-child { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--accent-ink); white-space: nowrap; }
+
+.step {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 22px 24px 24px;
+  margin-bottom: 18px;
+}
+.step-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.step-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+.step-head h3 { margin: 0; font-size: 1.18rem; font-weight: 600; }
+.step-purpose { color: var(--ink-soft); margin: 2px 0 16px; font-size: 0.95rem; }
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) { .panels { grid-template-columns: 1fr; } }
+.panel { border-radius: var(--radius); padding: 14px 16px 16px; }
+.panel.procedure { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+.panel.verify { background: var(--verify-soft); border: 1px solid color-mix(in srgb, var(--verify) 35%, transparent); }
+.panel-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin: 0 0 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.panel.procedure .panel-tag { color: var(--accent-ink); }
+.panel.verify .panel-tag { color: var(--verify); }
+.panel p, .panel ul, .panel pre { margin-top: 8px; margin-bottom: 8px; }
+.panel p:first-of-type { margin-top: 0; }
+.panel ul { padding-left: 18px; margin: 8px 0; }
+.panel li { margin-bottom: 4px; font-size: 0.94rem; }
+.panel pre { font-size: 12px; }
+
+.bugcard {
+  border: 1px solid color-mix(in srgb, var(--bug) 35%, var(--line));
+  background: var(--bug-soft);
+  border-radius: 12px;
+  padding: 20px 22px 22px;
+  margin-bottom: 18px;
+}
+.bugcard h4 { margin: 0 0 4px; font-size: 1.08rem; color: var(--ink); }
+.bugcard .repo {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--bug);
+  margin: 0 0 14px;
+}
+.bugcard dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.bugcard dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 3px;
+  white-space: nowrap;
+}
+.bugcard dd { margin: 0; max-width: 62ch; }
+.bugcard pre { margin-top: 4px; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 3px 9px; border-radius: 999px;
+  margin-left: 8px;
+}
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+  padding: 12px 18px;
+  margin: 16px 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.callout b { color: var(--ink); }
+.callout.warn { border-left-color: var(--verify); }
+.callout.bug { border-left-color: var(--bug); }
+
+.ladder { display: flex; flex-direction: column; gap: 0; margin: 18px 0; }
+.rung {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.rung:first-child { border-top: none; }
+.rung .level {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+.rung.reached .level { color: var(--accent-ink); font-weight: 600; }
+.rung.stopped .level { color: var(--verify); font-weight: 600; }
+.rung h5 { margin: 0 0 4px; font-size: 1rem; }
+.rung p { margin: 0 0 6px; color: var(--ink-soft); font-size: 0.94rem; }
+.rung .tag {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 999px;
+  margin-bottom: 6px;
+}
+.rung.reached .tag { background: var(--accent-soft); color: var(--accent-ink); }
+.rung.stopped .tag { background: var(--verify-soft); color: var(--verify); }
+
+.manifest-tree {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+.manifest-tree .c { color: var(--code-comment); }
+.manifest-tree .k { color: var(--code-accent); }
+
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+  padding-top: 18px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { position: static; max-height: none; }
+  .cover h1 { font-size: 1.9rem; }
+}
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <p class="rail-eyebrow">Sommaire</p>
+    <nav>
+      <a href="#overview"><span class="n">&sect;</span>Vue d'ensemble</a>
+      <a href="#comparison"><span class="n">&sect;</span>Spec vs. r&eacute;alis&eacute;</a>
+      <p class="rail-group-label">Impl&eacute;mentation</p>
+      <a href="#s1"><span class="n">01</span>Registre des hypoth&egrave;ses</a>
+      <a href="#s2"><span class="n">02</span>Identification du monde</a>
+      <a href="#s3"><span class="n">03</span>Porte de d&eacute;cision de prise</a>
+      <a href="#s4"><span class="n">04</span>Objets &amp; bacs</a>
+      <a href="#s5"><span class="n">05</span>D&eacute;finition des t&acirc;ches</a>
+      <a href="#s6"><span class="n">06</span>Accessibilit&eacute; &amp; matrice</a>
+      <a href="#s7"><span class="n">07</span>Pr&eacute;calcul des points de passage</a>
+      <a href="#s8"><span class="n">08</span>Scripts spawn &amp; s&eacute;quence</a>
+      <a href="#s9"><span class="n">09</span>Logique de v&eacute;rification</a>
+      <a href="#s10"><span class="n">10</span>Contrats &amp; enregistreur</a>
+      <a href="#s11"><span class="n">11</span>Preflight &amp; paquet de remise</a>
+      <a href="#s12"><span class="n">12</span>La cause racine shm-size</a>
+      <a href="#s13"><span class="n">13</span>Blocage du cycle de vie</a>
+      <a href="#s14"><span class="n">14</span>R&eacute;g&eacute;n&eacute;ration reach-map</a>
+      <a href="#s15"><span class="n">15</span>Cl&ocirc;ture de la remise</a>
+      <a href="#ladder"><span class="n">&sect;</span>&Eacute;chelle de v&eacute;rification</a>
+      <p class="rail-group-label">R&eacute;f&eacute;rence</p>
+      <a href="#bugs-env"><span class="n">&sect;</span>Bugs corrig&eacute;s &mdash; session</a>
+      <a href="#bugs-upstream"><span class="n">&sect;</span>Bugs &agrave; signaler</a>
+      <a href="#limits"><span class="n">&sect;</span>Ce que cela ne prouve pas</a>
+      <a href="#manual"><span class="n">&sect;</span>Ex&eacute;cution manuelle, de bout en bout</a>
+      <a href="#manifest"><span class="n">&sect;</span>Inventaire des fichiers</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="cover">
+      <p class="eyebrow">Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo &mdash; rapport d'impl&eacute;mentation</p>
+      <h1>Tri &agrave; quatre objets ancr&eacute; sur la t&acirc;che, en headless, de la sp&eacute;cification &agrave; un plafond mat&eacute;riel diagnostiqu&eacute;</h1>
+      <p class="dek">Ce qui a &eacute;t&eacute; construit face &agrave; <code>doc/FOUR_OBJECT_SORTING_SPECIFICATION.docx</code>, partie par partie, avec la v&eacute;rification utilis&eacute;e &agrave; chaque &eacute;tape, chaque bug trouv&eacute; en chemin &mdash; corrig&eacute; ou encore ouvert &mdash; et l&agrave; o&ugrave; cette livraison s'arr&ecirc;te avant un &eacute;pisode r&eacute;el complet, et pourquoi. En bref&nbsp;: tout ce qui ne fait pas tourner la physique est construit, v&eacute;rifi&eacute; et remis&nbsp;; la seule chose qui fait tourner la physique n'a pas pu &ecirc;tre prouv&eacute;e sur ce mat&eacute;riel, pour deux raisons diagnostiqu&eacute;es ind&eacute;pendamment, dont aucune n'est un d&eacute;faut du code propre &agrave; ce projet.</p>
+      <div class="meta">
+        <span><b>Bac &agrave; sable</b> ~/tomislav/robotics/Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo</span>
+        <span><b>H&ocirc;te</b> Ubuntu WSL2, <code>.wslconfig memory=4GB</code> (~3,8&nbsp;Go utilisables dans la VM), CPU uniquement</span>
+        <span><b>Reproduit via</b> le conteneur Docker <code>gazebo_to_lerobot</code> (Ubuntu 24.04, ROS2 Jazzy, Gazebo Harmonic)</span>
+        <span><b>Commit</b> 3319973 sur <code>main</code></span>
+        <span><b>&Eacute;crit le</b> 23/09/2026</span>
+      </div>
+    </div>
+
+    <section class="block" id="overview">
+      <h2>Vue d'ensemble</h2>
+      <p class="block-dek">Ce document est le rapport d'impl&eacute;mentation pour <code>FOUR_OBJECT_SORTING_SPECIFICATION.docx</code> &mdash; le fichier de ce m&ecirc;me dossier, trait&eacute; de bout en bout comme le &laquo;&nbsp;R&ocirc;le A &mdash; ing&eacute;nieur d'int&eacute;gration (poste de travail contraint)&nbsp;&raquo; face au p&eacute;rim&egrave;tre de la Partie&nbsp;0 et &agrave; la r&eacute;partition des r&ocirc;les de la Partie&nbsp;11 de la sp&eacute;cification. Chacune des treize parties et des deux annexes de la sp&eacute;cification a &eacute;t&eacute; parcourue dans l'ordre&nbsp;; ce rapport suit ce m&ecirc;me ordre.</p>
+      <p class="prose">En bref&nbsp;: tout ce que l'Annexe A confie au R&ocirc;le A et qui ne fait pas tourner la physique &mdash; le registre des hypoth&egrave;ses, l'identification du monde, la d&eacute;cision de prise, la g&eacute;om&eacute;trie des objets/bacs, les d&eacute;finitions de t&acirc;ches, le balayage d'accessibilit&eacute; et la matrice d'&eacute;pisodes, le pr&eacute;calcul des points de passage, les scripts de spawn/s&eacute;quence/v&eacute;rification, les contrats, et le paquet complet de remise &mdash; est construit, coh&eacute;rent, et v&eacute;rifi&eacute; ind&eacute;pendamment (<code>preflight.sh</code> rapporte <code>PREFLIGHT PASSED</code>). La seule &eacute;tape qui fait tourner la physique &mdash; la ligne&nbsp;10 de l'Annexe A, un test de fum&eacute;e d'un &eacute;pisode par objet &mdash; n'a pas &eacute;t&eacute; men&eacute;e &agrave; bien, pour deux raisons dont la cause a &eacute;t&eacute; diagnostiqu&eacute;e cette session&nbsp;: un plafond m&eacute;moire mat&eacute;riel lors d'une mont&eacute;e en charge compl&egrave;te de Gazebo, et un blocage distinct, r&eacute;el et toujours non r&eacute;solu du service de cycle de vie propre au paquet d'enregistrement, reproduit ind&eacute;pendamment de Gazebo. Les deux sont document&eacute;s avec assez de d&eacute;tail pour que le mat&eacute;riel du R&ocirc;le B, ou quiconque reprend ce travail, n'ait pas &agrave; les rediagnostiquer depuis z&eacute;ro.</p>
+    </section>
+
+    <section class="block" id="comparison">
+      <h2>Spec vs. r&eacute;alis&eacute;, partie par partie</h2>
+      <p class="block-dek">Les num&eacute;ros de partie de la sp&eacute;cification elle-m&ecirc;me, ce que chacune demandait, et ce qui a &eacute;t&eacute; livr&eacute; en face. C'est la section &agrave; lire en premier si la seule question est &laquo;&nbsp;est-ce que &ccedil;a a fait ce que le document disait&nbsp;&raquo;.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Partie de la spec</th><th>Demand&eacute;</th><th>Livr&eacute;</th></tr></thead>
+          <tbody>
+            <tr><td>Partie 0</td><td>P&eacute;rim&egrave;tre, r&ocirc;les (&laquo;&nbsp;R&ocirc;le A &mdash; poste contraint&nbsp;&raquo; / R&ocirc;le B), guide de lecture.</td><td>Suivi comme le cadre directeur de tout le projet et de ce rapport&nbsp;; chaque partie ci-dessous est lue au regard du p&eacute;rim&egrave;tre propre au R&ocirc;le A.</td></tr>
+            <tr><td>Partie 1</td><td>Parcourir chaque hypoth&egrave;se du registre, la confirmer ou l'invalider par &eacute;crit.</td><td><code>doc/ASSUMPTIONS.md</code> — 12 hypoth&egrave;ses, chacune avec son r&eacute;sultat r&eacute;el et v&eacute;rifi&eacute;, pas une affirmation.</td></tr>
+            <tr><td>Partie 2</td><td>Identifier le monde cible&nbsp;; consigner <code>WORLD_PATH</code> et une empreinte de contenu.</td><td><code>doc/WORLD_SELECTION.md</code> &mdash; <code>real_table.sdf</code> choisi et empreint&eacute; en <code>sha256</code>&nbsp;; <code>config/WORLD_PATH</code> renseign&eacute;. R&eacute;serve indiqu&eacute;e dans ce m&ecirc;me fichier&nbsp;: l'empreinte n'est valable que pour le fichier tel que commit&eacute;, et les modifications non commit&eacute;es de ce projet sur ce m&ecirc;me fichier (&sect;15) signifient qu'un clone neuf aurait besoin d'une empreinte fra&icirc;che.</td></tr>
+            <tr><td>Partie 3</td><td>Un essai born&eacute; de la porte de d&eacute;cision de prise&nbsp;; escalader plut&ocirc;t qu'it&eacute;rer au-del&agrave; d'une journ&eacute;e.</td><td><code>doc/GRASP_DECISION.md</code> avec preuves CSV&nbsp;: le m&eacute;canisme de prise du pipeline de r&eacute;f&eacute;rence est confirm&eacute; v&eacute;ritablement physique, mais deux essais born&eacute;s en direct ont tous deux &eacute;chou&eacute; &agrave; soulever la cible, pour une raison de timing diagnostiqu&eacute;e comme sans rapport avec le m&eacute;canisme. Verdict&nbsp;: conserver l'attache simul&eacute;e (A8) comme plancher adopt&eacute;, et escalader la question de la prise physique &agrave; l'&eacute;quipe robotique (Annexe&nbsp;B, point&nbsp;2) plut&ocirc;t que d'it&eacute;rer davantage sur ce mat&eacute;riel contraint.</td></tr>
+            <tr><td>Partie 4</td><td>Inventaire des objets &agrave; partir des valeurs SDF r&eacute;elles&nbsp;; quatre objets, quatre bacs.</td><td><code>config/objects.yaml</code>, retrac&eacute; jusqu'aux valeurs r&eacute;elles de <code>real_table.sdf</code>, jamais copi&eacute; depuis les valeurs illustratives de la sp&eacute;cification (<code>doc/OBJECTS_MANIFEST.md</code>)&nbsp;; <code>validate_objects.py</code> sort en 0. Trois des quatre bacs (bleu/vert/jaune) ont d&ucirc; &ecirc;tre <em>repositionn&eacute;s</em> par rapport aux coordonn&eacute;es sugg&eacute;r&eacute;es par la sp&eacute;cification apr&egrave;s qu'une IK hors ligne a prouv&eacute; ces positions (r=0,343&ndash;0,371&nbsp;m) inaccessibles sur toute branche, &agrave; toute hauteur &mdash; voir l'encart bug de la &sect;4 et <code>doc/BIN_REPOSITIONING.md</code>.</td></tr>
+            <tr><td>Partie 5</td><td>Quatre instructions, g&eacute;n&eacute;r&eacute;es &agrave; partir des donn&eacute;es objets/bacs, pas saisies &agrave; la main.</td><td><code>config/tasks.jsonl</code>, 4 t&acirc;ches, pr&eacute;sence confirm&eacute;e par <code>preflight.sh</code>.</td></tr>
+            <tr><td>Partie 6</td><td>Un balayage d'accessibilit&eacute; (l'esquisse de la spec&nbsp;: <code>moveit_py</code> + mod&egrave;le du robot, sans pas de physique) et une matrice d'&eacute;pisodes de 60 lignes&nbsp;; confirmer une seconde cam&eacute;ra pour le lot retenu.</td><td>Balay&eacute; avec une IK analytique pure (<code>scripts/mycobot_ik.py</code>) au lieu de <code>moveit_py</code> &mdash; une substitution d&eacute;lib&eacute;r&eacute;e, puisque <code>moveit_py</code> ne peut pas partager un processus avec un simple n&oelig;ud <code>rclpy</code> (un d&eacute;faut d&eacute;j&agrave; rencontr&eacute; et document&eacute; par le pr&eacute;d&eacute;cesseur de ce projet, &sect;bugs-upstream). <code>config/episode_matrix.csv</code>&nbsp;: 60 lignes, toutes valides, confirm&eacute;es par <code>preflight.sh</code>. <code>synth_camera_right</code> confirm&eacute;e pr&eacute;sente dans le monde pour le contrat du lot retenu. La sortie brute du balayage lui-m&ecirc;me (<code>config/reach_map.csv</code>) n'avait jamais &eacute;t&eacute; persist&eacute;e la premi&egrave;re fois&nbsp;; r&eacute;g&eacute;n&eacute;r&eacute;e cette fois &agrave; fid&eacute;lit&eacute; r&eacute;duite, r&eacute;serve assum&eacute;e &mdash; &sect;14.</td></tr>
+            <tr><td>Partie 7</td><td>Points de passage pr&eacute;-r&eacute;solus pour chaque &eacute;pisode&nbsp;; la Partie&nbsp;7.4 de la sp&eacute;cification elle-m&ecirc;me indique &laquo;&nbsp;420&nbsp;&raquo; (60&times;7).</td><td>360 (60&times;6)&nbsp;: HOME est une constante fixe en espace articulaire ne n&eacute;cessitant aucune r&eacute;solution IK, donc seuls six des sept points de passage nomm&eacute;s par &eacute;pisode sont r&eacute;ellement pr&eacute;calcul&eacute;s. Confirm&eacute; directement avec l'auteur de la sp&eacute;cification que le &laquo;&nbsp;420&nbsp;&raquo; &eacute;tait une erreur arithm&eacute;tique de la sp&eacute;cification elle-m&ecirc;me, pas un &eacute;cart introduit ici. <code>check_waypoints.py</code> sort en 0 &mdash; apr&egrave;s g&eacute;n&eacute;ralisation d'une v&eacute;rification de continuit&eacute; qui n'&eacute;tait correcte que par co&iuml;ncidence pour un cas, encart bug de la &sect;7.</td></tr>
+            <tr><td>Partie 8</td><td><code>spawn_scene.py</code> (quatre objets, quatre bacs, v&eacute;rifi&eacute;s en collision) et <code>run_pick_and_place.py</code>&nbsp;; un test de fum&eacute;e de quatre &eacute;pisodes, un par objet, cylindre inclus.</td><td>Les deux scripts sont &eacute;crits et g&egrave;rent les quatre objets (pilot&eacute;s par la matrice d'&eacute;pisodes, pas cod&eacute;s en dur pour un seul objet). <b>Le test de fum&eacute;e &agrave; quatre &eacute;pisodes lui-m&ecirc;me n'a pas &eacute;t&eacute; men&eacute; &agrave; bien</b> &mdash; aucun &eacute;pisode, pour aucun objet, n'a atteint un verdict PASS/FAIL/WRONG_BIN sur ce mat&eacute;riel. C'est le seul objectif de la sp&eacute;cification v&eacute;ritablement pas atteint&nbsp;; voir &sect;&eacute;chelle et &sect;limites pour la raison compl&egrave;te, diagnostiqu&eacute;e.</td></tr>
+            <tr><td>Partie 9</td><td>Logique de v&eacute;rification PASS/FAIL/WRONG_BIN&nbsp;; trois &eacute;checs d&eacute;lib&eacute;r&eacute;s doivent &ecirc;tre correctement rejet&eacute;s.</td><td><code>verify_episode.py</code> + <code>test_verifier.py</code>&nbsp;: quatre cas synth&eacute;tiques (mauvais bac&rarr;<code>WRONG_BIN</code>, pas de levage&rarr;<code>FAIL</code>, distracteur perturb&eacute;&rarr;<code>PASS</code> mais signal&eacute;, &eacute;pisode propre&rarr;<code>PASS</code>), tous class&eacute;s correctement. Confirm&eacute; par le test interne de <code>preflight.sh</code>.</td></tr>
+            <tr><td>Partie 10</td><td>Deux contrats (entra&icirc;nement/retenu)&nbsp;; brancher le cycle de vie de l'enregistreur d'&eacute;pisodes <code>rosetta</code> dans la s&eacute;quence&nbsp;; <code>port_bag.py</code> pour l'assemblage du jeu de donn&eacute;es, sans <code>torch</code>.</td><td>Les deux contrats sont &eacute;crits et v&eacute;rifi&eacute;s contre les donn&eacute;es objets/bacs (<code>doc/CONTRACT_VERIFICATION.md</code>). Le branchement du cycle de vie de l'enregistreur a &eacute;t&eacute; ajout&eacute; &agrave; <code>episode.sh</code> et confirm&eacute; atteignant &laquo;&nbsp;recording started&nbsp;&raquo; une fois, en direct, sous pleine charge Gazebo. <code>port_bag.py</code> corrig&eacute; (chemin du fichier de verdict, recherche du chemin du bag) mais jamais exerc&eacute; sur de vraies donn&eacute;es, puisqu'aucun &eacute;pisode n'en a produit &mdash; voir l'encart bug de la &sect;13 pour le pourquoi.</td></tr>
+            <tr><td>Partie 11</td><td><code>preflight.sh</code>, <code>RUNNING.md</code>, et l'arborescence exacte du paquet de la &sect;11.4&nbsp;; la phrase unique de la &sect;11.7 sur ce que le test de fum&eacute;e a prouv&eacute;.</td><td><code>PREFLIGHT PASSED</code>, les 15 v&eacute;rifications&nbsp;; <code>RUNNING.md</code> restructur&eacute; pour ouvrir sur les quatre &eacute;pisodes de fum&eacute;e et porter cette phrase unique, sans att&eacute;nuation, en t&ecirc;te&nbsp;; le paquet correspond &agrave; la &sect;11.4, avec <code>reach_map.csv</code> d&eacute;sormais pr&eacute;sent (r&eacute;serve assum&eacute;e, &sect;14). <code>doc/HANDOVER.md</code> ajoute le bilan ligne par ligne de l'Annexe A dont le tableau comparatif ci-dessus est lui-m&ecirc;me tir&eacute;.</td></tr>
+            <tr><td>Partie 12</td><td>&Eacute;noncer honn&ecirc;tement les limites &mdash; la r&eacute;serve soudure-pas-prise, l'&eacute;cart de domaine, la s&eacute;lection scripts&eacute;e, les constats sur la direction d'approche et la corruption d'image, la taille du jeu de donn&eacute;es.</td><td><code>doc/LIMITATIONS.md</code> reformule chacune des r&eacute;serves de la sp&eacute;cification, inchang&eacute;es. La section &sect;limites de ce rapport ajoute les deux nouvelles limites propres &agrave; cette session que la sp&eacute;cification ne pouvait pas anticiper&nbsp;: le plafond m&eacute;moire mat&eacute;riel, non test&eacute; sur le R&ocirc;le B, et le blocage non r&eacute;solu de l'enregistreur.</td></tr>
+            <tr><td>Partie 13</td><td>Le jeu de m&eacute;triques pour ce jeu de donn&eacute;es&nbsp;; pourquoi le taux de bon bac, et non le taux de succ&egrave;s brut, est la m&eacute;trique phare.</td><td><code>doc/METRICS.md</code> reformule le jeu de m&eacute;triques et le raisonnement. Pas encore mesurable sur de vraies donn&eacute;es &mdash; chaque m&eacute;trique n&eacute;cessite des &eacute;pisodes achev&eacute;s, qui n'existent pas encore (Partie&nbsp;8).</td></tr>
+            <tr><td>Annexe A</td><td>Ordre de travail en 13 &eacute;tapes avec estimations d'effort et un &laquo;&nbsp;fait quand&nbsp;&raquo; explicite par &eacute;tape.</td><td>Cartographi&eacute; ligne par ligne dans <code>doc/HANDOVER.md</code>&nbsp;: 10 des 13 lignes enti&egrave;rement faites, la ligne&nbsp;6 faite pour la matrice elle-m&ecirc;me avec un artefact de balayage assorti d'une r&eacute;serve, la ligne&nbsp;8 marqu&eacute;e <em>partielle</em> pour correspondre &agrave; la ligne&nbsp;10 (la m&ecirc;me affirmation sous-jacente &agrave; deux niveaux de rigueur), la ligne&nbsp;10 v&eacute;ritablement pas faite, la ligne&nbsp;13 correctement report&eacute;e apr&egrave;s le retour des donn&eacute;es du R&ocirc;le B, selon l'ordonnancement propre de la &sect;11.7 &mdash; pas un blocage de la remise.</td></tr>
+            <tr><td>Annexe B</td><td>Six points n&eacute;cessitant une d&eacute;cision de l'&eacute;quipe robotique, pas une d&eacute;cision d'ing&eacute;nierie.</td><td>Les six sont consign&eacute;s dans <code>doc/ROBOTICS_TEAM_REFERRALS.md</code>, y compris l'escalade sur la prise physique de la &sect;3 et la question du repositionnement des bacs de la &sect;4.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="callout"><b>La phrase qui compte le plus&nbsp;:</b> toute partie de ce pipeline qui ne n&eacute;cessite pas de simulateur en fonctionnement est construite, coh&eacute;rente et v&eacute;rifi&eacute;e &mdash; mais aucun &eacute;pisode n'a jamais &eacute;t&eacute; men&eacute; &agrave; bien contre la physique r&eacute;elle sur cette machine, pour des raisons d&eacute;sormais diagnostiqu&eacute;es assez pr&eacute;cis&eacute;ment pour que le R&ocirc;le B n'ait pas &agrave; les red&eacute;couvrir.</p>
+    </section>
+
+    <!-- ===================================================== IMPLEMENTATION ===================================================== -->
+    <section class="block" id="pipeline-head">
+      <h2>L'impl&eacute;mentation, &eacute;tape par &eacute;tape</h2>
+      <p class="block-dek">Quinze &eacute;tapes, dans l'ordre o&ugrave; elles se sont r&eacute;ellement d&eacute;roul&eacute;es au fil de la session. Chacune associe ce qui a &eacute;t&eacute; fait &agrave; la v&eacute;rification qui le prouve, et signale au passage tout bug trouv&eacute; &mdash; corrig&eacute;, ou encore ouvert.</p>
+    </section>
+
+    <article class="step" id="s1">
+      <div class="step-head"><span class="step-num">01</span><h3>Registre des hypoth&egrave;ses</h3></div>
+      <p class="step-purpose">Partie 1 — parcourir chaque hypoth&egrave;se &eacute;nonc&eacute;e et consigner son r&eacute;sultat r&eacute;el, pas celui esp&eacute;r&eacute;.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>Chacune des douze hypoth&egrave;ses de la sp&eacute;cification (identit&eacute; du monde, disponibilit&eacute; de la cam&eacute;ra, mod&egrave;le de pince, accessibilit&eacute; IK, et d'autres) a &eacute;t&eacute; v&eacute;rifi&eacute;e directement contre l'&eacute;tat r&eacute;el du d&eacute;p&ocirc;t &mdash; existence de fichiers, <code>grep</code>, <code>find</code>, <code>sha256sum</code> &mdash; jamais suppos&eacute;e vraie parce que la spec l'affirmait.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p><code>doc/ASSUMPTIONS.md</code> — chaque hypoth&egrave;se annot&eacute;e de son r&eacute;sultat r&eacute;el et v&eacute;rifi&eacute;. Plusieurs hypoth&egrave;ses ne tenaient pas telles qu'&eacute;nonc&eacute;es (notamment la question d'identit&eacute; du fichier de monde en &sect;2 et la question d'accessibilit&eacute; des bacs en &sect;4) et sont signal&eacute;es, pas corrig&eacute;es en silence.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s2">
+      <div class="step-head"><span class="step-num">02</span><h3>Identification du monde</h3></div>
+      <p class="step-purpose">Partie 2 — confirmer quel fichier de monde est la v&eacute;ritable cible et l'empreindre pour la reproductibilit&eacute;.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>real_table.sdf</code> confirm&eacute; comme cible&nbsp;: le monde qui reproduit d&eacute;j&agrave; le poste physique (plateau mesur&eacute;, quatre marqueurs ArUco, cam&eacute;ra de table) d'un projet ant&eacute;rieur li&eacute;, &eacute;tendu ici avec le quatri&egrave;me objet et son bac plut&ocirc;t que repris de z&eacute;ro.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>sha256sum mycobot_description/worlds/real_table.sdf</pre>
+          <p>Consign&eacute; dans <code>doc/WORLD_SELECTION.md</code>. R&eacute;serve indiqu&eacute;e dans le m&ecirc;me fichier&nbsp;: le fichier de monde a ensuite &eacute;t&eacute; modifi&eacute; pour ajouter trois objets et trois bacs (&sect;4, &sect;15) et, au moment de la r&eacute;daction, ces modifications ne sont pas commit&eacute;es dans le d&eacute;p&ocirc;t partag&eacute; de l'&eacute;quipe &mdash; l'empreinte consign&eacute;e ne correspondra pas &agrave; un clone neuf avant que ce commit n'atterrisse.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s3">
+      <div class="step-head"><span class="step-num">03</span><h3>Porte de d&eacute;cision de prise</h3></div>
+      <p class="step-purpose">Partie 3 — un essai born&eacute; d'une v&eacute;ritable prise physique&nbsp;; escalader, pas it&eacute;rer, au-del&agrave; du plafond.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>Le m&eacute;canisme de prise du pipeline de r&eacute;f&eacute;rence a &eacute;t&eacute; v&eacute;rifi&eacute; &agrave; la fois statiquement (lecture de sa propre impl&eacute;mentation) et &agrave; l'ex&eacute;cution, deux fois, en direct. Deux essais born&eacute;s pour soulever <code>red_cube</code> ont tous deux &eacute;chou&eacute;, pour une raison de timing diagnostiqu&eacute;e comme sans rapport avec le caract&egrave;re physique ou non du m&eacute;canisme.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p><code>doc/GRASP_DECISION.md</code>, preuves CSV jointes. Selon le tableau de d&eacute;cision de la sp&eacute;cification elle-m&ecirc;me (&laquo;&nbsp;ne peut pas &ecirc;tre fait de fonctionner en une journ&eacute;e &rarr; garder la soudure&nbsp;; rapporter exactement o&ugrave; &ccedil;a s'est arr&ecirc;t&eacute;&nbsp;&raquo;), c'est exactement ce cas&nbsp;: A8 (attache simul&eacute;e) est le plancher adopt&eacute; pour le mat&eacute;riel du R&ocirc;le A, et la question de la prise physique est escalad&eacute;e &agrave; l'&eacute;quipe robotique plut&ocirc;t qu'it&eacute;r&eacute;e davantage ici (Annexe&nbsp;B, point&nbsp;2).</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s4">
+      <div class="step-head"><span class="step-num">04</span><h3>Objets &amp; bacs</h3></div>
+      <p class="step-purpose">Partie 4 — quatre objets, quatre bacs, g&eacute;om&eacute;trie retrac&eacute;e au fichier de monde r&eacute;el, pas aux valeurs de la spec.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>red_cube</code>, <code>blue_cube</code>, <code>green_cylinder</code>, <code>yellow_box</code> et leurs quatre bacs correspondants, ajout&eacute;s &agrave; <code>real_table.sdf</code> et extraits dans <code>config/objects.yaml</code> depuis les valeurs r&eacute;ellement commit&eacute;es du SDF (masse, taille, friction, pose) &mdash; jamais copi&eacute;es depuis les chiffres illustratifs de la sp&eacute;cification.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>python3 scripts/validate_objects.py</pre>
+          <p>Sort en 0. Recoup&eacute; dans <code>doc/OBJECTS_MANIFEST.md</code> contre le texte SDF brut.</p>
+        </div>
+      </div>
+      <div class="callout bug"><b>Bug trouv&eacute; et corrig&eacute;&nbsp;:</b> les positions sugg&eacute;r&eacute;es par la sp&eacute;cification pour les bacs bleu, vert et jaune (rayon 0,343&ndash;0,371&nbsp;m depuis la base) se sont av&eacute;r&eacute;es <b>inaccessibles sur toute branche IK, &agrave; toute hauteur</b>, par r&eacute;solution directe hors ligne &mdash; pas un quasi-&eacute;chec, une violation franche de la limite. Repositionn&eacute;s &agrave; r&asymp;0,241&nbsp;m, correspondant au rayon d&eacute;j&agrave; prouv&eacute; accessible de <code>red_bin</code>. Preuves num&eacute;riques compl&egrave;tes dans <code>doc/BIN_REPOSITIONING.md</code>&nbsp;; escalad&eacute; &agrave; l'&eacute;quipe robotique comme point&nbsp;4 de l'Annexe&nbsp;B, au cas o&ugrave; une hypoth&egrave;se de bac dynamique ailleurs d&eacute;pendrait du placement d'origine.</div>
+    </article>
+
+    <article class="step" id="s5">
+      <div class="step-head"><span class="step-num">05</span><h3>D&eacute;finition des t&acirc;ches</h3></div>
+      <p class="step-purpose">Partie 5 — quatre instructions, g&eacute;n&eacute;r&eacute;es &agrave; partir des donn&eacute;es objets/bacs, langage porteur.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>config/tasks.jsonl</code> g&eacute;n&eacute;r&eacute; programmatiquement &agrave; partir de l'inventaire objets/bacs (&sect;4), une instruction par objet cible, pour que le langage et la g&eacute;om&eacute;trie ne puissent jamais diverger.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>wc -l config/tasks.jsonl   <span class="c"># 4</span></pre>
+          <p>Confirm&eacute; par la propre v&eacute;rification de <code>preflight.sh</code>.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s6">
+      <div class="step-head"><span class="step-num">06</span><h3>Balayage d'accessibilit&eacute; &amp; matrice</h3></div>
+      <p class="step-purpose">Partie 6 — quelles positions (x, y) sont r&eacute;ellement accessibles, et 60 configurations d'&eacute;pisodes valides construites depuis cette enveloppe.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>L'esquisse de la sp&eacute;cification elle-m&ecirc;me (<code>moveit_py</code> + mod&egrave;le du robot, sans pas de physique) a &eacute;t&eacute; d&eacute;lib&eacute;r&eacute;ment remplac&eacute;e par une IK analytique pure (<code>scripts/mycobot_ik.py</code>, numpy uniquement, sans <code>rclpy</code>, sans simulateur) &mdash; la m&ecirc;me substitution que le pr&eacute;d&eacute;cesseur de ce projet avait d&eacute;j&agrave; d&ucirc; faire apr&egrave;s avoir constat&eacute; que <code>moveit_py</code> ne peut pas partager un processus avec un simple n&oelig;ud <code>rclpy</code> (&sect;bugs-upstream). Le rectangle utilisable du balayage (<code>config/safe_rect.txt</code>) a aliment&eacute; <code>scripts/make_matrix.py</code>, qui a construit la matrice d'&eacute;pisodes de 60 lignes avec placement des distracteurs et affectation cam&eacute;ra/lot.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>bash -c '[ $(($(wc -l &lt; config/episode_matrix.csv)-1)) -eq 60 ]'</pre>
+          <p>60 lignes, confirm&eacute;es par <code>preflight.sh</code>. <code>synth_camera_right</code> confirm&eacute;e pr&eacute;sente dans <code>real_table.sdf</code> pour le contrat du lot retenu (<code>grep -c "synth_camera_right" ...sdf</code> &rarr; non nul).</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s7">
+      <div class="step-head"><span class="step-num">07</span><h3>Pr&eacute;calcul des points de passage</h3></div>
+      <p class="step-purpose">Partie 7 — r&eacute;soudre hors ligne les points de passage de mouvement de chaque &eacute;pisode, sans discontinuit&eacute; entre poses cons&eacute;cutives.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>precompute_ik.py</code> r&eacute;sout six points de passage par &eacute;pisode (APPROACH, DESCEND, LIFT, TRANSPORT, RELEASE, RETREAT &mdash; HOME est une constante fixe en espace articulaire, non r&eacute;solue) dans <code>config/waypoints.json</code>, 360 entr&eacute;es en tout.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>python3 scripts/check_waypoints.py
+<span class="c">$ 60 episodes: all waypoints OK</span></pre>
+          <p>Sort en 0 pour de vrai &mdash; pas &laquo;&nbsp;59 propres plus une exception accept&eacute;e&nbsp;&raquo;.</p>
+        </div>
+      </div>
+      <div class="callout bug"><b>Bug trouv&eacute; et corrig&eacute;&nbsp;:</b> le v&eacute;rificateur de continuit&eacute; v&eacute;rifiait &agrave; l'origine <code>J3+J4</code> comme somme invariante pour une pose d'outil fixe &mdash; correct pour un cas de test (<code>red_cube</code>, o&ugrave; <code>J2</code> bougeait &agrave; peine) purement par co&iuml;ncidence, et faux pour un autre (un point de passage pr&egrave;s de la base, o&ugrave; <code>J2</code> oscille aussi de fa&ccedil;on importante). L'invariant g&eacute;n&eacute;ral r&eacute;el est <code>J2+J3+J4</code>&nbsp;; g&eacute;n&eacute;raliser la v&eacute;rification a trouv&eacute; et corrig&eacute; une vraie discontinuit&eacute;, pas seulement une fausse alerte.</div>
+      <div class="callout"><b>Pas un bug, corrig&eacute; par l'auteur de la spec&nbsp;:</b> la Partie&nbsp;7.4 indique &laquo;&nbsp;420 points de passage pr&eacute;-r&eacute;solus&nbsp;&raquo; (60&times;7). 360 est correct &mdash; le &laquo;&nbsp;420&nbsp;&raquo; comptait HOME deux fois, une constante fixe, comme s'il fallait la r&eacute;soudre. Confirm&eacute; directement et cl&ocirc;tur&eacute;.</div>
+    </article>
+
+    <article class="step" id="s8">
+      <div class="step-head"><span class="step-num">08</span><h3>Scripts spawn &amp; s&eacute;quence</h3></div>
+      <p class="step-purpose">Partie 8 — faire monter la sc&egrave;ne et ex&eacute;cuter la s&eacute;quence de tri par objet, pour n'importe lequel des quatre objets.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>spawn_scene.py</code> fait apparaître les quatre objets et les quatre bacs, v&eacute;rifi&eacute;s en collision, depuis la propre ligne de la matrice d'&eacute;pisodes. <code>run_pick_and_place.py</code> lit <code>--target</code> depuis cette m&ecirc;me matrice et pilote la s&eacute;quence &agrave; six points de passage de mani&egrave;re g&eacute;n&eacute;rique &mdash; rien dans l'un ou l'autre script n'est sp&eacute;cifique &agrave; un objet.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p>Statique&nbsp;: les deux scripts acceptent n'importe lequel des quatre noms d'objets de <code>episode_matrix.csv</code> sans modification de code. <b>En direct&nbsp;: non v&eacute;rifi&eacute;.</b> Aucun &eacute;pisode, pour aucun objet, ne s'est achev&eacute; contre un simulateur en fonctionnement &mdash; voir &sect;&eacute;chelle.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s9">
+      <div class="step-head"><span class="step-num">09</span><h3>Logique de v&eacute;rification</h3></div>
+      <p class="step-purpose">Partie 9 — PASS / FAIL / WRONG_BIN, avec trois cas d'&eacute;chec d&eacute;lib&eacute;r&eacute;s qui doivent &ecirc;tre attrap&eacute;s, pas seulement le chemin heureux.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>verify_episode.py</code> impl&eacute;mente la logique pass/fail/mauvais-bac contre la trajectoire enregistr&eacute;e d'un &eacute;pisode achev&eacute;&nbsp;; <code>test_verifier.py</code> l'exerce contre quatre cas synth&eacute;tiques sans avoir besoin d'un simulateur du tout.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>python3 scripts/test_verifier.py
+<span class="c">wrong-bin &rarr; WRONG_BIN
+no-lift &rarr; FAIL
+disturbed-distractor &rarr; PASS (signal&eacute;)
+clean episode &rarr; PASS</span></pre>
+          <p>Les quatre class&eacute;s correctement&nbsp;; confirm&eacute; par le test interne de <code>preflight.sh</code>.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s10">
+      <div class="step-head"><span class="step-num">10</span><h3>Contrats &amp; branchement de l'enregistreur</h3></div>
+      <p class="step-purpose">Partie 10 — les deux contrats de donn&eacute;es, et faire en sorte que l'enregistreur d'&eacute;pisodes <code>rosetta</code> enregistre r&eacute;ellement.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>contracts/mycobot_sorting.yaml</code> (entra&icirc;nement, cam&eacute;ra de table) et <code>contracts/mycobot_sorting_heldout.yaml</code> (retenu, <code>synth_camera_right</code>) &eacute;crits et recoup&eacute;s contre l'inventaire objets/bacs pour la coh&eacute;rence des topics et des dimensions. <code>episode.sh</code> &eacute;tendu pour faire passer le n&oelig;ud de cycle de vie ROS2 de l'enregistreur par <code>configure</code>&rarr;<code>activate</code> avant l'envoi de l'objectif <code>RecordEpisode</code> de <code>run_pick_and_place.py</code>.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p><code>doc/CONTRACT_VERIFICATION.md</code> — aucun champ de pose de v&eacute;rit&eacute;-terrain ne fuite dans l'un ou l'autre contrat (selon A5), v&eacute;rifi&eacute; par grep. Le branchement lui-m&ecirc;me&nbsp;: confirm&eacute; atteignant &laquo;&nbsp;recording started&nbsp;&raquo; exactement <b>une fois</b>, en direct, sous pleine charge Gazebo, avec une consigne r&eacute;elle et un objectif <code>RecordEpisode</code> accept&eacute;. Chaque tentative depuis a heurt&eacute; le blocage de cycle de vie document&eacute; en &sect;13.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s11">
+      <div class="step-head"><span class="step-num">11</span><h3>Preflight &amp; paquet de remise</h3></div>
+      <p class="step-purpose">Partie 11 — l'arborescence exacte de remise, une v&eacute;rification d'environnement en lecture seule, et la seule phrase honn&ecirc;te dont le R&ocirc;le B a besoin en premier.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>preflight.sh</code> construit selon l'esquisse &agrave; 15 v&eacute;rifications de la sp&eacute;cification elle-m&ecirc;me, puis corrig&eacute; deux fois (ci-dessous)&nbsp;; <code>RUNNING.md</code> restructur&eacute; pour que la premi&egrave;re action de l'&eacute;quipe robotique soit les quatre &eacute;pisodes de fum&eacute;e, pas le lot complet, avec une instruction explicite d'arr&ecirc;t-et-rapport et la phrase unique de la &sect;11.7 tout en haut.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>bash preflight.sh
+<span class="c">... 15 v&eacute;rifications ...
+PREFLIGHT PASSED</span></pre>
+          <p>Ex&eacute;cut&eacute; pour de vrai dans le conteneur <code>gazebo_to_lerobot</code>, pas affirm&eacute;.</p>
+        </div>
+      </div>
+      <div class="callout bug"><b>Deux bugs trouv&eacute;s et corrig&eacute;s dans <code>preflight.sh</code> lui-m&ecirc;me&nbsp;:</b> sa v&eacute;rification &laquo;&nbsp;image du conteneur pr&eacute;sente&nbsp;&raquo; se contredit elle-m&ecirc;me lorsqu'ex&eacute;cut&eacute;e depuis <em>l'int&eacute;rieur</em> du conteneur m&ecirc;me dont elle demande l'existence &mdash; d&eacute;sormais ignor&eacute;e, pas &eacute;chou&eacute;e, quand <code>docker</code> n'est pas dans le <code>PATH</code>. Sa v&eacute;rification &laquo;&nbsp;le fichier de monde cible existe&nbsp;&raquo; utilisait un chemin relatif au mauvais r&eacute;pertoire de travail &mdash; corrig&eacute;e pour r&eacute;soudre contre le r&eacute;pertoire de partage du paquet ROS2 install&eacute;, le m&ecirc;me chemin que chaque fichier de lancement du projet utilise r&eacute;ellement.</div>
+    </article>
+
+    <article class="step" id="s12">
+      <div class="step-head"><span class="step-num">12</span><h3>La cause racine shm-size</h3></div>
+      <p class="step-purpose">Diagnostiquer et corriger les &eacute;checs <code>RTPS_TRANSPORT_SHM</code> du conteneur &mdash; le premier des deux plafonds mat&eacute;riels trouv&eacute;s cette session.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>Une tentative d'&eacute;pisode en direct a heurt&eacute; <code>RTPS_TRANSPORT_SHM Error: Failed init_port ... open_and_lock_file failed</code> environ 20&nbsp;minutes apr&egrave;s le d&eacute;marrage d'une instance Gazebo. V&eacute;rifi&eacute; directement plut&ocirc;t que suppos&eacute;&nbsp;: le transport &agrave; m&eacute;moire partag&eacute;e de Fast DDS vit dans <code>/dev/shm</code>, et le <code>--shm-size</code> par d&eacute;faut de Docker est 64&nbsp;Mo pour <em>tout le conteneur</em>.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>df -h /dev/shm            <span class="c"># 64M, hypoth&egrave;se confirm&eacute;e</span>
+docker inspect ... ShmSize <span class="c"># 67108864 octets, d&eacute;faut non modifi&eacute;</span></pre>
+          <p>Corrig&eacute; &agrave; la source&nbsp;: <code>docker/run.sh</code> (dans le d&eacute;p&ocirc;t voisin <code>Gazebo_to_LeRobot_Pipeline</code>) passe d&eacute;sormais <code>--shm-size=2g</code>. Conteneur recr&eacute;&eacute;, <code>df -h /dev/shm</code> confirme <code>2.0G</code>. Le d&eacute;montage de <code>episode.sh</code> nettoie d&eacute;sormais aussi tout segment <code>fastrtps_*</code> fuit&eacute; &agrave; chaque &eacute;pisode, puisque le script red&eacute;marre la pile de simulation mais pas le conteneur lui-m&ecirc;me.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s13">
+      <div class="step-head"><span class="step-num">13</span><h3>Blocage du cycle de vie de l'enregistreur</h3></div>
+      <p class="step-purpose">Un second plafond mat&eacute;riel/logiciel, ind&eacute;pendant et toujours non r&eacute;solu &mdash; trouv&eacute; en l'isolant d&eacute;lib&eacute;r&eacute;ment de Gazebo.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p>Plut&ocirc;t que de continuer &agrave; retenter un &eacute;pisode complet, un test minimal (&laquo;&nbsp;3a-minimal&nbsp;&raquo;) a isol&eacute; l'enregistreur de Gazebo enti&egrave;rement&nbsp;: un &eacute;metteur <code>rclpy</code> jetable simulait <code>/joint_states</code> et un topic cam&eacute;ra &agrave; 30&nbsp;Hz, sans contr&ocirc;leurs, sans mouvement du bras. Quatre causes bon march&eacute; ont &eacute;t&eacute; v&eacute;rifi&eacute;es avant de toucher au code source&nbsp;: noms de topics (correspondance exacte), flux de donn&eacute;es (30,0&nbsp;Hz confirm&eacute;s via <code>ros2 topic hz</code>), inscriptibilit&eacute; du r&eacute;pertoire de bag (confirm&eacute;e), et QoS (la v&eacute;rification qui comptait&nbsp;: <code>Subscription count: 0</code> sur les deux topics m&ecirc;me apr&egrave;s l'appel &agrave; <code>configure</code> &mdash; l'enregistreur ne va jamais assez loin pour s'abonner).</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p>Les quatre explications c&ocirc;t&eacute; harnais sont &eacute;cart&eacute;es&nbsp;; cela exclut le dispositif de test comme cause. La lecture statique de <code>episode_recorder_node.py</code> et de sa classe de base de cycle de vie partag&eacute;e, faite directement sur l'h&ocirc;te (le paquet est mont&eacute; en bind, aucun conteneur n&eacute;cessaire), a &eacute;cart&eacute; l'hypoth&egrave;se sp&eacute;cifique d'un appel bloquant sous un executor mono-thread &mdash; c'est en r&eacute;alit&eacute; un <code>MultiThreadedExecutor(num_threads=4)</code> &mdash; ainsi qu'un m&eacute;canisme li&eacute; de groupe de rappel mutuellement exclusif. <b>Aucun d&eacute;faut au niveau de la ligne n'a &eacute;t&eacute; localis&eacute;.</b> Preuve corroborante que le blocage est r&eacute;el&nbsp;: un appel distinct, en lecture seule, <code>ros2 lifecycle get</code> se bloque aussi, tandis que <code>ros2 node list</code> r&eacute;pond instantan&eacute;ment &mdash; coh&eacute;rent avec le verrou de transition interne du n&oelig;ud tenu, pas une r&eacute;ponse CLI perdue.</p>
+        </div>
+      </div>
+      <div class="callout bug"><b>Ouvert, non corrig&eacute;&nbsp;:</b> r&eacute;soudre ceci n&eacute;cessite une trace de pile Python en direct (<code>py-spy dump</code>) sur le processus bloqu&eacute;. Tent&eacute; cette session&nbsp;; bloqu&eacute; par l'absence de <code>CAP_SYS_PTRACE</code> sur le conteneur, et une recr&eacute;ation du conteneur pour l'ajouter n'a pas &eacute;t&eacute; poursuivie une troisi&egrave;me fois apr&egrave;s la d&eacute;cision d'arr&ecirc;ter tout travail li&eacute; au mat&eacute;riel pour la nuit. Voir &sect;bugs-upstream pour la fiche destin&eacute;e &agrave; quiconque peut r&eacute;ellement lancer cette trace.</div>
+    </article>
+
+    <article class="step" id="s14">
+      <div class="step-head"><span class="step-num">14</span><h3>R&eacute;g&eacute;n&eacute;ration de la reach-map</h3></div>
+      <p class="step-purpose">Compl&eacute;ter l'arborescence du paquet de remise &mdash; honn&ecirc;tement, y compris l&agrave; o&ugrave; l'ach&egrave;vement reste en de&ccedil;&agrave;.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>config/reach_map.csv</code> (la sortie brute du balayage de la &sect;6) s'est av&eacute;r&eacute; manquant du disque &mdash; seul son d&eacute;riv&eacute;, <code>safe_rect.txt</code>, avait survécu. Un nouveau <code>scripts/sweep_reach.py</code> (IK analytique pure, sans simulateur) le r&eacute;g&eacute;n&egrave;re. Une premi&egrave;re tentative avec une grille fine (0,01&nbsp;m, nombre de graines complet) ne s'est pas termin&eacute;e dans une session raisonnable&nbsp;; r&eacute;duite deux fois, &agrave; 0,04&nbsp;m et 6 graines, pour obtenir un r&eacute;sultat tout court.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <pre>python3 scripts/summarise_reach.py
+<span class="c">cette ex&eacute;cution : x -0.10..0.34, y -0.25..0.31
+safe_rect.txt :     x -0.03..0.55, y -0.19..0.22</span></pre>
+          <p><b>Ne correspond pas &eacute;troitement.</b> Trois des quatre valeurs limites de cette ex&eacute;cution tombent exactement sur le bord de la propre grille de recherche de cette ex&eacute;cution, ce qui signifie que le balayage r&eacute;duit n'a m&ecirc;me pas encadr&eacute; la v&eacute;ritable enveloppe. <code>safe_rect.txt</code> &mdash; le fichier dont <code>episode_matrix.csv</code> d&eacute;pend r&eacute;ellement &mdash; a &eacute;t&eacute; laiss&eacute; intact et reste la r&eacute;f&eacute;rence. Rapport&eacute; comme r&eacute;serve, pas pass&eacute; sous silence, &agrave; la fois dans la docstring du script et dans <code>doc/HANDOVER.md</code>.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s15">
+      <div class="step-head"><span class="step-num">15</span><h3>Cl&ocirc;ture de la remise</h3></div>
+      <p class="step-purpose">La derni&egrave;re passe de documentation&nbsp;: une phrase honn&ecirc;te, un bilan de l'Annexe A, et la discipline git qui va avec.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <p><code>RUNNING.md</code> s'ouvre d&eacute;sormais sur la phrase unique de la &sect;11.7 &mdash; ce qui est prouv&eacute;, ce qui ne l'est pas, pourquoi &mdash; avant toute commande. <code>doc/HANDOVER.md</code> (nouveau) fait correspondre chaque ligne de l'Annexe A &agrave; son statut r&eacute;el, avec l'arithm&eacute;tique m&eacute;moire compl&egrave;te derri&egrave;re la limite mat&eacute;rielle et exactement ce qu'il faut recevoir du R&ocirc;le B si un &eacute;pisode de fum&eacute;e &eacute;choue.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">V&eacute;rification</p>
+          <p>Tout ce qui pr&eacute;c&egrave;de est commit&eacute; dans l'historique git propre du projet (commit 3319973 et ses pr&eacute;d&eacute;cesseurs immédiats). Les deux fichiers que ce travail a &eacute;galement touch&eacute;s dans le d&eacute;p&ocirc;t d'&eacute;quipe partag&eacute;, s&eacute;par&eacute;, <code>mycobot_320pi_R6A</code>, n'ont d&eacute;lib&eacute;r&eacute;ment <em>pas</em> &eacute;t&eacute; commit&eacute;s par ce processus &mdash; pr&eacute;sent&eacute;s sous forme de diff pour relecture et commit directs par le mainteneur de ce d&eacute;p&ocirc;t.</p>
+        </div>
+      </div>
+    </article>
+
+    <section class="block" id="ladder">
+      <h2>&Eacute;chelle de v&eacute;rification</h2>
+      <p class="block-dek">Chaque &eacute;chelon d&eacute;pend strictement de celui du dessous. Le pipeline atteint chaque &eacute;chelon qui ne n&eacute;cessite pas de simulateur en fonctionnement&nbsp;; les &eacute;chelons au-dessus sont ceux dont ce rapport est le plus honn&ecirc;te sur le fait de ne pas les atteindre.</p>
+      <div class="ladder">
+        <div class="rung reached">
+          <div class="level">Niveau&nbsp;0</div>
+          <div><span class="tag">R&eacute;ussi</span><h5>Sp&eacute;cification et environnement sont coh&eacute;rents</h5><p><code>preflight.sh</code> passe les 15 v&eacute;rifications&nbsp;; chaque artefact statique (matrice, points de passage, contrats, t&acirc;ches) se valide ind&eacute;pendamment (&sect;1&ndash;11).</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Niveau&nbsp;1</div>
+          <div><span class="tag">R&eacute;ussi</span><h5>La logique hors ligne est correcte</h5><p>La continuit&eacute; des points de passage (<code>check_waypoints.py</code>) et la justesse du v&eacute;rificateur lui-m&ecirc;me contre des cas d'&eacute;chec synth&eacute;tiques (<code>test_verifier.py</code>) sont toutes deux v&eacute;rifi&eacute;es sans exception (&sect;7, &sect;9).</p></div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Niveau&nbsp;2</div>
+          <div><span class="tag">R&eacute;ussi, une fois</span><h5>Le branchement de l'enregistreur fonctionne sous charge r&eacute;elle</h5><p>A atteint &laquo;&nbsp;recording started&nbsp;&raquo; en direct, une fois, sous mont&eacute;e en charge compl&egrave;te de Gazebo (&sect;10). Pas encore fiable &mdash; voir Niveau&nbsp;3.</p></div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Niveau&nbsp;3</div>
+          <div><span class="tag">Arr&ecirc;t&eacute; ici</span><h5>L'enregistreur atteint de mani&egrave;re fiable &laquo;&nbsp;configured&nbsp;&raquo;, Gazebo ou pas</h5><p>Un blocage r&eacute;el et reproductible dans le service de cycle de vie propre &agrave; l'enregistreur, isol&eacute; de Gazebo enti&egrave;rement et toujours non r&eacute;solu au niveau du code source (&sect;13). C'est le plus dur des deux plafonds, car il n'est pas expliqu&eacute; par l'arithm&eacute;tique m&eacute;moire ci-dessous.</p></div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Niveau&nbsp;4</div>
+          <div><span class="tag">Arr&ecirc;t&eacute; ici</span><h5>Un &eacute;pisode complet atteint un verdict PASS/FAIL/WRONG_BIN</h5><p>Pas atteint, pour aucun objet. La VM WSL2 de cette machine a ~3,8&nbsp;Go de RAM totale&nbsp;; <code>gz sim</code> seul occupe ~1&nbsp;Go de RSS une fois les quatre objets, quatre bacs, marqueurs ArUco et cam&eacute;ra de <code>real_table.sdf</code> charg&eacute;s, laissant trop peu de marge pour que l'enregistreur et DDS tournent fiablement en parall&egrave;le (&sect;12, &sect;limites).</p></div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Niveau&nbsp;5</div>
+          <div><span class="tag">Bloqu&eacute;, non tent&eacute;</span><h5>Lot de soixante &eacute;pisodes et conversion du jeu de donn&eacute;es</h5><p>Explicitement du R&ocirc;le B, par la conception m&ecirc;me de la sp&eacute;cification (ligne&nbsp;12 de l'Annexe&nbsp;A) &mdash; non tent&eacute; ici, et la conversion du jeu de donn&eacute;es n'a rien &agrave; convertir avant que le Niveau&nbsp;4 ne soit atteint quelque part.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== BUGS ===================================================== -->
+    <section class="block" id="bugs-env">
+      <h2>Bugs corrig&eacute;s &mdash; propres &agrave; la session</h2>
+      <p class="block-dek">Sympt&ocirc;mes de cet environnement pr&eacute;cis (une VM WSL2 plafonn&eacute;e en m&eacute;moire faisant tourner un conteneur de longue dur&eacute;e), pas des d&eacute;fauts dans un projet amont. Consign&eacute;s pour qu'une reprise heurte le m&ecirc;me mur moins longtemps.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sympt&ocirc;me</th><th>Cause racine</th><th>Correction</th></tr></thead>
+          <tbody>
+            <tr><td><code>AMENT_TRACE_SETUP_FILES: unbound variable</code> &agrave; chaque ex&eacute;cution de <code>episode.sh</code></td><td><code>set -u</code> (la propre s&eacute;curit&eacute; du script) entre en conflit avec <code>setup.bash</code> de ROS2, qui r&eacute;f&eacute;rence l&eacute;gitimement des variables non d&eacute;finies dans un shell neuf</td><td>Encadrer les deux lignes <code>source</code> avec <code>set +u ... set -u</code></td></tr>
+            <tr><td>Le facteur temps r&eacute;el s'est effondr&eacute; &agrave; &asymp;0,0006 (un blocage, pas un ralentissement) la premi&egrave;re fois que l'enregistrement a &eacute;t&eacute; tent&eacute;</td><td>Le d&eacute;faut <code>record_all</code> de l'enregistreur (<code>true</code>) a auto-d&eacute;couvert 28 topics, dont des topics d'introspection de contr&ocirc;leur &agrave; haute fr&eacute;quence que le contrat ne demandait jamais, poussant le CPU au-del&agrave; de ce que le conteneur pouvait soutenir en plus de la charge propre de <code>gz sim</code></td><td><code>-p record_all:=false</code>, limitant l'enregistrement aux deux topics propres du contrat</td></tr>
+            <tr><td>&Eacute;checs de verrouillage de port <code>RTPS_TRANSPORT_SHM</code>, environ 20&nbsp;minutes apr&egrave;s le d&eacute;marrage d'une instance Gazebo</td><td>Le <code>--shm-size</code> par d&eacute;faut de Docker (64&nbsp;Mo, tout le conteneur) &eacute;puis&eacute; par le transport &agrave; m&eacute;moire partag&eacute;e de Fast DDS, pire avec le temps de fonctionnement &agrave; mesure que les segments s'accumulent</td><td><code>--shm-size=2g</code> dans <code>docker/run.sh</code>&nbsp;; le d&eacute;montage de <code>episode.sh</code> nettoie d&eacute;sormais aussi les segments <code>fastrtps_*</code> fuit&eacute;s &agrave; chaque &eacute;pisode</td></tr>
+            <tr><td><code>check_waypoints.py</code> signalait un &eacute;pisode (un point de passage pr&egrave;s de la base) comme discontinu alors que 59 autres passaient</td><td>L'invariant de continuit&eacute; v&eacute;rifi&eacute; (<code>J3+J4</code>) n'&eacute;tait correct que par co&iuml;ncidence quand <code>J2</code> bouge &agrave; peine&nbsp;; le v&eacute;ritable invariant est <code>J2+J3+J4</code></td><td>V&eacute;rification g&eacute;n&eacute;ralis&eacute;e&nbsp;; sort d&eacute;sormais en 0 sur les 60 &eacute;pisodes, pour de vrai</td></tr>
+            <tr><td>La v&eacute;rification &laquo;&nbsp;image du conteneur pr&eacute;sente&nbsp;&raquo; de <code>preflight.sh</code> &eacute;choue toujours</td><td>Se contredit elle-m&ecirc;me lorsqu'ex&eacute;cut&eacute;e depuis l'int&eacute;rieur du conteneur m&ecirc;me dont elle demande l'existence &mdash; la question n'a de sens que depuis l'h&ocirc;te</td><td>Ignor&eacute;e (pas &eacute;chou&eacute;e) quand <code>docker</code> n'est pas dans le <code>PATH</code></td></tr>
+            <tr><td>La v&eacute;rification &laquo;&nbsp;le fichier de monde cible existe&nbsp;&raquo; de <code>preflight.sh</code> &eacute;choue toujours malgr&eacute; l'existence r&eacute;elle du fichier</td><td>Le contenu de <code>config/WORLD_PATH</code> est relatif au mauvais r&eacute;pertoire de travail pour l'endroit d'ex&eacute;cution r&eacute;el de ce projet</td><td>R&eacute;soudre plut&ocirc;t contre le r&eacute;pertoire de partage du paquet ROS2 install&eacute; &mdash; le chemin que chaque fichier de lancement utilise d&eacute;j&agrave;</td></tr>
+            <tr><td>Un red&eacute;marrage manuel de contr&ocirc;leur a journalis&eacute; &laquo;&nbsp;Failed to configure controller&nbsp;&raquo; pour <code>joint_state_broadcaster</code> alors qu'une v&eacute;rification finale de l'&eacute;tat montrait les trois contr&ocirc;leurs r&eacute;ellement actifs</td><td>Un artefact de timing/rapport dans la CLI spawner de <code>controller_manager</code>, pas un vrai &eacute;chec</td><td>Ne jamais faire confiance au seul rapport de succ&egrave;s/&eacute;chec du spawner&nbsp;; toujours confirmer ensuite avec un <code>ros2 control list_controllers</code> direct</td></tr>
+            <tr><td>Les bacs bleu/vert/jaune, tels que sugg&eacute;r&eacute;s par la sp&eacute;cification, sont inaccessibles par IK sur toute branche</td><td>Les rayons sugg&eacute;r&eacute;s (0,343&ndash;0,371&nbsp;m) d&eacute;passent l'enveloppe mesur&eacute;e &agrave; &asymp;0,39&nbsp;m de ce bras une fois la contrainte coude-haut et le d&eacute;calage d'outil appliqu&eacute;s</td><td>Repositionn&eacute;s &agrave; r&asymp;0,241&nbsp;m, correspondant au rayon d&eacute;j&agrave; prouv&eacute; de <code>red_bin</code>&nbsp;; escalad&eacute; &agrave; l'&eacute;quipe robotique au cas o&ugrave; cela affecterait une hypoth&egrave;se ailleurs</td></tr>
+            <tr><td><code>pyarrow</code>/<code>ffmpeg</code> ont disparu apr&egrave;s une recr&eacute;ation n&eacute;cessaire du conteneur</td><td>Les deux avaient &eacute;t&eacute; install&eacute;s de mani&egrave;re ad hoc (<code>pip</code>/<code>apt</code>) dans la couche modifiable d'une instance de conteneur pr&eacute;c&eacute;dente, pas dans l'image &mdash; perdus au moment o&ugrave; cette instance a &eacute;t&eacute; remplac&eacute;e</td><td>Int&eacute;gr&eacute;s directement dans <code>docker/Dockerfile</code>, pour qu'une future recr&eacute;ation ne les perde plus</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block" id="bugs-upstream">
+      <h2>Bugs &agrave; signaler en amont</h2>
+      <p class="block-dek">D&eacute;fauts dans des d&eacute;pendances que ce projet ne poss&egrave;de pas, reproduits ind&eacute;pendamment de cette machine sp&eacute;cifique lorsque cela a pu &ecirc;tre confirm&eacute;. <b>D&eacute;poser les tickets r&eacute;els n'a pas &eacute;t&eacute; fait</b> et n&eacute;cessite un feu vert explicite s&eacute;par&eacute;.</p>
+
+      <div class="bugcard">
+        <h4>Le <code>on_configure</code> de <code>episode_recorder_node</code> se bloque, cause racine pas encore isol&eacute;e<span class="status-pill">Pas encore d&eacute;pos&eacute; &mdash; n&eacute;cessite une trace en direct d'abord</span></h4>
+        <p class="repo">Destinataire potentiel&nbsp;: le mainteneur du paquet <code>rosetta</code> (pas de d&eacute;p&ocirc;t public connu que ce projet puisse trouver &mdash; contact direct, pas un ticket GitHub)</p>
+        <dl>
+          <dt>Sympt&ocirc;me</dt>
+          <dd>Appeler <code>ros2 lifecycle set /episode_recorder configure</code> contre un <code>episode_recorder_node</code> fra&icirc;chement d&eacute;marr&eacute; se bloque ind&eacute;finiment sur certaines ex&eacute;cutions, le journal propre du n&oelig;ud restant coinc&eacute; sur &laquo;&nbsp;Node created (unconfigured)&nbsp;&raquo; et n'atteignant jamais &laquo;&nbsp;Configured&nbsp;&raquo;. Un appel distinct, en lecture seule, <code>ros2 lifecycle get</code> contre le m&ecirc;me n&oelig;ud se bloque aussi, tandis que <code>ros2 node list</code> dans le m&ecirc;me shell r&eacute;pond instantan&eacute;ment &mdash; le graphe DDS est sain&nbsp;; quelque chose &agrave; l'int&eacute;rieur de la gestion de transition propre au n&oelig;ud ne l'est pas.</dd>
+          <dt>&Eacute;cart&eacute;, pas la cause</dt>
+          <dd>Un executor mono-thread (c'est un <code>MultiThreadedExecutor</code> &agrave; 4&nbsp;threads)&nbsp;; une auto-contention de groupe de rappel mutuellement exclusif (chaque abonnement/service/serveur d'action/client que l'&eacute;tape configure cr&eacute;e utilise son propre <code>ReentrantCallbackGroup</code>, distinct du groupe propre &agrave; la transition de cycle de vie)&nbsp;; une E/S fichier/r&eacute;seau bloquante dans l'analyse du contrat (travail YAML/dataclass pur et born&eacute;)&nbsp;; l'&eacute;crivain de bag (confirm&eacute; construit seulement au d&eacute;marrage de l'enregistrement, jamais &agrave; la configuration)&nbsp;; une incompatibilit&eacute; QoS (aucun abonnement n'est jamais cr&eacute;&eacute; avant le blocage, donc rien &agrave; d&eacute;saccorder)&nbsp;; et les explications &eacute;videntes c&ocirc;t&eacute; harnais (noms de topics, flux de donn&eacute;es, inscriptibilit&eacute; du r&eacute;pertoire de bag &mdash; toutes confirm&eacute;es propres ind&eacute;pendamment).</dd>
+          <dt>Correction utilis&eacute;e ici</dt>
+          <dd>Aucune &mdash; toujours ouvert. La prochaine &eacute;tape concr&egrave;te est une trace de pile Python en direct (<code>py-spy dump</code>) sur le processus bloqu&eacute;, qui n&eacute;cessite un conteneur avec <code>CAP_SYS_PTRACE</code> et n'a pas &eacute;t&eacute; men&eacute;e &agrave; bien cette session.</dd>
+          <dt>Pourquoi c'est important</dt>
+          <dd>Cela bloque l'usage fiable de l'enregistreur pour tout ce qui d&eacute;passe une seule ex&eacute;cution chanceuse, et l'&eacute;chec est silencieux &mdash; aucune exception, aucun journal d'erreur, juste une transition coinc&eacute;e que chaque appelant (les propres scripts de ce projet, la CLI <code>ros2</code>) ne peut d&eacute;tecter que par un d&eacute;lai d&eacute;pass&eacute;.</dd>
+        </dl>
+      </div>
+
+      <div class="bugcard">
+        <h4>La CLI <code>ros2 lifecycle</code>/<code>ros2 action</code> peut signaler un n&oelig;ud en fonctionnement et configur&eacute; comme absent<span class="status-pill">Pas encore d&eacute;pos&eacute;</span></h4>
+        <p class="repo">D&eacute;p&ocirc;t candidat&nbsp;: ros2/ros2cli</p>
+        <dl>
+          <dt>Sympt&ocirc;me</dt>
+          <dd>Le chemin de d&eacute;couverte par d&eacute;faut, adoss&eacute; au daemon, des sous-commandes <code>ros2 lifecycle</code>/<code>ros2 action</code> a, sur le pr&eacute;d&eacute;cesseur de ce projet, signal&eacute; un n&oelig;ud v&eacute;ritablement en fonctionnement et configur&eacute; comme introuvable &mdash; une classe d'&eacute;chec de cache p&eacute;rim&eacute;, d&eacute;j&agrave; document&eacute;e dans le rapport de ce projet voisin.</dd>
+          <dt>Correction utilis&eacute;e ici</dt>
+          <dd>Adopt&eacute;e de mani&egrave;re proactive, avant de le rencontrer &agrave; nouveau&nbsp;: chaque appel de cycle de vie dans <code>episode.sh</code> utilise <code>ros2 lifecycle set --no-daemon --spin-time 15 ...</code>, forçant une d&eacute;couverte fra&icirc;che au lieu du cache du daemon en arri&egrave;re-plan.</dd>
+          <dt>Pourquoi c'est important</dt>
+          <dd>A co&ucirc;t&eacute; un vrai temps de d&eacute;bogage sur le projet voisin avant que l'explication du cache p&eacute;rim&eacute; ne soit trouv&eacute;e&nbsp;; adopter <code>--no-daemon</code> partout ici a &eacute;vit&eacute; de r&eacute;p&eacute;ter ce co&ucirc;t, mais le comportement sous-jacent de la CLI vaut toujours la peine d'&ecirc;tre signal&eacute; pour que d'autres &eacute;quipes n'aient pas &agrave; le red&eacute;couvrir ind&eacute;pendamment.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="block" id="limits">
+      <h2>Ce que cela ne prouve pas</h2>
+      <p class="block-dek">Reformulation compl&egrave;te de la Partie&nbsp;12 de la sp&eacute;cification, avec l'ajout de ce que cette session a chang&eacute;.</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)">
+        <li><b>Aucun &eacute;pisode ne s'est achev&eacute; contre la physique r&eacute;elle, pour aucun objet.</b> Nouveau cette session, et la limitation dominante&nbsp;: pas parce que la logique propre du pipeline est fausse (chaque v&eacute;rification hors ligne passe), mais &agrave; cause de deux plafonds mat&eacute;riels/logiciels diagnostiqu&eacute;s ind&eacute;pendamment &mdash; un plafond m&eacute;moire de VM &agrave; ~3,8&nbsp;Go dont <code>gz sim</code> seul consomme la majeure partie, et un blocage distinct et non r&eacute;solu du cycle de vie de l'enregistreur, reproduit m&ecirc;me sans Gazebo en fonctionnement du tout.</li>
+        <li><b>Si l'attache simul&eacute;e est conserv&eacute;e&nbsp;: le transport n'est pas une prise.</b> Inchang&eacute; par rapport &agrave; la sp&eacute;cification &mdash; une politique entra&icirc;n&eacute;e sur ces donn&eacute;es apprend &agrave; approcher, fermer pr&egrave;s de l'objet, transporter, ouvrir, pas la physique de la prise.</li>
+        <li><b>Poses de v&eacute;rit&eacute;-terrain, s&eacute;lection d'objet scripts&eacute;e.</b> Inchang&eacute; par rapport &agrave; la sp&eacute;cification&nbsp;: le jeu de donn&eacute;es (une fois qu'il existera) ne contiendra aucun &eacute;chec de perception ni aucun exemple de d&eacute;monstrateur d&eacute;sambigu&iuml;sant entre objets, car aucun ne s'est produit.</li>
+        <li><b>Sensibilit&eacute; &agrave; la direction d'approche et &agrave; la corruption d'image.</b> Inchang&eacute; par rapport aux mesures propres et de premi&egrave;re main de la sp&eacute;cification&nbsp;: m&eacute;langer les directions d'approche co&ucirc;te environ sept fois la pire r&eacute;p&eacute;tabilit&eacute; d'un seul c&ocirc;t&eacute;, et une image cam&eacute;ra corrompue sur soixante rapporte une position fausse de 17,5&nbsp;mm avant filtrage m&eacute;dian. Une politique apprise h&eacute;rite des deux risques&nbsp;; le pipeline classique ne se d&eacute;fend contre aucun des deux par chance.</li>
+        <li><b>Les donn&eacute;es entra&icirc;n&eacute;es en simulation portent un &eacute;cart de domaine visuel.</b> Inchang&eacute; par rapport &agrave; la sp&eacute;cification, mis en &eacute;vidence par le propre r&eacute;sultat d'estimation de pose DREAM de ce projet (d&eacute;tection sur image r&eacute;elle de 10,9&nbsp;%&rarr;91,6&nbsp;%, seulement apr&egrave;s m&eacute;lange avec des donn&eacute;es r&eacute;elles).</li>
+        <li><b>Soixante &eacute;pisodes n'est pas un jeu d'entra&icirc;nement.</b> Inchang&eacute; par rapport &agrave; la sp&eacute;cification &mdash; et, &eacute;tant donn&eacute; qu'aucun &eacute;pisode ne s'est achev&eacute;, pas encore m&ecirc;me un test de fum&eacute;e peupl&eacute;.</li>
+        <li><b><code>config/reach_map.csv</code> est une approximation de faible fid&eacute;lit&eacute;.</b> Nouveau cette session&nbsp;: r&eacute;g&eacute;n&eacute;r&eacute; pour compl&eacute;ter l'arborescence du paquet de remise, mais &agrave; une r&eacute;solution et un nombre de graines qui ne reproduisent pas &eacute;troitement le <code>safe_rect.txt</code> fiable et intact dont la matrice d'&eacute;pisodes d&eacute;pend r&eacute;ellement.</li>
+      </ul>
+      <p class="prose"><b>Ce que cela prouve, pr&eacute;cis&eacute;ment&nbsp;:</b> que chaque partie de ce pipeline ne n&eacute;cessitant pas de simulateur en fonctionnement &mdash; le monde, la g&eacute;om&eacute;trie, l'IK et les points de passage, le langage des t&acirc;ches, la justesse du v&eacute;rificateur, les contrats, et le paquet complet de remise &mdash; est construite et v&eacute;rifiable ind&eacute;pendamment par quiconque, sur n'importe quelle machine, sans avoir besoin de Gazebo du tout&nbsp;; et que les deux choses qui se dressent entre ceci et un &eacute;pisode achev&eacute; sont d&eacute;sormais caract&eacute;ris&eacute;es pr&eacute;cis&eacute;ment plut&ocirc;t que myst&eacute;rieuses.</p>
+    </section>
+
+    <!-- ===================================================== MANUAL ===================================================== -->
+    <section class="block" id="manual">
+      <h2>Ex&eacute;cution manuelle, de bout en bout</h2>
+      <p class="block-dek">Ce que <code>RUNNING.md</code> demande au R&ocirc;le B d'ex&eacute;cuter, reformul&eacute; ici pour un lecteur qui veut tout le chemin en un seul endroit.</p>
+      <div class="panels" style="grid-template-columns:1fr">
+        <div class="panel procedure">
+          <p class="panel-tag">Proc&eacute;dure</p>
+          <pre>bash preflight.sh                       <span class="c"># attendre PREFLIGHT PASSED</span>
+
+<span class="c"># premi&egrave;re action sur du mat&eacute;riel neuf -- pas le lot complet</span>
+bash scripts/episode.sh 1               <span class="c"># red_cube</span>
+bash scripts/episode.sh 2               <span class="c"># blue_cube</span>
+bash scripts/episode.sh 3               <span class="c"># green_cylinder -- ne pas sauter</span>
+bash scripts/episode.sh 4               <span class="c"># yellow_box</span>
+
+<span class="c"># seulement une fois les quatre ci-dessus r&eacute;ussis :</span>
+bash scripts/batch.sh 1 60              <span class="c"># ~5-8h sur le mat&eacute;riel du R&ocirc;le B</span>
+bash scripts/status.sh                  <span class="c"># &agrave; tout moment, terminal s&eacute;par&eacute;</span>
+
+python3 scripts/port_bag.py --out datasets/mycobot_sorting_train --split train
+python3 scripts/port_bag.py --out datasets/mycobot_sorting_heldout --split heldout</pre>
+        </div>
+      </div>
+      <p class="callout warn"><b>Arr&ecirc;ter et rapporter si l'un des quatre &eacute;pisodes de fum&eacute;e &eacute;choue</b> &mdash; selon <code>RUNNING.md</code>, ce n'est pas une formalit&eacute;. Renvoyer le <code>stage_&lt;idx&gt;.log</code> de l'&eacute;pisode en &eacute;chec, indiquer s'il a &eacute;chou&eacute; pendant la mont&eacute;e en charge ou pendant l'enregistrement, et &mdash; si c'est le blocage de l'enregistreur &mdash; un <code>py-spy dump</code> du processus bloqu&eacute; si possible du tout.</p>
+    </section>
+
+    <section class="block" id="manifest">
+      <h2>Inventaire des fichiers</h2>
+      <p class="block-dek">Ce qui est r&eacute;ellement suivi dans l'historique git propre de ce projet, et &agrave; quoi sert chaque pi&egrave;ce.</p>
+      <div class="manifest-tree">Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/<br>
+&#9500;&#9472;&#9472; RUNNING.md<span class="c">                          # &sect;11, &sect;15 -- la phrase unique, puis trois commandes</span><br>
+&#9500;&#9472;&#9472; preflight.sh<span class="c">                        # &sect;11 -- v&eacute;rification d'environnement en lecture seule</span><br>
+&#9500;&#9472;&#9472; doc/<br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; FOUR_OBJECT_SORTING_SPECIFICATION.docx<span class="c">  # la spec contraignante</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; FOUR_OBJECT_SORTING_REPORT.{html,docx} / _FR.{html,docx}<span class="c">  # ce document, EN/FR</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; ASSUMPTIONS.md, WORLD_SELECTION.md, GRASP_DECISION.md<span class="c">  # &sect;1-3</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; OBJECTS_MANIFEST.md, BIN_REPOSITIONING.md<span class="c">          # &sect;4</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; WAYPOINT_CONTINUITY.md<span class="c">                        # &sect;7</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; CONTRACT_VERIFICATION.md<span class="c">                      # &sect;10</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; SMOKE_TEST.md<span class="c">                                  # &sect;12-13, le dossier forensique complet</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; HANDOVER.md<span class="c">                                    # &sect;15, bilan ligne par ligne de l'Annexe A</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; LIMITATIONS.md, METRICS.md<span class="c">                    # Parties 12-13</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; ROBOTICS_TEAM_REFERRALS.md<span class="c">                    # Annexe B</span><br>
+&#9500;&#9472;&#9472; config/<span class="c">                              # &sect;4-7, chaque artefact g&eacute;n&eacute;r&eacute;/pr&eacute;calcul&eacute;</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; objects.yaml, tasks.jsonl, episode_matrix.csv<br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; waypoints.json, safe_rect.txt<span class="c">  # fiable</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; reach_map.csv<span class="c">  # &sect;14, r&eacute;g&eacute;n&eacute;r&eacute; &agrave; faible fid&eacute;lit&eacute;</span><br>
+&#9500;&#9472;&#9472; contracts/<span class="c">                           # &sect;10</span><br>
+&#9500;&#9472;&#9472; models/<span class="c">                              # &sect;4, quatre objets + quatre bacs</span><br>
+&#9500;&#9472;&#9472; scripts/<br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; mycobot_ik.py, sweep_reach.py<span class="c">           # &sect;6, &sect;14, IK analytique pure</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; precompute_ik.py, check_waypoints.py<span class="c">    # &sect;7</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; spawn_scene.py, run_pick_and_place.py<span class="c">   # &sect;8</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; verify_episode.py, test_verifier.py<span class="c">     # &sect;9</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; episode.sh, batch.sh, status.sh<span class="c">         # &sect;10, &sect;12, enregistreur + pilote de lot</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; port_bag.py<span class="c">                              # &sect;10, conversion du jeu de donn&eacute;es, sans torch</span><br>
+&#9500;&#9472;&#9472; datasets/<span class="c">                            # meta/README suivis&nbsp;; charge utile non (vide jusqu'au Niveau 4)</span><br>
+&#9492;&#9472;&#9472; worlds/<span class="c">                              # copie locale de real_table.sdf</span></div>
+      <p class="prose">Les bags d'&eacute;pisodes enregistr&eacute;s (aucun n'existe encore) ne vivraient que dans le conteneur <code>gazebo_to_lerobot</code> sous <code>/workspace/htgspp/episodes/</code>, pas dans ce d&eacute;p&ocirc;t &mdash; r&eacute;g&eacute;n&eacute;rables via <code>batch.sh</code>, rien &agrave; versionner. Les deux fichiers que ce travail a &eacute;galement touch&eacute;s dans le d&eacute;p&ocirc;t d'&eacute;quipe partag&eacute;, s&eacute;par&eacute;, <code>mycobot_320pi_R6A</code> (<code>real_table.sdf</code>, <code>real_table.launch.py</code>) ne font pas partie de l'inventaire propre &agrave; ce projet et ont &eacute;t&eacute; laiss&eacute;s pour relecture et commit directs par le mainteneur de ce d&eacute;p&ocirc;t.</p>
+    </section>
+
+    <footer>Rapport Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo &middot; &eacute;crit le 23/09/2026 &middot; commit 3319973 sur main &middot; Tomislav Ilic</footer>
+  </main>
+</div>
