@@ -225,6 +225,9 @@ class SimSortingGrasp(Node):
         self.declare_parameter('pose_source', 'gazebo')
         self.declare_parameter('max_attempts', 1)
         self.declare_parameter('csv_path', '')     # un verdict par essai (protocole, etape 11)
+        # Multiplie les attentes en temps reel : une garde thermique peut mettre
+        # Gazebo en pause, le temps simule s'arrete mais pas l'horloge murale.
+        self.declare_parameter('wall_timeout_scale', 1.0)
         self.pose_source = str(self.get_parameter('pose_source').value)
         self.max_attempts = int(self.get_parameter('max_attempts').value)
         if self.pose_source not in ('gazebo', 'vision', 'perception') or self.max_attempts < 1:
@@ -236,6 +239,7 @@ class SimSortingGrasp(Node):
         move_dur = float(self.get_parameter('move_duration').value)
         self.move_dur = move_dur if move_dur > 0.0 else None
         self.settle = float(self.get_parameter('settle_time').value)
+        self.wall_scale = float(self.get_parameter('wall_timeout_scale').value)
         only = str(self.get_parameter('only').value)
         self.only = [m.strip() for m in only.split(',') if m.strip()]
         if self.pose_source == 'vision' and self.only != ['red_cube']:
@@ -300,7 +304,7 @@ class SimSortingGrasp(Node):
         if not self.transit(q_observe, 'pose d observation'):
             raise RuntimeError('pose d observation inatteignable sans racler')
         requested = time.monotonic()
-        deadline = requested + 30.0
+        deadline = requested + 30.0 * self.wall_scale
         while rclpy.ok() and time.monotonic() < deadline:
             rclpy.spin_once(self, timeout_sec=0.1)
             fresh = [seen for t, seen in self.perceived if t > requested]
@@ -319,7 +323,7 @@ class SimSortingGrasp(Node):
         if self.pose_source == 'perception':
             return self.perceived_poses({target.model, tri_scene.PAIRS[target.model]})
         self.status('localisation du cube par les quatre cameras…')
-        deadline = time.monotonic() + 25.0
+        deadline = time.monotonic() + 25.0 * self.wall_scale
         # Require a new observation after any previous motion or failed attempt.
         requested = time.monotonic()
         samples = []
@@ -360,7 +364,7 @@ class SimSortingGrasp(Node):
         # Gazebo rendering can run slower than wall time with four cameras.
         # Gripper settling and trajectory durations are simulation seconds.
         end = self.get_clock().now().nanoseconds * 1e-9 + seconds
-        watchdog = time.monotonic() + max(15.0, seconds * 15.0)
+        watchdog = time.monotonic() + max(15.0, seconds * 15.0) * self.wall_scale
         while rclpy.ok() and self.get_clock().now().nanoseconds * 1e-9 < end:
             if time.monotonic() > watchdog:
                 raise RuntimeError('horloge de simulation arretee ou trop lente')
@@ -538,7 +542,7 @@ class SimSortingGrasp(Node):
         self.pub_arm.publish(traj)
 
         self.spin_for(duration)
-        deadline = time.monotonic() + max(5.0, self.settle * 10.0)
+        deadline = time.monotonic() + max(5.0, self.settle * 10.0) * self.wall_scale
         while rclpy.ok() and time.monotonic() < deadline:
             if float(np.max(np.abs(self.q_deg - q_deg))) < SETTLE_TOL_DEG:
                 return tool_tip(self.q_deg)

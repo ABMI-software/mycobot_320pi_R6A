@@ -40,10 +40,15 @@ venv/
 
 # Training checkpoints & artifacts
 training/checkpoints*/
-training/dream/checkpoints_dream/
+training/dream/checkpoints_dream/*
+!training/dream/checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/
+!training/dream/checkpoints_dream/vgg_tri_mix_ft_e10/
 *.pth
 *.pkl
 *.onnx
+# Modeles de reference publies : DREAM v4 (reel) et scene de tri, YOLO v6c
+!training/dream/checkpoints_dream/vgg_ultimate_v4_mix_ft_e30/best_network.pth
+!training/dream/checkpoints_dream/vgg_tri_mix_ft_e10/best_network.pth
 .claude/scheduled_tasks.lock
 training/calibration/__pycache__/
 

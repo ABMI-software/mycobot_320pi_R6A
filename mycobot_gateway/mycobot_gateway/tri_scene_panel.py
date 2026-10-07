@@ -5,6 +5,7 @@ from tkinter import ttk
 
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 
@@ -12,6 +13,8 @@ class TriScenePanel:
     def __init__(self, node):
         self.node = node
         self.client = node.create_client(Trigger, '/tri_scene/randomize')
+        node.create_subscription(String, '/tri_scene/status', self.on_status, 10)
+        self.busy = False
         self.pending = None
         self.window = tk.Tk()
         self.window.title('Scène de tri')
@@ -28,6 +31,10 @@ class TriScenePanel:
         ttk.Label(frame, textvariable=self.status, wraplength=400).pack(anchor='w', pady=(10, 0))
         self.window.after(50, self.tick)
 
+    def on_status(self, msg):
+        self.busy = False
+        self.status.set(msg.data)
+
     def request(self):
         self.pending = self.client.call_async(Trigger.Request())
         self.status.set('Bras en pose d’observation, puis nouvelle scène…')
@@ -38,9 +45,11 @@ class TriScenePanel:
             return
         rclpy.spin_once(self.node, timeout_sec=0)
         if self.pending is not None and self.pending.done():
-            self.status.set(self.pending.result().message)
+            result = self.pending.result()
+            self.busy = result.success
+            self.status.set(result.message)
             self.pending = None
-        ready = self.pending is None and self.client.service_is_ready()
+        ready = self.pending is None and not self.busy and self.client.service_is_ready()
         self.button.configure(state='normal' if ready else 'disabled')
         if self.pending is None and not self.client.service_is_ready():
             self.status.set('En attente de la simulation…')

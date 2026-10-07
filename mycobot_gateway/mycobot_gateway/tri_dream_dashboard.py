@@ -4,24 +4,32 @@ YOLO says where the object is; DREAM says where the gripper is (the robot pose
 seen by each camera, T_DREAM(t), its PnP on the FK of the joint angles of the
 image instant; the tip is placed in the base frame through the camera's
 calibrated pose, fused over the views with >= 5 keypoints). When the gripper
-closes on an object both should coincide, so the dashboard compares them to
-each other — no Gazebo ground truth here (that comparison is logged by
-dream_fk_compare and yolo_gt_overlay):
+closes on an object both should coincide. Gazebo's ground truth
+(/validation/gt/objects, validation only, never read by the sorter) is the
+reference both are measured against:
 
-  - per grasp: object according to YOLO, gripper according to DREAM, distance;
-  - in time: distance from DREAM's gripper to the object YOLO gave the sorter,
-    with the same distance from the gripper read on the joint encoders as reference;
+  - per grasp: object according to YOLO and to Gazebo, gripper according to
+    DREAM and to the encoders, and the distances between them;
+  - in time, one cycle per object, cut like the 3D path drawn in Gazebo: from
+    "▶ <object>" until the verdict that follows its drop. Three gripper ->
+    target distances, the target being the object until it is held, then its
+    bin; each curve swaps one source in: Gazebo (encoder tip -> true target),
+    YOLO (encoder tip -> YOLO target) and DREAM (DREAM tip -> true target).
+    A selector shows any of the four objects;
   - with embed_gazebo, the Gazebo GUI window itself in the top-left cell (one
     window; the gripper paths are drawn in Gazebo by tri_trajectoires_gazebo).
 
     ros2 launch mycobot_gateway tri_yolo.launch.py dream:=true dashboard:=true
 
 With log_dir, the per-grasp table is also written to <log_dir>/dream_vs_yolo.csv
-(rewritten whenever a row changes: DREAM poses arrive ~1 s after their image).
+and the full comparison to <log_dir>/tri_resultats.csv (date, run, object, bin,
+YOLO detection, positions and XY errors DREAM / YOLO / Gazebo / encoders), both
+rewritten whenever a row changes: DREAM poses arrive ~1 s after their image.
 """
 
 from collections import deque
 import csv
+import datetime
 import os
 import re
 from pathlib import Path
@@ -32,8 +40,8 @@ from ament_index_python.packages import get_package_share_directory
 import numpy as np
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QWindow
-from PyQt5.QtWidgets import (QApplication, QGridLayout, QHeaderView, QGroupBox, QLabel,
-                             QPlainTextEdit,
+from PyQt5.QtWidgets import (QApplication, QComboBox, QGridLayout, QHBoxLayout, QHeaderView,
+                             QGroupBox, QLabel, QPlainTextEdit,
                              QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 import pyqtgraph as pg
 import rclpy
@@ -47,6 +55,7 @@ from vision_msgs.msg import Detection3DArray
 from .dream_fk_compare import PREFIXES
 from .joint_history import JointHistory
 from .sim_sorting_grasp import tool_tip
+from .vision import tri_scene
 from .vision.sim_multicam_geometry import load_cameras
 
 sys.path.insert(0, str(Path(os.path.realpath(__file__)).parents[2] / 'training' / 'dream'))
@@ -69,6 +78,16 @@ REACH_BOUND_M = 1.0
 GAZEBO_CLASS = '"gz-sim-gui" "Gazebo GUI"'
 SAISIE = re.compile(r'^▶ (\S+) : saisie en \(([-+\d.]+), ([-+\d.]+)\)')
 VERDICT = re.compile(r'^(\S+) \(essai \d+\) : (.*)$')
+CURVE_PERIOD_S = 0.1
+# Log axis: a distance of 0 would not plot.
+MIN_PLOT_MM = 0.1
+# One colour per object, shared with its gripper path drawn in Gazebo.
+COLOURS = {'cube_rouge': (0.9, 0.1, 0.1), 'pave_jaune': (0.95, 0.85, 0.1),
+           'cylindre_vert': (0.1, 0.75, 0.2), 'cube_bleu': (0.1, 0.35, 1.0),
+           'transit': (0.55, 0.55, 0.55), 'dream': (1.0, 0.1, 0.9)}
+SOURCES = ('gazebo', 'yolo', 'dream')
+SOURCE_LABELS = {'gazebo': 'Gazebo (vérité)', 'yolo': 'YOLO', 'dream': 'DREAM'}
+ALL_OBJECTS = 'tous les objets'
 
 
 def flange_estimate(T_gt, T_dream, q):
@@ -149,16 +168,23 @@ class DashboardNode(Node):
         self.joints = JointHistory(HISTORY_S)
         self.tips = DreamTips({cam: np.linalg.inv(cameras[cam].world_from_optical)
                                for cam in CAMERAS})
-        self.distances = deque()
         self.inference_ms, self.latency_ms = deque(maxlen=200), deque(maxlen=200)
         self.status = deque(maxlen=STATUS_LINES)
         self.status_count = 0
         self.grasps = []
         self.target = None
         self.yolo = None
+        self.gt = {}
+        # Per object: the three distance curves of its approach, and its time window.
+        self.curves = {}
         log_dir = self.declare_parameter('log_dir', '').value
         self.grasp_csv = Path(log_dir) / 'dream_vs_yolo.csv' if log_dir else None
+        self.result_csv = Path(log_dir) / 'tri_resultats.csv' if log_dir else None
+        self.run_name = Path(log_dir).name if log_dir else ''
         self.written_rows = None
+        self.written_results = None
+        self.create_subscription(Detection3DArray, '/validation/gt/objects', self.on_gt, 10)
+        self.create_timer(CURVE_PERIOD_S, self.sample_curves)
         self.create_subscription(JointState, '/joint_states', self.joints.add, 50)
         self.create_subscription(String, '/pickplace/status', self.on_status, 50)
         self.create_subscription(Detection3DArray, '/yolo/objects_3d',
@@ -172,11 +198,6 @@ class DashboardNode(Node):
     def now_s(self):
         return self.get_clock().now().nanoseconds * 1e-9
 
-    @staticmethod
-    def trim(series):
-        while series and series[-1][0] - series[0][0] > HISTORY_S:
-            series.popleft()
-
     def yolo_object(self, name):
         """Centre of `name` in the latest fused YOLO objects, or None."""
         for d in (self.yolo.detections if self.yolo is not None else []):
@@ -184,6 +205,42 @@ class DashboardNode(Node):
                 c = d.results[0].pose.pose.position
                 return np.array([c.x, c.y, c.z])
         return None
+
+    def yolo_detection(self, name):
+        """(confidence, cameras that see it) of `name` in the fused YOLO objects."""
+        for d in (self.yolo.detections if self.yolo is not None else []):
+            if d.results[0].hypothesis.class_id == name:
+                score = d.results[0].hypothesis.score
+                return score, round(score * 4)
+        return None, 0
+
+    def on_gt(self, msg):
+        for d in msg.detections:
+            c = d.results[0].pose.pose.position
+            self.gt[d.results[0].hypothesis.class_id] = np.array([c.x, c.y, c.z])
+
+    def goals(self, name, t):
+        """(true target, YOLO target) at time t: the object until it is held, then its bin."""
+        curve = self.curves[name]
+        if curve['held'] is None or t < curve['held']:
+            return self.gt.get(name), self.target[1] if self.target else None
+        bin_name = tri_scene.PAIRS[name]
+        return self.gt.get(bin_name), curve['yolo_bin']
+
+    def sample_curves(self):
+        """Gazebo and YOLO curves of the current cycle, from the encoders."""
+        if self.target is None or not self.joints.qs:
+            return
+        name = self.target[0]
+        curve = self.curves[name]
+        if curve['end'] is not None:
+            return
+        t, tip = self.joints.times[-1], encoder_tip(self.joints.qs[-1])
+        true_goal, yolo_goal = self.goals(name, t)
+        if true_goal is not None:
+            curve['gazebo'].append((t - curve['t0'], np.linalg.norm(tip - true_goal) * 1000))
+        if yolo_goal is not None:
+            curve['yolo'].append((t - curve['t0'], np.linalg.norm(tip - yolo_goal) * 1000))
 
     def on_status(self, msg):
         self.status.append(msg.data)
@@ -196,21 +253,37 @@ class DashboardNode(Node):
             xy = np.array([float(saisie.group(2)), float(saisie.group(3))])
             centre = self.yolo_object(name)
             self.target = (name, np.array([*xy, centre[2] if centre is not None else 0.0]))
+            conf, cams = self.yolo_detection(name)
             self.grasps.append({'name': name, 'yolo': xy, 'dream': None, 'dream_mm': np.nan,
                                 'encoder_mm': np.nan, 'views': 0, 'verdict': 'en cours',
-                                'still': [None, None]})
+                                'still': [None, None], 'yolo_z': self.target[1][2],
+                                'yolo_conf': conf, 'yolo_cams': cams, 'gt': None,
+                                'encoder': None, 'verdict_text': '',
+                                'date': datetime.datetime.now().isoformat(timespec='seconds')})
+            t0 = self.joints.times[-1] if self.joints.times else self.now_s()
+            self.curves[name] = {'t0': t0, 'held': None, 'end': None,
+                                 'yolo_bin': self.yolo_object(tri_scene.PAIRS[name]),
+                                 **{src: [] for src in SOURCES}}
         elif text.startswith('pointe visee') and self.grasps and self.joints.qs:
             # The gripper has reached the object and stays on it until it is held.
             g = self.grasps[-1]
             g['still'][0] = self.joints.times[-1]
-            g['encoder_mm'] = np.linalg.norm(encoder_tip(self.joints.qs[-1])[:2] - g['yolo']) * 1000
+            g['encoder'] = encoder_tip(self.joints.qs[-1])
+            g['encoder_mm'] = np.linalg.norm(g['encoder'][:2] - g['yolo']) * 1000
+            g['gt'] = self.gt.get(g['name'])
         elif text.startswith('tenu a') and self.grasps and self.joints.qs:
             self.grasps[-1]['still'][1] = self.joints.times[-1]
+            # Held: from here the target is the bin.
+            self.curves[self.grasps[-1]['name']]['held'] = self.joints.times[-1]
         elif verdict:
+            # The drop is done: this object's cycle ends, as its 3D path does.
+            if verdict.group(1) in self.curves and self.joints.times:
+                self.curves[verdict.group(1)]['end'] = self.joints.times[-1]
             self.target = None
             for g in reversed(self.grasps):
                 if g['name'] == verdict.group(1):
                     g['verdict'] = 'OK' if verdict.group(2).startswith('OK') else verdict.group(2)
+                    g['verdict_text'] = verdict.group(2)
                     break
 
     def update_grasps(self):
@@ -222,6 +295,41 @@ class DashboardNode(Node):
                                  else np.linalg.norm(g['dream'][:2] - g['yolo']) * 1000)
         if self.grasp_csv is not None:
             self.write_grasps()
+            self.write_results()
+
+    def write_results(self):
+        def xyz(p, n=3):
+            return ('',) * n if p is None else tuple(f'{v * 1000:.1f}' for v in p[:n])
+
+        def xy_mm(a, b):
+            return '' if a is None or b is None else f'{np.linalg.norm(a[:2] - b[:2]) * 1000:.1f}'
+
+        rows = []
+        for g in self.grasps:
+            yolo = np.array([*g['yolo'], g['yolo_z']])
+            bin_name = tri_scene.PAIRS.get(g['name'], '')
+            rows.append([
+                g['date'], self.run_name, g['name'], bin_name, *xyz(self.gt.get(bin_name), 2),
+                '' if g['yolo_conf'] is None else f"{g['yolo_conf']:.3f}", g['yolo_cams'],
+                *xyz(g['gt']), *xyz(yolo), *xyz(g['dream']), *xyz(g['encoder']), g['views'],
+                xy_mm(yolo, g['gt']), xy_mm(g['dream'], g['gt']), xy_mm(g['dream'], yolo),
+                xy_mm(g['encoder'], g['gt']), xy_mm(g['encoder'], yolo),
+                g['verdict'], g['verdict_text']])
+        if rows == self.written_results:
+            return
+        with open(self.result_csv, 'w', newline='') as fh:
+            w = csv.writer(fh)
+            w.writerow(['date', 'run', 'object', 'bin', 'bin_gazebo_x_mm', 'bin_gazebo_y_mm',
+                        'yolo_confidence', 'yolo_cameras',
+                        'gazebo_x_mm', 'gazebo_y_mm', 'gazebo_z_mm',
+                        'yolo_x_mm', 'yolo_y_mm', 'yolo_z_mm',
+                        'dream_x_mm', 'dream_y_mm', 'dream_z_mm',
+                        'encoder_x_mm', 'encoder_y_mm', 'encoder_z_mm', 'dream_views',
+                        'err_yolo_gazebo_xy_mm', 'err_dream_gazebo_xy_mm', 'err_dream_yolo_xy_mm',
+                        'err_encoder_gazebo_xy_mm', 'err_encoder_yolo_xy_mm',
+                        'verdict', 'verdict_detail'])
+            w.writerows(rows)
+        self.written_results = rows
 
     def write_grasps(self):
         rows = [[g['name'], *(f'{v * 1000:.1f}' for v in g['yolo']),
@@ -254,11 +362,13 @@ class DashboardNode(Node):
         if est is None:
             return
         fused, _ = self.tips.fused(t)
-        if self.target is not None:
-            goal = self.target[1]
-            self.distances.append((t, np.linalg.norm(fused - goal) * 1000,
-                                   np.linalg.norm(encoder_tip(q) - goal) * 1000))
-            self.trim(self.distances)
+        # The image instant decides which approach it belongs to: poses arrive ~1 s late.
+        for name, curve in self.curves.items():
+            if t >= curve['t0'] and (curve['end'] is None or t <= curve['end']):
+                true_goal, _ = self.goals(name, t)
+                if true_goal is not None:
+                    curve['dream'].append((t - curve['t0'],
+                                           np.linalg.norm(fused - true_goal) * 1000))
 
 
 def fit_rows(table, rows):
@@ -298,28 +408,51 @@ class DashboardWindow(QWidget):
         QVBoxLayout(self.gazebo_box).addWidget(self.gazebo_slot)
         grid.addWidget(self.gazebo_box, 0, 0)
 
-        compare_box = QGroupBox('DREAM (pince) ↔ YOLO (objet)')
+        compare_box = QGroupBox('DREAM (pince) ↔ YOLO (objet) ↔ Gazebo (vérité)')
         self.grasp_table = QTableWidget(0, 7)
         self.grasp_table.setHorizontalHeaderLabels(
-            ['objet', 'YOLO objet x, y', 'DREAM pince x, y, z', 'DREAM ↔ YOLO',
-             'codeurs ↔ YOLO', 'images DREAM', 'tri'])
+            ['objet', 'YOLO objet x, y', 'DREAM pince x, y, z',
+             'DREAM ↔ Gazebo', 'YOLO ↔ Gazebo', 'images DREAM', 'tri'])
         self.grasp_table.setToolTip('Au serrage, la pince est sur l objet. Positions et écarts '
-                                    'en mm, écarts dans le plan XY. codeurs = pince lue aux '
-                                    'codeurs du robot, référence.')
+                                    'en mm, écarts dans le plan XY, par rapport à la vérité '
+                                    'Gazebo. Le CSV tri_resultats.csv garde tous les écarts.')
         fit_rows(self.grasp_table, 4)
         self.distance_plot = pg.PlotWidget(labels={
-            'left': 'pince → objet YOLO visé (mm, log)', 'bottom': 'temps simulé (s)'})
+            'left': 'pince → cible (mm, log)',
+            'bottom': 'temps simulé depuis le départ vers l objet (s)'})
         self.distance_plot.setLogMode(y=True)
         self.distance_plot.getAxis('left').enableAutoSIPrefix(False)
         self.distance_plot.addLegend()
-        self.dream_curve = self.distance_plot.plot(pen=pg.mkPen((255, 30, 230), width=2),
-                                                   name='DREAM')
-        self.encoder_curve = self.distance_plot.plot(
-            pen=pg.mkPen((200, 200, 200), width=1, style=Qt.DashLine), name='codeurs')
+        self.distance_plot.setToolTip(
+            'Cible = l objet jusqu à la saisie (trait vertical), puis son bac jusqu au dépôt. '
+            'Gazebo : pince (codeurs) → cible vraie. YOLO : pince (codeurs) → cible YOLO. '
+            'DREAM : pince DREAM → cible vraie.')
+        self.held_line = pg.InfiniteLine(angle=90, pen=pg.mkPen((150, 150, 150), style=Qt.DotLine))
+        self.distance_plot.addItem(self.held_line)
+        self.source_curves = {
+            'gazebo': self.distance_plot.plot(pen=pg.mkPen((60, 200, 90), width=2),
+                                              name=SOURCE_LABELS['gazebo'], connect='finite'),
+            'yolo': self.distance_plot.plot(pen=pg.mkPen((240, 200, 40), width=2,
+                                                         style=Qt.DashLine),
+                                            name=SOURCE_LABELS['yolo'], connect='finite'),
+            'dream': self.distance_plot.plot(pen=pg.mkPen((255, 30, 230), width=2),
+                                             symbol='o', symbolSize=5,
+                                             symbolBrush=(255, 30, 230),
+                                             name=SOURCE_LABELS['dream'], connect='finite'),
+        }
+        # "tous les objets": one line per cycle start, labelled with the object.
+        self.cycle_lines = []
+        self.selector = QComboBox()
+        self.selector.addItems(['objet en cours', ALL_OBJECTS, *tri_scene.OBJECTS])
+        chooser = QHBoxLayout()
+        chooser.addWidget(QLabel('Visualiser :'))
+        chooser.addWidget(self.selector)
+        chooser.addStretch()
         self.latency = QLabel()
         box = QVBoxLayout(compare_box)
         box.addWidget(self.grasp_table)
         box.addWidget(self.distance_plot)
+        box.addLayout(chooser)
         box.addWidget(self.latency)
         grid.addWidget(compare_box, 0, 1)
 
@@ -361,14 +494,60 @@ class DashboardWindow(QWidget):
         self.gazebo_slot.deleteLater()
 
     def tick(self):
+        if not rclpy.ok():
+            QApplication.quit()
+            return
         rclpy.spin_once(self.node, timeout_sec=0.0)
 
     def redraw(self):
         n = self.node
-        if n.distances:
-            t, d_dream, d_enc = (np.array(c) for c in zip(*n.distances))
-            self.dream_curve.setData(t, d_dream)
-            self.encoder_curve.setData(t, d_enc)
+        choice = self.selector.currentText()
+        everything = choice == ALL_OBJECTS
+        if everything:
+            shown = list(n.curves)
+        elif choice == 'objet en cours':
+            shown = [n.grasps[-1]['name']] if n.grasps else []
+        else:
+            shown = [choice]
+        # One object: time from its own departure. All: one time axis, cycle after cycle.
+        origin = min((c['t0'] for c in n.curves.values()), default=0.0)
+        self.distance_plot.setLabel('bottom', 'temps simulé depuis le début du tri (s)' if everything
+                                    else 'temps simulé depuis le départ vers l objet (s)')
+        self.distance_plot.setTitle('tous les objets' if everything else (shown[0] if shown else ''))
+        shown = sorted(shown, key=lambda name: n.curves[name]['t0'] if name in n.curves else 0.0)
+        curve = n.curves.get(shown[0]) if len(shown) == 1 else None
+        held = curve['held'] - curve['t0'] if curve and curve['held'] is not None else None
+        self.held_line.setVisible(held is not None and not everything)
+        if held is not None:
+            self.held_line.setValue(held)
+        for src, item in self.source_curves.items():
+            t_all, d_all = [], []
+            for name in shown:
+                points = sorted(n.curves[name][src]) if name in n.curves else []
+                if not points:
+                    continue
+                t, d = (np.array(c) for c in zip(*points))
+                shift = n.curves[name]['t0'] - origin if everything else 0.0
+                # A NaN between two cycles breaks the line instead of joining them.
+                t_all += [t + shift, [np.nan]]
+                d_all += [np.maximum(d, MIN_PLOT_MM), [np.nan]]
+            if t_all:
+                item.setData(np.concatenate(t_all), np.concatenate(d_all))
+            else:
+                item.setData([], [])
+        starts = ([(name, n.curves[name]['t0'] - origin) for name in shown if name in n.curves]
+                  if everything else [])
+        while len(self.cycle_lines) < len(starts):
+            line = pg.InfiniteLine(angle=90, pen=pg.mkPen((150, 150, 150), style=Qt.DotLine),
+                                   label='', labelOpts={'position': 0.95, 'color': (220, 220, 220),
+                                                         'anchors': [(0, 0), (0, 0)]})
+            self.distance_plot.addItem(line)
+            self.cycle_lines.append(line)
+        for i, line in enumerate(self.cycle_lines):
+            line.setVisible(i < len(starts))
+            if i < len(starts):
+                line.setValue(starts[i][1])
+                line.label.setFormat(starts[i][0])
         if n.inference_ms:
             self.latency.setText(f'DREAM, latence médiane : inférence {np.median(n.inference_ms):.0f} ms, '
                                  f'image → pose {np.median(n.latency_ms):.0f} ms')
@@ -377,10 +556,11 @@ class DashboardWindow(QWidget):
         self.grasp_table.setRowCount(len(n.grasps))
         for i, g in enumerate(n.grasps):
             dream = '—' if g['dream'] is None else ', '.join(f'{v * 1000:.0f}' for v in g['dream'])
+            gt = g['gt']
+            to_gt = (lambda p: '—' if p is None or gt is None
+                     else f'{np.linalg.norm(p[:2] - gt[:2]) * 1000:.1f}')
             cells = (g['name'], ', '.join(f'{v * 1000:.0f}' for v in g['yolo']), dream,
-                     '—' if np.isnan(g['dream_mm']) else f"{g['dream_mm']:.1f}",
-                     '—' if np.isnan(g['encoder_mm']) else f"{g['encoder_mm']:.1f}",
-                     str(g['views']), g['verdict'])
+                     to_gt(g['dream']), to_gt(g['yolo']), str(g['views']), g['verdict'])
             for col, v in enumerate(cells):
                 self.grasp_table.setItem(i, col, QTableWidgetItem(v))
 

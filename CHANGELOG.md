@@ -9,6 +9,25 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — Dashboard YOLO / DREAM / Gazebo et modeles publies (07/10)
+
+- **`tri_dream_dashboard`** : verite terrain Gazebo (`/validation/gt/objects`)
+  tracee avec YOLO et DREAM, une courbe par objet du debut du cycle jusqu'au
+  depot dans le bac. Selecteur « Visualiser » (objet en cours, tous les
+  objets, un objet). Tableau de prise reduit a DREAM<->Gazebo et
+  YOLO<->Gazebo. `tri_resultats.csv` ecrit dans `log_dir` : date, run, objet,
+  bac, positions et ecarts XY, detection YOLO.
+- **`sim_sorting_grasp`** : parametre `wall_timeout_scale`, pour que les gels
+  thermiques d'une campagne ne declenchent pas les delais en temps reel.
+- **`tri_scene_randomizer`** : boucle mono-thread (l'executeur multi-thread
+  tournait a vide a ~100 % CPU, ~10 % maintenant), etat publie sur
+  `/tri_scene/status` et affiche par `tri_scene_panel`.
+- **Modeles publies** (exception dans `.gitignore`, le reste de
+  `checkpoints_dream/` reste ignore, 25 Go) : DREAM
+  `vgg_ultimate_v4_mix_ft_e30/best_network.pth` (reel) et
+  `vgg_tri_mix_ft_e10/best_network.pth` (scene de tri), 89 Mo chacun, et YOLO
+  `pieces_v6c_gazebo_yolo26s/weights/best.pt`, 20 Mo.
+
 ### Ajoute — Randomiser sans relancer Gazebo, coins YOLO exacts, etape 10 validee (07/10)
 
 Protocole : `docs/PROTOCOLE_YOLO_GAZEBO.md`, fin de l'etape 10 et sections du 07/10.
