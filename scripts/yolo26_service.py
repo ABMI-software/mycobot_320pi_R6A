@@ -28,6 +28,7 @@ Le champ `camera` n'est pas lu par le modele — il est journalise pour que le
 service dise sur quelle vue il travaille quand on le lance a la main.
 """
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -65,6 +66,10 @@ import tri_couleur as tc  # noqa: E402
 POIDS_DEFAUT = (RACINE / 'runs' / 'detect' / 'training' / 'yolo' / 'runs'
                 / 'pieces_v6c_gazebo_yolo26s' / 'weights' / 'best.pt')
 TAILLE = 640
+# Coins tronques a l entier : -0,5 px en moyenne sur le centre (mesure 01/10 :
+# -0,47 / -0,51 px, +-0,2). Le banc reel est cale avec ; la simulation demande
+# les coins exacts (tri_yolo.launch.py).
+BOITES_PRECISES = os.environ.get('YOLO26_BOITES_PRECISES') == '1'
 
 
 def detecte(modele, image, seuil):
@@ -72,7 +77,7 @@ def detecte(modele, image, seuil):
     r = modele.predict(image, conf=seuil, imgsz=TAILLE, verbose=False)[0]
     gardes = []
     for bt in sorted(r.boxes, key=lambda b: -float(b.conf)):
-        boite = tuple(int(v) for v in bt.xyxy[0])
+        boite = tuple(float(v) if BOITES_PRECISES else int(v) for v in bt.xyxy[0])
         if any(tc.recouvre(boite, g[1]) > tc.RECOUVREMENT_DOUBLON for g in gardes):
             continue
         gardes.append((modele.names[int(bt.cls)], boite, float(bt.conf)))

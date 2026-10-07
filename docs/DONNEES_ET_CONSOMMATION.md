@@ -1,6 +1,6 @@
 # Données d'entraînement DREAM et consommation du PC Tour
 
-*État au 06/10/2026, pendant le fine-tuning `vgg_tri_mix_ft_e10`.*
+*État au 06/10/2026, pendant le fine-tuning `vgg_tri_mix_ft_e10`. Mesures par composant et essai sans épinglage ajoutés le 07/10 (§ 3.2 et § 4.3).*
 
 Ce document répond à quatre questions :
 - comment les données du fine-tuning sont réparties ;
@@ -111,23 +111,34 @@ Ce tableau vient des journaux des runs : le scratchpad `etape10/*_resume.txt`, p
 
 Pour la dernière ligne : la carte graphique était à **99 %**, à **122 W** sur 130, à **84 °C**, avec 4,3 Go de mémoire. Le processus principal utilisait 109 % de CPU et les chargeurs de données jusqu'à 100 % chacun.
 
-### 3.2 Par composant : **non mesuré**
+### 3.2 Par composant — mesuré le 07/10
 
-Aucun run n'a lancé **Gazebo seul**, **YOLO seul** ou **DREAM seul** avec un relevé de leur charge CPU (`pidstat`) et GPU. Les chiffres ci-dessus portent sur des **combinaisons**. Les seules comparaisons qu'on peut en tirer sont des différences entre deux runs. Elles ne sont pas des mesures propres, parce qu'il y a une seule répétition, que la température de départ varie et que le scénario change :
+Méthode « en escalier » : on ajoute les composants un par un, via `tri_yolo.launch.py` (`seed:=3 piece_reach:=0.28 observe:=false panel:=false dream_model:=vgg_tri_mix_ft_e10 dream_rate:=1.0`), tout épinglé `taskset -c 16-19`. Chaque marche : 30 s de démarrage, puis 60 s de mesure, avec un relevé toutes les 2 s. CPU par processus lu dans `/proc/<pid>/stat` sur l'arbre du launch, GPU via `nvidia-smi`, température via `sensors`. Départ à 52-60 °C, arrêt à 88 °C. 100 % = 1 cœur logique.
 
-- **YOLO pèse lourd** : 84 °C sans YOLO (balayages) contre 95 °C avec (graine 2), sur les mêmes 4 cœurs.
-- **La cadence de DREAM pèse lourd** : 95 °C à la cadence par défaut contre 85 °C à `dream_rate:=1.0`, sur les mêmes cœurs.
-- **L'épinglage pèse le plus** : 99 °C en moins d'une minute sans `taskset`, contre 81-85 °C avec `taskset -c 16-19`, pour la même combinaison.
+| Marche | Gazebo | DREAM | YOLO | ROS autres | Charge CPU totale (100 % = 1 cœur ; max. 400 %) | GPU | Tmax Package |
+|---|---|---|---|---|---|---|---|
+| 1. Gazebo sans fenêtre (`headless:=true`) | 120 % | — | — | 10 % | **133 %** (33 % des 4 cœurs) | 11 %, 7,5 W, 1,0 Go | **70 °C** |
+| 2. + fenêtre Gazebo | 162 % | — | — | 10 % | **176 %** (44 % des 4 cœurs) | 25 %, 23 W, 1,5 Go | **77 °C** |
+| 3. + 1 DREAM (`dream_cameras:=top`) | 124 % | 12 % | — | 24 % | **163 %** (41 % des 4 cœurs) | 31 W, 2,1 Go | **77 °C** |
+| 4. + 4 DREAM | 114 % | 47 % | — | 24 % | **188 %** (47 % des 4 cœurs) | 31 W, 3,3 Go | **75 °C** |
+| 5. + YOLO | 154 % | 47 % | 23 % | 24 % | **251 %** (63 % des 4 cœurs) | 35 W, 3,8 Go | **82 °C** |
 
-**Protocole proposé pour mesurer chaque composant** (à faire hors entraînement) :
-- lancer chaque composant seul, 5 minutes, épinglé sur 16-19 ;
-- relever toutes les 2 s :
-  - `pidstat -u -p <pids> 2`, pour le CPU par processus ;
-  - `nvidia-smi --query-gpu=utilization.gpu,power.draw,temperature.gpu`, pour la carte graphique ;
-  - `sensors` (Package et Core 28/32-35), pour la température ;
-- dans cet ordre : Gazebo sans écran → + fenêtre Gazebo → + 1 DREAM → + 4 DREAM → + YOLO.
+Lecture, marche 1 : Gazebo 120 % (1,2 cœur) + programmes ROS autour 13 % (les 10 % de la colonne + 3 % de nœuds `tri_yolo`, voir ci-dessous) = 133 %, soit 1,33 cœur, environ un tiers des 400 % autorisés par l'épinglage sur 4 cœurs.
 
-Chaque marche donne alors le coût de ce qu'on vient d'ajouter.
+La colonne YOLO soustrait ~3 % présents dès la marche 1 : ce sont des nœuds ROS dont la ligne de commande contient `tri_yolo`, pas YOLO.
+
+**Par composant :**
+- Gazebo : **1,2 cœur** sans fenêtre, ~**+0,4 cœur** et +16 W GPU avec la fenêtre. Environ 60 % de la charge CPU totale à la marche 5.
+- DREAM à 1 Hz : **0,12 cœur** par instance (0,47 pour 4) et ~0,45-0,6 Go de mémoire GPU par instance.
+- YOLO (4 caméras) : **0,23 cœur**, +4 W, +0,5 Go. **+7 °C** (75 → 82 °C).
+- Tout ensemble : **2,5 cœurs sur 4**, 35 W GPU sur 130, **82 °C**.
+
+**Limites.** Une seule répétition, 60 s par marche, bras immobile, sans tri. Gazebo varie de 114 à 162 % d'une marche à l'autre : les écarts inférieurs à ~0,4 cœur ne sont pas fiables. Sur la campagne longue avec tri, Tmax monte jusqu'à 89 °C (§ 3.1).
+
+Comparaisons plus anciennes, entre runs différents (une seule répétition, température de départ et scénario variables) :
+- **YOLO** : 84 °C sans YOLO (balayages) contre 95 °C avec (graine 2), sur les mêmes 4 cœurs.
+- **La cadence de DREAM** : 95 °C à la cadence par défaut contre 85 °C à `dream_rate:=1.0`, sur les mêmes cœurs.
+- **L'épinglage** : 99 °C en moins d'une minute sans `taskset`, contre 81-85 °C avec `taskset -c 16-19`, pour la même combinaison. Confirmé le 07/10 (§ 4.3).
 
 ---
 
@@ -159,7 +170,19 @@ Au total, **284 pauses**. La température lue au moment de la pause va de 90 à 
 
 5. **Pourquoi épingler sur les cœurs E fonctionne.** Les cœurs E sont plafonnés à **4,2 GHz** et consomment beaucoup moins à la tâche. Toutes les campagnes Gazebo épinglées sur 16-19, qui sont 4 cœurs E, sont restées sous **85 °C**. La même combinaison sans épinglage a atteint 99 °C en moins d'une minute.
 
-### 4.3 Les limites physiques à retenir
+### 4.3 Essai sans épinglage — 07/10
+
+Même marche 5 que le § 3.2, mais **sans `taskset`**. Garde à 88 °C contrôlée chaque seconde dès le lancement.
+
+| Instant | Package id 0 | Capteur le plus chaud |
+|---|---|---|
+| départ | 59 °C | — |
+| 1 s | 75 °C | Core 16 = CPU 8-9 (cœur P) |
+| 2 s | **98 °C**, arrêt | Core 20 = CPU 10-11 (cœur P). Cœurs E ≤ **79 °C** |
+
+Redescendu à 53 °C quelques secondes après l'arrêt. Épinglée sur 4 cœurs E, la même combinaison restait à 82 °C. Cet essai montre que limiter les programmes aux cœurs E réduit fortement le pic au démarrage, ce qui est cohérent avec le point chaud sur un cœur P décrit au § 4.2. Un seul essai, de 2 s.
+
+### 4.4 Les limites physiques à retenir
 
 - **Le PC tient en continu une combinaison Gazebo + DREAM + YOLO, à condition de l'épingler sur les cœurs E et de régler DREAM à `dream_rate:=1.0`.** Mesuré à 81-85 °C.
 - **Sans épinglage, aucune combinaison lourde ne tient plus d'une minute** sous 90 °C.
@@ -178,7 +201,7 @@ Rien de ceci n'est appliqué au 06/10.
 | Ajouter `training/dream/dream_data/` au `.gitignore` | Plus aucun `git add` de VS Code ne lira les ~100 000 images | Proposé, pas fait |
 | Ne pas utiliser « Stage All » dans VS Code pendant un calcul | Supprime la source de chaleur du 06/10 à 14 h | Consigne |
 | Préfixer toute commande manuelle Gazebo/DREAM/YOLO par `taskset -c 16-19` | Déjà la règle depuis le 05/10 | En place |
-| Mesurer chaque composant séparément (protocole du § 3.2) | Remplir la colonne « par composant », aujourd'hui vide | À faire |
+| Mesurer chaque composant séparément (§ 3.2) | Remplir la colonne « par composant » | **Fait le 07/10**, une répétition |
 
 ---
 
@@ -188,4 +211,5 @@ Rien de ceci n'est appliqué au 06/10.
 - Scratchpad `etape10/` : `resume.txt`, `demo_resume.txt`, `montage_resume.txt`, `monde50k_resume.txt`, `ablation_resume.txt`, avec les options des scripts `.sh` correspondants.
 - Mesures en direct du 06/10 à 14:58 : `sensors`, `nvidia-smi`, `top`, `taskset -p 502707` (masque `fc000` = CPU 14-19), `/sys/devices/system/cpu/cpu*/topology/core_id`, `/sys/class/powercap/intel-rapl:0`.
 - Mémoire projet : relevés des 29/09 et 05/10, sans épinglage.
+- Mesure en escalier et essai sans épinglage du 07/10 : scratchpad de session `conso/` (`escalier.py`, `resultats.json`, `libre/run.log`).
 - Données : `training/dream/dream_data/`. Découpage : `train_dream_ultimate_v5_geo.py`, lignes 120-121 et 425-429.

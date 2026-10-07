@@ -1,5 +1,101 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (7 octobre 2026 — après-midi, étape 10 validée en simulation)
+
+### Ce qui a été accompli aujourd'hui
+
+1. **Non-régression de la pince avec `vgg_tri_mix_ft_e10`** : mêmes 14 poses que le 05/10, graine 1,
+   4 caméras. Sans → avec pince : détection 98,7 → **99,2 %**, médiane 3,0 → **3,0 px**, aberrant
+   0,0 → 0,5 %. Le 05/10 avec v4_mix : 65,2 → 49,5 %, 3,8 → 11,2 px. Caméra du dessus : 100 %.
+2. **Étape 10 validée en simulation**, avec quatre réserves : rotation de T_DREAM 5,3° au p90 sur la
+   caméra droite, J6 non observable, une vue seule ambiguë, aucun test réel hors échantillon.
+   Tableau du verdict : `docs/PROTOCOLE_YOLO_GAZEBO.md` § « Verdict de l'étape 10 ».
+3. **Charge du PC mesurée par composant** (épinglé 16-19, DREAM à 1 Hz) : Gazebo 1,2 cœur
+   (+0,4 avec la fenêtre), DREAM 0,12 cœur par instance, YOLO 0,23 cœur et +7 °C ; tout ensemble
+   2,5 cœurs et 82 °C. Sans `taskset` : 98 °C en 2 s, sur un cœur P.
+   `docs/DONNEES_ET_CONSOMMATION.md` (poussé) et sa version Word (locale).
+
+4. **Bouton « Randomiser »** (étape 2) : `tri_scene_randomizer` + `tri_scene_panel`. Les 8 positions
+   sont à 0,03-0,05 mm du tirage, et le tri après tirage fait 4/4 au premier essai.
+5. **Le −0,5 px de yolo26 expliqué** : troncature `int()` des coins dans `yolo26_service.py`.
+   Corrigé en simulation seulement (`yolo_exact_boxes:=1`) : erreur 3D médiane 1,4-2,1 →
+   0,13-0,57 mm. Le banc réel n'est pas modifié.
+6. **Étape 11, détections manquées** : table 10,8 %, soulevée 70,4 %, fond de bac 90,7 %. La
+   caméra du dessus rate 100 % des pièces au fond d'un bac : yolo26 n'en a probablement jamais vu.
+
+### Décisions prises
+
+- Résultats des balayages : `results/yolo_gazebo/2026-10-07_pince_tri_mix_ft_e10_*`.
+- Coins YOLO exacts en simulation seulement ; le réel reste calé sur les coins tronqués.
+  L'appliquer au réel serait une décision séparée, avec une nouvelle mesure au banc.
+
+### Prochaines actions
+
+1. [ROUGE] Test réel indépendant de `vgg_tri_mix_ft_e10` : nouvelle capture sur le robot, avec
+   vérité terrain contrôlée.
+2. [JAUNE] Mettre la branche locale à jour avec GitHub (204 commits de retard) ; abandonner les
+   deux commits locaux du `.md`, déjà poussés sous d'autres identifiants.
+3. [VERT] Un keypoint en aval de J6 (pince ou bride) pour rendre J6 observable.
+
+### Commande rapide de reprise
+
+```bash
+taskset -c 16-19 ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1 piece_reach:=0.28 \
+    dream:=true dream_rate:=1.0 dream_model:=vgg_tri_mix_ft_e10 dashboard:=true
+```
+
+## État actuel (7 octobre 2026 — matin, DREAM fine-tuné validé dans le tri en simulation)
+
+### Ce qui a été accompli (06/10 soir → 07/10)
+
+Les 4 points restants sur `vgg_tri_mix_ft_e10`, en simulation :
+
+1. **DREAM ↔ YOLO par saisie** : le dashboard l'écrit maintenant dans
+   `dream_vs_yolo.csv`. Mesuré sur 40 saisies : médiane **8,2 mm**, p90
+   12,5 mm, max 19,7 mm. Le 05/10, avec l'ancien modèle : 10-315 mm.
+   Codeurs ↔ YOLO : 2,2 mm.
+2. **10 graines** : tri **40/40**, aucun arrêt thermique, Tmax 89 °C.
+   T_DREAM : front 8,3 mm / 1,8°, right 12,9 mm / 2,6°. Keypoints
+   99,4 / 100 %, à 2,8 / 3,1 px.
+3. **Test réel hors échantillon** : impossible avec les données existantes.
+   Contrôle par md5 :
+   - `real_3cam_val` partage les sessions de capture de l'entraînement ;
+   - `session6` a une vérité terrain cassée ;
+   - `real_3cam_gripper` n'a pas de keypoints.
+4. **Observabilité** (206 images, 2 vues) : J1-J5 entre 0,4 et 1,8° médian.
+   **J6 n'est pas observable** avec 7 keypoints : 91°, même en FK exacte.
+   Avec une vue seule, le calcul tombe sur une autre solution qui se
+   reprojette aussi bien, même en FK exacte.
+
+Détail : `docs/PROTOCOLE_YOLO_GAZEBO.md`, § « Campagne 10 graines avec
+`vgg_tri_mix_ft_e10` » et suivants.
+
+### Décisions prises
+
+- Analyses CPU longues : 4 cœurs E au plus. Sur 10 cœurs, le processeur
+  est monté à 90 °C (garde déclenchée).
+- `real_3cam_val` n'est plus présenté comme un test réel indépendant.
+
+### Prochaines actions
+
+1. [ROUGE] Valider ou refuser l'étape 10 avec `vgg_tri_mix_ft_e10`, à
+   partir des chiffres de la campagne.
+2. [JAUNE] Pour un test réel indépendant : une nouvelle capture sur le
+   robot, avec vérité terrain contrôlée.
+3. [JAUNE] Pour J6 : un keypoint en aval de J6 (bride ou pince) dans le
+   schéma DREAM.
+4. [VERT] PR #18 → `main` (tri Gazebo graine 1 et `pytest` sur la branche
+   fusionnée).
+
+### Commande rapide de reprise
+
+```bash
+ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1 piece_reach:=0.28 dream:=true \
+    dashboard:=true dream_cameras:=front,right dream_model:=vgg_tri_mix_ft_e10 \
+    log_dir:=results/yolo_gazebo/<nouveau_dossier>
+```
+
+
 > **Date de dernière mise à jour :** 5 octobre 2026 (essai des PR #14 et #15 sous Gazebo, analyse du dataset de la PR #15)
 > **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
 > **Branche :** `fix/tool-offset-and-test-collection`, issue de `main`
