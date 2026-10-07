@@ -83,8 +83,72 @@ def trouve_la_pi(delai=0.6):
                 if ok:
                     return hote
     return None
-TOOL = np.array(json.loads((RACINE / 'scripts' / 'tool_offset.json').read_text())
-                ['tool_offset_mm'], float)
+DEPORT_OUTIL = RACINE / 'scripts' / 'tool_offset.json'
+
+
+class _DeportInconnu:
+    """Sentinelle : l'import passe, tout usage geometrique leve.
+
+    Pas de valeur par defaut et pas de repli silencieux. `garde_au_sol`,
+    `PLANCHER` et `capsules` se calculent tous depuis ce vecteur : un deport
+    faux de 17 mm fait descendre les doigts 17 mm plus bas que ce que le
+    garde-fou croit proteger. Le depot porte justement deux calibrations
+    incompatibles de cet ordre — voir `charge_deport`.
+    """
+
+    MESSAGE = (
+        "deport d'outil inconnu : scripts/tool_offset.json est absent (il n'a "
+        "jamais ete commite) et MYCOBOT_TOOL_OFFSET_MM n'est pas defini.\n"
+        "Aucune garde au sol n'est valide sans lui. Mesurer le deport, puis :\n"
+        "  echo '{\"tool_offset_mm\": [x, y, z]}' > scripts/tool_offset.json\n"
+        "ou, pour un essai hors robot : MYCOBOT_TOOL_OFFSET_MM='x,y,z'."
+    )
+
+    def _refuse(self, *_, **__):
+        raise RuntimeError(self.MESSAGE)
+
+    __array__ = __matmul__ = __rmatmul__ = _refuse
+    __add__ = __radd__ = __sub__ = __rsub__ = __mul__ = __rmul__ = _refuse
+    __iter__ = __getitem__ = __len__ = _refuse
+
+    def __repr__(self):
+        return '<deport outil INCONNU>'
+
+
+def charge_deport():
+    """Deport d'outil en mm dans le repere bride, ou la sentinelle.
+
+    L'axe est `-X` de la bride, pas `+Z` : verifie contre le test de contact
+    `test_la_reference_de_l_outil_est_bien_le_bout_des_doigts`, qui exige
+    `pointe(q_contact).Z = 0 +/- 1 mm`.
+
+    ATTENTION — le depot porte DEUX calibrations qui different de 17 mm au
+    bout des doigts, et rien ne dit laquelle est a jour :
+
+      * 27/08, encode dans les tests : longueur 110,4 mm, lateraux -8,9 /
+        +11,9 (soit 7,73 deg de l'axe -X). Donne +0,04 mm au point de
+        contact, donc passe le test.
+      * 09/09, decrit dans le bloc de recalage ci-dessous : la meme chose
+        raccourcie de 17,33 mm, soit 93,07 mm. Donne +17,1 mm au meme point,
+        donc echouerait le test — qui n'a pas pu etre rejoue, la suite ne
+        collectant plus depuis que le JSON manque.
+
+    Trancher demande une mesure physique, pas une lecture de ce fichier :
+    amener les doigts fermes au contact de la planche, lire `get_angles`, et
+    verifier que `pointe(q)[2]` rend bien 0. Ne pas rejouer le point qui a
+    produit le deport (piege circulaire, cf. BOUCLE_FERMEE 5.3).
+    """
+    brut = os.environ.get('MYCOBOT_TOOL_OFFSET_MM')
+    if brut:
+        return np.array([float(v) for v in brut.split(',')], float)
+    if DEPORT_OUTIL.exists():
+        return np.array(json.loads(DEPORT_OUTIL.read_text())['tool_offset_mm'],
+                        float)
+    return _DeportInconnu()
+
+
+TOOL = charge_deport()
+DEPORT_MESURE = not isinstance(TOOL, _DeportInconnu)
 
 # Pose de prise validee le 20/08 : elle fixe l'orientation de reference et son
 # azimut. Toute cible reprend cette orientation, tournee de l'ecart d'azimut.

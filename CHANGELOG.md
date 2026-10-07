@@ -9,6 +9,91 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — un refus du bridge n'est plus ignoré (23/09)
+
+- `move()` et `grip()` de
+  [`scripts/pick_and_place_vision.py`](scripts/pick_and_place_vision.py)
+  imprimaient la réponse du bridge puis **continuaient quoi qu'elle dise**.
+  Sur `ERROR:`, les étapes suivantes partaient sur une pose que le robot
+  n'avait jamais atteinte et le cycle se déroulait à vide. Elles lèvent
+  désormais une `RuntimeError`.
+- C'est d'autant plus utile que `send_coords` échoue normalement **en
+  silence**, en rendant `OK` (247,8 mm d'erreur mesurés le 20/08) : un
+  `ERROR:` explicite est la seule fois où il dit la vérité, et c'est
+  exactement ce qui était jeté.
+- Les deux tests qui décrivaient ce garde-fou
+  (`test_pick_control_safety.py`, commités le 27/08) étaient **rouges depuis
+  l'origine** — le comportement qu'ils spécifient n'avait jamais été écrit.
+  Ils passent.
+
+### Corrigé — une source unique pour les butées articulaires, et deux URDF qui mentaient (23/09)
+
+- Le dépôt portait **onze déclarations de butées pour trois jeux de valeurs**,
+  jusqu'à **25,3° d'écart sur J2**. [`scripts/diff_ik.py`](scripts/diff_ik.py)
+  les nomme désormais toutes les trois avec leur provenance —
+  `URDF_JOINT_LIMITS_DEG`, `URDF_GAZEBO_JOINT_LIMITS_DEG`,
+  `PRACTICAL_JOINT_LIMITS_DEG` — et dit laquelle fait foi pour ce qui commande
+  le robot : le domaine pratique, seul des trois adossé à une contrainte
+  mesurée plutôt qu'héritée d'un fichier (le firmware refuse J2 hors de ±137°).
+- **Aucune valeur n'a changé.** `sim_sorting_grasp.py` et
+  `calibrate_hand_eye_node.py` recopiaient à l'identique le domaine pratique :
+  ils l'importent maintenant. `precision_benchmark_node.py` conserve
+  l'enveloppe de l'URDF Gazebo, sa provenance étant désormais écrite —
+  l'élargir changerait la distribution des poses d'une campagne de précision,
+  ce qui est à trancher et non à subir.
+- [`tests/test_joint_limits_coherence.py`](tests/test_joint_limits_coherence.py)
+  épingle les trois jeux, vérifie que **chacun des quatre URDF** porte celui
+  qu'il est censé porter, que les copies Python restantes suivent un jeu nommé,
+  et que les deux sites dédoublonnés n'ont pas retranscrit les valeurs. Une
+  douzième table recopiée à la main fait désormais échouer la suite.
+- **L'en-tête de `mycobot_pro_320_pi_gazebo.urdf` et de `..._benchmark.urdf`
+  était faux.** Il annonçait « Joint names, limits and kinematics are identical
+  to `mycobot_pro_320_pi.urdf` » : les limites diffèrent sur les six joints du
+  bras, et la cinématique diffère aussi — `joint5_to_joint4` vaut
+  `0.1205 0 0.082` ici contre `0.12 0 0.09` là, soit **8 mm en Z**.
+- Sur la cinématique, **c'est l'URDF d'origine l'intrus** : `0.1205 / 0.082`
+  est ce qu'implémente `training/dream/mycobot_fk.py`, donc ce avec quoi
+  calculent `diff_ik`, `pick_fsm` et toute la pile DREAM. Un avertissement a
+  été ajouté dans `mycobot_pro_320_pi.urdf`, que `rviz_sync.launch.py`,
+  `slider_control.launch.py` et `marker_follow_full.launch.py` chargent encore.
+
+### Corrigé — la suite de tests ne collectait plus, et deux calibrations d'outil se contredisent (23/09)
+
+- `scripts/tool_offset.json` **n'a jamais été commité** (vérifié sur tout
+  l'historique) alors que `pick_fsm.py:86` le lisait au niveau module.
+  `pick_fsm`, `pick_dashboard` et **cinq fichiers de test sur sept** étaient
+  donc inimportables depuis un clone : `pytest tests/` rendait 5 erreurs de
+  collecte et **0 test exécuté**, là où la doc annonce 95 tests.
+- Le déport passe désormais par `charge_deport()`. Fichier absent →
+  sentinelle `_DeportInconnu` : l'import réussit, mais tout usage géométrique
+  lève un message actionnable. **Ni valeur par défaut, ni repli silencieux** —
+  `garde_au_sol`, `PLANCHER` et `capsules` se calculent tous depuis ce
+  vecteur, donc un déport faux de 17 mm ferait descendre les doigts 17 mm plus
+  bas que ce que le garde-fou croit protéger. Surcharge possible par
+  `MYCOBOT_TOOL_OFFSET_MM` pour un essai hors robot.
+- **Aucune valeur n'est écrite au dépôt, parce que deux calibrations
+  incompatibles y cohabitent.** Le test `test_la_reference_de_l_outil_est_bien_
+  le_bout_des_doigts` (27/08) exige `pointe(q_contact).Z = 0 ± 1 mm` : le
+  déport de 110,4 mm — à 7,73° de l'axe **−X de la bride**, et non +Z — donne
+  **+0,04 mm** et passe ; le recalage du 09/09, qui le raccourcit de 17,33 mm,
+  donne **+17,1 mm** et échouerait. Le recalage a invalidé ce test sans que
+  personne le voie, la suite ne collectant plus depuis que le JSON manque.
+  Trancher demande une mesure physique : doigts fermés au contact de la
+  planche, `get_angles`, vérifier que `pointe(q)[2]` rend bien 0 — sans
+  rejouer le point qui a produit le déport (piège circulaire, cf.
+  `PICK_AND_PLACE_BOUCLE_FERMEE.md` § 5.3).
+- `tests/conftest.py` fige explicitement la géométrie **contre laquelle les
+  tests ont été écrits**, avec l'avertissement de ne pas l'employer sur le
+  robot.
+- Trois tests portaient sur des modules jamais commités
+  (`live_aruco_geometry`, `adaptive_pick_by_demo`, `joint_ik_control` : le
+  commit `281b4950` a ajouté les tests sans le code testé). Passés en
+  `pytest.importorskip` avec la raison écrite plutôt que supprimés — ils
+  encodent une spécification.
+- Résultat : **161 passés, 25 échoués, 3 ignorés** contre 0 exécuté. Les 25
+  échecs sont préexistants et hors de ce lot — dérive d'API entre les tests et
+  `pick_fsm` (`releve_les_doigts` renommé `cale_les_doigts`, signatures à 2
+  contre 3 valeurs).
 ### Ajoute — DREAM en parallele du tri, dashboard DREAM <-> YOLO, fine-tuning scene de tri (05-06/10)
 
 Protocole complet : `docs/PROTOCOLE_YOLO_GAZEBO.md`, etapes 9 a 11.

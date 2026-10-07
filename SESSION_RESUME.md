@@ -1,5 +1,10 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+> **Date de dernière mise à jour :** 5 octobre 2026 (essai des PR #14 et #15 sous Gazebo, analyse du dataset de la PR #15)
+> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
+> **Branche :** `fix/tool-offset-and-test-collection`, issue de `main`
+> **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
+> **Pi réelle :** `10.10.0.221` (pas `.223`/`.225` comme certains anciens docs)
 ## État actuel (6 octobre 2026 — après-midi, fine-tuning DREAM sur la scène de tri)
 
 ### Ce qui a été accompli (05/10 → 06/10)
@@ -223,7 +228,300 @@ ros2 launch mycobot_gateway banc_realiste.launch.py
 ```
 
 
-## État actuel (22 septembre 2026 — mise au propre du dépôt)
+## État actuel (2–5 octobre 2026 — essai des PR #14 et #15 sous Gazebo)
+
+### Ce qui a été accompli aujourd'hui
+
+Essai, interface graphique ouverte, des deux dernières PR fusionnées dans
+`main` (02577857), dans le conteneur `Gazebo_to_LeRobot_Pipeline`
+(`docker/Dockerfile`, transmission graphique WSLg, `--shm-size=2g`). Le
+dépôt de travail n'a pas été touché : `origin/main` est extrait dans
+`~/mycobot_ws/pr_test` (worktree), l'espace monté dans le conteneur est
+`~/mycobot_ws/pr_ws` (tous deux portent un `COLCON_IGNORE`).
+
+**PR #14 (lanceur unique du pick-and-place) : PASS** —
+`motions_ok=True placed_on_plate=True grasp_held=True`, environ 4 min. Deux
+défauts : `ros-jazzy-moveit-py` manque au Dockerfile, et `run_demo.py`
+traduit ce plantage en « no reachable IK solution » ; Ctrl+C sur le lancement
+graphique laisse Gazebo tourner (`ros2 launch` tue l'orchestrateur à 10 s,
+avant son nettoyage de 15 s + pkill).
+
+**PR #15 (tri de quatre objets) : 0 / 4, trois séries, dont une propre**
+(épisodes 1, 16, 31, 46 — un par objet ; `RUNNING.md` propose 1 à 4, qui
+sont tous le cube rouge). Résultat déterministe, poses finales identiques à
+quelques mm près d'une série à l'autre. Causes mesurées :
+- l'attache simulée ne fait rien : `/htgspp/attach` n'a aucun abonné, le
+  `DetachableJoint` n'est que dans `models/*.sdf`, jamais chargés ; les
+  métadonnées affichent pourtant `simulated_attachment: true` et
+  `grasp_held: true` partout ;
+- `episode.sh` n'appelle jamais `spawn_scene.py` : objets toujours à leur
+  pose du monde, 44 des 60 lignes de la matrice et toutes les positions de
+  distracteurs ne sont jamais appliquées ;
+- le bac rouge chevauche le bleu (85 × 25 mm) et le vert (65 × 15 mm) ; sa
+  paroi traverse le bac bleu, et c'est contre elle que le cube bleu reste
+  penché (z = 37 mm, au-dessus du bord de 30 mm) ;
+- `episode.sh` tue `ros2 launch` en `kill -9` : un `robot_state_publisher`
+  et deux `parameter_bridge` (dont `/clock`) restent orphelins à chaque
+  épisode. Ce n'est pas la cause des échecs (la série propre donne le même
+  résultat) ;
+- postures : butées respectées sur les 360 waypoints (domaine pratique et
+  URDF Gazebo, tous coude haut), mais les objets à 10 cm de l'axe replient
+  le bras jusqu'à mettre le coude derrière la base, sans contrôle
+  d'auto-collision ;
+- lenteur : RTF 0,11–0,18 avec l'interface graphique (cinq caméras à 10 Hz),
+  pas un défaut de commande.
+
+**Dataset de la PR #15 : vide (aucun PASS), et inexploitable en l'état même
+avec des PASS** (conversion de diagnostic de l'épisode 16 hors dataset) :
+`action` est une copie de `observation.state` sur 100 % des images ; la
+colonne `timestamp` (185,7 s, temps mural) contredit la vidéo (139 images à
+30 fps = 4,6 s) et la durée simulée (27 s) ; ~5 images/s en temps simulé ;
+le `resize: [224, 224]` du contrat n'est pas appliqué (vidéo 1280 × 960) ;
+~500 Mo par épisode.
+
+Constats publiés en commentaires sur les PR #14 et #15 (le commentaire de la
+#15 a été corrigé : le cube bleu n'est pas lâché hors du bac).
+
+### Décisions prises
+
+- Ne rien corriger dans le code des PR : les constats vont à leur auteur.
+- Le conteneur `gazebo_to_lerobot` reste en place pour réessayer après un
+  correctif.
+
+### Prochaines actions
+1. [ROUGE] Attendre le correctif de la PR #15 (attache, `spawn_scene`,
+   bacs), puis relancer les épisodes 1 / 16 / 31 / 46 avec nettoyage complet
+   entre chaque.
+2. [JAUNE] Faire corriger le dataset avant tout lot de 60 épisodes :
+   `action[t] = state[t+1]` au minimum, horodatage en temps simulé
+   cohérent avec le fps, redimensionnement du contrat.
+3. [VERT] Ajouter `ros-jazzy-moveit-py`, `ffmpeg` et `pyarrow` au Dockerfile
+   du pipeline.
+
+### Commande rapide de reprise
+```bash
+docker start gazebo_to_lerobot
+docker exec -it gazebo_to_lerobot bash
+# dans le conteneur :
+cd /workspace/htgspp && bash scripts/episode_gui.sh 16     # copie d'episode.sh, headless:=false
+cd /workspace/htgpp  && ros2 launch launch/pick_and_place_demo.launch.py
+```
+
+---
+
+## État précédent (23 septembre 2026 — inventaire avant le `workspace_safety_checker`)
+
+### Ce qui a été accompli aujourd'hui
+
+Inventaire demandé avant d'écrire un `workspace_safety_checker` (limites
+articulaires, enveloppe, garde au sol, zones interdites, support caméra, bacs,
+orientation pince, auto-collisions). Il a buté sur des bloquants qu'il a fallu
+lever d'abord.
+
+**Le banc réel ne démarrait pas depuis un clone.** `scripts/tool_offset.json`
+n'a **jamais été commité** et `pick_fsm.py` le lisait au niveau module :
+`pytest tests/` rendait 5 erreurs de collecte et **0 test exécuté**, là où la
+doc annonce 95. Le déport passe maintenant par `charge_deport()` avec une
+sentinelle — l'import réussit, tout usage géométrique lève.
+
+**Deux calibrations d'outil incompatibles cohabitent, et c'est non résolu.**
+Le test de contact du 27/08 exige `pointe(q_contact).Z = 0 ± 1 mm` : le déport
+de 110,4 mm (7,73° de l'axe **−X** de la bride, pas +Z) donne +0,04 mm ; le
+recalage du 09/09 qui le raccourcit de 17,33 mm donne **+17,1 mm**. Le recalage
+a invalidé ce test sans que personne le voie, la suite ne collectant plus.
+
+**Onze déclarations de butées pour trois jeux de valeurs**, jusqu'à 25,3° sur
+J2. Nommées dans `diff_ik.py`, dédoublonnées côté commande sans changer une
+seule valeur, et verrouillées par `tests/test_joint_limits_coherence.py`.
+
+**L'en-tête de deux URDF était faux** sur les limites *et* sur la cinématique.
+`joint5_to_joint4` diffère de 8 mm en Z, et c'est l'URDF d'origine l'intrus —
+`mycobot_fk.py`, donc `diff_ik`, `pick_fsm` et DREAM, utilisent la valeur des
+autres. Trois launch chargent pourtant l'intrus.
+
+**Un refus du bridge n'est plus ignoré** dans `pick_and_place_vision.py`.
+
+Suite de tests : **171 passés, 23 échoués, 3 ignorés** contre 0 exécuté.
+
+### Décisions prises
+
+1. **Aucune valeur de déport n'est écrite au dépôt** tant qu'une mesure
+   physique n'a pas tranché. Ni valeur par défaut, ni repli silencieux : un
+   déport faux de 17 mm ferait descendre les doigts 17 mm sous ce que
+   `garde_au_sol` croit protéger.
+2. **Le domaine pratique fait foi pour ce qui commande le robot** — seul des
+   trois jeux adossé à une contrainte mesurée (firmware, J2 ±137°).
+3. **`precision_benchmark_node` garde l'enveloppe URDF Gazebo.** L'élargir
+   changerait la distribution des poses d'une campagne de précision.
+4. Les trois tests portant sur des modules jamais commités sont **ignorés avec
+   leur raison**, pas supprimés : ils encodent une spécification.
+
+### Prochaines actions
+
+1. [ROUGE] **Mesurer le déport d'outil** : doigts fermés au contact de la
+   planche, `get_angles`, vérifier que `pointe(q)[2]` rend 0 — sans rejouer le
+   point qui a produit le déport (piège circulaire, BOUCLE_FERMEE § 5.3).
+   Tout le reste du `workspace_safety_checker` en dépend.
+2. [ROUGE] **Relever la géométrie des obstacles** : le support caméra n'est
+   modélisé nulle part (`table_camera` de `real_table.sdf` est un capteur sans
+   volume de collision), et `workspace_markers.yaml` est périmé de **12,9 à
+   28,1 mm** selon le marqueur depuis que la planche a bougé le 10/09. Sans ce
+   relevé, les contrôles « zones interdites » et « distance au support caméra »
+   ne peuvent pas être écrits.
+3. [JAUNE] **Résorber la dérive d'API** des 23 tests rouges restants
+   (`releve_les_doigts` renommé `cale_les_doigts`, signatures à 2 contre 3
+   valeurs).
+4. [JAUNE] Trancher si `rviz_sync`, `slider_control` et `marker_follow_full`
+   doivent passer à l'URDF Gazebo.
+5. [VERT] Écrire le `workspace_safety_checker` lui-même, une fois 1 et 2 faits.
+6. [JAUNE] **Trancher sur la PR #14** : poster ou non le commentaire de revue
+   rédigé ci-dessous, et décider du sort de
+   `fix/pr14-process-scope-and-paths` (proposer à l'auteur, ou laisser la PR
+   être mergée telle quelle). Voir « Le second fil de la séance ».
+
+### Où on en est, concrètement
+
+Travail sur la branche **`fix/tool-offset-and-test-collection`**, issue de
+`main`, quatre commits, **non poussée**. Elle a été créée parce que la séance
+avait démarré sur `main` et qu'un `checkout` vers
+`fix/pr14-process-scope-and-paths` est intervenu en cours de route ; cette
+branche-là porte le commit `7a4ff756`, issu du second fil décrit plus bas ;
+aucun fichier n'est commun aux deux.
+
+⚠ Ses `.claude/rules/` exigent un trailer `Co-Authored-By`, à rebours de
+`CLAUDE.md` sur `main`. C'est `CLAUDE.md` qui a été suivi : aucun commit de
+cette séance ne porte d'attribution.
+
+### Le second fil de la séance — la PR #14
+
+Revue de la **PR #14** de `citdemond`, *« Add a single-entry-point demo launch
+file for the pick-and-place POC »*, **ouverte et non mergée**. Elle remplace
+les sept étapes manuelles de `episode.sh` par une commande, via
+`scripts/run_demo.py` et deux launch files, dans
+`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/`.
+
+Ce qu'elle apporte tient. Les quatre bugs qu'elle corrige sont réels, et
+`attach_mode` déclaré en argument de lancement met la limite — le bloc est
+porté par une soudure `DetachableJoint`, pas par une prise — sous les yeux de
+qui lance la démo, au lieu de l'enterrer dans un rapport.
+
+**Le défaut bloquant était le nettoyage de processus.** `run_demo.py` tuait par
+motif nu (`gz sim`, `parameter_bridge`, `robot_state_publisher`, `move_group`),
+au démarrage **et** à l'arrêt. Dans le conteneur c'est sans risque : il possède
+son espace de processus. Sur la PC Tour, non — treize launch files de
+`mycobot_gateway/launch/` lancent ces mêmes exécutables, dont
+`sim_grasp.launch.py` et le tableau de bord multicam. Lancer la démo pendant
+qu'un de ces bancs tourne le tuait, silencieusement.
+
+Quatre corrections sur **`fix/pr14-process-scope-and-paths`** (`7a4ff756`),
+branchée sur la tête de la PR, **non poussée** :
+
+1. Chaque fils est lancé dans sa propre session et signalé **par groupe** : le
+   démontage n'a plus besoin de la liste de motifs. Mesuré — un SIGKILL sur le
+   seul PID du parent laisse un petit-fils vivant, le même signal au groupe
+   n'en laisse aucun. Le balayage de démarrage passe derrière un argument
+   `reap_stale`, **défaut `false`** : il liste ce qui gêne et s'arrête.
+   `matching_pids()` exclut sa propre ascendance, `pgrep -f` comparant la ligne
+   de commande entière — c'est ce piège qui donnait `LAUNCH_EXIT=143`.
+2. Trois chemins `/workspace` codés en dur, dont `controller.yaml`, qui porte
+   le rattrapage de la course perdue au démarrage à froid.
+3. `exit_code` vaut 1 jusqu'à preuve du contraire. Un run tué se déclarait en
+   succès, contre un contrat qui dit « 0 = posé sur l'assiette et tenu ».
+4. Les docstrings annonçaient `ros2 launch <fichier>.launch.py` ; ce dossier
+   n'a ni `package.xml`, ni `CMakeLists.txt`, ni `setup.py`.
+
+⚠ **Rien n'a tourné de bout en bout** — il y faut le conteneur, Gazebo et
+MoveIt. Vérifié hors ligne seulement : les deux launch files chargent et
+déclarent `reap_stale`, le refus d'`attach_mode` sort toujours en 2, la
+détection refuse et **épargne** un leurre, `reap_stale:=true` en tue un, et le
+démontage par groupe atteint le petit-fils.
+
+**Aucune entrée CHANGELOG** pour ces corrections : elles portent sur du code
+non mergé, absent de `main`.
+
+#### Le commentaire de revue, rédigé et non posté
+
+> Solid work — the four bugs are real and the comments earn their keep, and
+> putting `attach_mode` in the launch arguments is the right call: nobody can
+> watch this demo and mistake the weld for a grasp.
+>
+> Four things I'd change before merge, proposed as a branch off your head
+> (`fix/pr14-process-scope-and-paths`):
+>
+> 1. `pkill_stale()` kills by bare command-line pattern, at startup *and* at
+>    teardown. Safe in the container; on the workstation, thirteen launch files
+>    under `mycobot_gateway/launch/` run `robot_state_publisher` /
+>    `parameter_bridge` — including `sim_grasp.launch.py` and the multicam
+>    dashboard. The branch spawns each child in its own session and signals by
+>    process group instead (measured: PID-only SIGKILL leaves a grandchild
+>    alive, group SIGKILL doesn't), and gates the startup sweep behind a new
+>    `reap_stale` argument, default false.
+> 2. `/workspace/install/.../controller.yaml` is load-bearing in the respawn
+>    fallback and pins the demo to one machine; same for
+>    `sys.path.insert("/workspace/htgpp")` in `precompute_ik.py`.
+> 3. `exit_code` defaulted to 0, so a killed run reported success against the
+>    headless file's own "0 = placed and held" contract.
+> 4. `ros2 launch pick_and_place_demo.launch.py` only resolves from inside
+>    `launch/` — this folder has no `package.xml`.
+>
+> Two questions rather than changes: could the report land as Markdown? Two
+> `.docx` are invisible to `git diff`, and the repo asks for explicit approval
+> on binary workbooks for that reason. And this adds two launch files, a script
+> and five arguments with no `CHANGELOG.md` / `INDEX.md` entry — the repo
+> convention is same-commit.
+
+Il n'a **pas** été posté : publier sur la PR d'un tiers est une action
+sortante, et `gh` n'est pas installé ici (il faudrait passer par l'API avec le
+token). À poster tel quel, ou à recomposer.
+
+### Commande rapide de reprise
+
+```bash
+conda deactivate
+cd ~/mycobot_ws/src/mycobot_320pi_R6A
+/usr/bin/python3 -m pytest tests/ -q        # 171 passés, 23 échoués, 3 ignorés
+```
+
+**Le tableau de bord ne démarre plus sans déport d'outil** — c'est voulu. Pour
+travailler hors robot en attendant la mesure :
+
+```bash
+MYCOBOT_TOOL_OFFSET_MM='-109.395,-8.9,11.9' /usr/bin/python3 scripts/pick_dashboard.py
+```
+
+Cette valeur est celle du **27/08**, celle contre laquelle les tests ont été
+écrits. **Ce n'est pas une mesure** : ne pas s'en servir pour saisir.
+
+### [ROUGE] La mesure du déport, pas à pas
+
+Tout le `workspace_safety_checker` en dépend, et une seule pose ne suffit pas :
+elle donne une équation pour trois inconnues, et la valider sur elle-même est
+le piège circulaire de BOUCLE_FERMEE § 5.3.
+
+1. Pince **fermée**, amener les doigts au contact de la planche. Relever `q`
+   par `get_angles`.
+2. Recommencer sur **au moins quatre azimuts nettement différents** — c'est ce
+   qui sépare la longueur de la direction.
+3. Résoudre au sens des moindres carrés, pour chaque pose :
+   `p_bride(q)[2] + R_bride(q)[2, :] @ TOOL = 0`
+   (`pose_bride` est dans `pick_fsm.py`). **Garder une pose de côté** pour la
+   validation, jamais une de celles qui ont produit le déport.
+4. Écrire le résultat et vérifier :
+
+```bash
+echo '{"tool_offset_mm": [x, y, z]}' > scripts/tool_offset.json
+/usr/bin/python3 -m pytest tests/ -q -k reference_de_l_outil
+```
+
+Attendu : `pointe(q_contact).Z = 0 ± 1 mm`. Si la mesure confirme le recalage
+du 09/09 (93,07 mm) plutôt que le 27/08 (110,4 mm), **c'est le test qu'il faut
+mettre à jour**, pas la mesure — et il faudra alors revoir avec lui les
+hauteurs décalées de +16,9 mm au même moment, `pick_fsm.py:96` prévenant
+qu'elles vont ensemble.
+
+---
+
+## État précédent (22 septembre 2026 — mise au propre du dépôt)
 
 ### Ce qui a été accompli aujourd'hui
 
