@@ -1,0 +1,88 @@
+!!omap
+- data_path: dream_data/mix_synth50k_real3camx5_ndds
+- manipulator: !!omap
+  - name: mycobot320
+  - keypoints:
+    - name: mycobot320_base
+      friendly_name: Base
+      ros_frame: base
+    - name: mycobot320_link1
+      friendly_name: Joint1
+      ros_frame: link1
+    - name: mycobot320_link2
+      friendly_name: Joint2
+      ros_frame: link2
+    - name: mycobot320_link3
+      friendly_name: Joint3
+      ros_frame: link3
+    - name: mycobot320_link4
+      friendly_name: Joint4
+      ros_frame: link4
+    - name: mycobot320_link5
+      friendly_name: Joint5
+      ros_frame: link5
+    - name: mycobot320_link6
+      friendly_name: EndEffector
+      ros_frame: link6
+- architecture: !!omap
+  - type: vgg
+  - target: belief_maps
+  - input_heads:
+    - image_rgb
+  - output_heads:
+    - belief_maps
+  - image_normalization: !!omap
+    - mean:
+      - 0.5
+      - 0.5
+      - 0.5
+    - stdev:
+      - 0.5
+      - 0.5
+      - 0.5
+  - loss: !!omap
+    - type: mse
+  - image_preprocessing: shrink-and-crop
+- training: !!omap
+  - config: !!omap
+    - epochs: 30
+    - training_data_fraction: 0.8
+    - validation_data_fraction: 0.1
+    - batch_size: 8
+    - data_augmentation: !!omap
+      - image_rgb: true
+    - worker_size: 8
+    - optimizer: !!omap
+      - type: adam
+      - learning_rate: 0.0001
+    - image_preprocessing: shrink-and-crop
+    - image_raw_resolution:
+      - 640
+      - 480
+    - net_input_resolution:
+      - 400
+      - 400
+    - keypoint_weights:
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.5
+      - 1.5
+      - 6.0
+    - net_output_resolution:
+      - 100
+      - 100
+  - platform: !!omap
+    - user: genji
+    - hostname: genji-HP-Z2-Tower-G9-Workstation-Desktop-PC
+    - gpu_ids:
+      - 0
+  - results: !!omap
+    - epochs_trained: 27
+    - training_loss: !!omap
+      - mean: 0.0009177806514617259
+      - stdev: 0.00024761574487497796
+    - validation_loss: !!omap
+      - mean: 0.0009417470213666093
+      - stdev: 0.00024591379670751696
