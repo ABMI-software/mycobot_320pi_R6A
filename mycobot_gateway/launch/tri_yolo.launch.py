@@ -13,7 +13,8 @@ Protocol: docs/PROTOCOLE_YOLO_GAZEBO.md.
 
 dream:=true (protocol step 10) runs DREAM on the same four images, one
 dream_inference per camera (/dream_front, /dream_right, /dream_left, /dream_top),
-and, with log_dir, dream_fk_compare writes dream_vs_fk.csv and dream_pose.csv.
+and, with log_dir, dream_fk_compare writes dream_vs_fk.csv and dream_pose.csv, and the
+dashboard (dashboard:=true) writes dream_vs_yolo.csv, one row per grasp.
 
 log_dir (protocol step 11): run.yaml (seed, scene, cameras, masses, commit,
 yolo26 weights) and yolo_vs_gt.csv. Pass the same folder to sim_sorting_grasp
@@ -102,7 +103,8 @@ def dream_nodes(seed, log_dir, model, rate, dashboard, gazebo_window, cams):
     if dashboard:
         nodes.append(Node(package='mycobot_gateway', executable='tri_dream_dashboard',
                           output='screen', parameters=[{'use_sim_time': True,
-                                                        'embed_gazebo': gazebo_window}]))
+                                                        'embed_gazebo': gazebo_window,
+                                                        'log_dir': str(log_dir or '')}]))
     if gazebo_window:
         nodes.append(Node(package='mycobot_gateway', executable='tri_trajectoires_gazebo',
                           output='screen', parameters=[{'use_sim_time': True}]))

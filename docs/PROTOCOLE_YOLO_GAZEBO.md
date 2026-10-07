@@ -1360,9 +1360,133 @@ keypoints sur 167, avec une médiane de 6,6 à 20,9 px.
 **atteints dans la scène de tri**, puisque la rotation médiane est de 1,6 et 2,6°. Ils ne le sont
 **pas sur toutes les vues**, où le maximum atteint 8,4°.
 
-**Non mesuré** : l'écart DREAM ↔ YOLO par saisie. Il n'est affiché que dans le tableau du
-dashboard et n'est écrit dans aucun CSV, et les captures automatiques ont saisi une autre fenêtre.
-Pour l'avoir, il faut relancer le run et relever le tableau, ou journaliser ce tableau.
+**DREAM ↔ YOLO par saisie** : le dashboard l'écrit maintenant dans `<log_dir>/dream_vs_yolo.csv`,
+une ligne par saisie. Le fichier est réécrit à chaque changement, parce que les poses DREAM arrivent
+environ 1 s après leur image. Colonnes :
+
+- objet ;
+- position YOLO ;
+- pointe DREAM en x, y, z ;
+- écarts XY DREAM ↔ YOLO et codeurs ↔ YOLO ;
+- nombre de vues DREAM ;
+- fenêtre d'immobilité ;
+- verdict.
+
+Graine 7, second run (`…_tri_mix_ft_e10_b/`) : 4/4, et DREAM ↔ YOLO = 7,4 / 14,9 / 9,4 / 8,8 mm. Avec
+l'ancien modèle, le cube rouge était à 44,5 mm. Codeurs ↔ YOLO : 1,6-2,7 mm. Tmax 91 °C, lu une seule fois.
+
+### Campagne 10 graines avec `vgg_tri_mix_ft_e10` (06/10)
+
+Réglages identiques à la graine 7 :
+
+- caméras front et right ;
+- 1 Hz ;
+- dashboard ;
+- `piece_reach:=0.28`, `max_attempts:=2`.
+
+Graines 1 à 10, de 18:26 à 19:54. Résultats dans `results/yolo_gazebo/2026-10-06_campagne10_tri_mix_ft_e10/seed_N/`.
+
+Garde thermique :
+
+- départ sous 60 °C ;
+- arrêt à 90 °C confirmé, ou après 5 lectures ≥ 88 °C ;
+- Gazebo sur les cœurs 16-19.
+
+Aucun arrêt. Tmax de 77 à 89 °C, 89 °C sur la graine 6.
+
+| graine | tri | Tmax | DREAM ↔ YOLO par saisie (mm) | codeurs ↔ YOLO médian |
+|---|---|---|---|---|
+| 1 | 4/4 | 77 °C | 9,2 · 4,4 · 8,0 · 8,9 | 2,2 mm |
+| 2 | 4/4 | 77 °C | 3,5 · 12,9 · 4,3 · 3,7 | 2,2 mm |
+| 3 | 4/4 | 79 °C | 11,3 · 7,5 · 12,2 · 9,4 | 2,0 mm |
+| 4 | 4/4 | 78 °C | 6,9 · 10,8 · 7,8 · 14,7 | 1,7 mm |
+| 5 | 4/4 | 84 °C | 9,2 · 10,1 · 12,5 · 3,4 | 2,3 mm |
+| 6 | 4/4 | 89 °C | 12,2 · 3,9 · 10,0 · 1,6 | 2,0 mm |
+| 7 | 4/4 | 79 °C | 7,4 · 14,7 · 6,0 · 8,8 | 2,4 mm |
+| 8 | 4/4 | 78 °C | 2,1 · 11,1 · 5,9 · 2,1 | 2,6 mm |
+| 9 | 4/4 | 79 °C | 8,3 · 4,9 · 3,7 · 10,5 | 2,1 mm |
+| 10 | 4/4 | 79 °C | 4,1 · 3,4 · 19,7 · 12,2 | 2,5 mm |
+
+L'ordre des saisies est cube rouge, pavé jaune, cylindre vert, cube bleu.
+
+- **Tri** : 40/40.
+- **DREAM ↔ YOLO** : 40 saisies sur 40 mesurées. Médiane **8,2 mm**, p90 12,5 mm, max 19,7 mm. Le
+  05/10, avec l'ancien modèle, l'écart allait de 10 à 315 mm. Par objet, les médianes vont de 7,9 à
+  8,9 mm, donc l'écart ne dépend pas de la pièce.
+- **Codeurs ↔ YOLO** : médiane 2,2 mm, p90 2,9 mm. DREAM ajoute donc environ 6 mm à la chaîne codeurs.
+- **T_DREAM**, médiane (p90) :
+  - front : 8,3 (18,2) mm, 1,8 (4,4)°, sur 859 poses ;
+  - right : 12,9 (21,1) mm, 2,6 (5,3)°, sur 853 poses.
+- **Keypoints contre la FK** :
+  - front : 99,4 % (5 977 / 6 013), 2,8 px médian, 3,4 px p90 ;
+  - right : 100 % (5 971 / 5 971), 3,1 px médian, 3,8 px p90.
+
+Les chiffres de la graine 7 se retrouvent sur les 10 graines. Le critère de rotation < 5° tient en
+médiane, et au p90 pour la caméra front ; il ne tient pas au p90 pour la caméra right, à 5,3°.
+Bilan : `scripts/bilan_campagne_dream_tri.py`.
+
+### Test réel hors échantillon : impossible avec les données existantes (06/10)
+
+Contrôle par md5 du contenu des images, et non par leur nom :
+
+| jeu | images | en commun avec `real_3cam_train_x5_ndds` (5 988 uniques) | utilisable ? |
+|---|---|---|---|
+| `real_3cam_val_ndds` | 1 498 uniques | 8 | non : mêmes sessions de capture que l'entraînement |
+| `real_3cam_session6_ndds` | 298 uniques | 0 | non : vérité terrain cassée (contrôle du 07/09 : points sur la plante et le bureau) |
+| `real_3cam_gripper` | — | — | non : angles articulaires seuls, aucun keypoint de vérité |
+
+Le chiffre réel du tableau d'évaluation (88,5 %) vient donc de la même distribution que
+l'entraînement. Il ne prouve pas que le modèle généralise au réel. Pour l'avoir, il faut une nouvelle
+capture sur le robot, avec une vérité terrain contrôlée.
+
+### Observabilité J1-J6 depuis les keypoints (06/10)
+
+Question : DREAM permet-il de retrouver les angles J1-J6 à partir des keypoints, avec les caméras
+connues ? Les caméras sont celles de la simulation, donc il n'y a pas d'erreur d'extrinsèque.
+
+Données : 206 images de la campagne. Une image est retenue si elle est vue par front et right, avec
+au moins 4 keypoints sur chaque vue.
+
+Ajustement :
+
+- moindres carrés sur la reprojection, sans a priori ni rappel vers les codeurs ;
+- départ « froid » : 6 départs (zéro et 5 tirés au hasard dans les butées) ;
+- départ « oracle » : sur le q vrai, ce qui ne mesure que la précision locale.
+
+Trois sources de keypoints :
+
+- les détections DREAM ;
+- la projection FK avec un bruit de 3 px ;
+- la projection FK exacte.
+
+Médiane (p90) de |q estimé − q vrai|, en degrés, départ froid :
+
+| keypoints | vues | J1 | J2 | J3 | J4 | J5 | J6 |
+|---|---|---|---|---|---|---|---|
+| DREAM | front seule | 1,6 (78) | 1,4 (31) | 3,6 (141) | 7,6 (73) | 5,7 (164) | 85 (162) |
+| DREAM | right seule | 1,7 (7,4) | 1,2 (3,1) | 1,3 (3,6) | 2,6 (7,9) | 6,6 (168) | 99 (163) |
+| DREAM | **front + right** | **0,4 (1,3)** | **0,6 (1,1)** | **1,2 (2,4)** | **1,8 (3,4)** | **1,6 (5,4)** | 87 (163) |
+| FK + 3 px | front + right | 0,8 (1,7) | 0,7 (1,9) | 1,6 (4,3) | 2,8 (7,1) | 4,0 (8,4) | 89 (163) |
+| FK exacte | front seule | 0,0 (91) | 0,0 (44) | 0,0 (152) | 0,0 (71) | 0,0 (168) | 91 (165) |
+| FK exacte | front + right | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 | 91 (163) |
+
+Lecture :
+
+- **J6 n'est pas observable** avec le schéma à 7 keypoints, même avec des keypoints parfaits : 91°
+  d'erreur médiane, soit une valeur au hasard. Depuis le départ oracle, J6 ne bouge pas (0,0°), parce
+  que la reprojection ne dépend pas de J6. Aucun réentraînement ne corrige cela. Il faut un keypoint
+  en aval de J6 (pince ou bride).
+- **J4** : avec 2 vues, 1,8° médian et 3,4° au p90. Avec la caméra front seule, 7,6° médian et 73°
+  au p90. J4 devient donc observable avec 2 vues.
+- **Une vue seule** : le départ froid tombe sur une autre solution qui se reprojette aussi bien. Le
+  p90 sur J1-J5 atteint 31-168° avec la caméra front, même avec la FK exacte (0 px d'erreur). C'est
+  l'ambiguïté monoculaire déjà mesurée sur le banc réel le 15/07. Elle vient de la géométrie, pas de
+  DREAM.
+- **Avec 2 vues**, DREAM fait au moins aussi bien que la FK + 3 px, alors que son erreur image est
+  d'environ 3 px. L'objectif de 0,5-0,9° est atteint sur J1 et J2, pas sur J3-J5 (1,2 à 1,8° médian).
+
+Script : `training/dream/observabilite_multivue.py` (une graine par processus, puis `--fusion`). Il a été lancé sur les cœurs E
+24-27. Un premier lancement sur 10 cœurs a été coupé par la garde thermique à 90 °C.
 
 ## Étape 11 : journalisation CSV (05/10)
 
@@ -1431,4 +1555,5 @@ taux de détection, ne garder que les lignes en pose d'observation.
 | 05/10/2026 | 10 — dashboard YOLO + DREAM | fait, **à valider** | `dashboard:=true` → `tri_dream_dashboard` ; T_DREAM contre T_GT, trajectoire de la bride, dXYZ, rotation, latence ; PnP de `dream_inference` sur les angles de l'instant de l'image |
 | 05/10/2026 | 10 — dashboard v2 DREAM ↔ YOLO, une seule fenêtre | fait, **à valider** | Gazebo reparenté dans la case 3D du dashboard (`embed_gazebo`) ; trajectoires colorées par objet + DREAM dans Gazebo ; pointe = `tool_tip` du trieur (codeurs ↔ YOLO 1,8-2,8 mm) ; `dream_cameras:=front,right` : 4/4 à 88 °C ; écart DREAM ↔ YOLO 10-315 mm, dû à T_DREAM (rotation 27-32°, profondeur 29-43 mm, keypoints 7-37 px) |
 | 05-06/10/2026 | 10 — fine-tuning DREAM scène de tri | fait | `synthetic_data_collector_tri` : 12 080 images train (1001-1016) + 1 200 test (2001-2003), Tmax 84 °C ; v4_mix sur le test : 52,6 % / 16,7 px ; `v5_geo` depuis v4_mix sur 104 160 images, 10 époques → `vgg_tri_mix_ft_e10` |
-| 06/10/2026 | 10 — évaluation de `vgg_tri_mix_ft_e10` | fait, **à valider** | test tri 2001-2003 : 53,6 → 99,7 %, 15,4 → 3,0 px ; réel 87,6 → 88,5 %, 2,43 → 3,18 px ; 50K inchangé (99,4 %) ; graine 7 front + right : 4/4, rotation de T_DREAM 32,1 / 26,5° → 1,6 / 2,6°, translation 36,8 / 46,1 → 8,4 / 12,2 mm, keypoints 17,5 / 12,3 → 2,8 / 3,0 px ; DREAM ↔ YOLO par saisie non relevé |
+| 06/10/2026 | 10 — évaluation de `vgg_tri_mix_ft_e10` | fait, **à valider** | test tri 2001-2003 : 53,6 → 99,7 %, 15,4 → 3,0 px ; réel 87,6 → 88,5 %, 2,43 → 3,18 px ; 50K inchangé (99,4 %) ; graine 7 front + right : 4/4, rotation de T_DREAM 32,1 / 26,5° → 1,6 / 2,6°, translation 36,8 / 46,1 → 8,4 / 12,2 mm, keypoints 17,5 / 12,3 → 2,8 / 3,0 px ; DREAM ↔ YOLO par saisie relevé ensuite (ligne suivante) |
+| 06/10/2026 | 10 — campagne 10 graines avec `vgg_tri_mix_ft_e10` | fait, **à valider** | **40/40**, aucun arrêt thermique, Tmax 89 °C ; `dream_vs_yolo.csv` par saisie : DREAM ↔ YOLO médiane **8,2 mm**, p90 12,5, max 19,7 (05/10 : 10-315 mm) ; codeurs ↔ YOLO 2,2 mm ; T_DREAM front 8,3 mm / 1,8°, right 12,9 mm / 2,6° ; keypoints 99,4 / 100 %, 2,8 / 3,1 px ; observabilité (206 images) : 2 vues J1-J5 0,4-1,8° médian, J6 non observable (91° même en FK exacte), 1 vue ambiguë ; test réel hors échantillon impossible (md5 : val partage les sessions, session6 vérité cassée) |

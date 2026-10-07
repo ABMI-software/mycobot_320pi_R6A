@@ -36,6 +36,18 @@ Protocole complet : `docs/PROTOCOLE_YOLO_GAZEBO.md`, etapes 9 a 11.
   fine-tuning, consommation mesuree par configuration, et cause des pics a
   90-100 °C : un seul coeur P au turbo. Entrainement sur les coeurs E 16-27 :
   74 °C au lieu de 85-100, vitesse inchangee.
+- **`vgg_tri_mix_ft_e10` dans le tri (06/10)** : campagne 10 graines 40/40,
+  DREAM <-> YOLO par saisie median 8,2 mm (p90 12,5 ; 05/10 : 10-315 mm),
+  T_DREAM 1,8 / 2,6 deg de rotation, keypoints 99,4 / 100 % a 2,8 / 3,1 px.
+- **`dream_vs_yolo.csv`** : avec `log_dir`, `tri_dream_dashboard` ecrit une
+  ligne par saisie (position YOLO, pointe DREAM, ecarts DREAM et codeurs a
+  YOLO, vues, fenetre d'immobilite, verdict).
+- **`training/dream/observabilite_multivue.py`** : J1-J6 retrouves depuis les
+  keypoints, 1 ou 2 vues, contre la FK exacte et FK + 3 px ; `--fusion` reunit
+  des runs par graine. 2 vues : J1-J5 0,4-1,8 deg median ; J6 non observable
+  avec 7 keypoints.
+- **`scripts/bilan_campagne_dream_tri.py`** : bilan d'une campagne de tri
+  avec DREAM (tri, DREAM <-> YOLO, T_DREAM, keypoints).
 
 
 ### Ajoute — tri des 4 pieces dans Gazebo pilote par yolo26 sur 4 cameras (29/09-02/10)

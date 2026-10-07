@@ -15,9 +15,13 @@ dream_fk_compare and yolo_gt_overlay):
     window; the gripper paths are drawn in Gazebo by tri_trajectoires_gazebo).
 
     ros2 launch mycobot_gateway tri_yolo.launch.py dream:=true dashboard:=true
+
+With log_dir, the per-grasp table is also written to <log_dir>/dream_vs_yolo.csv
+(rewritten whenever a row changes: DREAM poses arrive ~1 s after their image).
 """
 
 from collections import deque
+import csv
 import os
 import re
 from pathlib import Path
@@ -152,6 +156,9 @@ class DashboardNode(Node):
         self.grasps = []
         self.target = None
         self.yolo = None
+        log_dir = self.declare_parameter('log_dir', '').value
+        self.grasp_csv = Path(log_dir) / 'dream_vs_yolo.csv' if log_dir else None
+        self.written_rows = None
         self.create_subscription(JointState, '/joint_states', self.joints.add, 50)
         self.create_subscription(String, '/pickplace/status', self.on_status, 50)
         self.create_subscription(Detection3DArray, '/yolo/objects_3d',
@@ -205,6 +212,33 @@ class DashboardNode(Node):
                 if g['name'] == verdict.group(1):
                     g['verdict'] = 'OK' if verdict.group(2).startswith('OK') else verdict.group(2)
                     break
+
+    def update_grasps(self):
+        # DREAM poses arrive ~1 s after their image: recomputed at each call.
+        for g in self.grasps:
+            if None not in g['still']:
+                g['dream'], g['views'] = self.tips.between(*g['still'])
+                g['dream_mm'] = (np.nan if g['dream'] is None
+                                 else np.linalg.norm(g['dream'][:2] - g['yolo']) * 1000)
+        if self.grasp_csv is not None:
+            self.write_grasps()
+
+    def write_grasps(self):
+        rows = [[g['name'], *(f'{v * 1000:.1f}' for v in g['yolo']),
+                 *(('', '', '') if g['dream'] is None else (f'{v * 1000:.1f}' for v in g['dream'])),
+                 '' if np.isnan(g['dream_mm']) else f"{g['dream_mm']:.1f}",
+                 '' if np.isnan(g['encoder_mm']) else f"{g['encoder_mm']:.1f}",
+                 g['views'], *('' if t is None else f'{t:.3f}' for t in g['still']), g['verdict']]
+                for g in self.grasps]
+        if rows == self.written_rows:
+            return
+        with open(self.grasp_csv, 'w', newline='') as fh:
+            w = csv.writer(fh)
+            w.writerow(['object', 'yolo_x_mm', 'yolo_y_mm', 'dream_x_mm', 'dream_y_mm', 'dream_z_mm',
+                        'dream_yolo_xy_mm', 'encoder_yolo_xy_mm', 'dream_views',
+                        'still_from_s', 'still_to_s', 'verdict'])
+            w.writerows(rows)
+        self.written_rows = rows
 
     def on_keypoints(self, cam, msg):
         self.tips.keypoints(cam, msg)
@@ -339,13 +373,9 @@ class DashboardWindow(QWidget):
             self.latency.setText(f'DREAM, latence médiane : inférence {np.median(n.inference_ms):.0f} ms, '
                                  f'image → pose {np.median(n.latency_ms):.0f} ms')
 
+        n.update_grasps()
         self.grasp_table.setRowCount(len(n.grasps))
         for i, g in enumerate(n.grasps):
-            # DREAM poses arrive ~1 s after their image: recomputed at each redraw.
-            if None not in g['still']:
-                g['dream'], g['views'] = n.tips.between(*g['still'])
-                g['dream_mm'] = (np.nan if g['dream'] is None
-                                 else np.linalg.norm(g['dream'][:2] - g['yolo']) * 1000)
             dream = '—' if g['dream'] is None else ', '.join(f'{v * 1000:.0f}' for v in g['dream'])
             cells = (g['name'], ', '.join(f'{v * 1000:.0f}' for v in g['yolo']), dream,
                      '—' if np.isnan(g['dream_mm']) else f"{g['dream_mm']:.1f}",

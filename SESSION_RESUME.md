@@ -1,5 +1,57 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (7 octobre 2026 — matin, DREAM fine-tuné validé dans le tri en simulation)
+
+### Ce qui a été accompli (06/10 soir → 07/10)
+
+Les 4 points restants sur `vgg_tri_mix_ft_e10`, en simulation :
+
+1. **DREAM ↔ YOLO par saisie** : le dashboard l'écrit maintenant dans
+   `dream_vs_yolo.csv`. Mesuré sur 40 saisies : médiane **8,2 mm**, p90
+   12,5 mm, max 19,7 mm. Le 05/10, avec l'ancien modèle : 10-315 mm.
+   Codeurs ↔ YOLO : 2,2 mm.
+2. **10 graines** : tri **40/40**, aucun arrêt thermique, Tmax 89 °C.
+   T_DREAM : front 8,3 mm / 1,8°, right 12,9 mm / 2,6°. Keypoints
+   99,4 / 100 %, à 2,8 / 3,1 px.
+3. **Test réel hors échantillon** : impossible avec les données existantes.
+   Contrôle par md5 :
+   - `real_3cam_val` partage les sessions de capture de l'entraînement ;
+   - `session6` a une vérité terrain cassée ;
+   - `real_3cam_gripper` n'a pas de keypoints.
+4. **Observabilité** (206 images, 2 vues) : J1-J5 entre 0,4 et 1,8° médian.
+   **J6 n'est pas observable** avec 7 keypoints : 91°, même en FK exacte.
+   Avec une vue seule, le calcul tombe sur une autre solution qui se
+   reprojette aussi bien, même en FK exacte.
+
+Détail : `docs/PROTOCOLE_YOLO_GAZEBO.md`, § « Campagne 10 graines avec
+`vgg_tri_mix_ft_e10` » et suivants.
+
+### Décisions prises
+
+- Analyses CPU longues : 4 cœurs E au plus. Sur 10 cœurs, le processeur
+  est monté à 90 °C (garde déclenchée).
+- `real_3cam_val` n'est plus présenté comme un test réel indépendant.
+
+### Prochaines actions
+
+1. [ROUGE] Valider ou refuser l'étape 10 avec `vgg_tri_mix_ft_e10`, à
+   partir des chiffres de la campagne.
+2. [JAUNE] Pour un test réel indépendant : une nouvelle capture sur le
+   robot, avec vérité terrain contrôlée.
+3. [JAUNE] Pour J6 : un keypoint en aval de J6 (bride ou pince) dans le
+   schéma DREAM.
+4. [VERT] PR #18 → `main` (tri Gazebo graine 1 et `pytest` sur la branche
+   fusionnée).
+
+### Commande rapide de reprise
+
+```bash
+ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1 piece_reach:=0.28 dream:=true \
+    dashboard:=true dream_cameras:=front,right dream_model:=vgg_tri_mix_ft_e10 \
+    log_dir:=results/yolo_gazebo/<nouveau_dossier>
+```
+
+
 ## État actuel (6 octobre 2026 — après-midi, fine-tuning DREAM sur la scène de tri)
 
 ### Ce qui a été accompli (05/10 → 06/10)
