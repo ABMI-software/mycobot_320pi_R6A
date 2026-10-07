@@ -115,13 +115,15 @@ Pour la dernière ligne : la carte graphique était à **99 %**, à **122 W** su
 
 Méthode « en escalier » : on ajoute les composants un par un, via `tri_yolo.launch.py` (`seed:=3 piece_reach:=0.28 observe:=false panel:=false dream_model:=vgg_tri_mix_ft_e10 dream_rate:=1.0`), tout épinglé `taskset -c 16-19`. Chaque marche : 30 s de démarrage, puis 60 s de mesure, avec un relevé toutes les 2 s. CPU par processus lu dans `/proc/<pid>/stat` sur l'arbre du launch, GPU via `nvidia-smi`, température via `sensors`. Départ à 52-60 °C, arrêt à 88 °C. 100 % = 1 cœur logique.
 
-| Marche | Gazebo | DREAM | YOLO | ROS autres | Total CPU | GPU | Tmax Package |
+| Marche | Gazebo | DREAM | YOLO | ROS autres | Charge CPU totale (100 % = 1 cœur ; max. 400 %) | GPU | Tmax Package |
 |---|---|---|---|---|---|---|---|
-| 1. Gazebo sans fenêtre (`headless:=true`) | 120 % | — | — | 10 % | **133 %** | 11 %, 7,5 W, 1,0 Go | **70 °C** |
-| 2. + fenêtre Gazebo | 162 % | — | — | 10 % | **176 %** | 25 %, 23 W, 1,5 Go | **77 °C** |
-| 3. + 1 DREAM (`dream_cameras:=top`) | 124 % | 12 % | — | 24 % | **163 %** | 31 W, 2,1 Go | **77 °C** |
-| 4. + 4 DREAM | 114 % | 47 % | — | 24 % | **188 %** | 31 W, 3,3 Go | **75 °C** |
-| 5. + YOLO | 154 % | 47 % | 23 % | 24 % | **251 %** | 35 W, 3,8 Go | **82 °C** |
+| 1. Gazebo sans fenêtre (`headless:=true`) | 120 % | — | — | 10 % | **133 %** (33 % des 4 cœurs) | 11 %, 7,5 W, 1,0 Go | **70 °C** |
+| 2. + fenêtre Gazebo | 162 % | — | — | 10 % | **176 %** (44 % des 4 cœurs) | 25 %, 23 W, 1,5 Go | **77 °C** |
+| 3. + 1 DREAM (`dream_cameras:=top`) | 124 % | 12 % | — | 24 % | **163 %** (41 % des 4 cœurs) | 31 W, 2,1 Go | **77 °C** |
+| 4. + 4 DREAM | 114 % | 47 % | — | 24 % | **188 %** (47 % des 4 cœurs) | 31 W, 3,3 Go | **75 °C** |
+| 5. + YOLO | 154 % | 47 % | 23 % | 24 % | **251 %** (63 % des 4 cœurs) | 35 W, 3,8 Go | **82 °C** |
+
+Lecture, marche 1 : Gazebo 120 % (1,2 cœur) + programmes ROS autour 13 % (les 10 % de la colonne + 3 % de nœuds `tri_yolo`, voir ci-dessous) = 133 %, soit 1,33 cœur, environ un tiers des 400 % autorisés par l'épinglage sur 4 cœurs.
 
 La colonne YOLO soustrait ~3 % présents dès la marche 1 : ce sont des nœuds ROS dont la ligne de commande contient `tri_yolo`, pas YOLO.
 
