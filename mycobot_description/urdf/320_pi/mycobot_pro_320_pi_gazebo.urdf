@@ -6,8 +6,22 @@
   - <inertial> tags on every link  (required by Gazebo physics)
   - <gazebo> colour hints
   
-  Joint names, limits and kinematics are identical to
-  mycobot_pro_320_pi.urdf.
+  Joint NAMES are identical to mycobot_pro_320_pi.urdf. Limits and
+  kinematics are NOT. The previous wording of this comment claimed they
+  were, and it was wrong on both counts:
+
+  - Joint limits differ on all six arm joints. The widest gap is J2:
+    +/-159.9 deg there against +/-134.6 deg here, i.e. 25.3 deg apart.
+    scripts/diff_ik.py names the three limit sets this repository carries;
+    tests/test_joint_limits_coherence.py pins every copy of them.
+  - joint5_to_joint4 sits at xyz="0.1205 0 0.082" here against
+    xyz="0.12 0 0.09" there, i.e. 8 mm in Z and 0.5 mm in X.
+
+  On the kinematics, THIS file is the one to trust. Its forearm offset is
+  what training/dream/mycobot_fk.py implements, and that FK is what
+  scripts/diff_ik.py, scripts/pick_fsm.py and the whole DREAM stack compute
+  with. mycobot_pro_320_pi.urdf is the outlier, and rviz_sync,
+  slider_control and marker_follow_full still load it.
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mycobot_320_pi">
 

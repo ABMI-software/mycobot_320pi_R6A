@@ -1,4 +1,22 @@
 <?xml version="1.0"?>
+<!--
+  MyCobot 320 Pi, original vendor URDF.
+
+  WARNING. This file disagrees with the rest of the repository on two
+  points, and it is the odd one out on both:
+
+  - joint5_to_joint4 is at xyz="0.12 0 0.09". Every other model
+    (_gazebo, _benchmark, new_..._moveit) and training/dream/mycobot_fk.py
+    use xyz="0.1205 0 0.082", i.e. 8 mm apart in Z. Anything computed from
+    mycobot_fk (diff_ik, pick_fsm, DREAM) therefore describes a slightly
+    different arm than this file draws.
+  - Its joint limits are the widest of the three sets in the repository
+    (J2 +/-159.9 deg). See scripts/diff_ik.py.
+
+  Loaded by rviz_sync.launch.py, slider_control.launch.py and
+  marker_follow_full.launch.py. Kept as the vendor reference; prefer
+  mycobot_pro_320_pi_gazebo.urdf for anything measured.
+-->
 <robot  xmlns:xacro="http://www.ros.org/wiki/xacro" name="firefighter" >
 	
 <xacro:property name="width" value=".2" />
