@@ -209,7 +209,8 @@ def launch_scene(context):
                 'robot_model_suffix': ROBOTS[LaunchConfiguration('robot').perform(context)],
                 'gui_config': gui_config,
             }.items()),
-    ] + (sorting_nodes(seed, run_yaml, csv_path, panel) if sorting else []) + [
+    ] + (sorting_nodes(seed, run_yaml, csv_path, panel) if sorting else []) + (
+        randomize_nodes(context, seed, run_yaml) if sorting and pieces else []) + [
         TimerAction(period=12.0, condition=IfCondition(LaunchConfiguration('observe')), actions=[
             LogInfo(msg=f'observation pose {tri_scene.OBSERVATION_Q_DEG} deg'),
             ExecuteProcess(cmd=['ros2', 'topic', 'pub', '--once', '-w', '1',
@@ -217,6 +218,18 @@ def launch_scene(context):
                                 'trajectory_msgs/msg/JointTrajectory', trajectory],
                            output='screen')]),
     ]
+
+
+def randomize_nodes(context, seed, run_yaml):
+    """Step 2: redraw pieces and bins without restarting Gazebo, button with the GUI."""
+    nodes = [Node(package='mycobot_gateway', executable='tri_scene_randomizer', output='screen',
+                  parameters=[{'use_sim_time': True, 'world_name': WORLD_NAME, 'seed': seed,
+                               'piece_reach': float(LaunchConfiguration('piece_reach').perform(context)),
+                               'run_yaml': run_yaml}])]
+    if (LaunchConfiguration('randomize_panel').perform(context) == 'true'
+            and LaunchConfiguration('headless').perform(context) != 'true'):
+        nodes.append(Node(package='mycobot_gateway', executable='tri_scene_panel', output='screen'))
+    return nodes
 
 
 def sorting_nodes(seed, run_yaml, csv_path, panel):
@@ -229,6 +242,7 @@ def sorting_nodes(seed, run_yaml, csv_path, panel):
         # own (no fusion, protocol step 7).
         Node(package='mycobot_gateway', executable='yolo_gazebo_node', output='screen',
              condition=IfCondition(LaunchConfiguration('yolo')),
+             additional_env={'YOLO26_BOITES_PRECISES': LaunchConfiguration('yolo_exact_boxes')},
              parameters=[{'use_sim_time': True, 'cameras': list(CAMERAS), 'run_yaml': run_yaml}]),
         Node(package='mycobot_gateway', executable='yolo_localizer', output='screen',
              condition=IfCondition(LaunchConfiguration('yolo')),
@@ -272,6 +286,11 @@ def generate_launch_description():
         DeclareLaunchArgument('robot', default_value='robot_yolo_pickplace', choices=list(ROBOTS),
                               description='robot_dream_baseline = no gripper, for the DREAM '
                                           'non-regression (protocol 2.1, step 10)'),
+        DeclareLaunchArgument('yolo_exact_boxes', default_value='1', choices=['0', '1'],
+                              description='1 = yolo26 box corners not truncated to integers '
+                                          '(the truncation costs -0.5 px; the real bench keeps it)'),
+        DeclareLaunchArgument('randomize_panel', default_value='true', choices=['true', 'false'],
+                              description='Button window for /tri_scene/randomize (step 2), with the GUI'),
         DeclareLaunchArgument('dream', default_value='false', choices=['true', 'false'],
                               description='DREAM on the four cameras (protocol step 10)'),
         DeclareLaunchArgument('dream_model', default_value='vgg_ultimate_v4_mix_ft_e30',

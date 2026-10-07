@@ -9,6 +9,27 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — Randomiser sans relancer Gazebo, coins YOLO exacts, etape 10 validee (07/10)
+
+Protocole : `docs/PROTOCOLE_YOLO_GAZEBO.md`, fin de l'etape 10 et sections du 07/10.
+
+- **`tri_scene_randomizer`** : service `/tri_scene/randomize` (Trigger). Bras
+  en pose d'observation, puis 4 pieces et 4 bacs replaces sur un nouveau
+  tirage `[seed, k]`, consigne dans `run.yaml`. **`tri_scene_panel`** : le
+  bouton, lance avec la fenetre Gazebo (`randomize_panel:=false` pour le
+  retirer). Tri apres tirage : 4/4 au premier essai.
+- **`yolo_exact_boxes:=1`** (defaut de `tri_yolo.launch.py`) :
+  `yolo26_service.py` garde les coins des boites sans les tronquer quand
+  `YOLO26_BOITES_PRECISES=1`. La troncature causait le -0,5 px mesure le
+  01/10. Erreur 3D mediane 1,4-2,1 -> 0,13-0,57 mm (graines 1-2 ; borne basse
+  en monde parfait, pas une precision attendue au reel). Sans la
+  variable, rien ne change : le banc reel garde son comportement.
+- **Etape 10 validee en simulation** : non-regression de la pince avec
+  `vgg_tri_mix_ft_e10`, 98,7 -> 99,2 % et 3,0 -> 3,0 px (v4_mix : 65,2 ->
+  49,5 %). Reserves : rotation T_DREAM 5,3 deg au p90 (camera droite), J6 non
+  observable, une vue seule ambigue, aucun test reel hors echantillon.
+- **Charge du PC par composant** : `docs/DONNEES_ET_CONSOMMATION.md`.
+
 ### Ajoute — DREAM en parallele du tri, dashboard DREAM <-> YOLO, fine-tuning scene de tri (05-06/10)
 
 Protocole complet : `docs/PROTOCOLE_YOLO_GAZEBO.md`, etapes 9 a 11.
