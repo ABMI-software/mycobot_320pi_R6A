@@ -1,6 +1,90 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-## État actuel (7 octobre 2026 — après-midi, étape 10 validée en simulation)
+## État actuel (8 octobre 2026 — YOLO + DREAM sous Gazebo sur un poste WSL2, simulation ×5)
+
+### Ce qui a été accompli aujourd'hui
+
+**Le tri YOLO + DREAM d'Osama (PR #18, #19, #21) tourne sur un poste WSL2 neuf**
+(laptop, GPU NVIDIA T1200 4 Go). Graine 7, `dream:=true dashboard:=true`,
+`vgg_tri_mix_ft_e10` sur front + right : **4/4 triés au premier essai** sur la
+seule perception YOLO, keypoints DREAM publiés sur GPU.
+
+Ce qu'il a fallu pour y arriver :
+- **Deux défauts du code fusionné**, corrigés sur `fix/tri-yolo-launch`
+  (`88c2e4c6`, non poussé) : `_pythonpath_venv_dream()` appelée par
+  `tri_yolo.launch.py` mais définie nulle part (`dream:=true` plantait partout) ;
+  liste imbriquée dans `PathJoinSubstitution` de `sim_grasp.launch.py`, refusée
+  par `ros-jazzy-launch` 3.4.4 (tout lancement plantait avant Gazebo).
+- **Environnement local** : `~/mycobot_ws/venv_dream` (torch CUDA, `ultralytics`
+  8.3.227, PyQt5, dépendances DREAM, `numpy<2` pour `cv_bridge`), `~/DREAM`
+  (NVlabs), `python3-pyqtgraph`, lien `.venv` → `venv_dream` (exclu de git).
+- `mycobot_gateway/setup.py` installe `glob('scripts/*')` : un `__pycache__`
+  dans `scripts/` casse le build. Non corrigé.
+
+**La simulation était lente pour deux raisons, mesurées :**
+1. Rendu sur le processeur (`llvmpipe`) faute de variables D3D12 : RTF 0,002.
+   Avec D3D12 sur l'iGPU Intel : 0,06 ; sur la NVIDIA : 0,14. Les variables
+   sont dans `~/.bashrc`, gardées par un test WSL.
+2. **Les collisions du robot reprenaient les DAE d'affichage** : 52 000 à
+   243 000 faces par lien, 1,1 million au total. Les caméras ne pèsent presque
+   rien (0,158 → 0,174 sans elles). Retirer ces collisions : 0,17 → 0,96.
+
+**Collisions allégées** (`feature/gazebo-collisions-legeres`, issue de
+`fix/tri-yolo-launch`) : enveloppe extérieure de chaque DAE (voxelisée,
+marching cubes, décimée à 3 000 faces), même repère. Matière ajoutée p99
+≤ 1,8 mm sur le bras, ≤ 0,62 mm sur les doigts (pas de 0,5 mm). RTF 0,17 → 0,73
+sans interface, 0,14 → 0,62 avec.
+
+**Validation du tri avec les collisions allégées** — partielle :
+
+| Essai | Résultat | Durée |
+|---|---|---|
+| Graines 1 à 4, sans interface, YOLO seul | **16/16, tous au 1er essai** | 235-269 s par graine |
+| Graine 7, interface + YOLO + DREAM + dashboard | **4/4 au 1er essai**, dépose 0 à 14 mm du centre | **4 min 34 s** (22 min 14 s avant) |
+| Graines 5 à 10 | **pas encore faites** (campagne mise en pause pour la démo) | — |
+
+Référence d'Osama avec les DAE complets : 40/40 sur les graines 1-10.
+
+**5 tests échouent déjà sur `main`**, sans rapport avec ces changements
+(vérifié en mettant les changements de côté) : `test_joint_limits_coherence`
+(2), `test_cameras_dream50k` (2), `test_dream_fk_compare` (1) — butées et
+caméras du dernier merge. Et `pytest tests/` ne collecte rien :
+`test_adaptive_pick_by_demo.py` fait un `skip` au niveau module.
+
+### Décisions prises
+
+- Pas d'enveloppe convexe ni de décimation directe des DAE : la première double
+  le volume de link1, la seconde s'en écarte de 15 mm (soupes CAO de centaines
+  à milliers de fragments).
+- Les variables D3D12 restent hors du dépôt : elles casseraient le rendu sur
+  une machine Linux native.
+- `…_nogripper.urdf` (référence DREAM, invariant I7) non touché.
+
+### Prochaines actions
+1. [ROUGE] Finir la campagne : graines 5 à 10 avec les collisions allégées,
+   puis PR (à valider avec Osama : modification du modèle physique).
+2. [ROUGE] Pousser `fix/tri-yolo-launch` et ouvrir sa PR (les deux défauts de
+   lancement bloquent tout poste autre que celui d'Osama).
+3. [JAUNE] Réparer les 5 tests en échec sur `main` et la collecte de `tests/`.
+4. [VERT] `setup.py` : exclure `__pycache__` de `glob('scripts/*')`.
+
+### Commande rapide de reprise
+```bash
+conda deactivate
+cd ~/mycobot_ws && colcon build --base-paths src --packages-select mycobot_description mycobot_gateway --symlink-install
+source install/setup.bash && cd src/mycobot_320pi_R6A
+export VENV_DREAM=~/mycobot_ws/venv_dream      # D3D12/NVIDIA déjà dans ~/.bashrc
+# démo complète (terminal 1)
+ros2 launch mycobot_gateway tri_yolo.launch.py seed:=7 piece_reach:=0.28 dream:=true \
+    dashboard:=true dream_rate:=1.0 dream_cameras:=front,right panel:=false dream_model:=vgg_tri_mix_ft_e10
+# tri (terminal 2)
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true \
+    -p world_name:=tri_yolo -p pose_source:=perception -p max_attempts:=2
+```
+
+---
+
+## État précédent (7 octobre 2026 — après-midi, étape 10 validée en simulation)
 
 ### Ce qui a été accompli aujourd'hui
 
