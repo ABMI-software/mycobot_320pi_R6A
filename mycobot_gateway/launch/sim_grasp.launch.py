@@ -46,9 +46,8 @@ def generate_launch_description():
 
     # nogripper = the 50K DREAM render, file used as is (protocol I7); its
     # cameras are the dream50k ones and it has no xacro arguments.
-    urdf_path = PathJoinSubstitution([
-        desc_pkg, 'urdf', '320_pi',
-        ['mycobot_pro_320_pi_gazebo', LaunchConfiguration('robot_model_suffix'), '.urdf']])
+    urdf_path = [os.path.join(desc_pkg, 'urdf', '320_pi', 'mycobot_pro_320_pi_gazebo'),
+                 LaunchConfiguration('robot_model_suffix'), '.urdf']
     world_name = LaunchConfiguration('world_name')
     # Concatenation a plat : selon la version de launch, PathJoinSubstitution
     # rejette la liste imbriquee que '<world_name>.sdf' impose.
@@ -93,7 +92,7 @@ def generate_launch_description():
     headless = LaunchConfiguration('headless')
 
     robot_description = ParameterValue(
-        Command(['xacro ', urdf_path, ' robot_appearance:=',
+        Command(['xacro ', *urdf_path, ' robot_appearance:=',
                  LaunchConfiguration('robot_appearance'), ' gripper_mass_kg:=',
                  LaunchConfiguration('gripper_mass_kg'), ' enable_cameras:=',
                  LaunchConfiguration('enable_cameras'), ' camera_layout:=',
