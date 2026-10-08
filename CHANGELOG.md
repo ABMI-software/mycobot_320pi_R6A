@@ -9,6 +9,32 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifie — Collisions du robot Gazebo allegees : simulation ~4x plus rapide (08/10)
+
+- **`mycobot_pro_320_pi_gazebo.urdf`** : les 14 blocs `<collision>` chargent
+  `urdf/{320_pi,pro_adaptive_gripper}/collision/*.stl` (3 000 faces chacun) au
+  lieu des DAE d'affichage (52 000 a 243 000 faces par lien, 1,1 million au
+  total). Affichage, origines, masses, inerties et `…_nogripper.urdf`
+  (reference DREAM) inchanges. Facteur temps reel de la scene de tri, GPU
+  NVIDIA : 0,17 -> 0,73 sans interface, 0,14 -> 0,62 avec.
+- **`scripts/simplify_collision_meshes.py`** : enveloppe exterieure de chaque DAE
+  (voxelisee et remplie, marching cubes, decimee), dans son repere et ses unites.
+  Matiere ajoutee p99 <= 1,8 mm sur le bras, <= 0,62 mm sur les doigts (pas de
+  0,5 mm : 2,5 mm de jeu par cote a la saisie) ; echoue au-dela de 2 mm.
+
+### Corrige — `tri_yolo.launch.py` ne demarrait pas hors du poste d'origine (08/10)
+
+- **`dream:=true` plantait toujours** : `tri_yolo.launch.py` appelle
+  `_pythonpath_venv_dream()` dans `dream_multicam.launch.py`, qui ne la
+  definissait pas. Elle prepend les `site-packages` de `VENV_DREAM` (defaut
+  `~/ros_jazzy/venv_dream`) au `PYTHONPATH` des noeuds DREAM, et echoue en
+  nommant le chemin cherche s'il est absent.
+- **`sim_grasp.launch.py` plantait avant d'ouvrir Gazebo** avec
+  `ros-jazzy-launch` 3.4.4 : `PathJoinSubstitution` y recevait une liste
+  imbriquee, que cette version refuse. Le chemin de l'URDF est concatene a plat,
+  comme celui du monde l'etait deja. Touche tous les lancements qui passent par
+  `sim_grasp.launch.py`.
+
 ### Ajoute — Dashboard YOLO / DREAM / Gazebo et modeles publies (07/10)
 
 - **`tri_dream_dashboard`** : verite terrain Gazebo (`/validation/gt/objects`)

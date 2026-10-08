@@ -139,7 +139,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/320_pi/base.dae"/>
+        <mesh filename="package://mycobot_description/urdf/320_pi/collision/base.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="0.0 0 0" rpy="0 0 3.1415926"/>
     </collision>
@@ -159,7 +159,7 @@
     <xacro:robot_joint_collar link="link1" xyz="0 0 -0.0770" radius="0.03754"/>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/320_pi/link1.dae"/>
+        <mesh filename="package://mycobot_description/urdf/320_pi/collision/link1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="0.115 -0.172 -0.09" rpy="0 0 3.1415926"/>
     </collision>
@@ -177,7 +177,7 @@
     <xacro:robot_joint_collar link="link2" xyz="0.0008 0 0.0482" radius="0.03779"/>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/320_pi/link2.dae"/>
+        <mesh filename="package://mycobot_description/urdf/320_pi/collision/link2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="-0.075 -0.115 -0.022" rpy="1.5708 0 1.5708"/>
     </collision>
@@ -195,7 +195,7 @@
     <xacro:robot_joint_collar link="link3" xyz="-0.0002 0 0.0430" radius="0.03404"/>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/320_pi/link3.dae"/>
+        <mesh filename="package://mycobot_description/urdf/320_pi/collision/link3.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="-0.22 -0.115 0.142" rpy="1.5708 0 1.5708"/>
     </collision>
@@ -213,7 +213,7 @@
     <xacro:robot_joint_collar link="link4" xyz="0 0.0012 -0.0483" radius="0.02914"/>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/320_pi/link4.dae"/>
+        <mesh filename="package://mycobot_description/urdf/320_pi/collision/link4.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="-0.115 0.338 -0.1435" rpy="1.5708 0 0"/>
     </collision>
@@ -231,7 +231,7 @@
     <xacro:robot_joint_collar link="link5" xyz="0.0001 0.00078 -0.0490" radius="0.02914"/>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/320_pi/link5.dae"/>
+        <mesh filename="package://mycobot_description/urdf/320_pi/collision/link5.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="-0.1149 -0.0322 -0.482" rpy="0 0 0"/>
     </collision>
@@ -249,7 +249,7 @@
     <xacro:robot_joint_collar link="link6" xyz="0.000105 -0.000204 -0.0104" radius="0.02914"/>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/320_pi/link6_2022.dae"/>
+        <mesh filename="package://mycobot_description/urdf/320_pi/collision/link6_2022.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="0.0 0.0 -0.0115" rpy="1.5708 1.5708 0"/>
     </collision>
@@ -267,7 +267,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_base.dae"/>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/collision/gripper_base.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="-0.02 0.012 -0.018" rpy="1.5708 0 1.5708"/>
     </collision>
@@ -284,7 +284,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left1.dae"/>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/collision/gripper_left1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="0.048 -0.035 -0.003" rpy="1.5708 0 1.5708"/>
     </collision>
@@ -301,7 +301,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left2.dae"/>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/collision/gripper_left2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="0.026 0.022 -0.018" rpy="1.5708 0 1.5708"/>
     </collision>
@@ -318,7 +318,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_left3.dae"/>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/collision/gripper_left3.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="0.0 0.0 -0.018" rpy="1.5708 0 1.5708"/>
     </collision>
@@ -335,7 +335,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right1.dae"/>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/collision/gripper_right1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="-0.086 -0.036 -0.003" rpy="1.5708 0 1.5708"/>
     </collision>
@@ -352,7 +352,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right2.dae"/>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/collision/gripper_right2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="-0.062 0.0224 -0.018" rpy="1.5708 0 1.5708"/>
     </collision>
@@ -369,7 +369,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/gripper_right3.dae"/>
+        <mesh filename="package://mycobot_description/urdf/pro_adaptive_gripper/collision/gripper_right3.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <origin xyz="-0.034 0.0 -0.018" rpy="1.5708 0 1.5708"/>
     </collision>

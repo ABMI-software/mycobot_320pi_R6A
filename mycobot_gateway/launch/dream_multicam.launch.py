@@ -29,6 +29,19 @@ from launch_ros.actions import Node
 
 from mycobot_gateway.vision.camera_registry import detect_cameras
 
+import os
+from pathlib import Path
+
+
+def _pythonpath_venv_dream():
+    # torch lives in venv_dream, rclpy in the system Python: the DREAM node runs under
+    # the system interpreter with venv_dream's site-packages prepended.
+    venv = Path(os.environ.get('VENV_DREAM', Path.home() / 'ros_jazzy' / 'venv_dream'))
+    site = sorted(venv.glob('lib/python3*/site-packages'))
+    if not site:
+        raise RuntimeError(f'venv_dream introuvable : {venv} (définir VENV_DREAM)')
+    return os.pathsep.join([str(site[0]), os.environ.get('PYTHONPATH', '')]).rstrip(os.pathsep)
+
 
 def generate_launch_description():
     model_name_arg = DeclareLaunchArgument(

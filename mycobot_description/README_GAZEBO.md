@@ -221,10 +221,44 @@ ros2 launch mycobot_description gazebo_sim.launch.py
 ros2 launch mycobot_description gazebo_sim.launch.py rviz:=true
 ```
 
+## Collisions allégées et vitesse de simulation
+
+Les `<collision>` de `mycobot_pro_320_pi_gazebo.urdf` chargent
+`urdf/320_pi/collision/*.stl` et `urdf/pro_adaptive_gripper/collision/*.stl`
+(3 000 faces chacun), pas les DAE d'affichage : ceux-ci font 52 000 à 243 000
+faces par lien, qu'ODE testait à chaque pas de 1 ms. Les STL sont l'enveloppe
+extérieure de chaque DAE, dans son repère et en millimètres (d'où
+`scale="0.001 0.001 0.001"`) ; ils se régénèrent par
+`python3 scripts/simplify_collision_meshes.py` (venv avec `trimesh`,
+`pycollada`, `fast-simplification`, `rtree`, `scikit-image`), qui échoue si la
+matière ajoutée dépasse 2 mm au 99e centile. `…_nogripper.urdf`, référence DREAM,
+n'est pas concerné.
+
+Facteur temps réel mesuré, scène `tri_yolo` en pose d'observation (08/10, WSL2,
+GPU NVIDIA T1200) :
+
+| Configuration | DAE complets | Collisions allégées |
+|---|---|---|
+| Sans interface (`headless:=true`) | 0,17 | 0,73 |
+| Avec interface | 0,14 | 0,62 |
+
+**Sous WSL2, faire rendre Gazebo par le GPU** — sans ces variables, Mesa rend
+sur le processeur (`llvmpipe`) et la scène tombe à ~0,002x :
+
+```bash
+export GALLIUM_DRIVER=d3d12 MESA_LOADER_DRIVER_OVERRIDE=d3d12
+export MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA   # sinon D3D12 prend l'iGPU Intel : ~2x plus lent
+```
+
+Le périphérique effectivement utilisé est écrit dans `~/.gz/rendering/ogre2.log`
+(`Device Name`). Ces variables sont propres à WSL : ne pas les mettre dans un
+fichier de lancement.
+
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
+| Simulation très lente sous WSL2 (RTF ≪ 0,1) | `grep "Device Name" ~/.gz/rendering/ogre2.log` : si `llvmpipe` ou `Intel`, exporter les variables D3D12 ci-dessus |
 | `[gz] [Err] Unable to find file …` | Rebuild: `colcon build --packages-select mycobot_description --symlink-install` |
 | Gazebo opens but robot is invisible | Check `GZ_SIM_RESOURCE_PATH` includes the install share path |
 | Robot falls through the ground | Make sure `mycobot_pro_320_pi_gazebo.urdf` is used (has `world` fixed joint) |
