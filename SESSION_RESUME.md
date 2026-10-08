@@ -35,13 +35,12 @@ marching cubes, décimée à 3 000 faces), même repère. Matière ajoutée p99
 ≤ 1,8 mm sur le bras, ≤ 0,62 mm sur les doigts (pas de 0,5 mm). RTF 0,17 → 0,73
 sans interface, 0,14 → 0,62 avec.
 
-**Validation du tri avec les collisions allégées** — partielle :
+**Validation du tri avec les collisions allégées** — complète :
 
 | Essai | Résultat | Durée |
 |---|---|---|
-| Graines 1 à 4, sans interface, YOLO seul | **16/16, tous au 1er essai** | 235-269 s par graine |
+| Graines 1 à 10, sans interface, YOLO seul | **40/40, tous au 1er essai** ; dépose à 7,1 mm médian du centre du bac (max 16,1) | 235-300 s par graine |
 | Graine 7, interface + YOLO + DREAM + dashboard | **4/4 au 1er essai**, dépose 0 à 14 mm du centre | **4 min 34 s** (22 min 14 s avant) |
-| Graines 5 à 10 | **pas encore faites** (campagne mise en pause pour la démo) | — |
 
 Référence d'Osama avec les DAE complets : 40/40 sur les graines 1-10.
 
@@ -61,10 +60,10 @@ caméras du dernier merge. Et `pytest tests/` ne collecte rien :
 - `…_nogripper.urdf` (référence DREAM, invariant I7) non touché.
 
 ### Prochaines actions
-1. [ROUGE] Finir la campagne : graines 5 à 10 avec les collisions allégées,
-   puis PR (à valider avec Osama : modification du modèle physique).
-2. [ROUGE] Pousser `fix/tri-yolo-launch` et ouvrir sa PR (les deux défauts de
-   lancement bloquent tout poste autre que celui d'Osama).
+1. [ROUGE] Faire valider PR #23 par Osama (modification du modèle physique ;
+   40/40 mesuré, égal à sa référence). Après fusion de #22, rebasculer #23 sur `main`.
+2. [ROUGE] Faire fusionner PR #22 (`fix/tri-yolo-launch`) : les deux défauts de
+   lancement bloquent tout poste autre que celui d'Osama.
 3. [JAUNE] Réparer les 5 tests en échec sur `main` et la collecte de `tests/`.
 4. [VERT] `setup.py` : exclure `__pycache__` de `glob('scripts/*')`.
 
