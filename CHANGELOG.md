@@ -9,6 +9,19 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrige — `tri_yolo.launch.py` ne demarrait pas hors du poste d'origine (08/10)
+
+- **`dream:=true` plantait toujours** : `tri_yolo.launch.py` appelle
+  `_pythonpath_venv_dream()` dans `dream_multicam.launch.py`, qui ne la
+  definissait pas. Elle prepend les `site-packages` de `VENV_DREAM` (defaut
+  `~/ros_jazzy/venv_dream`) au `PYTHONPATH` des noeuds DREAM, et echoue en
+  nommant le chemin cherche s'il est absent.
+- **`sim_grasp.launch.py` plantait avant d'ouvrir Gazebo** avec
+  `ros-jazzy-launch` 3.4.4 : `PathJoinSubstitution` y recevait une liste
+  imbriquee, que cette version refuse. Le chemin de l'URDF est concatene a plat,
+  comme celui du monde l'etait deja. Touche tous les lancements qui passent par
+  `sim_grasp.launch.py`.
+
 ### Ajoute — Dashboard YOLO / DREAM / Gazebo et modeles publies (07/10)
 
 - **`tri_dream_dashboard`** : verite terrain Gazebo (`/validation/gt/objects`)
