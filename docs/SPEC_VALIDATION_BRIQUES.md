@@ -2,7 +2,8 @@
 
 *Cadre d'évaluation comparative. Première instanciation : l'estimation de pose
 sans marqueur, DREAM contre RoboPEPP, sur le pick-and-place — d'abord en
-simulation, puis sur le banc de Lyon.*
+simulation, puis sur banc physique (Lyon pour DREAM et la baseline, Nanterre
+pour RoboPEPP).*
 
 > **Statut :** proposition, à relire par l'équipe. Rien de ce document n'est
 > implémenté. Les faits cités sont tirés du dépôt et référencés ; les
@@ -79,7 +80,7 @@ flowchart LR
         GT["gz_sim_localizer<br/>verite terrain Gazebo<br/>(reference)"]
         AR["aruco_localizer<br/>PnP 4 ArUco<br/>(sortant)"]
         DR["dream_localizer<br/>T_cam-base par DREAM<br/>(candidat, a ecrire)"]
-        RP["pepp_localizer<br/>RoboPEPP<br/>(evaluation en cours, hors depot)"]
+        RP["pepp_localizer<br/>RoboPEPP<br/>(evaluation Nanterre,<br/>depot Nanterre_R6A_Robopepp)"]
     end
     SRC -->|"/aruco/object_pose<br/>/aruco/workspace_valid"| PP
 
@@ -240,29 +241,49 @@ Aucune ne peut être tranchée depuis le code seul.
 2. **Le nombre d'essais en UC4**, fixé avant de commencer.
 3. **Qui écrit `dream_localizer` et `pepp_localizer`**, et sur quelle branche —
    la règle de branchement impose un domaine par branche.
-4. **Ce que l'évaluation RoboPEPP en cours doit rapporter** — voir §11. Le
-   travail a commencé hors de ce dépôt ; ce qui manque n'est pas la décision
-   d'évaluer, mais l'accord sur les mesures à produire.
+4. **Ce que l'évaluation RoboPEPP en cours doit rapporter** — voir §10. Le
+   travail est mené à **Nanterre** par **Thomas BANDINI**, dans un dépôt
+   séparé (§10) ; ce qui manque n'est pas la décision d'évaluer, mais
+   l'accord sur les mesures à produire.
 5. **Le banc de référence.** Les données de campagne actuelles viennent de
-   **Lyon**, qui mène aussi l'évaluation RoboPEPP : UC3 et UC4 ont donc tout
-   intérêt à être menés là, dans une seule campagne. Si Nanterre doit produire
-   des mesures comparables, le protocole commun est un prérequis, pas une
-   conséquence.
+   **Lyon**, qui opère DREAM ; l'évaluation RoboPEPP est menée à **Nanterre**.
+   Deux voies, à trancher avant UC3/UC4 (§10) : mener UC3 et UC4 des deux
+   briques à Lyon dans une seule campagne, ou caractériser d'abord le banc de
+   Nanterre avec le protocole commun. Dans les deux cas, le protocole commun
+   est un prérequis, pas une conséquence.
 
 ---
 
-## 10. RoboPEPP — évaluation en cours, hors de ce dépôt
+## 10. RoboPEPP — évaluation menée à Nanterre
 
-**État au 23/09/2026 :** RoboPEPP est en cours de test et de validation,
-**mené par ABMI Lyon**, sous **licence open-source**. Ce dépôt n'en porte
-encore aucune trace — ni branche, ni pull request, ni fichier.
+**État au 09/10/2026 :** RoboPEPP est en cours de test et de validation,
+**mené par ABMI Nanterre**, sous la responsabilité de **Thomas BANDINI**, sur
+le **banc de Nanterre** : MyCobot 320 Pi à **finition noire**, caméra RGB
+Arducam. Le travail vit dans le dépôt
+[`Nanterre_R6A_Robopepp`](https://github.com/ABMI-software/Nanterre_R6A_Robopepp) (branche
+`refactor/structure`, **dépôt privé, accès sur demande**).
 
-**Lyon tient aussi le banc qui définit la baseline** (§5). C'est une
-circonstance favorable qu'il serait dommage de gâcher : l'équipe qui évalue
-RoboPEPP a sous la main l'instrument, le protocole des treize essais et
-l'opérateur qui l'a exécuté. UC3 et UC4 peuvent donc être menés **par les
-mêmes mains, sur le même banc, dans la même campagne** — ce qui supprime d'un
-coup la plus grosse source d'incomparabilité entre deux évaluations.
+*Corrige l'état du 23/09, qui attribuait cette évaluation à Lyon.*
+
+Ce qui y est fait, d'après son README : portage de RoboPEPP au MyCobot
+(6 articulations, 7 keypoints, cinématique URDF), jeu synthétique Gazebo de
+1 982 images annotées, pré-entraînement I-JEPA et fine-tuning exécutés de bout
+en bout. **Aucune métrique de test n'est encore publiée et aucune mesure n'a
+été faite sur banc.**
+
+**La baseline (§5) et DREAM sont à Lyon ; RoboPEPP est évalué à Nanterre.**
+UC3 et UC4 traversent donc deux sites, ce qui est la plus grosse source
+d'incomparabilité entre deux évaluations. Deux voies :
+
+- **(a) Une seule campagne à Lyon :** UC3 et UC4 des deux briques menés par
+  les mêmes mains, sur le même banc, le même jour.
+- **(b) Deux bancs caractérisés :** caractériser d'abord le banc de Nanterre
+  avec les treize essais du protocole, puis comparer chaque brique à la
+  baseline de son propre banc.
+
+Dans les deux cas, **l'apparence du bras est une variable** : les deux briques
+apprennent sur des images, et le bras de Nanterre est noir. Finition du bras,
+éclairage et fond doivent être consignés à chaque campagne.
 
 Le risque restant : **une validation menée hors de ce cadre produira des
 chiffres incomparables avec ceux de DREAM**, et il faudra la refaire. Le projet
@@ -288,6 +309,11 @@ Sans ces cinq points, le résultat ne sera pas opposable à DREAM :
    s'il faut ré-entraîner sur le MyCobot — auquel cas les données nécessaires et
    leur volume.
 
+**État au 09/10 côté Nanterre :**
+- **Points 1, 3 et 4 :** à venir.
+- **Point 2 :** pas encore satisfait. Le jeu actuel vient d'un **seul montage de caméra**.
+- **Point 5 :** le ré-entraînement sur MyCobot est fait (1 982 images synthétiques Gazebo) ; les licences sont détaillées ci-dessous.
+
 ### Ce que ce dépôt fournit en retour
 
 - La scène `real_table.sdf`, réplique mesurée du banc, pour évaluer les deux
@@ -299,8 +325,9 @@ Sans ces cinq points, le résultat ne sera pas opposable à DREAM :
 
 ### Deux points à verrouiller
 
-⚠ **Le lien du dépôt.** Tant que ce document ne peut pas y renvoyer, quiconque
-lit cette spécification ignorera que l'évaluation existe — et la referait.
+✓ **Le lien du dépôt** — résolu le 09/10 :
+[`Nanterre_R6A_Robopepp`](https://github.com/ABMI-software/Nanterre_R6A_Robopepp). Le dépôt est
+privé : un lecteur sans accès voit une erreur 404 et doit le demander.
 
 ⚠ **La licence exacte, pas seulement « open-source ».** Ce dépôt est sous
 **Apache-2.0** (voir [`../LICENSE`](../LICENSE)). Une brique sous MIT, BSD ou
@@ -309,6 +336,15 @@ conditions à ce qui l'embarque : la question doit être tranchée **avant**
 d'écrire `pepp_localizer`, pas après. Si le doute existe, un appel réseau vers
 un service séparé isole la contrainte — mais c'est un choix d'architecture, à
 faire en connaissance de cause.
+
+**État au 09/10 (relevé dans le dépôt Nanterre) :**
+- **Contributions ABMI :** Apache-2.0.
+- **Code I-JEPA embarqué :** **CC BY-NC 4.0**, non commercial.
+- **Dépôt RoboPEPP amont :** **aucune licence déclarée**, donc tous droits réservés par défaut.
+
+« Open-source » ne suffit donc pas. Avant d'écrire `pepp_localizer`, il faut une licence ou une
+autorisation écrite des auteurs de RoboPEPP, et une décision sur les termes non
+commerciaux d'I-JEPA.
 
 ---
 
