@@ -9,6 +9,25 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — tri des quatre objets sous Docker, positions vérité terrain (09/10)
+
+- **`sim_sorting_grasp -p pose_source:=ground_truth`** : la scène `tri_yolo`
+  d'Osama, triée sur `/validation/gt/objects` au lieu de `/yolo/objects_3d`.
+  Même cycle que `perception` (pose d'observation, 3 échantillons stables,
+  prise physique, largage) ; seule la source des positions change.
+  Démonstrateur oracle pour générer des épisodes (spec A5), jamais une mesure
+  de la perception. Raison : le conteneur `gazebo_to_lerobot` n'a ni torch ni
+  ultralytics.
+- **`scripts/run_sort_gui.sh [graine]`** : la même chose avec l'interface
+  Gazebo, depuis l'hôte WSL2 :
+  `docker exec -it gazebo_to_lerobot /workspace/src/scripts/run_sort_gui.sh 1`.
+- Essai sans interface dans le conteneur, graine 1 : **4/4 triés au premier
+  essai** (écarts au centre du bac +7/+1, +11/−6, +6/+3, −1/0 mm), ~20 min
+  murales pour 85 s simulées — facteur temps réel ~0,04-0,1 avec les quatre
+  caméras rendues en logiciel.
+- `tests/test_gt_isolation.py` échouait déjà avant ce changement, sur
+  `tri_dream_dashboard.py` (absent de la liste autorisée) ; non corrigé ici.
+
 ### Ajoute — Dashboard YOLO / DREAM / Gazebo et modeles publies (07/10)
 
 - **`tri_dream_dashboard`** : verite terrain Gazebo (`/validation/gt/objects`)

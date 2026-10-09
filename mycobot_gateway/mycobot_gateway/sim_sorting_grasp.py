@@ -160,6 +160,11 @@ TARGETS = [
 
 # Scene de tri (tri_yolo.launch.py) : memes pieces aux noms des classes yolo26.
 # Le bac vient de la perception (pose_source:=perception), d'ou bin_xy vide.
+# pose_source:=ground_truth lit la verite terrain Gazebo au meme format, a la
+# place de yolo26 : generation de donnees (demonstrateur oracle), jamais une
+# mesure de la perception.
+TRI_SCENE_TOPICS = {'perception': '/yolo/objects_3d',
+                    'ground_truth': '/validation/gt/objects'}
 TRI_TARGETS = [
     # Un cube se pince par deux faces : a 45° les doigts tombent sur les aretes
     # (71 mm de diagonale pour 50) et le cube file (cube_bleu, graine 4, 01/10).
@@ -230,8 +235,10 @@ class SimSortingGrasp(Node):
         self.declare_parameter('wall_timeout_scale', 1.0)
         self.pose_source = str(self.get_parameter('pose_source').value)
         self.max_attempts = int(self.get_parameter('max_attempts').value)
-        if self.pose_source not in ('gazebo', 'vision', 'perception') or self.max_attempts < 1:
-            raise ValueError('pose_source must be gazebo/vision/perception and max_attempts >= 1')
+        if (self.pose_source not in ('gazebo', 'vision', *TRI_SCENE_TOPICS)
+                or self.max_attempts < 1):
+            raise ValueError('pose_source must be gazebo/vision/perception/ground_truth '
+                             'and max_attempts >= 1')
         self.perceived = []
         self.vision_pose = None
         self.vision_received = 0.0
@@ -248,9 +255,10 @@ class SimSortingGrasp(Node):
         if not math.isfinite(self.startup_timeout) or self.startup_timeout <= 0.0:
             raise ValueError('startup_timeout doit etre positif et fini')
         self.targets = []
-        if self.pose_source == 'perception':
+        tri_scene_source = self.pose_source in TRI_SCENE_TOPICS
+        if tri_scene_source:
             self.targets = list(TRI_TARGETS)
-        for target in ([] if self.pose_source == 'perception' else TARGETS):
+        for target in ([] if tri_scene_source else TARGETS):
             param = f'bin_xy.{target.model}'
             self.declare_parameter(param, list(target.bin_xy))
             bin_xy = tuple(self.get_parameter(param).value)
@@ -272,8 +280,9 @@ class SimSortingGrasp(Node):
         self.create_subscription(JointState, '/joint_states', self._joint_cb, 10)
         if self.pose_source == 'vision':
             self.create_subscription(PoseStamped, '/vision/red_cube/pose', self._vision_cb, 10)
-        if self.pose_source == 'perception':
-            self.create_subscription(Detection3DArray, '/yolo/objects_3d', self._perception_cb, 10)
+        if tri_scene_source:
+            self.create_subscription(Detection3DArray, TRI_SCENE_TOPICS[self.pose_source],
+                                     self._perception_cb, 10)
         self.controller_client = self.create_client(
             ListControllers, '/controller_manager/list_controllers')
 
@@ -320,7 +329,7 @@ class SimSortingGrasp(Node):
         """Use fresh vision for aiming; Gazebo poses are only grasp verification."""
         if self.pose_source == 'gazebo':
             return self.object_poses()
-        if self.pose_source == 'perception':
+        if self.pose_source in TRI_SCENE_TOPICS:
             return self.perceived_poses({target.model, tri_scene.PAIRS[target.model]})
         self.status('localisation du cube par les quatre cameras…')
         deadline = time.monotonic() + 25.0 * self.wall_scale

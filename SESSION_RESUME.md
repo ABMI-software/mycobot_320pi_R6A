@@ -1,5 +1,33 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (9 octobre 2026 — après-midi, tri 4/4 sous Docker)
+
+### Ce qui a été accompli aujourd'hui
+1. Branche `feature/sort-episodes` : fusion d'`upstream/main` (ABMI-software,
+   scène `tri_yolo` d'Osama) dans la branche du fork `citdemond`.
+2. Paquets `mycobot_gateway` / `mycobot_description` du conteneur remplacés
+   par la version fusionnée (sauvegarde :
+   `Gazebo_to_LeRobot_Pipeline/backup_mycobot_pkgs_2026-10-09.tar.gz`) ;
+   `update_rate: 100`, `sorting_table.sdf`, `policy_runner_node.py` remis ;
+   `scripts/diff_ik.py` et `training/dream/mycobot_fk.py` ajoutés à côté.
+3. `pose_source:=ground_truth` ajouté à `sim_sorting_grasp` ; graine 1 : 4/4.
+
+### Décisions prises
+- Positions par vérité terrain Gazebo (option B), pas YOLO : même scène, même
+  pince physique, mêmes gestes qu'Osama.
+
+### Prochaines actions
+1. [ROUGE] Réduire les 4 caméras à 1-2 enregistrées : facteur temps réel ~0,04-0,1.
+2. [JAUNE] Brancher l'enregistreur rosetta sur le tri (4 sous-épisodes + 1 épisode complet par graine).
+3. [VERT] Vérifier qu'un épisode HTGSPP (ex. 16) passe toujours avec les paquets fusionnés.
+
+### Commande rapide de reprise
+```bash
+docker exec -it gazebo_to_lerobot /workspace/src/scripts/run_sort_gui.sh 1
+```
+
+---
+
 ## État actuel (7 octobre 2026 — après-midi, étape 10 validée en simulation)
 
 ### Ce qui a été accompli aujourd'hui
