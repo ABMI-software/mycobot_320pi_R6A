@@ -539,4 +539,13 @@ qui tient.
   dessus sera fausse de 12 à 28 mm selon le marqueur. Tout point enseigné en
   coordonnées planche **avant le 10/09** est décalé d'autant.
 
-*Dernière mise à jour : 10 septembre 2026.*
+> **⚠ Dépassé le 15/09/2026.** Les deux conséquences ci-dessus sont fausses.
+> `arducam_extrinsic_pick.yaml` n'était pas valable : mesurée au robot,
+> l'arducam voyait les marqueurs à 40-100 mm de leur place, parce que la
+> référence `planche_actuelle.yaml` avait été relevée à travers une extrinsèque
+> déjà fausse. La référence est désormais **mesurée au robot**, le 19 et le 23
+> pince placée à la main puis codeurs lus. L'extrinsèque a été recalibrée
+> contre elle (leave-one-out 1,4-2,7 mm), et la balle saisie du premier coup.
+> Voir `docs/PICK_AND_PLACE_REAL.md` § « Calibration contre le robot ».
+
+*Dernière mise à jour : 15 septembre 2026.*

@@ -1,0 +1,59 @@
+source: 'calibration_extrinseque_auto.py, 16 coins des 4 marqueurs, 5 trames, exposition
+  75 gain 0, 15/09/2026 15:03. Reference : planche_actuelle.yaml (positions reelles
+  de la planche).'
+camera_index: 2
+intrinsics_stem: cam_3
+reprojection_rms_px: 0.5264
+marker_size_mesure_mm: 48.319
+marker_size_yaml_mm: 50.0
+markers_used:
+- 19
+- 23
+- 25
+- 26
+frame_id: base_link
+resolution:
+- 640
+- 480
+T_cam_world:
+- - 0.21059223745025357
+  - -0.9773530610413651
+  - 0.020782290508260637
+  - -0.20687606594926655
+- - -0.9593491082666036
+  - -0.2107053188044844
+  - -0.18775664327946706
+  - 0.13635127257473037
+- - 0.18788346918706925
+  - 0.019602619737534785
+  - -0.9819956921013744
+  - 1.0416069699892334
+- - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+camera: arducam
+deplacement_constate: position precedente (-17.3, -203.1, 1054.5) mm ; nouvelle (-21.3,
+  -193.9, 1052.8) mm ; deplacement 10.2 mm.
+exposition: 'expo 45, gain 60. ATTENTION : apres un rebranchement USB, la valeur d
+  exposition ne rend PLUS la meme luminance et le GAIN est remis a 0 par les anciens
+  scripts, ce qui noircit l image. Regler expo ET gain, et verifier la luminance (~85).'
+piege_detection: 'Le 10/09, deux marqueurs sur quatre etaient indetectables : un CABLE
+  NOIR touchait leur bordure noire. ArUco cherche un quadrilatere noir ferme ; un
+  cable qui touche le bord fusionne avec lui et le contour n est plus un carre. Contraste
+  (236) et nettete (4318) etaient pourtant meilleurs que sur les marqueurs detectes.
+  Ecarter le cable a suffi : 4/4 a toutes les expositions.'
+taille_marqueur_NE_PAS_CORRIGER: 'Le champ marker_size_mesure_mm ci-dessous vaut ~48,7
+  mm. NE PAS en conclure que les marqueurs font 48,7 mm, et NE PAS corriger marker_size_mm
+  dans workspace_markers.yaml. Mesure du 10/09 : la detection ArUco tire les coins
+  d un petit carre vers l INTERIEUR, d autant plus que le marqueur est vu de biais
+  (correlation -0,920 avec l obliquite). Cinq marqueurs IDENTIQUES se mesurent de
+  47,7 a 49,7 mm alors que chacun repete a 0,108 mm pres. Extrapole a une vue de face
+  : 50,65 mm. Preuve independante : les distances entre centres (383-580 mm) sont
+  justes a -0,044 %, contre -2,6 % sur les cotes. Les marqueurs font 50 mm.'
+validation_leave_one_out_mm:
+  19: 1.21
+  23: 0.99
+  25: 0.47
+  26: 0.69
+sauvegarde: arducam_extrinsic_pick.avant_1509_1503.yaml

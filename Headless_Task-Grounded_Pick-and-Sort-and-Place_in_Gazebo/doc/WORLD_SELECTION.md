@@ -173,7 +173,7 @@ contradiction. `pick_and_place_sorting.sdf` genuinely was — and remains —
 the only merged, git-committed world with all eight objects (authored by
 José Bernardo, 2026-04-23, commits `bff55d0c`/`ab0de957`). `real_table.sdf`
 genuinely was, at the start of this work, a single-object (`red_cube`/
-`red_bin`) world — matching the screenshots in both of Osama's presentations
+`red_bin`) world — matching the screenshots in both project presentations
 (`Presentation24`, pages 3 and 8–9; `Presentation23`, page 25), where
 extending it to all four objects is explicitly listed as a **future** step,
 not yet done.

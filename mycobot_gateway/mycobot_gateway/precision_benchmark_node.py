@@ -319,14 +319,13 @@ class PrecisionBenchmarkNode(Node):
     # ── IK ───────────────────────────────────────────────────────────────────
 
     # Limites joints URDF (rad)
-    _JOINT_LIMITS = [
-        (-2.93, 2.93),   # joint2_to_joint1
-        (-2.35, 2.35),   # joint3_to_joint2
-        (-2.53, 2.53),   # joint4_to_joint3
-        (-2.53, 2.53),   # joint5_to_joint4
-        (-2.93, 2.93),   # joint6_to_joint5
-        (-3.14, 3.14),   # joint6output_to_joint6
-    ]
+    # Enveloppe de l'URDF Gazebo/benchmark, en radians. Valeurs INCHANGEES :
+    # ce noeud echantillonne des poses de mesure, et les elargir changerait la
+    # distribution d'une campagne de precision. Passer au domaine pratique de
+    # diff_ik elargirait J3 de 5 deg et resserrerait J5 de 2,9 — a trancher,
+    # pas a subir. Source : scripts/diff_ik.URDF_GAZEBO_JOINT_LIMITS_DEG.
+    _JOINT_LIMITS = [(-2.93, 2.93), (-2.35, 2.35), (-2.53, 2.53),
+                     (-2.53, 2.53), (-2.93, 2.93), (-3.14, 3.14)]
 
     def _angles_in_limits(self, angles: np.ndarray) -> bool:
         return all(lo <= a <= hi for a, (lo, hi) in zip(angles, self._JOINT_LIMITS))

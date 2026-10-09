@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!-- Genere par scripts/generer_pieces_gazebo.py — regenerer plutot qu'editer.
+     Cotes lues dans tri_couleur.OBJET_PAR_COULEUR['jaune'] : (50.0, 30.0, 40.0) mm.
+     Origine au CENTRE DE LA BASE : une pose a Z=0 repose sur la planche. -->
+<sdf version="1.9">
+  <model name="pave_jaune">
+    <link name="corps">
+      <pose>0 0 0.020000 0 0 0</pose>
+      <inertial>
+        <mass>0.030000</mass>
+        <inertia>
+          <ixx>0.000006250</ixx><iyy>0.000010250</iyy><izz>0.000008500</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="collision">
+        <geometry><box><size>0.050000 0.030000 0.040000</size></box></geometry>
+        <surface>
+          <friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction>
+        </surface>
+      </collision>
+      <visual name="visual">
+        <geometry><box><size>0.050000 0.030000 0.040000</size></box></geometry>
+        <material>
+          <ambient>0.647 0.486 0.039 1</ambient>
+          <diffuse>0.647 0.486 0.039 1</diffuse>
+          <specular>0.1 0.1 0.1 1</specular>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

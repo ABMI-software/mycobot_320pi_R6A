@@ -1,0 +1,21 @@
+{
+  "name": "sim_svpro",
+  "commentaire": "Intrinseques SIMULEES : memes fx, fy, cx, cy que cam_2, distorsion NULLE. Gazebo rend une projection pinhole pure ; appliquer les coefficients reels a ces images decalerait chaque point.",
+  "resolution": [
+    640,
+    480
+  ],
+  "results": {
+    "fx": 447.7581678483226,
+    "fy": 446.54412729951036,
+    "cx": 333.17913502330583,
+    "cy": 267.29592861669016,
+    "dist_coeffs": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}
