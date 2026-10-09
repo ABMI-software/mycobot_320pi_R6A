@@ -9,6 +9,21 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — l'évaluation RoboPEPP est menée à Nanterre (09/10)
+
+- **`docs/SPEC_VALIDATION_BRIQUES.md` §10** : l'évaluation RoboPEPP est menée
+  par **ABMI Nanterre**, sous la responsabilité de **Thomas BANDINI**, sur le
+  banc de Nanterre (MyCobot 320 Pi noir, caméra Arducam). Corrige l'entrée du
+  23/09, qui l'attribuait à Lyon.
+- **Lien vers le dépôt** de l'évaluation : [`Nanterre_R6A_Robopepp`](https://github.com/ABMI-software/Nanterre_R6A_Robopepp)
+  (privé, accès sur demande).
+- **Licences relevées dans ce dépôt** : I-JEPA est sous CC BY-NC 4.0 et
+  RoboPEPP amont ne déclare aucune licence. Une décision est requise avant
+  d'écrire `pepp_localizer`.
+- **§9.5** : la comparaison traverse désormais deux sites. Deux voies sont
+  posées : une seule campagne à Lyon, ou la caractérisation préalable du banc
+  de Nanterre.
+
 ### Ajoute — Dashboard YOLO / DREAM / Gazebo et modeles publies (07/10)
 
 - **`tri_dream_dashboard`** : verite terrain Gazebo (`/validation/gt/objects`)
