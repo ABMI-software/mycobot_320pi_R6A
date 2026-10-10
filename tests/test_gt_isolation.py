@@ -13,7 +13,8 @@ PACKAGE = ROOT / 'mycobot_gateway' / 'mycobot_gateway'
 GT = re.compile(r'/validation/gt|pose/info|dynamic_pose|gz_pose_info')
 ALLOWED = {
     'gazebo_ground_truth.py',      # the ground-truth publisher itself
-    'sim_sorting_grasp.py',        # post-grasp verification, never a target in vision mode
+    'sim_sorting_grasp.py',        # post-grasp verification; targets only in pose_source:=ground_truth
+                                   # (oracle demonstrator for data generation), never in perception/vision
     'yolo_gt_overlay.py',          # draws YOLO vs ground truth in Gazebo, validation only
 }
 

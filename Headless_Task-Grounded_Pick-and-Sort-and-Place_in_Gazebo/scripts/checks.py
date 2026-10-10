@@ -20,9 +20,17 @@ def placed_in_correct_bin(target, cfg, obj_pose, tol=0.005):
     """Part 9.2. Inside its OWN bin footprint, and below the rim -- not
     resting on it."""
     b = cfg["bins"][cfg["objects"][target]["bin"]]
+    o = cfg["objects"][target]
     dx, dy = obj_pose[0] - b["pose"][0], obj_pose[1] - b["pose"][1]
     inside = math.hypot(dx, dy) <= (b["inner_radius"] - tol)
-    settled = obj_pose[2] <= b["rim_z"]
+    # "Below the rim, not resting on it" is about the object's LOWEST point,
+    # not its centre: a 5 cm object standing in a 3 cm-deep bin has its
+    # centre ABOVE the rim (0.027-0.037 m vs rim 0.030), while one resting on
+    # the rim sits at rim + half-height (0.055 m). Require the lowest point
+    # >= 1 cm below the rim. (The centre-below-rim test rejected a correct
+    # placement of blue_cube, smoke episode 16, 2026-10-03.)
+    half_h = (o["size"][2] if o["shape"] == "box" else o["length"]) / 2
+    settled = obj_pose[2] <= b["rim_z"] + half_h - 0.010
     return inside and settled, {"inside": inside, "below_rim": settled}
 
 

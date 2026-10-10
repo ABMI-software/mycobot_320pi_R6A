@@ -1,0 +1,21 @@
+policy:
+  type: smolvla
+  scheduler_warmup_steps: 50    # Key fix: was 1000 in default lerobot config
+  scheduler_decay_steps: 300    # Cosine decay over full run
+  n_obs_steps: 1
+  n_action_steps: 1
+  freeze_vision_encoder: True
+  train_expert_only: True
+  video_backend: pyav
+
+dataset:
+  root: Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/datasets/mycobot_sorting_train
+  repo_id: mycobot_sorting_train
+  episodes: [0]
+
+training:
+  steps: 300
+  batch_size: 1
+  optimizer_lr: 1e-4
+
+output_dir: /tmp/smolvla_overfit

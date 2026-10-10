@@ -1,0 +1,12 @@
+# The ONE place the LeRobot version is pinned. scripts/port_bag.py refuses to
+# run under any other version, so changing the pin is this line plus a re-run.
+# PROVISIONAL (2026-10-05): the current release; to be confirmed against the
+# version the team trains with.
+lerobot[smolvla]==0.4.4
+# Reading the ROS 2 bags (MCAP) without a ROS install.
+mcap==1.5.0
+mcap-ros2-support==0.5.7
+# Install into a CPU-only venv, outside the ROS container, torch from the CPU index:
+#   python3.11 -m venv ~/venvs/lerobot044-cpu
+#   ~/venvs/lerobot044-cpu/bin/pip install "torch<2.11" "torchvision<0.26" --index-url https://download.pytorch.org/whl/cpu
+#   ~/venvs/lerobot044-cpu/bin/pip install -r scripts/requirements-lerobot.txt --extra-index-url https://download.pytorch.org/whl/cpu

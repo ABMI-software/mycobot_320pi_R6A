@@ -1,5 +1,94 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (10 octobre 2026 — soir, lot de 40 épisodes et documentation)
+
+### Ce qui a été accompli aujourd'hui
+1. Lot des graines 1 à 10 d'Osama : 39/40 au premier essai ; seul échec
+   graine 10, cube bleu (poussé hors de portée par les prises précédentes).
+2. Jeux LeRobot (39 épisodes, 6 874 images) et RLDS (39 épisodes,
+   6 881 pas), chacun rechargé par son lecteur officiel.
+3. Rejeux LeRobot et RLDS dans Gazebo : cube rouge dans son bac (+7/+1,
+   +7/0 mm). Vidéos faites par l'utilisateur.
+4. Documentation : rapport EN/FR §28–41, spécification annexe D, RUNNING.md.
+
+### Décisions prises
+- Positions par vérité terrain (option B) ; 3 caméras top/right/left,
+  640×480, 10 Hz, QoS reliable ; action = commande des contrôleurs.
+
+### Prochaines actions
+1. [FAIT] Graine 10 relancée : 4/4, lot 40/40, jeux de 40 épisodes (10 par instruction).
+2. [JAUNE] Choisir la vue unique d'OpenVLA ; enregistrer le jeu RLDS dans la configuration OXE.
+3. [VERT] Signaler à Osama l'échec de `tests/test_gt_isolation.py` sur `tri_dream_dashboard.py`.
+4. [FAIT] Reproduction depuis un clone (`docker/setup_workspace.sh`, `run_container.sh`), testée depuis zéro ; PR #17 intégrée ; PR ouverte.
+
+### Commande rapide de reprise
+```bash
+sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'; sleep 5; docker start gazebo_to_lerobot rlds_builder
+docker exec gazebo_to_lerobot python3 /workspace/src/scripts/summarise_tri_batch.py
+```
+
+---
+
+## État actuel (10 octobre 2026 — matin, premier épisode enregistré)
+
+### Ce qui a été accompli aujourd'hui
+1. Choix des 3 caméras : `top` + `right` + `left` (poses réelles, deux cycles
+   d'images, taille des objets sur 40 prises).
+2. Contrat `mycobot_tri_sort.yaml` validé par rosetta ; 10 Hz conservé.
+3. Pilote d'enregistrement + script par graine ; épisode cube rouge graine 1
+   complet après passage des images en `reliable`.
+
+### Décisions prises
+- 3 vues, 640×480 natif, 10 Hz (réglage d'Osama inchangé).
+- Un épisode = une prise-dépôt, du « ▶ » au verdict.
+
+### Mise à jour (10 octobre 2026 — fin de matinée, étape 3 terminée)
+- Action = commande des contrôleurs (relais `commanded_action_relay.py`) :
+  précède l'état d'une image.
+- Chaîne complète prouvée sur un épisode : bag → LeRobot (`rosetta_port`,
+  rechargé par `LeRobotDataset`, 172 images) et bag → RLDS (rechargé par
+  `tfds`, 173 pas).
+
+### Prochaines actions
+1. [ROUGE] Lot de 40 épisodes (graines 1-10), puis conversion des deux formats.
+2. [JAUNE] Enregistrer le jeu RLDS dans la configuration OXE d'OpenVLA.
+3. [VERT] Aligner LeRobot et RLDS sur le même nombre d'images (172 vs 173).
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_test /workspace/src/scripts/record_tri_seed.sh 1 cube_rouge'
+```
+
+---
+
+## État actuel (9 octobre 2026 — après-midi, tri 4/4 sous Docker)
+
+### Ce qui a été accompli aujourd'hui
+1. Branche `feature/sort-episodes` : fusion d'`upstream/main` (ABMI-software,
+   scène `tri_yolo` d'Osama) dans la branche du fork `citdemond`.
+2. Paquets `mycobot_gateway` / `mycobot_description` du conteneur remplacés
+   par la version fusionnée (sauvegarde :
+   `Gazebo_to_LeRobot_Pipeline/backup_mycobot_pkgs_2026-10-09.tar.gz`) ;
+   `update_rate: 100`, `sorting_table.sdf`, `policy_runner_node.py` remis ;
+   `scripts/diff_ik.py` et `training/dream/mycobot_fk.py` ajoutés à côté.
+3. `pose_source:=ground_truth` ajouté à `sim_sorting_grasp` ; graine 1 : 4/4.
+
+### Décisions prises
+- Positions par vérité terrain Gazebo (option B), pas YOLO : même scène, même
+  pince physique, mêmes gestes qu'Osama.
+
+### Prochaines actions
+1. [ROUGE] Réduire les 4 caméras à 1-2 enregistrées : facteur temps réel ~0,04-0,1.
+2. [JAUNE] Brancher l'enregistreur rosetta sur le tri (4 sous-épisodes + 1 épisode complet par graine).
+3. [VERT] Vérifier qu'un épisode HTGSPP (ex. 16) passe toujours avec les paquets fusionnés.
+
+### Commande rapide de reprise
+```bash
+docker exec -it gazebo_to_lerobot /workspace/src/scripts/run_sort_gui.sh 1
+```
+
+---
+
 ## État actuel (7 octobre 2026 — après-midi, étape 10 validée en simulation)
 
 ### Ce qui a été accompli aujourd'hui
@@ -401,6 +490,163 @@ docker exec -it gazebo_to_lerobot bash
 # dans le conteneur :
 cd /workspace/htgspp && bash scripts/episode_gui.sh 16     # copie d'episode.sh, headless:=false
 cd /workspace/htgpp  && ros2 launch launch/pick_and_place_demo.launch.py
+```
+
+---
+
+## État actuel (5 octobre 2026)
+
+### Ce qui a été accompli aujourd'hui
+
+**Les jeux de données du tri se chargent dans le vrai LeRobot, et SmolVLA s'entraîne dessus.**
+La première conversion (écrite à la main) ne se chargeait pas et portait quatre
+défauts ; elle est remplacée par `scripts/port_bag.py` réécrit sur l'écrivain de
+LeRobot, dans un venv CPU sur l'hôte WSL2 (`~/venvs/lerobot044-cpu`).
+- `action[t] = état[t+1]` (aucun topic de commande enregistré ; dernière image
+  retirée) ; horodatage = indice / 30 ; appariement sur le temps d'en-tête ;
+  une seule clé `observation.images.top`.
+- Contrôles a–f réussis hors ligne : 48 / 12 épisodes, 29 687 / 7 411 images ;
+  l'image renvoyée par le chargeur est celle du MP4 au bon indice.
+- Test d'entraînement SmolVLA sur CPU (lot de 1, 10 pas) : perte finie,
+  ~4,1 s/pas, 3,5 Go, expert d'action seul entraîné (100 M / 450 M).
+- Rapport (EN/FR, HTML + Word) : nouvelle §28 ; spécification : annexe C ;
+  `datasets/README.md`, `MEASUREMENTS.md` §10, `RUNNING.md` à jour.
+- Références au partage Rôle A / Rôle B retirées de tous les documents du
+  projet ; procédure « entrer dans le conteneur » ajoutée à la documentation.
+
+### Décisions prises
+
+- lerobot **0.4.4**, épinglage **provisoire** (un seul endroit :
+  `scripts/requirements-lerobot.txt`) en attendant la version de l'équipe.
+- `distractors_moved` et la configuration caméra dans `meta/episodes_extra.jsonl`
+  (l'écrivain 0.4.4 n'accepte pas de champ par épisode personnalisé).
+- Les prochains lots enregistrent l'état désiré du contrôleur et la commande de
+  pince (canaux `adjunct` des contrats).
+
+### Prochaines actions
+1. [ROUGE] Confirmer la version de LeRobot de l'équipe ; reconvertir si elle diffère.
+2. [JAUNE] Fusionner la PR #16, puis la PR #17.
+3. [VERT] Évaluation en boucle fermée dans Gazebo via `policy_runner_node` (rosetta) ;
+   plus d'épisodes et plus de diversité de positions.
+
+### Commande rapide de reprise
+```bash
+# hôte WSL2
+~/venvs/lerobot044-cpu/bin/python -c "import lerobot, importlib.metadata as m; print(m.version('lerobot'))"
+cd Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo && cat datasets/README.md | head -40
+```
+
+---
+
+## État actuel (4 octobre 2026 — après-midi)
+
+### Ce qui a été accompli aujourd'hui
+
+**Le POC de tri quatre objets est terminé sur une seule machine** (le portable
+WSL2, conteneur `gazebo_to_lerobot`) : lot de 60 épisodes **60/60 PASS du
+premier coup** sous une seule version de code (`f977d7af65dc`), converti en
+`mycobot_sorting_train` (48) et `mycobot_sorting_heldout` (12), et deux launch
+files testés (GUI : reste ouvert, Ctrl+C propre ; headless : code de sortie
+0/1/2). Tout est dans
+`Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/MEASUREMENTS.md` §9–10.
+
+**Chemin parcouru, dans l'ordre :**
+- bacs de 100 mm qui s'interpénétraient → aucune disposition atteignable de
+  quatre bacs de 100 mm ; ouverture 70 mm → **échec à la sonde** (cubes calés
+  sur le rebord à 28°) ; ouverture 80 mm → échec au seuil de 5 mm de marge ;
+- cause trouvée : en se fermant, les mors mettent le cube d'équerre avec la
+  pince, donc **le cube atterrit au lacet de la pince à la dépose, modulo 90°**
+  (prédiction exacte sur les trois épisodes sondés). Avec un lacet libre, le
+  pire cas vaut 45° (70,7 mm pour un cube de 50) et **aucune géométrie de bac
+  ne pouvait convenir** ;
+- correctif : dépose d'équerre avec le bac, résolue sous contrainte de lacet
+  dans `precompute_ik.py` ; sonde sur six épisodes (rouge, bleu, jaune ×
+  variantes intérieure et extérieure) : tous passent, marge ≥ 11,4 mm.
+
+**Épisode 12** : le mors ouvert a poussé le cylindre vert de 22,9 mm en
+descendant vers la prise (vérifié image par image). Conservé et étiqueté :
+`distractors_moved` est reporté par `port_bag.py` dans `meta/episodes.jsonl`.
+
+### Décisions prises
+
+- **Un seuil fixé par l'utilisateur ne se relâche pas.** Un seuil de 5 mm a
+  été abaissé après coup et un lot lancé dessus ; arrêté après 2 épisodes,
+  archivé (`archive_2026-10-04_option2_stopped/`). Une marge porte sur les
+  épisodes non sondés, pas sur ceux qui l'ont été.
+- Bacs : 80 mm d'ouverture, parois 3 mm, bac bleu en (0,24, 0,01).
+- `BIN_CLEAR = 5 mm` est une valeur choisie, pas une marge dérivée.
+- Le lot du 03/10 (54/60) avait le chevauchement des bacs : il n'est pas une
+  référence.
+
+### Prochaines actions
+1. [ROUGE] Relire le commit et la PR préparés, puis commit/PR sur instruction.
+2. [JAUNE] Charger les jeux de données avec la vraie classe `LeRobotDataset`
+   sur une machine avec PyTorch (jamais fait).
+3. [VERT] Prochaine itération : maillages de collision → primitives (RTF),
+   obstruction en levée repliée (J2 ≤ 48°), caméra poignet
+   (`doc/LIMITATIONS.md`).
+
+### Commande rapide de reprise
+```bash
+# hôte WSL2
+sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'
+docker start gazebo_to_lerobot      # démarre le conteneur en arrière-plan, ne donne pas de shell
+docker exec -it gazebo_to_lerobot /workspace/htgspp/scripts/run_gui_demo.sh episode:=16   # démo GUI
+docker exec -it gazebo_to_lerobot bash                    # ou un shell dans le conteneur (ROS déjà chargé)
+```
+
+---
+
+## État actuel (3 octobre 2026 — matin)
+
+### Ce qui a été accompli aujourd'hui
+
+**La démo GUI du POC headless a enfin été regardée.** Le §15 du rapport avait
+livré `pick_and_place_demo.launch.py` sans vérification visuelle (pas d'écran).
+Les 02–03/10, elle a été exécutée et observée de bout en bout dans Gazebo sur
+le portable WSL2, en partant de rien : démon Docker arrêté, ni image ni
+conteneur `gazebo_to_lerobot`. Le bras saisit le cube rouge et le pose sur
+l'assiette, à ~3 mm du centre ; `RESULT: motions_ok=True placed_on_plate=True
+grasp_held=True`, sans interface comme avec.
+
+**Cinq obstacles, tous mesurés et documentés** dans l'addendum §16–30 du
+rapport (EN/FR, HTML + Word) :
+- démon Docker à lancer à la main (`sudo sh -c 'nohup dockerd …'`), pas de
+  systemd dans WSL ;
+- `moveit_py` absent de l'image (`ros-jazzy-moveit` ne l'inclut pas) —
+  `run_demo.py` le présente comme « no reachable elbow-up IK solution » ;
+- simulation figée : le `DISPLAY=172.24.112.1:0` de l'hôte, transmis par
+  `run.sh`, bloque le capteur caméra et donc le pas de simulation
+  (contrôleurs jamais actifs) ; `DISPLAY=:0` (WSLg) corrige ;
+- fenêtre Gazebo blanche : D3D12 n'offre qu'OpenGL 4.1 sans compute shaders,
+  `ogre` comme `ogre2` ; llvmpipe (OpenGL 4.5, logiciel) corrige ;
+- vue minuscule qui se dézoome seule : mode Follow sur `mycobot_320`
+  (décalage 3 m / 2 m) et boîte englobante incluant le support de caméras.
+
+**`scripts/run_gui_demo.sh`** regroupe les trois corrections d'affichage, place
+la caméra près du bras et nettoie `move_group`/Gazebo à la sortie. Vérifié :
+démarrage, cadrage, contrôleurs actifs en 20–22 s, arrêt sans processus
+résiduel ; la séquence complète avec la version précédente du script (seule la
+sortie diffère).
+
+### Décisions prises
+
+- `Dockerfile`, `run.sh` et `run_demo.py` **non modifiés** : les corrections
+  vivent dans le script et dans les commandes documentées ; les trois
+  corrections permanentes sont proposées dans le rapport.
+- `moveit_py` installé dans le **conteneur**, pas dans l'image : un
+  `docker rm` le perd.
+
+### Prochaines actions
+1. [ROUGE] Faire reproduire la démo par José sur son poste avec l'addendum §16–30.
+2. [JAUNE] Appliquer les trois corrections permanentes (Dockerfile, run.sh, run_demo.py).
+3. [VERT] Ajouter les branches `*_tomislav_branch` à la carte de `.claude/rules/git-branching.md`.
+
+### Commande rapide de reprise
+```bash
+sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'
+docker start gazebo_to_lerobot
+docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh
 ```
 
 ---

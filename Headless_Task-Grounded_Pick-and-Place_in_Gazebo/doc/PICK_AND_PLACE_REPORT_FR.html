@@ -386,6 +386,23 @@ footer {
       <a href="#s10"><span class="n">10</span>Enregistrer 20 &eacute;pisodes</a>
       <a href="#s11"><span class="n">11</span>&Eacute;tat v&eacute;rit&eacute;-disque</a>
       <a href="#s12"><span class="n">12</span>Conversion du jeu de donn&eacute;es</a>
+      <p class="rail-group-label">Addendum 03/10/2026</p>
+      <a href="#addendum2-head"><span class="n">&sect;</span>Démo GUI sous WSL2</a>
+      <a href="#s16"><span class="n">16</span>Où et quel terminal</a>
+      <a href="#s17"><span class="n">17</span>Démarrer Docker</a>
+      <a href="#s18"><span class="n">18</span>Construire l'image</a>
+      <a href="#s19"><span class="n">19</span>Démarrer le conteneur</a>
+      <a href="#s20"><span class="n">20</span>Description du robot</a>
+      <a href="#s21"><span class="n">21</span>Compiler l'espace</a>
+      <a href="#s22"><span class="n">22</span>Installer moveit_py</a>
+      <a href="#s23"><span class="n">23</span>Copier le projet</a>
+      <a href="#s24"><span class="n">24</span>Simulation figée : DISPLAY</a>
+      <a href="#s25"><span class="n">25</span>Fenêtre blanche</a>
+      <a href="#s26"><span class="n">26</span>Vue minuscule, Follow</a>
+      <a href="#s27"><span class="n">27</span>run_gui_demo.sh</a>
+      <a href="#s28"><span class="n">28</span>Commandes Gazebo</a>
+      <a href="#s29"><span class="n">29</span>Lire le résultat</a>
+      <a href="#s30"><span class="n">30</span>Arrêter et relancer</a>
       <a href="#ladder"><span class="n">&sect;</span>&Eacute;chelle de v&eacute;rification</a>
       <p class="rail-group-label">R&eacute;f&eacute;rence</p>
       <a href="#bugs-env"><span class="n">&sect;</span>Bugs corrig&eacute;s &mdash; session</a>
@@ -407,6 +424,7 @@ footer {
         <span><b>Reproduit via</b> le conteneur Docker <code>gazebo_to_lerobot</code> (Ubuntu 24.04, ROS2 Jazzy, Gazebo Harmonic)</span>
         <span><b>Commit</b> 5c92a565 sur <code>main</code></span>
         <span><b>&Eacute;crit le</b> 22/09/2026</span>
+        <span><b>Mis à jour le</b> 03/10/2026 (§16–30, démo GUI sous WSL2)</span>
       </div>
     </div>
 
@@ -414,6 +432,7 @@ footer {
       <h2>Vue d'ensemble</h2>
       <p class="block-dek">Ce document est le rapport d'impl&eacute;mentation de <code>headless_pick_and_place_specification.md</code> &mdash; le fichier situ&eacute; dans ce m&ecirc;me dossier, trait&eacute; comme une sp&eacute;cification contraignante des <em>objectifs</em> de conception et de v&eacute;rification, pas des d&eacute;tails d'impl&eacute;mentation. Selon l'instruction directrice sous laquelle ce travail a &eacute;t&eacute; men&eacute;, les choix de programmation pr&eacute;cis de ce document pouvaient librement &ecirc;tre remplac&eacute;s par de meilleures solutions ; chaque objectif devait &ecirc;tre soit atteint, soit explicitement signal&eacute; comme probl&egrave;me.</p>
       <p class="prose">En bref&nbsp;: chaque &eacute;tape num&eacute;rot&eacute;e de la sp&eacute;cification (Parties 1&agrave;8) a &eacute;t&eacute; impl&eacute;ment&eacute;e et v&eacute;rifi&eacute;e, vingt &eacute;pisodes au format LeRobot ont &eacute;t&eacute; enregistr&eacute;s et r&eacute;partis en un jeu d'entra&icirc;nement de 15 &eacute;pisodes et un jeu de validation &agrave; cam&eacute;ra tenue &agrave; l'&eacute;cart de 5 &eacute;pisodes, et le pipeline est enti&egrave;rement auto-v&eacute;rifiant (un contr&ocirc;le r&eacute;ussite/&eacute;chec bas&eacute; sur un CSV tourne &agrave; la fin de chaque &eacute;pisode). La seule d&eacute;viation structurante se situe dans le m&eacute;canisme de prise lui-m&ecirc;me&nbsp;: apr&egrave;s qu'une exp&eacute;rience de physique d&eacute;lib&eacute;r&eacute;e et born&eacute;e n'a produit aucune tenue par friction, le bloc est port&eacute; par une soudure Gazebo <code>DetachableJoint</code>, d&eacute;clench&eacute;e &agrave; la fermeture de la pince et rel&acirc;ch&eacute;e &agrave; son ouverture &mdash; &eacute;tiquet&eacute;e <b>ATTACHE SIMUL&Eacute;E, PAS une prise physique</b> partout o&ugrave; elle appara&icirc;t, dans les commentaires de code, les lignes de journal, et les m&eacute;tadonn&eacute;es de chaque &eacute;pisode. Quatre bugs ont &eacute;t&eacute; corrig&eacute;s dans le chemin de s&eacute;quencement bras/pince, trois autres dans l'infrastructure du lot d'enregistrement, trois autres dans l'orchestrateur de d&eacute;mo ajout&eacute; le 22/09/2026 (&sect;13&ndash;15), et quatre sont signal&eacute;s comme m&eacute;ritant un rapport en amont.</p>
+      <p class="prose"><b>Addendum, 03/10/2026 (§16–30) :</b> la démo GUI du §15 a enfin été exécutée et regardée dans la fenêtre Gazebo, sur un portable WSL2, en partant d'une machine sans image ni conteneur. Cinq problèmes ont dû être résolus en chemin (démon Docker, <code>moveit_py</code> manquant, simulation figée à cause de <code>DISPLAY</code>, fenêtre Gazebo blanche, et caméra bloquée au loin). Ils sont documentés étape par étape, et un nouveau script, <code>run_gui_demo.sh</code>, réduit toute la démo à une seule commande.</p>
       <p class="prose"><b>Addendum, 22/09/2026 (&sect;13&ndash;15)&nbsp;:</b> un manager a demand&eacute; un point d'entr&eacute;e unique <code>ros2 launch</code> pour r&eacute;ellement ex&eacute;cuter et regarder cette d&eacute;mo, plut&ocirc;t que le parcours manuel en 7 &eacute;tapes (&sect;manuel) qui &eacute;tait le seul moyen de la lancer avant. Deux fichiers launch encapsulent d&eacute;sormais un seul script orchestrateur, avec <code>gui</code>, <code>record</code>, <code>block_x</code>/<code>block_y</code> et <code>attach_mode</code> expos&eacute;s comme des arguments <code>ros2 launch</code> ordinaires et document&eacute;s &mdash; <code>attach_mode</code> d&eacute;lib&eacute;r&eacute;ment, pour que la limite de l'attache simul&eacute;e soit visible au point d'usage, pas seulement dans ce document.</p>
       <p class="prose">Ce rapport suit la m&ecirc;me structure que les runbooks de <code>Gazebo_to_LeRobot_Pipeline/docs/</code> et <code>ROS2_to_RLDS_Conversion_OpenVLA/docs/</code>&nbsp;: un compte-rendu &eacute;tape par &eacute;tape associant ce qui a &eacute;t&eacute; fait au contr&ocirc;le concret qui le prouve, une section de r&eacute;f&eacute;rence pour les bugs et les limites, et un guide manuel, ex&eacute;cutable par un humain, en fin de document.</p>
     </section>
@@ -741,7 +760,276 @@ ros2 launch pick_and_place_no_gui_demo.launch.py      <span class="c"># headless
       </div>
       <p class="callout"><b><code>gui:=true</code> reste ouvert d&eacute;lib&eacute;r&eacute;ment&nbsp;:</b> apr&egrave;s avoir affich&eacute; le verdict, la variante GUI ne d&eacute;mant&egrave;le rien &mdash; Gazebo et <code>move_group</code> continuent de tourner pour que la sc&egrave;ne finale reste &agrave; l'&eacute;cran. Ctrl+C sur le launch pour tout arr&ecirc;ter&nbsp;; cela atteint bien le gestionnaire de signaux propre de <code>run_demo.py</code>, qui ex&eacute;cute le m&ecirc;me nettoyage que le &sect;14.</p>
       <p class="callout warn"><b>Non v&eacute;rifi&eacute; visuellement&nbsp;:</b> le rendu GUI lui-m&ecirc;me n'a pas &eacute;t&eacute; v&eacute;rifi&eacute; &mdash; cette machine n'a pas d'&eacute;cran (m&ecirc;me limite que la remarque sur le facteur temps r&eacute;el du &sect;1). La variante sans GUI a &eacute;t&eacute; v&eacute;rifi&eacute;e deux fois de bout en bout&nbsp;; la variante GUI partage le m&ecirc;me orchestrateur &agrave; l'identique et n'a &eacute;t&eacute; v&eacute;rifi&eacute;e que pour le passage correct des arguments et le d&eacute;marrage.</p>
+      <p class="callout"><b>Mise à jour, 03/10/2026 :</b> désormais vérifié visuellement. La variante GUI a été exécutée et regardée de bout en bout sur un portable WSL2 ; sur ce type de machine, elle a besoin des corrections des §24–26, toutes regroupées dans <code>run_gui_demo.sh</code> (§27).</p>
     </article>
+
+    <!-- ============================================ ADDENDUM 2026-10-03 ============================================ -->
+    <section class="block" id="addendum2-head">
+      <h2>Addendum, 03/10/2026 : regarder la démo GUI sur un portable WSL2, depuis une machine vide</h2>
+      <p class="block-dek">Le §15 a livré <code>pick_and_place_demo.launch.py</code> sans que personne ne l'ait regardé tourner : la machine sur laquelle il a été écrit n'avait pas d'écran. Le 03/10/2026, il a été exécuté et <b>observé de bout en bout dans l'interface graphique de Gazebo</b> sur un portable Windows (carte graphique Intel Iris Xe) sous Ubuntu 22.04.3 dans WSL2 (noyau 6.18.40.1-microsoft-standard-WSL2), avec Docker Engine 24.0.5 installé directement dans WSL (sans Docker Desktop). Point de départ : le démon Docker ne tournait pas, et ni l'image ni le conteneur <code>gazebo_to_lerobot</code> n'existaient. Cinq problèmes distincts séparaient la commande d'une ligne du §15 d'un pick-and-place visible à l'écran. Chaque étape ci-dessous donne les commandes exactes, le terminal dans lequel les taper, ce que vous devez voir, et le symptôme de chaque problème tel qu'il apparaît à l'écran, pour que vous puissiez le reconnaître. Toutes les commandes ont réellement été exécutées ; toutes les sorties citées sont réelles.</p>
+      <h3 style="margin-top:22px;font-size:1.1rem">Version courte, une fois l'installation initiale (§17–§24) faite</h3>
+      <pre><span class="c"># Dans un terminal Ubuntu (WSL) normal, après chaque redémarrage de Windows ou `wsl --shutdown` :</span>
+sudo sh -c 'nohup dockerd &gt; /tmp/dockerd.log 2&gt;&amp;1 &amp;'
+docker start gazebo_to_lerobot
+
+<span class="c"># Puis, à chaque fois que vous voulez regarder la démo (même terminal) :</span>
+docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh
+<span class="c"># autre position du bloc :</span>
+docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh block_x:=0.28 block_y:=0.05
+<span class="c"># Ctrl+C dans ce terminal arrête tout.</span></pre>
+    </section>
+
+    <article class="step" id="s16">
+      <div class="step-head"><span class="step-num">16</span><h3>Où se trouve la commande, et dans quel terminal la lancer</h3></div>
+      <p class="step-purpose">La première question que tout le monde se pose après avoir lu le §15 : où est <code>pick_and_place_demo.launch.py</code>, et depuis quel terminal taper <code>ros2 launch pick_and_place_demo.launch.py</code> ?</p>
+      <p class="prose">Le fichier est <code>launch/pick_and_place_demo.launch.py</code> dans ce projet, soit <code>~/tomislav/robotics/mycobot_320pi_R6A_tomislav_02_10_2026/Headless_Task-Grounded_Pick-and-Place_in_Gazebo/launch/pick_and_place_demo.launch.py</code> sur le portable (adaptez le préfixe à l'endroit où vous avez cloné le dépôt). Son voisin <code>pick_and_place_no_gui_demo.launch.py</code> est la variante sans interface graphique.</p>
+      <p class="prose"><b><code>ros2 launch pick_and_place_demo.launch.py</code></b><b> ne fonctionne pas tel quel depuis n'importe quel répertoire.</b> Ce projet n'est pas un paquet ROS : il n'a pas de <code>package.xml</code> et n'est jamais compilé avec <code>colcon</code>, donc <code>ros2 launch</code> ne peut pas trouver le fichier par son nom. Il accepte en revanche un chemin de fichier : soit le chemin complet, soit le nom seul quand le répertoire courant est le répertoire <code>launch/</code> lui-même.</p>
+      <p class="prose"><b>Il ne fonctionne pas non plus depuis votre terminal Ubuntu habituel.</b> Le fichier launch démarre <code>scripts/run_demo.py</code>, qui a besoin de ROS2 Jazzy, Gazebo Harmonic, MoveIt2, <code>moveit_py</code>, et des paquets <code>gazebo_to_lerobot_bringup</code> et <code>mycobot_moveit_config</code>. Tout cela n'existe que dans le conteneur Docker <code>gazebo_to_lerobot</code>. Vous utiliserez deux sortes de terminaux, et l'invite de commande indique dans lequel vous êtes :</p>
+      <div class="table-wrap"><table><thead><tr><th>Terminal</th><th>L'invite ressemble à</th><th>Sert à</th></tr></thead><tbody><tr><td>Terminal hôte : un terminal Ubuntu (WSL) normal sur le portable</td><td><code>tilic@LAPTOP-7BFDQAO6:~$</code></td><td>Démarrer Docker, <code>docker build</code>, <code>docker cp</code>, <code>docker exec</code>, copier des fichiers</td></tr><tr><td>Shell du conteneur : ouvert avec <code>docker exec -it gazebo_to_lerobot bash</code></td><td><code>root@c76def923a51:/workspace#</code></td><td><code>ros2 …</code>, <code>gz …</code>, <code>colcon</code>, et le fichier launch lui-même</td></tr></tbody></table></div>
+      <p class="prose">Dans le conteneur, les fichiers launch se trouvent dans <code>/workspace/htgpp/launch/</code> une fois que le §23 les y a copiés. La forme exacte de la commande du §15 fonctionne alors :</p>
+      <pre><span class="c"># shell du conteneur</span>
+source /opt/ros/jazzy/setup.bash
+source /workspace/install/setup.bash
+cd /workspace/htgpp/launch
+ros2 launch pick_and_place_demo.launch.py</pre>
+      <p class="callout warn"><b>Sur un portable WSL2, cette commande seule ne suffit pas.</b> La simulation se fige si le shell n'a pas été ouvert avec <code>-e DISPLAY=:0</code> (§24), et la fenêtre Gazebo qu'elle ouvre reste blanche (§25). Le §27 regroupe tout en une seule commande qui évite les deux.</p>
+    </article>
+
+    <article class="step" id="s17">
+      <div class="step-head"><span class="step-num">17</span><h3>Démarrer le démon Docker</h3></div>
+      <p class="step-purpose">Sur ce type d'installation WSL2, le démon Docker ne démarre pas tout seul, et les commandes habituelles pour le démarrer ne fonctionnent pas.</p>
+      <p class="prose"><b>Symptôme.</b> Toute commande <code>docker</code> répond :</p>
+      <pre>Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?</pre>
+      <p class="prose"><b>Pourquoi les solutions habituelles échouent.</b> Ici WSL tourne sans systemd (<code>ps -p 1 -o comm=</code> affiche <code>init(Ubuntu)</code>), donc <code>sudo systemctl start docker</code> répond <code>System has not been booted with systemd as init system (PID 1). Can't operate.</code>, et il n'existe pas de script <code>/etc/init.d/docker</code>, donc <code>sudo service docker start</code> ne fait rien non plus. Le démon doit être lancé à la main.</p>
+      <p class="panel-tag" style="margin-top:16px">Procédure (terminal hôte)</p>
+      <pre>groups<span class="c">                 # doit contenir 'docker' ; sinon : sudo usermod -aG docker $USER, puis rouvrir WSL</span>
+sudo sh -c 'nohup dockerd &gt; /tmp/dockerd.log 2&gt;&amp;1 &amp;'
+<span class="c"># demande une fois votre mot de passe Linux ; le démon tourne ensuite en arrière-plan</span></pre>
+      <p class="panel-tag" style="margin-top:16px">Vérification</p>
+      <pre>docker ps -a --format '{{.Names}}\t{{.Status}}'</pre>
+      <p class="prose">N'importe quelle liste, même vide, signifie que le démon répond. Si <code>docker</code> ne peut toujours pas se connecter, lisez <code>/tmp/dockerd.log</code>.</p>
+      <p class="callout warn"><b>À refaire après chaque redémarrage de Windows ou </b><b><code>wsl --shutdown</code></b><b>.</b> Le démon meurt avec la VM WSL. Constaté le 03/10/2026 : le démon lancé la veille avait disparu le lendemain matin.</p>
+    </article>
+
+    <article class="step" id="s18">
+      <div class="step-head"><span class="step-num">18</span><h3>Construire l'image, si le conteneur n'existe pas</h3></div>
+      <p class="step-purpose">Le 03/10/2026, la liste du §17 ne montrait que cinq conteneurs sans rapport datant de 2022 : pas de <code>gazebo_to_lerobot</code>, et <code>docker images</code> ne montrait pas non plus d'image <code>gazebo_to_lerobot</code>.</p>
+      <p class="prose">Si <code>gazebo_to_lerobot</code> <b>apparaît</b> dans la liste du §17, passez directement au §22 : l'image, le conteneur et son espace de travail existent déjà. Sinon, construisez l'image à partir du projet voisin <code>Gazebo_to_LeRobot_Pipeline</code>, comme le décrit son propre guide (étape 01).</p>
+      <p class="panel-tag" style="margin-top:16px">Procédure (terminal hôte)</p>
+      <pre>cd ~/tomislav/robotics/mycobot_320pi_R6A_tomislav_02_10_2026/Gazebo_to_LeRobot_Pipeline
+docker build -t gazebo_to_lerobot:jazzy-harmonic -f docker/Dockerfile docker</pre>
+      <p class="prose">Cela télécharge l'image de base <code>ros:jazzy-ros-base</code> et y installe ROS desktop, Gazebo Harmonic, ros2_control et MoveIt2. Le résultat fait <b>4,77 Go</b> ; comptez plusieurs dizaines de minutes selon votre connexion.</p>
+      <p class="panel-tag" style="margin-top:16px">Vérification</p>
+      <pre>docker images gazebo_to_lerobot
+<span class="c"># gazebo_to_lerobot   jazzy-harmonic   ...   4.77GB</span></pre>
+      <p class="prose">Le journal de construction se termine par <code>Successfully tagged gazebo_to_lerobot:jazzy-harmonic</code>.</p>
+    </article>
+
+    <article class="step" id="s19">
+      <div class="step-head"><span class="step-num">19</span><h3>Démarrer le conteneur persistant</h3></div>
+      <p class="step-purpose">Un seul conteneur de longue durée, avec les sockets d'affichage WSLg et le périphérique GPU <code>/dev/dxg</code> transmis.</p>
+      <p class="panel-tag" style="margin-top:16px">Procédure (terminal hôte, toujours dans Gazebo_to_LeRobot_Pipeline)</p>
+      <pre>bash docker/run.sh</pre>
+      <p class="prose"><code>run.sh</code> relance <code>docker build</code> (instantané cette fois, toutes les couches sont en cache), puis <code>docker run -d --name gazebo_to_lerobot …</code>, en montant <code>/tmp/.X11-unix</code>, <code>/mnt/wslg</code> et <code>/usr/lib/wsl</code>, et en liant <code>Gazebo_to_LeRobot_Pipeline/src</code> à <code>/workspace/src</code>. Il refuse de s'exécuter si un conteneur de ce nom existe déjà (supprimez-le d'abord avec <code>docker rm -f gazebo_to_lerobot</code> seulement si vous voulez vraiment repartir de zéro : cela efface aussi l'installation du §22).</p>
+      <p class="panel-tag" style="margin-top:16px">Vérification</p>
+      <pre>docker ps --format '{{.Names}}\t{{.Status}}'
+<span class="c"># gazebo_to_lerobot   Up ...</span></pre>
+      <p class="callout warn"><b><code>run.sh</code></b><b> recopie le </b><b><code>DISPLAY</code></b><b> de l'hôte dans le conteneur</b> (<code>-e DISPLAY="${DISPLAY:-:0}"</code>). Sur ce portable, le <code>DISPLAY</code> de l'hôte vaut <code>172.24.112.1:0</code>, ce qui bloque la simulation (§24). C'est pourquoi chaque <code>docker exec</code> suivant de cet addendum passe explicitement <code>-e DISPLAY=:0</code>. <code>run.sh</code> lui-même n'a pas été modifié.</p>
+    </article>
+
+    <article class="step" id="s20">
+      <div class="step-head"><span class="step-num">20</span><h3>Copier la description du robot dans l'espace de travail</h3></div>
+      <p class="step-purpose"><code>Gazebo_to_LeRobot_Pipeline</code> ne conserve que trois fichiers modifiés à la main sous <code>overrides/</code>, pas l'arborescence de maillages de 135 Mo. Les deux paquets du robot doivent être copiés depuis le dépôt principal, puis les overrides appliqués par-dessus (guide du pipeline, étape 03).</p>
+      <p class="panel-tag" style="margin-top:16px">Procédure (terminal hôte, dans Gazebo_to_LeRobot_Pipeline)</p>
+      <pre>mkdir -p src/mycobot_R6A
+cp -r ../mycobot_description ../mycobot_gateway src/mycobot_R6A/
+cp -r overrides/mycobot_description/* src/mycobot_R6A/mycobot_description/
+cp -r overrides/mycobot_gateway/* src/mycobot_R6A/mycobot_gateway/</pre>
+      <p class="panel-tag" style="margin-top:16px">Vérification</p>
+      <pre>for f in $(cd overrides &amp;&amp; find . -type f); do diff -q overrides/$f src/mycobot_R6A/$f &amp;&amp; echo "OK $f"; done
+<span class="c"># OK ./mycobot_gateway/launch/mycobot_teleop.launch.py</span>
+<span class="c"># OK ./mycobot_description/config/controller.yaml</span>
+<span class="c"># OK ./mycobot_description/urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf</span>
+grep -c "&lt;always_on&gt;false" src/mycobot_R6A/mycobot_description/urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf
+<span class="c"># 3</span></pre>
+      <p class="prose"><code>src/mycobot_R6A/</code> est ignoré par git dans <code>Gazebo_to_LeRobot_Pipeline</code>, donc cette copie laisse <code>git status</code> propre. Comme <code>run.sh</code> lie <code>src/</code>, le conteneur voit la copie immédiatement.</p>
+    </article>
+
+    <article class="step" id="s21">
+      <div class="step-head"><span class="step-num">21</span><h3>Compiler l'espace de travail ROS dans le conteneur</h3></div>
+      <p class="step-purpose">Importer les cinq dépôts rosetta, installer leurs dépendances système, et compiler les neuf paquets.</p>
+      <p class="panel-tag" style="margin-top:16px">Procédure (terminal hôte ; la commande s&#x27;exécute dans le conteneur)</p>
+      <pre>docker exec gazebo_to_lerobot bash -c 'source /opt/ros/jazzy/setup.bash &amp;&amp; cd /workspace \
+  &amp;&amp; vcs import src &lt; src/rosetta.repos \
+  &amp;&amp; apt-get update \
+  &amp;&amp; rosdep install --from-paths src --ignore-src -r -y \
+  &amp;&amp; colcon build --symlink-install'</pre>
+      <p class="prose">Quelques minutes au total ; <code>colcon build</code> lui-même a pris 21 s. <code>rosdep</code> affiche une <code>ERROR</code> <b>attendue et sans conséquence</b>, car <code>-r</code> le fait continuer :</p>
+      <pre>ERROR: the following packages/stacks could not have their rosdep keys resolved
+to system dependencies:
+lerobot_rosetta: Cannot locate rosdep definition for [ament_python]
+...  (même ligne pour rosetta, lerobot_teleoperator_rosetta, gazebo_to_lerobot_bringup, lerobot_robot_rosetta)
+Continuing to install resolvable dependencies...</pre>
+      <p class="panel-tag" style="margin-top:16px">Vérification</p>
+      <pre><span class="c"># dernières lignes de la compilation :</span>
+Summary: 9 packages finished [21.3s]
+
+docker exec gazebo_to_lerobot bash -c 'source /opt/ros/jazzy/setup.bash; source /workspace/install/setup.bash; ros2 pkg list | grep -E "mycobot|gazebo_to_lerobot|rosetta"'
+<span class="c"># gazebo_to_lerobot_bringup, lerobot_robot_rosetta, lerobot_rosetta, lerobot_teleoperator_rosetta,</span>
+<span class="c"># mycobot_description, mycobot_gateway, mycobot_moveit_config, rosetta, rosetta_interfaces</span></pre>
+    </article>
+
+    <article class="step" id="s22">
+      <div class="step-head"><span class="step-num">22</span><h3>Installer moveit_py, absent de l'image</h3></div>
+      <p class="step-purpose">Le Dockerfile installe <code>ros-jazzy-moveit</code>, qui <b>n'inclut pas</b> les liaisons Python de MoveIt. <code>precompute_ik.py</code> (§3–4) ne peut pas fonctionner sans elles. Le conteneur dans lequel ce projet a été développé a dû les recevoir à la main ; cette étape n'avait jamais été écrite jusqu'ici.</p>
+      <p class="panel-tag" style="margin-top:16px">Procédure (terminal hôte)</p>
+      <pre>docker exec gazebo_to_lerobot bash -c 'apt-get install -y ros-jazzy-moveit-py'</pre>
+      <p class="prose">Version installée le 03/10/2026 : <code>ros-jazzy-moveit-py 2.12.4-1noble.20260903.100911</code>.</p>
+      <p class="panel-tag" style="margin-top:16px">Vérification</p>
+      <pre>docker exec gazebo_to_lerobot bash -c 'source /opt/ros/jazzy/setup.bash; python3 -c "import moveit; print(\"moveit_py OK\")"'
+<span class="c"># moveit_py OK</span></pre>
+      <p class="callout bug"><b>Symptôme trompeur si vous sautez cette étape.</b> La démo s'arrête environ une seconde après <code>solving IK for the settled block pose</code> avec : <code>FATAL: no reachable elbow-up IK solution for this block position (0.25, 0.0) -- try a position closer to (0.25, 0.00)</code>. La position est correcte. La vraie erreur, visible seulement en lançant <code>python3 precompute_ik.py</code> à la main dans le conteneur, est <code>ModuleNotFoundError: No module named 'moveit'</code>. <code>run_demo.py</code> n'affiche que la sortie standard de <code>precompute_ik.py</code>, donc la trace d'erreur (sur la sortie d'erreur) est perdue et tout échec est présenté comme une position inatteignable. Non corrigé dans <code>run_demo.py</code> ; documenté ici.</p>
+      <p class="callout warn"><b>L'installation vit dans le conteneur, pas dans l'image.</b> Arrêter puis redémarrer le conteneur la conserve. Un <code>docker rm</code> suivi de <code>run.sh</code> redonne un conteneur sans <code>moveit_py</code> : refaites alors cette étape.</p>
+    </article>
+
+    <article class="step" id="s23">
+      <div class="step-head"><span class="step-num">23</span><h3>Copier ce projet dans le conteneur</h3></div>
+      <p class="step-purpose">Le conteneur ne voit jamais le répertoire de ce projet : seul <code>Gazebo_to_LeRobot_Pipeline/src</code> est monté. Tout est copié dans <code>/workspace/htgpp/</code>.</p>
+      <p class="panel-tag" style="margin-top:16px">Procédure (terminal hôte, dans Headless_Task-Grounded_Pick-and-Place_in_Gazebo)</p>
+      <pre>cd ~/tomislav/robotics/mycobot_320pi_R6A_tomislav_02_10_2026/Headless_Task-Grounded_Pick-and-Place_in_Gazebo
+docker exec gazebo_to_lerobot mkdir -p /workspace/htgpp
+for d in launch scripts models contracts; do docker cp $d gazebo_to_lerobot:/workspace/htgpp/; done
+<span class="c"># les scripts doivent AUSSI être à plat dans /workspace/htgpp/ :</span>
+for f in scripts/*.py scripts/*.sh; do docker cp $f gazebo_to_lerobot:/workspace/htgpp/; done</pre>
+      <p class="prose"><b>Pourquoi deux copies des scripts.</b> <code>run_demo.py</code> appelle <code>/workspace/htgpp/precompute_ik.py</code>, et non <code>/workspace/htgpp/scripts/precompute_ik.py</code> : le conteneur a toujours été déployé avec tous les scripts mis à plat à la racine du projet (commentaire du §14 dans le fichier launch). Le fichier launch, lui, trouve <code>run_demo.py</code> aux deux endroits. La seconde boucle installe aussi <code>run_gui_demo.sh</code> (§27) en <code>/workspace/htgpp/run_gui_demo.sh</code>.</p>
+      <p class="panel-tag" style="margin-top:16px">Vérification</p>
+      <pre>docker exec gazebo_to_lerobot ls /workspace/htgpp
+<span class="c"># batch.sh contracts episode.sh grab_frame.py ik_helper.py launch models port_bag.py</span>
+<span class="c"># precompute_ik.py run_demo.py run_gui_demo.sh run_pick_and_place.py scripts status.sh test_ik.py</span></pre>
+      <p class="prose">Refaites cette étape après toute modification des scripts, fichiers launch ou modèles du projet sur l'hôte : le conteneur contient des copies, pas des liens.</p>
+    </article>
+
+    <article class="step" id="s24">
+      <div class="step-head"><span class="step-num">24</span><h3>Vérification sans interface, et la simulation figée (DISPLAY)</h3></div>
+      <p class="step-purpose">Lancez d'abord la variante sans interface : c'est celle que le §15 a vérifiée, elle se termine avec un code réussite/échec, et elle sépare les problèmes de simulation des problèmes d'affichage.</p>
+      <p class="panel-tag" style="margin-top:16px">Procédure (terminal hôte)</p>
+      <pre>docker exec -e DISPLAY=:0 gazebo_to_lerobot bash -c 'source /opt/ros/jazzy/setup.bash; source /workspace/install/setup.bash
+  ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py; echo "exit code: $?"'</pre>
+      <p class="panel-tag" style="margin-top:16px">Vérification</p>
+      <p class="prose">Environ 4 minutes plus tard : <code>RESULT: motions_ok=True placed_on_plate=True grasp_held=True</code>. Le 03/10/2026, les contrôleurs sont devenus actifs 16 à 19 s après <code>launching sim</code>.</p>
+      <p class="callout bug"><b>Symptôme sans </b><b><code>-e DISPLAY=:0</code></b><b> : la simulation est figée.</b> Le journal affiche <code>controllers not all active yet -- respawning the missing ones sequentially</code>, puis environ 4 min 30 plus tard <code>FATAL: controllers never reached 'active' -- see sim.log</code>. Dans <code>/workspace/htgpp/demo/sim.log</code>, le gestionnaire de contrôleurs répète <code>Activating controllers: [ joint_state_broadcaster ]</code> toutes les 60 s et les spawners affichent <code>Failed getting a result from calling /controller_manager/switch_controller</code> ; <code>mycobot_controller</code> n'est même jamais chargé. L'horloge de la simulation n'avance pas : <code>gz topic -e -t /world/empty/clock -n 1</code> (dans le conteneur) expire alors que le topic a bien un éditeur.</p>
+      <p class="prose"><b>Cause.</b> Sur ce portable, le <code>DISPLAY</code> de l'hôte vaut <code>172.24.112.1:0</code> (vérifiez avec <code>echo $DISPLAY</code> dans un terminal hôte) : l'adresse d'un serveur X externe (de type VcXsrv) que rien ne sert. <code>run.sh</code> la transmet au conteneur. Le capteur caméra du monde simulé a besoin d'un contexte OpenGL ; son ouverture bloque sur cette adresse morte, et comme les capteurs sont mis à jour pendant le pas de simulation, toute la simulation s'arrête. Le même blocage se voit directement : <code>glxinfo -B</code> dans le conteneur ne rend jamais la main. L'affichage propre de WSLg, <code>:0</code> (socket <code>/tmp/.X11-unix/X0</code>), fonctionne :</p>
+      <pre>docker exec -e DISPLAY=:0 gazebo_to_lerobot glxinfo -B | grep renderer
+<span class="c"># OpenGL renderer string: D3D12 (Intel(R) Iris(R) Xe Graphics)</span></pre>
+      <p class="prose"><b>Correction.</b> Passez <code>-e DISPLAY=:0</code> à <b>chaque</b> <code>docker exec</code> qui lance la simulation, y compris <code>docker exec -it -e DISPLAY=:0 gazebo_to_lerobot bash</code> quand vous ouvrez un shell dans le conteneur. <code>run_gui_demo.sh</code> (§27) le fait lui-même.</p>
+    </article>
+
+    <article class="step" id="s25">
+      <div class="step-head"><span class="step-num">25</span><h3>La fenêtre Gazebo blanche : utiliser l'OpenGL logiciel</h3></div>
+      <p class="step-purpose">Avec <code>DISPLAY=:0</code>, <code>pick_and_place_demo.launch.py</code> tourne et la fenêtre Gazebo s'ouvre, mais sa vue 3D reste entièrement blanche pendant toute l'exécution, alors que le journal montre le bras effectuer toute la séquence.</p>
+      <p class="prose"><b>Cause.</b> Via WSLg, le GPU Intel est atteint par la couche de traduction D3D12 de Mesa, qui n'offre qu'OpenGL 4.1, sans compute shaders. <code>~/.gz/rendering/ogre2.log</code> dans le conteneur indique <code>GL_RENDERER = D3D12 (Intel(R) Iris(R) Xe Graphics)</code>, <code>GL_VERSION = 4.1 (Core Profile)</code> et <code>Compute programs: no</code>. Le moteur par défaut de Gazebo, <code>ogre2</code>, dessine une vue blanche dans ces conditions. L'ancien moteur (<code>gz sim -g --render-engine ogre</code>) a été essayé et était blanc lui aussi : le problème vient donc du chemin D3D12, pas du moteur.</p>
+      <p class="prose"><b>Correction.</b> Faire calculer le rendu par Mesa sur le CPU (llvmpipe), qui offre OpenGL 4.5. Trois variables d'environnement ; la troisième reçoit une valeur <b>vide</b> pour annuler le <code>MESA_LOADER_DRIVER_OVERRIDE=d3d12</code> que <code>run.sh</code> place dans le conteneur :</p>
+      <pre>LIBGL_ALWAYS_SOFTWARE=1
+GALLIUM_DRIVER=llvmpipe
+MESA_LOADER_DRIVER_OVERRIDE=</pre>
+      <p class="panel-tag" style="margin-top:16px">Vérification</p>
+      <pre>docker exec -e DISPLAY=:0 -e LIBGL_ALWAYS_SOFTWARE=1 -e GALLIUM_DRIVER=llvmpipe -e MESA_LOADER_DRIVER_OVERRIDE= \
+  gazebo_to_lerobot glxinfo -B | grep -E 'renderer string|core profile version'
+<span class="c"># OpenGL renderer string: llvmpipe (LLVM 20.1.2, 256 bits)</span>
+<span class="c"># OpenGL core profile version string: 4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.4</span></pre>
+      <p class="prose"><b>Premier essai : une seconde fenêtre.</b> Une seconde interface lancée avec ces variables et connectée à la simulation déjà en cours affichait correctement la scène :</p>
+      <pre>docker exec -e DISPLAY=:0 -e LIBGL_ALWAYS_SOFTWARE=1 -e GALLIUM_DRIVER=llvmpipe -e MESA_LOADER_DRIVER_OVERRIDE= \
+  gazebo_to_lerobot bash -c 'source /opt/ros/jazzy/setup.bash; gz sim -g --force-version 8'</pre>
+      <p class="callout warn"><b>Pourquoi cette approche à deux fenêtres a été abandonnée.</b> Elle exige d'ouvrir un second terminal au bon moment. <code>controllers active</code> défile moins de 20 s après le démarrage ; le temps que la seconde fenêtre soit ouverte et zoomée, le bras avait terminé et il ne restait qu'une scène immobile. Le §27 donne plutôt ces variables au launch lui-même, si bien que l'unique fenêtre qu'il ouvre est rendue correctement dès le départ. Coût mesuré : aucun au démarrage (contrôleurs actifs en 20 s, comme avec le GPU) ; le mouvement dans la fenêtre est un peu moins fluide.</p>
+    </article>
+
+    <article class="step" id="s26">
+      <div class="step-head"><span class="step-num">26</span><h3>La vue minuscule, et la caméra qui se dézoome toute seule</h3></div>
+      <p class="step-purpose">Une fois la fenêtre rendue, le bras est tout petit au milieu de la vue. Deux causes distinctes, dont l'une donne l'impression que Gazebo se dézoome tout seul.</p>
+      <p class="prose"><b>Cause 1 : la boîte englobante du robot inclut le support de caméras.</b> Les quatre caméras de la scène (avant, gauche, droite, dessus) sont des liens du modèle <code>mycobot_320</code>, donc sa boîte englobante couvre tout le support. <b>Move to</b> sur <code>mycobot_320</code> dans l'Entity Tree vole jusqu'au bras puis cadre toute cette boîte, ce qui dézoome à nouveau. C'est signalé dans les commentaires de <code>sim_full.launch.py</code>.</p>
+      <p class="prose"><b>Cause 2 : le mode Follow.</b> Si <b>Follow</b> a été choisi un jour pour <code>mycobot_320</code>, la caméra de l'interface reste accrochée au robot à 3 m en arrière et 2 m au-dessus, et y revient après chaque zoom, même après <b>Move to</b> sur <code>red_block</code>. Vérifié dans le conteneur :</p>
+      <pre>gz topic -e -t /gui/currently_tracked -n 1
+<span class="c"># track_mode: FOLLOW</span>
+<span class="c"># follow_target { name: "mycobot_320" }</span>
+<span class="c"># follow_offset { x: -3  z: 2 }</span></pre>
+      <p class="panel-tag" style="margin-top:16px">Correction à la main (dans la fenêtre Gazebo)</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)"><li>Clic droit sur une zone vide de la vue 3D, puis <b>Unfollow</b> (aussi disponible dans le menu clic droit de l'entité dans l'Entity Tree).</li><li>Puis clic droit sur <code>red_block</code> (ou <code>plate</code>) dans l'Entity Tree, et <b>Move to</b>. N'utilisez ni <b>Move to</b> ni <b>Follow</b> sur <code>mycobot_320</code>.</li></ul>
+      <p class="panel-tag" style="margin-top:16px">Correction par commande (shell du conteneur, ouvert avec -e DISPLAY=:0)</p>
+      <pre><span class="c"># arrêter le suivi</span>
+gz service -s /gui/follow --reqtype gz.msgs.StringMsg --reptype gz.msgs.Boolean --timeout 5000 --req 'data: ""'
+<span class="c"># placer la caméra en (0,65, -0,55, 0,45) m, regardant la zone de travail autour de (0,18, -0,06, 0,05) m</span>
+gz service -s /gui/move_to/pose --reqtype gz.msgs.GUICamera --reptype gz.msgs.Boolean --timeout 5000 \
+  --req 'pose: {position: {x: 0.65, y: -0.55, z: 0.45}, orientation: {w: 0.37847, x: -0.24197, y: 0.10319, z: 0.88745}}'
+<span class="c"># chacune affiche : data: true</span></pre>
+      <p class="prose">L'orientation est le quaternion correspondant à roulis 0, tangage 0,532 rad (regard vers le bas), lacet 2,335 rad (vers la zone de travail). Après ces deux commandes, <code>gz topic -e -t /gui/currently_tracked -n 1</code> n'affiche plus rien, ce qui signifie qu'aucun suivi n'est actif, et la vue reste proche. <code>run_gui_demo.sh</code> (§27) envoie la seconde commande automatiquement.</p>
+    </article>
+
+    <article class="step" id="s27">
+      <div class="step-head"><span class="step-num">27</span><h3>run_gui_demo.sh : toute la démo GUI en une seule commande</h3></div>
+      <p class="step-purpose">Nouveau fichier <code>scripts/run_gui_demo.sh</code>. Il enveloppe <code>pick_and_place_demo.launch.py</code> avec les trois corrections ci-dessus : la personne qui regarde tape une seule commande dans un seul terminal et voit le bras bouger dès le début, de près.</p>
+      <p class="prose">Ce qu'il fait, dans l'ordre :</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)"><li>Il fixe <code>DISPLAY=:0</code> (§24) et les trois variables d'OpenGL logiciel (§25). Le launch, <code>run_demo.py</code>, <code>sim_full.launch.py</code> et l'interface de Gazebo en héritent, donc l'unique fenêtre qui s'ouvre est rendue correctement.</li><li>Il source <code>/opt/ros/jazzy/setup.bash</code> et <code>/workspace/install/setup.bash</code>, pour que vous n'ayez pas à les taper.</li><li>Il lance un assistant en arrière-plan qui attend que l'interface propose le service <code>/gui/move_to/pose</code>, attend encore 8 s que la scène se charge, envoie la commande caméra du §26 et affiche <code>[run_gui_demo] GUI camera framed on the arm</code>.</li><li>Il exécute <code>ros2 launch pick_and_place_demo.launch.py</code> depuis <code>/workspace/htgpp/launch</code>, en transmettant les arguments supplémentaires (<code>block_x:=…</code>, <code>block_y:=…</code>, <code>record:=…</code>).</li><li>En sortie (Ctrl+C ou fin du launch), il arrête l'assistant et tue tout <code>move_group</code> ou <code>gz sim</code> encore en cours. Le 03/10/2026, un Ctrl+C dans un terminal interactif avait laissé un <code>move_group</code> derrière lui, ce qui ferait échouer l'exécution suivante.</li></ul>
+      <p class="panel-tag" style="margin-top:16px">Installation (terminal hôte, dans Headless_Task-Grounded_Pick-and-Place_in_Gazebo)</p>
+      <pre>docker cp scripts/run_gui_demo.sh gazebo_to_lerobot:/workspace/htgpp/run_gui_demo.sh
+<span class="c"># (déjà fait si la seconde boucle du §23 a été lancée après la création de ce fichier)</span></pre>
+      <p class="panel-tag" style="margin-top:16px">Exécution (terminal hôte)</p>
+      <pre>docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh
+docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh block_x:=0.28 block_y:=0.05</pre>
+      <p class="prose">Ni <code>-e DISPLAY=:0</code> ni lignes <code>source</code> ne sont nécessaires ici : le script les fixe lui-même. Gardez <code>-it</code>, pour que Ctrl+C atteigne le launch.</p>
+      <p class="panel-tag" style="margin-top:16px">Vérification : l&#x27;exécution du 03/10/2026, minute par minute</p>
+      <div class="table-wrap"><table><thead><tr><th>Heure</th><th>Ligne du terminal</th><th>Ce que montre la fenêtre Gazebo</th></tr></thead><tbody><tr><td>04:25:27</td><td><code>gui=True record=False block=(0.25,0.0) attach_mode=simulated</code></td><td>Rien encore</td></tr><tr><td>04:25:31</td><td><code>launching sim (GUI)...</code></td><td>La fenêtre Gazebo s'ouvre, rendue (grille du sol, bras, support de caméras)</td></tr><tr><td>quelques s après</td><td><code>[run_gui_demo] GUI camera framed on the arm</code></td><td>La vue saute près du bras</td></tr><tr><td>04:25:51</td><td><code>controllers active. Spawning plate and block...</code></td><td>L'assiette et le cube rouge apparaissent</td></tr><tr><td>04:26:12</td><td><code>block settled at (0.25, 0.0, 0.02049)</code></td><td>Le cube repose sur le sol</td></tr><tr><td>04:26:12</td><td><code>solving IK for the settled block pose ...</code></td><td>Scène immobile (environ 35 s)</td></tr><tr><td>04:26:48</td><td><code>starting move_group...</code></td><td>Scène immobile (environ 60 s)</td></tr><tr><td>04:27:49</td><td><code>running the pick-and-place sequence...</code></td><td>Le bras bouge : approche, descente, fermeture, levée, transport, dépose, ouverture, retrait, retour</td></tr><tr><td>04:30:00</td><td><code>RESULT: motions_ok=True placed_on_plate=True grasp_held=True</code></td><td>Cube sur l'assiette, bras revenu en position initiale</td></tr></tbody></table></div>
+      <p class="prose">Au total : environ 4 min 30, dont les 2 dernières minutes de mouvement du bras. Observé et confirmé le 03/10/2026 : la fenêtre était rendue, la vue était proche dès le départ, et le bras a été vu porter le cube rouge jusqu'à l'assiette.</p>
+      <p class="callout"><b>La fenêtre reste ouverte volontairement</b> après <code>RESULT</code>, sur la scène finale (§15). Appuyez sur <b>Ctrl+C</b> dans le terminal pour tout arrêter ; relancez la même commande pour regarder une nouvelle exécution.</p>
+    </article>
+
+    <article class="step" id="s28">
+      <div class="step-head"><span class="step-num">28</span><h3>Se déplacer dans la fenêtre Gazebo (y compris avec un trackball)</h3></div>
+      <p class="step-purpose">Les commandes de vue de base de Gazebo Harmonic. Elles ne déplacent que votre point de vue, jamais la simulation.</p>
+      <div class="table-wrap"><table><thead><tr><th>Action</th><th>Souris avec molette</th><th>Trackball sans molette</th></tr></thead><tbody><tr><td>Zoom</td><td>Molette (zoome vers le point sous le curseur)</td><td>Maintenir le bouton <b>droit</b> et rouler la boule vers l'avant (zoom avant) ou l'arrière (zoom arrière)</td></tr><tr><td>Déplacer la vue</td><td>Maintenir le bouton gauche et glisser</td><td>Maintenir le bouton gauche et rouler</td></tr><tr><td>Tourner autour (orbite)</td><td>Maintenir le bouton du milieu (appui sur la molette) et glisser</td><td><b>Maj</b> + bouton gauche, et rouler</td></tr><tr><td>Sélectionner un objet</td><td>Clic gauche</td><td>Clic gauche</td></tr><tr><td>Menu contextuel</td><td>Clic droit bref</td><td>Clic droit bref (seul l'appui maintenu avec mouvement zoome)</td></tr></tbody></table></div>
+      <ul style="max-width:70ch;color:var(--ink-soft)"><li>Placez le curseur sur le cube rouge <b>avant</b> de zoomer : le zoom se dirige vers le point sous le curseur.</li><li><b>Move to</b> sur <code>red_block</code> ou <code>plate</code> (clic droit dans l'Entity Tree) les cadre de près. Évitez <b>Move to</b> et <b>Follow</b> sur <code>mycobot_320</code> (§26).</li><li>En bas à gauche, <b>▶ / ⏸</b> lance ou met en pause la simulation : ne la laissez pas en pause, sinon la démo s'arrête. En bas à droite, <b>RTF</b> est le facteur temps réel ; bien en dessous de 100 % est normal sur ce portable.</li><li>Beaucoup de trackballs (Logitech Ergo/M575, Kensington Expert/Orbit et d'autres) peuvent émuler une molette (anneau de défilement, ou bouton maintenu + boule) via leur logiciel Windows (Logi Options+, KensingtonWorks).</li></ul>
+      <p class="callout warn"><b>N'utilisez pas les outils Translate (T) et Rotate (R)</b> de la barre du haut : ils déplacent les objets dans la simulation elle-même, pas la caméra. Faire glisser le cube ou le bras gâche l'exécution. Appuyez sur <b>Échap</b> pour revenir au mode sélection.</p>
+    </article>
+
+    <article class="step" id="s29">
+      <div class="step-head"><span class="step-num">29</span><h3>Lire le résultat dans le terminal</h3></div>
+      <p class="step-purpose">Ce que signifie la fin du journal, sur l'exécution reproductible (bloc en (0,25, 0,00)).</p>
+      <pre>[pick_and_place]: [place] correction 1: max_err=0.0057 rad
+[pick_and_place]: SIMULATED ATTACHMENT: releasing block from link6
+[pick_and_place]: [release] gripper reached -0.045 (target 0.0)
+[pick_and_place]: [retreat] move OK
+[pick_and_place]: [home_final] move OK
+All motions succeeded: True
+Block carried (dz constant AND block rose through lift+transport): True
+Grasp held (dz constant through lift+transport): True
+Block final pose: (0.19744, -0.151968, 0.068)  placed on plate: True
+RESULT: motions_ok=True placed_on_plate=True grasp_held=True</pre>
+      <ul style="max-width:70ch;color:var(--ink-soft)"><li><code>move OK</code> : l'action MoveGroup a signalé un succès pour cette phase. Les lignes <code>correction N: max_err=…</code> sont l'ajustement en boucle fermée du §5, pas des erreurs.</li><li><code>dz</code> est la hauteur de la pince moins celle du cube. Constant pendant la levée et le transport alors que le cube monte, il prouve que le cube a vraiment été porté (§6).</li><li>Pose finale (0,197, −0,152, 0,068) : environ 3 mm du centre de l'assiette (0,20, −0,15). La hauteur est cohérente aussi : 0,068 m = dessus de l'assiette (0,044 + 0,004 = 0,048 m) + moitié du cube de 4 cm (0,020 m), donc le cube repose sur l'assiette.</li><li><code>SIMULATED ATTACHMENT</code> : le cube est porté par une soudure Gazebo scriptée, fermée quand la pince se ferme et ouverte quand elle s'ouvre (§8–9), pas par friction.</li><li><code>motions_ok</code>, <code>placed_on_plate</code> et <code>grasp_held</code> doivent tous trois valoir <code>True</code> pour une réussite. Les mêmes valeurs sont dans <code>/workspace/htgpp/demo/grasp_meta.json</code>.</li></ul>
+    </article>
+
+    <article class="step" id="s30">
+      <div class="step-head"><span class="step-num">30</span><h3>Arrêter, relancer, et processus résiduels</h3></div>
+      <p class="step-purpose">Un arrêt propre compte : un <code>move_group</code> ou un Gazebo restant de l'exécution précédente fait échouer la suivante.</p>
+      <p class="prose"><b>Arrêter :</b> Ctrl+C dans le terminal qui exécute <code>run_gui_demo.sh</code> (ou le launch). <b>Vérifier</b> depuis un terminal hôte qu'il ne reste rien :</p>
+      <pre>docker exec gazebo_to_lerobot pgrep -af "gz sim|move_group|ros2 launch"
+<span class="c"># rien d'affiché = propre (les lignes marquées &lt;defunct&gt; sont des zombies déjà morts, sans conséquence)</span></pre>
+      <p class="prose">S'il reste quelque chose, par exemple le <code>ros2 launch mycobot_moveit_config move_group.launch.py</code> constaté le 03/10/2026 après un Ctrl+C sur le fichier launch seul :</p>
+      <pre>docker exec gazebo_to_lerobot pkill -INT -f move_group
+docker exec gazebo_to_lerobot pkill -INT -f "gz sim"
+<span class="c"># quelques secondes plus tard, si c'est encore là :</span>
+docker exec gazebo_to_lerobot pkill -9 -f move_group
+docker exec gazebo_to_lerobot pkill -9 -f "gz sim"</pre>
+      <p class="callout bug"><b>N'enveloppez pas </b><b><code>pkill -f</code></b><b> dans </b><b><code>bash -c</code></b><b>.</b> <code>docker exec gazebo_to_lerobot bash -c 'pkill -f move_group; …'</code> tue son propre shell : le motif figure dans la ligne de commande de ce shell, donc <code>pkill</code> le reconnaît, et la commande se termine avec le code 137 ou 143 sans aller au bout. C'est arrivé quatre fois le 03/10/2026. Appelez <code>pkill</code> directement via <code>docker exec</code>, comme ci-dessus.</p>
+      <p class="prose"><b>Relancer :</b> exécutez à nouveau la même commande <code>docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh …</code>. Chaque exécution redémarre la simulation de zéro.</p>
+      <p class="prose"><b>Fin de session :</b> <code>docker stop gazebo_to_lerobot</code> (facultatif ; le conteneur conserve <code>moveit_py</code> et l'espace de travail compilé). La fois suivante, commencez par la version courte en tête de cet addendum.</p>
+    </article>
+
+    <section class="block" id="addendum2-trouble">
+      <h2>Récapitulatif des problèmes</h2>
+      <div class="table-wrap"><table><thead><tr><th>Ce que vous voyez</th><th>Cause</th><th>Correction</th></tr></thead><tbody><tr><td><code>Cannot connect to the Docker daemon</code></td><td>Démon non démarré (pas de systemd dans WSL)</td><td>§17</td></tr><tr><td><code>docker ps -a</code> ne montre pas <code>gazebo_to_lerobot</code></td><td>Image et conteneur jamais construits sur cette machine</td><td>§18–§23</td></tr><tr><td><code>controllers not all active yet</code>, puis <code>FATAL: controllers never reached 'active'</code></td><td>Le <code>DISPLAY=172.24.112.1:0</code> de l'hôte, transmis au conteneur, fige la simulation</td><td><code>-e DISPLAY=:0</code> (§24)</td></tr><tr><td><code>FATAL: no reachable elbow-up IK solution</code> environ 1 s après <code>solving IK</code>, pour une position atteignable</td><td><code>moveit_py</code> non installé ; vraie erreur masquée</td><td>§22</td></tr><tr><td>La fenêtre Gazebo s'ouvre mais reste blanche</td><td>Chemin GPU D3D12 : OpenGL 4.1, sans compute shaders</td><td>OpenGL logiciel (§25), intégré à <code>run_gui_demo.sh</code></td></tr><tr><td>Bras minuscule ; la vue se dézoome après chaque zoom avant</td><td>Follow sur <code>mycobot_320</code> (3 m en arrière, 2 m au-dessus) ; boîte englobante incluant les caméras</td><td>Unfollow, Move to <code>red_block</code> (§26)</td></tr><tr><td>La seconde fenêtre s'ouvre trop tard : bras déjà immobile</td><td>Approche à deux terminaux</td><td><code>run_gui_demo.sh</code> (§27)</td></tr><tr><td>Pas de molette</td><td>Trackball</td><td>Le glisser bouton droit zoome (§28)</td></tr><tr><td>L'exécution suivante échoue tout de suite après un Ctrl+C</td><td><code>move_group</code> / <code>gz sim</code> résiduel</td><td>§30</td></tr><tr><td><code>docker exec … bash -c 'pkill -f …'</code> se termine avec le code 137/143</td><td><code>pkill -f</code> a reconnu son propre shell</td><td>Appeler <code>pkill</code> sans <code>bash -c</code> (§30)</td></tr></tbody></table></div>
+      <h3 style="margin-top:26px;font-size:1.1rem">Ce qui n'a pas été modifié</h3>
+      <p class="prose">Pour que cet addendum reste un relevé fidèle, les fichiers partagés ont été laissés tels quels ; les corrections vivent dans les commandes ci-dessus et dans le nouveau <code>run_gui_demo.sh</code>. Trois corrections permanentes sont proposées, non appliquées :</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)"><li><code>Gazebo_to_LeRobot_Pipeline/docker/Dockerfile</code> : ajouter <code>ros-jazzy-moveit-py</code>, ce qui rendrait le §22 inutile.</li><li><code>Gazebo_to_LeRobot_Pipeline/docker/run.sh</code> : transmettre <code>DISPLAY=:0</code> au lieu du <code>DISPLAY</code> de l'hôte sous WSLg, ce qui rendrait inutile le <code>-e DISPLAY=:0</code> du §24.</li><li><code>scripts/run_demo.py</code> : afficher la sortie d'erreur de <code>precompute_ik.py</code> en cas d'échec, pour qu'un module manquant ne soit plus présenté comme une position inatteignable (§22).</li></ul>
+    </section>
 
     <!-- ===================================================== LADDER ===================================================== -->
     <section class="block" id="ladder">
@@ -955,6 +1243,7 @@ ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py --show-
 <span class="c"># rien affich&eacute; = propre. Les entr&eacute;es marqu&eacute;es &lt;defunct&gt; sont des processus</span>
 <span class="c"># zombies d&eacute;j&agrave; morts en attente d'&ecirc;tre r&eacute;colt&eacute;s -- inoffensifs, ne retiennent aucune ressource, sans danger.</span></pre>
       <p class="callout warn"><b>Premi&egrave;re ex&eacute;cution sur un conteneur neuf&nbsp;?</b> Le dossier <code>waypoints/</code> pr&eacute;-r&eacute;solu du &sect;10 n'est pas n&eacute;cessaire ici&nbsp;: le chemin de d&eacute;tection live du &sect;13 r&eacute;sout l'IK pour l&agrave; o&ugrave; le bloc atterrit r&eacute;ellement, chaque fois, pour n'importe quelle position pass&eacute;e.</p>
+      <p class="callout"><b>Regarder la variante GUI sur un portable WSL2 :</b> la commande GUI simple ci-dessus s'y fige ou y affiche une fenêtre blanche. Utilisez plutôt <code>docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh</code>, après l'installation unique des §17–§23 (voir §27).</p>
     </section>
 
     <section class="block" id="manifest">
@@ -978,7 +1267,8 @@ ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py --show-
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; episode.sh, batch.sh<span class="c">             # &sect;10, le pilote d'enregistrement par &eacute;pisode</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; status.sh<span class="c">                        # &sect;11, &eacute;tat du lot v&eacute;rit&eacute;-disque</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; port_bag.py<span class="c">                      # &sect;12, conversion du jeu de donn&eacute;es sans torch</span><br>
-&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; run_demo.py<span class="c">                      # &sect;14, orchestrateur derri&egrave;re les deux fichiers launch</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; run_demo.py<span class="c">                      # &sect;14, orchestrateur derri&egrave;re les deux fichiers launch</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; run_gui_demo.sh<span class="c">                  # &sect;27, démo GUI en une commande pour WSL2 (03/10/2026)</span><br>
 &#9500;&#9472;&#9472; contracts/<span class="c">                          # &sect;10, contrats rosetta cam&eacute;ra avant et cam&eacute;ra tenue &agrave; l'&eacute;cart</span><br>
 &#9500;&#9472;&#9472; datasets/<span class="c">                           # &sect;12, meta/README suivis&nbsp;; charge utile parquet/mp4 dans .gitignore</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; mycobot_pick_place_train/<br>
@@ -987,6 +1277,6 @@ ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py --show-
       <p class="prose">Les bags enregistr&eacute;s eux-m&ecirc;mes (&asymp;1,7&nbsp;Go pour 20 &eacute;pisodes) ne vivent que dans le conteneur <code>gazebo_to_lerobot</code>, sous <code>/workspace/htgpp/episodes/</code>, ni dans ce d&eacute;p&ocirc;t ni dans les dossiers de jeux de donn&eacute;es ci-dessus &mdash; r&eacute;g&eacute;n&eacute;rables via <code>batch.sh</code>, pas quelque chose &agrave; versionner.</p>
     </section>
 
-    <footer>Rapport Headless_Task-Grounded_Pick-and-Place_in_Gazebo &middot; &eacute;crit le 22/09/2026 &middot; commit 5c92a565 sur main &middot; Tomislav Ilic</footer>
+    <footer>Rapport Headless_Task-Grounded_Pick-and-Place_in_Gazebo &middot; &eacute;crit le 22/09/2026 &middot; mis &agrave; jour le 03/10/2026 &middot; commit 5c92a565 sur main &middot; Tomislav Ilic</footer>
   </main>
 </div>
