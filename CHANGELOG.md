@@ -9,6 +9,23 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — action commandée et conversion LeRobot vérifiée (10/10)
+
+- **Action = commande des contrôleurs**, plus l'état mesuré :
+  `scripts/commanded_action_relay.py` republie en `JointState`
+  (`/tri_sort/commanded_action`) la consigne interpolée du bras
+  (`/mycobot_controller/controller_state`, `reference`) et la dernière
+  commande de pince. Mesuré sur le cube rouge : l'action précède l'état d'une
+  image (0,1 s), écart résiduel 0,02-0,22° par articulation à ce décalage ;
+  la pince montre le serrage (commande −0,823, bloquée à −0,804 sur le cube).
+- **Conversion LeRobot par `rosetta_port`** (écrivain LeRobot officiel) dans
+  `/workspace/venv_lerobot` du conteneur : lerobot 0.6.1, torch 2.11 CPU,
+  plus protobuf, grpcio et scipy récents (ceux d'Ubuntu sont trop anciens
+  pour numpy 2). ROS n'est pas touché.
+- **Rechargé par `LeRobotDataset`** (`scripts/check_lerobot_dataset.py`,
+  `check_action_lead.py`) : 172 images à 10 fps, 3 caméras 480×640,
+  état/action 7 valeurs nommées, instruction présente, 3 Mo par épisode.
+
 ### Ajouté — enregistrement rosetta du tri d'Osama, un épisode par prise-dépôt (10/10)
 
 - **`contracts/mycobot_tri_sort.yaml`** (HTGSPP) : caméras `top`, `right`,

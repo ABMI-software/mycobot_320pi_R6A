@@ -33,6 +33,10 @@ until ros2 control list_controllers 2>/dev/null | grep -q 'gripper_position_cont
 done
 stage "controllers active"
 
+python3 "$HERE/commanded_action_relay.py" > "$D/relay.log" 2>&1 &
+until timeout 10 ros2 topic echo --once /tri_sort/commanded_action >/dev/null 2>&1; do sleep 2; done
+stage "commanded-action relay publishing"
+
 ros2 run rosetta episode_recorder_node --ros-args -p use_sim_time:=true \
     -p contract_path:="$CONTRACT" -p bag_base_dir:="$D/bags" -p record_all:=false \
     > "$D/recorder.log" 2>&1 &
