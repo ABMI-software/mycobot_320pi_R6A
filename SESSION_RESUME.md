@@ -16,7 +16,7 @@
   640×480, 10 Hz, QoS reliable ; action = commande des contrôleurs.
 
 ### Prochaines actions
-1. [ROUGE] Relancer la graine 10 (~19 min) pour le 40e épisode, puis reconvertir.
+1. [FAIT] Graine 10 relancée : 4/4, lot 40/40, jeux de 40 épisodes (10 par instruction).
 2. [JAUNE] Décider le partage d'évaluation (graines réservées, caméra) et la vue unique d'OpenVLA ; enregistrer le jeu RLDS dans la configuration OXE.
 3. [VERT] Pousser `feature/sort-episodes` ; signaler à Osama l'échec de `tests/test_gt_isolation.py` sur `tri_dream_dashboard.py`.
 

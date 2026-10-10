@@ -9,6 +9,19 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — graine 10 relancée : 40/40, jeux de 40 épisodes (10/10)
+
+- Graine 10 réenregistrée (`record_tri_batch.sh 10 10`, 19:09–19:27) : 4/4,
+  le cube bleu poussé de 5 mm seulement cette fois. Premier lancement mis de
+  côté (`seed_010.first_run`), jamais converti. **Lot : 40/40**, 10 épisodes
+  par instruction.
+- Jeux reconvertis : LeRobot `local/mycobot_tri_sort` 40 épisodes,
+  7 049 images, 116 Mo ; RLDS `mycobot_tri_sort` 1.0.0 40 épisodes,
+  7 056 pas, 190 Mo. Les jeux de 39 épisodes restent sous `…_39ep`.
+- `record_tri_batch.sh` : le total ne compte plus que les dossiers
+  `seed_NNN` (il annonçait « 43 OK » en incluant le lancement mis de côté).
+- Documentation mise à jour avec ces chiffres (rapport EN/FR, spécification).
+
 ### Ajouté — lot de 40 épisodes du tri d'Osama, jeux LeRobot et RLDS, documentation (10/10)
 
 - **Lot des graines 1 à 10 d'Osama** (`record_tri_batch.sh`, reprise, chien
