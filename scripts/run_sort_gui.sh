@@ -23,10 +23,10 @@ source /opt/ros/jazzy/setup.bash
 source /workspace/install/setup.bash
 # WSLg display and software OpenGL: the host's forwarded DISPLAY stalls the sim
 # clock, and the GPU path renders runtime-spawned objects white.
-export DISPLAY=:0 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe MESA_LOADER_DRIVER_OVERRIDE=
+export DISPLAY="${TRI_DISPLAY:-:0}" LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe MESA_LOADER_DRIVER_OVERRIDE=
 ros2 daemon stop >/dev/null 2>&1 || true
 
-trap 'kill 0 2>/dev/null' EXIT
+source "$(dirname "$(readlink -f "$0")")/tri_cleanup.sh"
 ros2 launch mycobot_gateway tri_yolo.launch.py seed:="$SEED" piece_reach:=0.28 \
     headless:=false yolo:=false panel:=false randomize_panel:=false > "$LOG/scene.log" 2>&1 &
 

@@ -9,7 +9,7 @@
 **Second acquisition (2026-10-10):** Osama's four-object sort (`tri_yolo`),
 recorded as one episode per pick-and-place and converted to LeRobot and RLDS.
 Its commands are in the last section, "Recording Osama's four-object sort";
-the full account is `doc/FOUR_OBJECT_SORTING_REPORT` addendum §28–41 and
+the full account is `doc/FOUR_OBJECT_SORTING_REPORT` addendum §29–43 and
 the specification's Appendix D.
 
 ## Where each command runs
@@ -149,14 +149,39 @@ gripper contact. Positions come from Gazebo ground truth
 (`sim_sorting_grasp -p pose_source:=ground_truth`), not YOLO. Each
 pick-and-place is one rosetta episode: cameras `top`, `right`, `left` at
 640×480 and 10 Hz, state = 6 joints + gripper, action = what the controllers
-command. Report addendum §28–41 explains every choice.
+command. Report addendum §29–43 explains every choice.
 
-The container runs the copies of the scripts placed in its mount
-(`/workspace/src/scripts`, `scripts/rlds`, `contracts`); the repository copies
-are under this project's `scripts/` and `contracts/`.
+### From a fresh clone, on a bare Linux machine (or WSL2)
+
+Needs only `git` and Docker (and an X display for the Gazebo GUI). Everything
+else is built from this repository: `docker/` holds the image
+(`tri_sort:jazzy-harmonic`, on top of `Gazebo_to_LeRobot_Pipeline/docker`),
+the exact LeRobot environment (`requirements_lerobot.txt`), the rosetta
+packages pinned to the commits used (`rosetta.repos`), and two scripts.
+
+    git clone https://github.com/ABMI-software/mycobot_320pi_R6A.git && cd mycobot_320pi_R6A
+    Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/docker/setup_workspace.sh   # images + ~/tri_sort_ws/src
+    Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/docker/run_container.sh     # containers + colcon build
+
+`setup_workspace.sh [workspace]` builds three images (`gazebo_to_lerobot`,
+`tri_sort`, `rlds_builder`; the first time downloads several GB), clones the
+pinned rosetta packages into `~/tri_sort_ws/src`, and copies into it
+`mycobot_description` and `mycobot_gateway` (repository root),
+`mycobot_moveit_config`, the controller rate of 100 Hz, `sorting_table.sdf`,
+and every script and contract below to `scripts/`, `scripts/rlds/`,
+`contracts/`, `training/dream/`. Re-run it after a `git pull`.
+`run_container.sh [workspace]` starts `gazebo_to_lerobot` (`--shm-size=2g`,
+the X display: `TRI_DISPLAY`; `xhost +local:root` on plain Linux) and
+`rlds_builder`, then runs `rosdep` and `colcon build` inside. `CONTAINER` and
+`RLDS_CONTAINER` change the container names.
+
+The container runs the copies placed in the workspace (`/workspace/src/scripts`,
+`scripts/rlds`, `contracts`); the repository copies are under this project's
+`scripts/`, `contracts/`, `docker/`, and `ROS2_to_RLDS_Conversion_OpenVLA/extraction/`.
 
     # WSL2 host, every new session (WSL2 has no systemd; Docker stops with WSL2)
     sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'; sleep 5
+    # every new session, Linux or WSL2
     docker start gazebo_to_lerobot rlds_builder
 
     # watch a sort with the Gazebo GUI (seed, optional piece list)
@@ -173,9 +198,18 @@ are under this project's `scripts/` and `contracts/`.
     docker exec gazebo_to_lerobot /workspace/src/scripts/convert_tri_sort.sh
     ./scripts/build_rlds_tri_sort_host.sh
 
-    # replay one episode from each dataset in Gazebo (GUI); HEADLESS=1 without the window
-    docker exec -it gazebo_to_lerobot /workspace/src/scripts/replay_gui.sh lerobot
-    ./scripts/replay_rlds_gui_host.sh
+    # replay one episode from each dataset in Gazebo (GUI): <seed> <piece>, default 1 cube_rouge;
+    # HEADLESS=1 without the window
+    docker exec -it gazebo_to_lerobot /workspace/src/scripts/replay_gui.sh lerobot 1 cube_rouge
+    ./scripts/replay_rlds_gui_host.sh 1 cube_rouge
+
+    # pieces: cube_rouge, pave_jaune, cylindre_vert, cube_bleu (Osama's sort order)
+
+Expected results (2026-10-10, Osama's seeds 1–10): 40/40 pick-and-places in
+their bin, each on its first attempt (seed 10 needed a re-run: its blue cube was
+pushed out of reach once; contact physics is not deterministic, so check every
+verdict with `summarise_tri_batch.py`), ~19 min per seed, 19.6 GB of bags;
+LeRobot 40 episodes / 7 049 frames, RLDS 40 episodes / 7 056 steps.
 
 Before a batch: Windows sleep off (`powercfg /change standby-timeout-ac 0`,
 `powercfg /change hibernate-timeout-ac 0`), keep a WSL2 terminal open, mains

@@ -9,6 +9,28 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — reproduction depuis un clone sur machine Linux nue ; PR #17 intégrée (10/10)
+
+- **`Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/docker/`** :
+  `Dockerfile` (`tri_sort:jazzy-harmonic` : `moveit-py`, `venv`, `vcstool`,
+  `/workspace/venv_lerobot` aux versions exactes de
+  `requirements_lerobot.txt`), `rosetta.repos` (rosetta figé sur ses commits),
+  `setup_workspace.sh` (images + espace de travail depuis le dépôt),
+  `run_container.sh` (Linux ou WSL2, `--shm-size=2g`, `TRI_DISPLAY`, colcon).
+  Git et Docker suffisent. Testé depuis zéro : enregistrement, conversion et
+  rejeu du cube rouge de la graine 1, sans processus restant.
+- Corrigé par ce test : `colcon` compilait des projets CMake du venv
+  (`--base-paths src`, `COLCON_IGNORE`) ; `trap 'kill 0'` tuait aussi le
+  shell appelant (code 143, commandes enchaînées coupées) ; remplacé par
+  `scripts/tri_cleanup.sh`, qui s'arrêtait sous `set -e` en laissant une
+  simulation tourner (le rejeu suivant mesurait le cube hors du bac).
+- Rejeux par `<graine> <pièce>` (`meta/tri_sort_sources.json` écrit par
+  `convert_tri_sort.sh` ; RLDS par `file_path`) ; scripts hôte sans chemin
+  propre à l'auteur.
+- **PR #17 intégrée** (jeux LeRobot v3.0 des 60 épisodes, §28, annexe C,
+  SmolVLA) : l'addendum du 10/10 devient §29–43, la spécification garde
+  l'annexe D (D.10 : reproduction).
+
 ### Modifié — graine 10 relancée : 40/40, jeux de 40 épisodes (10/10)
 
 - Graine 10 réenregistrée (`record_tri_batch.sh 10 10`, 19:09–19:27) : 4/4,

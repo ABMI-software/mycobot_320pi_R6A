@@ -20,9 +20,9 @@ CONTRACT=/workspace/src/contracts/mycobot_tri_sort.yaml
 set +u
 source /opt/ros/jazzy/setup.bash
 source /workspace/install/setup.bash
-export DISPLAY=:0 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe MESA_LOADER_DRIVER_OVERRIDE=
+export DISPLAY="${TRI_DISPLAY:-:0}" LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe MESA_LOADER_DRIVER_OVERRIDE=
 ros2 daemon stop >/dev/null 2>&1 || true
-trap 'kill 0 2>/dev/null' EXIT
+source "$(dirname "$(readlink -f "$0")")/tri_cleanup.sh"
 stage() { echo "[$(TZ=Europe/Paris date +%H:%M:%S)] $*" | tee -a "$D/stages.log"; }
 
 ros2 launch mycobot_gateway tri_yolo.launch.py seed:="$SEED" piece_reach:=0.28 \

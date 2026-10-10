@@ -36,6 +36,16 @@ echo "$n OK episodes staged in $STAGE"
 /workspace/venv_lerobot/bin/python -W ignore -m rosetta.robots.ros2.offline.port \
     --raw-dir "$STAGE" --contract /workspace/src/contracts/mycobot_tri_sort.yaml \
     --repo-id "$REPO_ID" --root "$ROOT" 2>&1 | grep -E "frames from|Completed|rror"
+# rosetta_port keeps no source name: record which bag became which episode (it
+# processes the bags sorted by path), for replay_gui.sh <seed> <piece>.
+python3 - "$STAGE" "$ROOT/$REPO_ID/meta/tri_sort_sources.json" <<'PY2'
+import json, sys
+from pathlib import Path
+names = sorted(p.parent.name for p in Path(sys.argv[1]).rglob('metadata.yaml'))
+Path(sys.argv[2]).write_text(json.dumps([{'episode_index': i, 'source': n, 'seed': int(n[5:8]),
+    'piece': n.split('_ep_')[1].rsplit('_a', 1)[0]} for i, n in enumerate(names)], indent=1) + '\n')
+print(f'{len(names)} episode sources -> {sys.argv[2]}')
+PY2
 /workspace/venv_lerobot/bin/python -W ignore "$HERE/check_lerobot_dataset.py" \
     "$ROOT/$REPO_ID" "$REPO_ID" "$ROOT/$(basename "$REPO_ID")_sheet.png" 2>&1 | grep -v "^Svt\|INFO"
 
