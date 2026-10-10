@@ -1,5 +1,30 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (10 octobre 2026 — matin, premier épisode enregistré)
+
+### Ce qui a été accompli aujourd'hui
+1. Choix des 3 caméras : `top` + `right` + `left` (poses réelles, deux cycles
+   d'images, taille des objets sur 40 prises).
+2. Contrat `mycobot_tri_sort.yaml` validé par rosetta ; 10 Hz conservé.
+3. Pilote d'enregistrement + script par graine ; épisode cube rouge graine 1
+   complet après passage des images en `reliable`.
+
+### Décisions prises
+- 3 vues, 640×480 natif, 10 Hz (réglage d'Osama inchangé).
+- Un épisode = une prise-dépôt, du « ▶ » au verdict.
+
+### Prochaines actions
+1. [ROUGE] Conversion : `lerobot` + torch CPU dans le conteneur (`rosetta_port`), image `rlds_builder` pour RLDS — à valider par l'utilisateur.
+2. [JAUNE] Vérifier le jeu LeRobot rechargé par `LeRobotDataset`, et le jeu RLDS.
+3. [VERT] Lot de 40 épisodes (graines 1-10).
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_test /workspace/src/scripts/record_tri_seed.sh 1 cube_rouge'
+```
+
+---
+
 ## État actuel (9 octobre 2026 — après-midi, tri 4/4 sous Docker)
 
 ### Ce qui a été accompli aujourd'hui

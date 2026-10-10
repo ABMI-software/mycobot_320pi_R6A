@@ -1,0 +1,74 @@
+# Contract for recording Osama's four-object sort (tri_yolo.launch.py +
+# sim_sorting_grasp, ABMI-software main 36e2d4d5), one episode per
+# pick-and-place. Setup unchanged; positions from Gazebo ground truth
+# (pose_source:=ground_truth), which never enters this contract (spec A5):
+# observation = images + joint/gripper proprioception only.
+#
+# Cameras: 3 of the scene's 4 (settled 2026-10-10):
+#   top   -- closest to the real Arducam (9.5 deg, 0.18 m); sees the board,
+#            blind at grasp and drop (arm overhead)
+#   right -- closest to the real SVPRO (35 deg, 0.63 m)
+#   left  -- mirror of right: every object always has a close side view
+# front dropped: cuts the destination bin at the frame edge in 21/40 picks of
+# seeds 1-10 (under 75 % visible in 18/40).
+#
+# Images at native 640x480: rosetta requires a declared output size, so each
+# stream carries resize [480, 640], the identity. Resolution lost at
+# recording cannot be recovered, and SmolVLA works at 512x512 (OpenVLA/pi0 at 224 are resized at
+# conversion). The cameras publish at 10 Hz (URDF update_rate), so fps is 10.
+#
+# Images are subscribed RELIABLE: best_effort lost 23-69 % of these 0.9 MB
+# frames in transport (measured 2026-10-10, scene idle, no recorder: 34-65 of
+# 80 per camera best_effort, 80/80 reliable). Gazebo renders every frame.
+#
+# The recorder writes raw messages to the bag; fps and alignment apply at
+# conversion only, so /joint_states stays at its full rate in the bag.
+#
+# action := achieved joint/gripper state, as in mycobot_sorting.yaml (no
+# leader arm). The VLA convention action[t] = state[t+1] is applied at
+# conversion, from the full-rate joint states.
+
+robot_type: mycobot_320_pi
+robot_interface: ros2
+fps: 10
+
+observations:
+  observation.images.top:
+    channel: {topic: /synth_camera_top/image,
+              type: sensor_msgs/msg/Image,
+              qos: {reliability: reliable, history: keep_last, depth: 10}}
+    align: {strategy: hold, timeline: header}
+    apply: [resize: [480, 640]]
+
+  observation.images.right:
+    channel: {topic: /synth_camera_right/image,
+              type: sensor_msgs/msg/Image,
+              qos: {reliability: reliable, history: keep_last, depth: 10}}
+    align: {strategy: hold, timeline: header}
+    apply: [resize: [480, 640]]
+
+  observation.images.left:
+    channel: {topic: /synth_camera_left/image,
+              type: sensor_msgs/msg/Image,
+              qos: {reliability: reliable, history: keep_last, depth: 10}}
+    align: {strategy: hold, timeline: header}
+    apply: [resize: [480, 640]]
+
+  observation.state:
+    channel: {topic: /joint_states, type: sensor_msgs/msg/JointState,
+              qos: {reliability: best_effort, history: keep_last, depth: 50}}
+    align: {strategy: hold, timeline: header}
+    select: [position.joint2_to_joint1, position.joint3_to_joint2,
+             position.joint4_to_joint3, position.joint5_to_joint4,
+             position.joint6_to_joint5, position.joint6output_to_joint6,
+             position.gripper_controller]
+
+actions:
+  action:
+    channel: {topic: /joint_states, type: sensor_msgs/msg/JointState,
+              qos: {reliability: best_effort, history: keep_last, depth: 50}}
+    align: {strategy: hold, timeline: header}
+    select: [position.joint2_to_joint1, position.joint3_to_joint2,
+             position.joint4_to_joint3, position.joint5_to_joint4,
+             position.joint6_to_joint5, position.joint6output_to_joint6,
+             position.gripper_controller]

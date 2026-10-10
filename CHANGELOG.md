@@ -9,6 +9,25 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — enregistrement rosetta du tri d'Osama, un épisode par prise-dépôt (10/10)
+
+- **`contracts/mycobot_tri_sort.yaml`** (HTGSPP) : caméras `top`, `right`,
+  `left` de `tri_yolo` en 640×480 natif, 10 Hz (cadence de l'URDF), état et
+  action = 6 articulations + pince. `front` écartée : coupe le bac de dépôt
+  au bord de l'image dans 21/40 prises (graines 1-10, `view_size_check.py`) ;
+  `top` et `right` sont les plus proches de l'Arducam (9,5°) et de la SVPRO
+  (35°) réelles (`compare_camera_poses.py`).
+- **Images en QoS `reliable`** : en `best_effort`, 23 à 69 % des images de
+  0,9 Mo se perdaient au transport (scène à l'arrêt, sans enregistreur :
+  34-65 sur 80 ; `reliable` : 80/80). Gazebo rend toutes les images.
+- **`scripts/record_tri_sort.py`** : pilote l'enregistreur sur
+  `/pickplace/status` sans modifier `sim_sorting_grasp` — « ▶ pièce » ouvre
+  un épisode avec son instruction, le verdict le ferme ; un JSON par épisode.
+  **`scripts/record_tri_seed.sh <graine> [pièces]`** : une graine de bout en bout.
+- Graine 1, cube rouge : 1 épisode, 17,3 s simulées, 173/172/172 images
+  (attendu ~172, aucun trou), 1 729 états articulaires, 457 Mo ; dans le bac
+  à +7/0 mm. Conversion LeRobot / RLDS pas encore faite.
+
 ### Ajouté — tri des quatre objets sous Docker, positions vérité terrain (09/10)
 
 - **`sim_sorting_grasp -p pose_source:=ground_truth`** : la scène `tri_yolo`
