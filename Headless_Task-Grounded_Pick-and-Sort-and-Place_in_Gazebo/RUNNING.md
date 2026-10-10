@@ -6,6 +6,12 @@
 (`MEASUREMENTS.md` §10, `datasets/README.md`). The history before that
 (the smoke-test blockers of 2026-09-23) is in `doc/SMOKE_TEST.md`.
 
+**Second acquisition (2026-10-10):** Osama's four-object sort (`tri_yolo`),
+recorded as one episode per pick-and-place and converted to LeRobot and RLDS.
+Its commands are in the last section, "Recording Osama's four-object sort";
+the full account is `doc/FOUR_OBJECT_SORTING_REPORT` addendum §28–41 and
+the specification's Appendix D.
+
 ## Where each command runs
 
 Every command below runs in a **shell inside the container**, unless it starts
@@ -124,3 +130,44 @@ Either `datasets/` (19 MB converted, 2026-10-04) or the raw recordings under
 The graphical path was exercised on 2026-10-04 (section 0). On WSL2, keep
 `DISPLAY=:0` and software OpenGL: the host's forwarded DISPLAY stalls the
 simulation clock, and the GPU path renders every spawned object white.
+
+## Recording Osama's four-object sort (added 2026-10-10)
+
+Osama's scene (`tri_yolo`, team repository `main` `36e2d4d5`, merged into
+`feature/sort-episodes`) sorts four objects into four bins per seed with real
+gripper contact. Positions come from Gazebo ground truth
+(`sim_sorting_grasp -p pose_source:=ground_truth`), not YOLO. Each
+pick-and-place is one rosetta episode: cameras `top`, `right`, `left` at
+640×480 and 10 Hz, state = 6 joints + gripper, action = what the controllers
+command. Report addendum §28–41 explains every choice.
+
+The container runs the copies of the scripts placed in its mount
+(`/workspace/src/scripts`, `scripts/rlds`, `contracts`); the repository copies
+are under this project's `scripts/` and `contracts/`.
+
+    # WSL2 host, every new session (WSL2 has no systemd; Docker stops with WSL2)
+    sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'; sleep 5
+    docker start gazebo_to_lerobot rlds_builder
+
+    # watch a sort with the Gazebo GUI (seed, optional piece list)
+    docker exec -it gazebo_to_lerobot /workspace/src/scripts/run_sort_gui.sh 1
+    docker exec -it gazebo_to_lerobot /workspace/src/scripts/run_sort_gui.sh 1 cube_rouge
+
+    # record one seed, or Osama's ten (about 19 min per seed; resumable)
+    docker exec gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort /workspace/src/scripts/record_tri_seed.sh 1'
+    docker exec -d gazebo_to_lerobot /workspace/src/scripts/record_tri_batch.sh 1 10
+    docker exec gazebo_to_lerobot tail -f /workspace/tri_sort/batch.log
+    docker exec gazebo_to_lerobot python3 /workspace/src/scripts/summarise_tri_batch.py
+
+    # convert: LeRobot (+ check with LeRobotDataset) and the RLDS .npy, then the RLDS build
+    docker exec gazebo_to_lerobot /workspace/src/scripts/convert_tri_sort.sh
+    ./scripts/build_rlds_tri_sort_host.sh
+
+    # replay one episode from each dataset in Gazebo (GUI); HEADLESS=1 without the window
+    docker exec -it gazebo_to_lerobot /workspace/src/scripts/replay_gui.sh lerobot
+    ./scripts/replay_rlds_gui_host.sh
+
+Before a batch: Windows sleep off (`powercfg /change standby-timeout-ac 0`,
+`powercfg /change hibernate-timeout-ac 0`), keep a WSL2 terminal open, mains
+power. "Cannot connect to the Docker daemon" means WSL2 restarted: run the
+first two commands again; `record_tri_batch.sh` with the same range resumes.

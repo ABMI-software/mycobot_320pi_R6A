@@ -8,8 +8,9 @@ Runs in gazebo_to_lerobot (rosbag2_py + moveit_py, system Python). One .npy
 per episode JSON written by record_tri_sort.py whose verdict is OK; the
 builder in the rlds_builder container reads only these files.
 
-Timeline: the top camera's own header stamps (10 Hz sim time); the right and
-left frames are the ones with the same stamp (the cameras tick together).
+Timeline: the header stamps shared by the three cameras (10 Hz sim time; a
+recording can cut one tick at an edge, so a frame not seen by all three is
+dropped and reported).
 Joint state and commanded action are linearly interpolated onto each stamp,
 never the images.
 
@@ -94,10 +95,12 @@ def opening(gripper_rad):
 
 def extract(robot_model, meta):
     joints, images = read_bag(meta['bag_path'])
-    stamps = sorted(images['top'])
-    missing = {c: sum(t not in images[c] for t in stamps) for c in ('right', 'left')}
-    if any(missing.values()):
-        raise ValueError(f"{meta['bag_path']}: side frames without a top frame: {missing}")
+    # The three cameras tick together but a recording can start or stop between
+    # their frames of one tick: keep the stamps all three have.
+    stamps = sorted(set(images['top']) & set(images['right']) & set(images['left']))
+    dropped = {c: len(images[c]) - len(stamps) for c in CAMERAS}
+    if any(dropped.values()):
+        print(f"{meta['bag_path']}: edge frames without all three cameras dropped: {dropped}")
     steps = []
     for i, t in enumerate(stamps):
         q = interpolate(joints[STATE_TOPIC], t)

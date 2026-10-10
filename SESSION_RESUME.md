@@ -1,5 +1,33 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (10 octobre 2026 — soir, lot de 40 épisodes et documentation)
+
+### Ce qui a été accompli aujourd'hui
+1. Lot des graines 1 à 10 d'Osama : 39/40 au premier essai ; seul échec
+   graine 10, cube bleu (poussé hors de portée par les prises précédentes).
+2. Jeux LeRobot (39 épisodes, 6 874 images) et RLDS (39 épisodes,
+   6 881 pas), chacun rechargé par son lecteur officiel.
+3. Rejeux LeRobot et RLDS dans Gazebo : cube rouge dans son bac (+7/+1,
+   +7/0 mm). Vidéos faites par l'utilisateur.
+4. Documentation : rapport EN/FR §28–41, spécification annexe D, RUNNING.md.
+
+### Décisions prises
+- Positions par vérité terrain (option B) ; 3 caméras top/right/left,
+  640×480, 10 Hz, QoS reliable ; action = commande des contrôleurs.
+
+### Prochaines actions
+1. [ROUGE] Relancer la graine 10 (~19 min) pour le 40e épisode, puis reconvertir.
+2. [JAUNE] Décider le partage d'évaluation (graines réservées, caméra) et la vue unique d'OpenVLA ; enregistrer le jeu RLDS dans la configuration OXE.
+3. [VERT] Pousser `feature/sort-episodes` ; signaler à Osama l'échec de `tests/test_gt_isolation.py` sur `tri_dream_dashboard.py`.
+
+### Commande rapide de reprise
+```bash
+sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'; sleep 5; docker start gazebo_to_lerobot rlds_builder
+docker exec gazebo_to_lerobot python3 /workspace/src/scripts/summarise_tri_batch.py
+```
+
+---
+
 ## État actuel (10 octobre 2026 — matin, premier épisode enregistré)
 
 ### Ce qui a été accompli aujourd'hui

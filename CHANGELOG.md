@@ -9,6 +9,28 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — lot de 40 épisodes du tri d'Osama, jeux LeRobot et RLDS, documentation (10/10)
+
+- **Lot des graines 1 à 10 d'Osama** (`record_tri_batch.sh`, reprise, chien
+  de garde 75 min) : **39/40 prises-dépôts dans leur bac au premier essai**,
+  écart au centre du bac médiane 6,7 mm, max 17,3 mm (Osama : 40/40, médiane
+  7, max 17), 15:15–18:21, ~19 min par graine, 19,2 Go de bags. L'échec
+  (graine 10, cube bleu) : poussé de 15 mm par les prises précédentes, à
+  287 mm de l'axe, hors de portée ; planification refusée avant tout
+  mouvement, épisode exclu de la conversion.
+- **Jeux de données** : LeRobot `local/mycobot_tri_sort` 39 épisodes,
+  6 874 images, 113 Mo, rechargé par `LeRobotDataset` ; RLDS
+  `mycobot_tri_sort` 1.0.0 39 épisodes, 6 881 pas, 186 Mo, rechargé par
+  `tfds`, sans NaN (`convert_tri_sort.sh`, `build_rlds_tri_sort_host.sh`,
+  `summarise_tri_batch.py`).
+- Corrigé : `record_tri_batch.sh` jugeait une graine finie sur le code de
+  retour (143 à chaque fois, `trap kill 0`) — désormais sur sa ligne
+  « done: » ; `extract_tri_sort.py` garde les horodatages communs aux trois
+  caméras (une image de bord écartée dans 11 épisodes sur 39).
+- **Documentation** : rapport `FOUR_OBJECT_SORTING_REPORT` (EN/FR, HTML et
+  docx) addendum §28–41 ; spécification, annexe D ; `RUNNING.md`, section
+  « Recording Osama's four-object sort ».
+
 ### Ajouté — rejeu des jeux LeRobot et RLDS dans Gazebo (10/10)
 
 - **`scripts/replay_episode.py`** (HTGSPP) : rejoue un épisode à partir des

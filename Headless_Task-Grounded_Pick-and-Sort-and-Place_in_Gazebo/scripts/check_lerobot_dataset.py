@@ -27,10 +27,20 @@ item = ds[picks[1]]
 print("task:", repr(item["task"]))
 print("image tensor:", tuple(item[cams[0]].shape), item[cams[0]].dtype,
       f"range {float(item[cams[0]].min()):.2f}..{float(item[cams[0]].max()):.2f}")
-st = np.stack([ds[i]["observation.state"].numpy() for i in range(len(ds))])
-ac = np.stack([ds[i]["action"].numpy() for i in range(len(ds))])
+hf = ds.hf_dataset
+st = np.stack([np.asarray(r, float) for r in hf["observation.state"]])
+ac = np.stack([np.asarray(r, float) for r in hf["action"]])
+ep = np.array([int(e) for e in hf["episode_index"]])
+ts = np.array([float(t) for t in hf["timestamp"]])
 print("state range per joint (rad):", np.round(st.min(0), 2), np.round(st.max(0), 2))
 print("gripper min/max:", round(float(st[:, 6].min()), 3), round(float(st[:, 6].max()), 3))
 print("action == state on every frame:", bool(np.allclose(st, ac)))
-ts = np.array([float(ds[i]["timestamp"]) for i in range(len(ds))])
-print("timestamps: first", ts[0], "last", round(ts[-1], 2), "step", sorted(set(np.round(np.diff(ts), 3))))
+steps = sorted(set(np.round(np.diff(ts)[np.diff(ep) == 0], 3)))
+lengths = np.bincount(ep)
+print(f"episodes {len(lengths)}: frames per episode min {lengths.min()} median {int(np.median(lengths))} "
+      f"max {lengths.max()}; timestamp steps within episodes {steps}")
+tasks = {}
+for e, k in zip(hf["episode_index"], hf["task_index"]):
+    tasks.setdefault(int(k), set()).add(int(e))
+for k, eps in sorted(tasks.items()):
+    print(f"  task {k}: {len(eps)} episodes -- {ds.meta.tasks.index[k]!r}")
