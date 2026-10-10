@@ -9,6 +9,23 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — rejeu des jeux LeRobot et RLDS dans Gazebo (10/10)
+
+- **`scripts/replay_episode.py`** (HTGSPP) : rejoue un épisode à partir des
+  seules actions du jeu de données, sans `sim_sorting_grasp`, sur l'horloge
+  simulée ; mesure ensuite les articulations contre l'état du jeu et la
+  position finale de la pièce (même test « dans le bac » qu'Osama).
+  RLDS : chaque commande articulaire est reconstruite par IK MoveIt (KDL)
+  depuis la pose et le déplacement OpenVLA, dans un processus séparé.
+- Lecture par les lecteurs officiels : `export_lerobot_episode.py`
+  (`LeRobotDataset`), `ROS2_to_RLDS_Conversion_OpenVLA/extraction/export_rlds_episode.py` (`tfds`).
+- Commandes GUI : `run_sort_gui.sh 1 cube_rouge` (l'original),
+  `replay_gui.sh lerobot`, `replay_rlds_gui_host.sh` (depuis l'hôte).
+- Mesuré sans interface, graine 1 cube rouge : **LeRobot** dans le bac
+  rouge à +7/+1 mm (original +7/0), articulations à 0,00° médian / 0,49° max
+  de l'état du jeu ; **RLDS** dans le bac à +7/0 mm, IK à 0,004° max des
+  commandes, articulations 0,00° / 0,59°.
+
 ### Ajouté — conversion RLDS (OpenVLA) du tri d'Osama, vérifiée (10/10)
 
 - **`ROS2_to_RLDS_Conversion_OpenVLA/extraction/extract_tri_sort.py`** : bags

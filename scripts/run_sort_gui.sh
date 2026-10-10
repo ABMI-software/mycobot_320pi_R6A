@@ -4,11 +4,17 @@
 # (pose_source:=ground_truth), not YOLO: the container has no torch/ultralytics.
 #
 # From the WSL2 host:
-#   docker exec -it gazebo_to_lerobot /workspace/src/scripts/run_sort_gui.sh [seed]
+#   docker exec -it gazebo_to_lerobot /workspace/src/scripts/run_sort_gui.sh [seed] [piece,...]
+#
+# Without a piece list all four objects are sorted; e.g. `1 cube_rouge` sorts
+# only the red cube of seed 1, the input of the recorded test episode.
 #
 # The GUI stays open on the final scene; Ctrl+C stops everything.
 set -e
 SEED="${1:-1}"
+ONLY="${2:-}"
+ONLY_ARGS=()
+[ -n "$ONLY" ] && ONLY_ARGS=(-p only:="$ONLY")
 LOG=/workspace/sort_smoke/gui_seed${SEED}_$(date +%H%M%S)
 mkdir -p "$LOG"
 
@@ -32,7 +38,7 @@ echo "controllers active -- sorting (slow: software rendering, ~0.1x real time)"
 
 ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true \
     -p world_name:=tri_yolo -p pose_source:=ground_truth -p max_attempts:=2 \
-    -p wall_timeout_scale:=15.0 -p startup_timeout:=600.0 \
+    -p wall_timeout_scale:=15.0 -p startup_timeout:=600.0 "${ONLY_ARGS[@]}" \
     -p csv_path:="$LOG/tri.csv" 2>&1 | tee "$LOG/sort.log" | grep --line-buffered -E '▶|essai|RESULTAT|✔|✘' || true
 
 echo "done -- the GUI stays open on the final scene; Ctrl+C to quit"
