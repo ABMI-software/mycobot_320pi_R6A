@@ -13,10 +13,17 @@
 - 3 vues, 640×480 natif, 10 Hz (réglage d'Osama inchangé).
 - Un épisode = une prise-dépôt, du « ▶ » au verdict.
 
+### Mise à jour (10 octobre 2026 — fin de matinée, étape 3 terminée)
+- Action = commande des contrôleurs (relais `commanded_action_relay.py`) :
+  précède l'état d'une image.
+- Chaîne complète prouvée sur un épisode : bag → LeRobot (`rosetta_port`,
+  rechargé par `LeRobotDataset`, 172 images) et bag → RLDS (rechargé par
+  `tfds`, 173 pas).
+
 ### Prochaines actions
-1. [ROUGE] Conversion : `lerobot` + torch CPU dans le conteneur (`rosetta_port`), image `rlds_builder` pour RLDS — à valider par l'utilisateur.
-2. [JAUNE] Vérifier le jeu LeRobot rechargé par `LeRobotDataset`, et le jeu RLDS.
-3. [VERT] Lot de 40 épisodes (graines 1-10).
+1. [ROUGE] Lot de 40 épisodes (graines 1-10), puis conversion des deux formats.
+2. [JAUNE] Enregistrer le jeu RLDS dans la configuration OXE d'OpenVLA.
+3. [VERT] Aligner LeRobot et RLDS sur le même nombre d'images (172 vs 173).
 
 ### Commande rapide de reprise
 ```bash

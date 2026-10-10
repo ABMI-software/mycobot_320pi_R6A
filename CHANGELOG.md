@@ -9,6 +9,25 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — conversion RLDS (OpenVLA) du tri d'Osama, vérifiée (10/10)
+
+- **`ROS2_to_RLDS_Conversion_OpenVLA/extraction/extract_tri_sort.py`** : bags
+  rosetta → `.npy` par épisode (conteneur `gazebo_to_lerobot`, FK MoveIt).
+  Trois caméras 224×224 **sans recadrage** (le recadrage central coupe le
+  bord du plateau, où sont les bacs) ; `state` = pose link6 + ouverture pince
+  [0, 1] (1 = ouverte) ; `action` = de la pose mesurée à la pose **commandée**
+  + ouverture commandée ; articulations brutes gardées (`joint_state`,
+  `joint_action`). Seuls les épisodes au verdict OK sont extraits.
+- **Constructeur TFDS `overrides/rlds_dataset_builder/mycobot_tri_sort/`** ;
+  image `rlds_builder:py39-tf213` construite (2,19 Go) depuis
+  `docker/Dockerfile`.
+- **Rechargé par `tfds`** (`extraction/check_rlds_tri_sort.py`), graine 1
+  cube rouge : 173 pas, 3 images 224×224, instruction présente, aucun NaN,
+  4,7 Mo. Le jeu LeRobot du même épisode a 172 images : `rosetta_port`
+  saute le premier tick.
+- Pas encore fait : enregistrement dans la configuration OXE d'OpenVLA
+  (`configs.py`, `transforms.py`, `mixtures.py`).
+
 ### Ajouté — action commandée et conversion LeRobot vérifiée (10/10)
 
 - **Action = commande des contrôleurs**, plus l'état mesuré :
