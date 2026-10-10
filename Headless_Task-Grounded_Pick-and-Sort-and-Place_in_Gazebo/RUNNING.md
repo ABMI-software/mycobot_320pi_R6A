@@ -64,14 +64,14 @@ object, cylinder included, before the unattended batch.)
 **Stop and report back if any of these four fails** — do not proceed to
 the full batch on a guess that it'll sort itself out, and do not retry
 past a second attempt on the same episode without reporting first. This
-is not extra caution for its own sake: on Role A hardware this session,
+is not extra caution for its own sake: on the memory-constrained machine of 2026-09-23,
 recorder wiring was confirmed working end to end exactly once, under
 Gazebo load — but no single episode was ever driven through to a
 completed PASS/FAIL/WRONG_BIN verdict, and a second, independent
 resource-exhaustion mode surfaced when testing the recorder in
 isolation (a lifecycle-service hang, unrelated to memory — see
-`doc/SMOKE_TEST.md`'s 2026-09-23 entries for the full record). Role B's
-hardware is expected to be materially less memory-constrained, but that
+`doc/SMOKE_TEST.md`'s 2026-09-23 entries for the full record). A machine
+with more memory was expected to avoid both, but that
 expectation itself hasn't been tested — these four episodes are that
 test. A failure here is exactly the kind of thing worth stopping for.
 
@@ -110,19 +110,29 @@ and 15 per object across train + heldout.
 **outside** the episode folder, so a retry cannot erase it. Send that file
 back.
 
-## Convert to LeRobot format (after the batch, or per-object as episodes finish)
+## Convert to LeRobot format (after the batch)
 
-    python3 scripts/port_bag.py --out datasets/mycobot_sorting_train --split train
-    python3 scripts/port_bag.py --out datasets/mycobot_sorting_heldout --split heldout
+On the **WSL2 host, not in the container**: the converter uses LeRobot's own
+writer in a CPU-only venv, pinned in `scripts/requirements-lerobot.txt`
+(install commands at the top of that file). Copy the bags and the episode
+metadata out of the container first, then:
 
-Only ports episodes whose `grasp_meta.verdict.json` says `"verdict": "PASS"`
-and whose frames, colour check and re-send count are also clean; anything
-else is skipped with its reason printed. An episode that displaced another
-object is kept and labelled (`distractors_moved` in `meta/episodes.jsonl`).
+    V=~/venvs/lerobot044-cpu/bin/python
+    $V scripts/port_bag.py --split train   --out datasets/mycobot_sorting_train \
+        --episodes-dir <copy>/episodes --bags-dir <copy>/bags
+    $V scripts/port_bag.py --split heldout --out datasets/mycobot_sorting_heldout \
+        --episodes-dir <copy>/episodes --bags-dir <copy>/bags
+
+~1 min for held-out, ~4 min for train on the laptop. Only ports episodes whose
+`grasp_meta.verdict.json` says `"verdict": "PASS"` and whose frames, colour
+check and re-send count are also clean; anything else is skipped with its
+reason printed. An episode that displaced another object is kept and labelled
+(`distractors_moved` in the sidecar `meta/episodes_extra.jsonl`). Format,
+action definition and validation: `datasets/README.md`.
 
 ## What to return
 
-Either `datasets/` (19 MB converted, 2026-10-04) or the raw recordings under
+Either `datasets/` (112 MB converted, 2026-10-05) or the raw recordings under
 `/workspace/htgspp/bags/` (8.1 GB, regenerable from `batch.sh`).
 
 ## If this is the first run on this machine

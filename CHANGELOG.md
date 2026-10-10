@@ -699,13 +699,46 @@ terminal, `ctx.echecs` n'augmente plus, et la boucle tourne sans fin. Passe
 - Tests : `tests/test_correction_vision.py` 23/23. **Pas encore essaye sur le
   robot.**
 
+### Corrigé — tri quatre objets : jeux de données au format LeRobot v3.0, chargés et testés avec SmolVLA (05/10)
+
+- `scripts/port_bag.py` réécrit sur l'écrivain de LeRobot (`LeRobotDataset.create`
+  / `add_frame` / `save_episode`). La première conversion ne se chargeait pas
+  et comportait quatre défauts : action = état au même instant (le
+  convertisseur avait décalé l'indice), horodatages en temps mural de
+  réception, clé caméra différente selon la partie, ni statistiques ni index
+  global. Désormais : **action[t] = état[t+1]** (aucun topic de commande n'a
+  été enregistré ; dernière image de chaque épisode retirée),
+  `timestamp = frame_index / 30`, appariement image–état sur l'horodatage
+  d'en-tête (temps simulé), une seule clé `observation.images.top`.
+- **Vérifié hors ligne avec lerobot 0.4.4** (épinglage provisoire, en un seul
+  endroit : `scripts/requirements-lerobot.txt`) : 48 / 12 épisodes, 29 687 /
+  7 411 images ; action[t] = état[t+1] sur chaque ligne ; l'image renvoyée par
+  le chargeur est identique à l'image décodée du MP4 au même indice ;
+  statistiques présentes.
+- **Test d'entraînement SmolVLA sur CPU** (`lerobot/smolvla_base`, lot de 1,
+  10 pas) : perte finie à chaque pas, ~4,1 s par pas, 3,5 Go de RAM au plus,
+  100 M de paramètres entraînables sur 450 M (expert d'action seul).
+- `distractors_moved` et la configuration caméra de chaque épisode dans
+  `meta/episodes_extra.jsonl` (l'écrivain 0.4.4 ne stocke pas de champ
+  par épisode personnalisé).
+- Contrats : l'état désiré du contrôleur et la commande de pince ajoutés en
+  canaux `adjunct` pour les prochains lots ; clé caméra unifiée.
+- Documentation : rapport EN/FR (HTML + Word) avec une nouvelle §28 ;
+  spécification, annexe C ; partage Rôle A / Rôle B retiré de tous les
+  documents du projet (une seule personne, un seul portable WSL2) ; la
+  procédure d'entrée dans le conteneur (`docker exec -it gazebo_to_lerobot bash`)
+  ajoutée là où elle manquait.
+
 ### Ajouté — tri quatre objets : lot de 60 épisodes, jeux de données, deux launch files (04/10)
 
 - **Lot de 60 épisodes, 60/60 PASS du premier coup**, sous une seule version
   de code (`f977d7af65dc`), sur un seul portable WSL2 : aucune reprise,
   aucun renvoi de trajectoire, images complètes partout. Converti en
-  `mycobot_sorting_train` (48 épisodes, 29 735 images) et
-  `mycobot_sorting_heldout` (12 épisodes, 7 423 images). Détail :
+  `mycobot_sorting_train` (48 épisodes, 29 687 images) et
+  `mycobot_sorting_heldout` (12 épisodes, 7 411 images). **Corrigé le 05/10 :
+  29 687 / 7 411** après reconversion (action en avance d'une image, horodatage
+  en temps mural, clé caméra différente selon la partie, pas de statistiques) ;
+  voir l'entrée du 05/10 ci-dessus. Détail :
   `Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/MEASUREMENTS.md` §10.
 - **Deux launch files** dans `launch/` : `pick_and_sort_and_place_demo.launch.py`
   (GUI Gazebo, reste ouvert) et `pick_and_sort_and_place_no_gui_demo.launch.py`

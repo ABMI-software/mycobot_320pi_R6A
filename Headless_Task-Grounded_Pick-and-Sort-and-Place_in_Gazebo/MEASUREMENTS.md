@@ -588,9 +588,17 @@ nothing moved); episode 12 is training episode 11 there, with
 `"source_episode": 12, "distractors_moved": [["green_cylinder", 0.0229]]`.
 The verifier's rule (a disturbed object is flagged, not failed) is unchanged.
 
-**Converted:** `mycobot_sorting_train` 48 episodes, 29 735 frames;
-`mycobot_sorting_heldout` 12 episodes, 7 423 frames. 320 × 240 at 30 fps;
-video frame counts match the parquet rows (checked on two episodes).
+**Converted** (2026-10-05, LeRobot v3.0 format, lerobot 0.4.4, provisional
+pin): `mycobot_sorting_train` 48 episodes, 29 687 frames;
+`mycobot_sorting_heldout` 12 episodes, 7 411 frames; 320 × 240 at 30 fps.
+One frame fewer per episode than recorded: `action[t] = state[t+1]` (no
+command topic was recorded), so each episode's last frame is dropped. Loaded
+by the real `LeRobotDataset` and smoke-trained with SmolVLA on CPU; checks
+and numbers in `datasets/README.md`. **Correction, 2026-10-05:** this
+paragraph first gave 29 735 / 7 423 frames, from a hand-written conversion of
+2026-10-04 that did not load and was replaced. Why: action one frame early
+(`action[t] = state[t]`), wall-clock timestamps, a different camera key per
+split, and no statistics.
 
 
 ## Also observed

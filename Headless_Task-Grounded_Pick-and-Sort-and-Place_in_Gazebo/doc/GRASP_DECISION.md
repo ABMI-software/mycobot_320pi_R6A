@@ -3,7 +3,7 @@
 ## Verdict
 
 **A8 (labelled simulated attachment) remains the adopted floor for this
-acquisition on Role A hardware.** The reference pipeline's grasp mechanism
+acquisition on the memory-constrained machine of 2026-09-23.** The reference pipeline's grasp mechanism
 is genuinely physical (confirmed both statically and at runtime, twice) —
 not a weld — but two bounded live attempts on this constrained container
 both failed to lift `red_cube`, for a diagnosed timing reason unrelated to
@@ -12,8 +12,9 @@ within one day → keep the weld; report exactly where it stopped and what
 was tried"), this is exactly that row.
 
 **Recommendation for the robotics team (Appendix B item 2):** the failure
-mode strongly suggests the mechanism would succeed on Role B's faster
-hardware. Re-running this same test there, before finalizing on A8, is
+mode strongly suggests the mechanism would succeed on faster hardware
+(the WSL2 laptop used since 2026-10-02 runs at RTF ≈ 0.34; the test has
+not been re-run there). Re-running this same test there, before finalizing on A8, is
 cheap and would retire the dataset's single largest caveat if it succeeds.
 
 ## 3.2 — Static evidence
@@ -110,9 +111,9 @@ This is the same class of bug the specification itself calls out in Part
 8.1 for wall-clock settle waits generally (`sleep 3` at RTF 0.082 buying a
 quarter of a simulated second) — except here it is baked into the
 **reference pipeline's own code**, not just the new orchestration scripts
-this specification asks Role A to write. It is a strong, independent
+this specification asks for. It is a strong, independent
 argument for A10: this reference pipeline's timing assumptions may not
-survive Role A's real-time factor at all, regardless of which grasp
+survive that machine's real-time factor at all, regardless of which grasp
 mechanism is used.
 
 ## A separate bug found and fixed along the way: `sim_grasp.launch.py`'s `world_name` argument
