@@ -108,6 +108,34 @@ joint_sync (/joint_states)  ·  bridge_tour (↔ Pi TCP 5005)                   
 
 ---
 
+## DREAM sur le banc réel — tri, dashboard, extrinsèque sans marqueur (14/10/2026)
+
+Modèle réel : **`vgg_tri_reel_ft_e10`** (fine-tuning sur 600 poses arducam + SVPRO étiquetées par
+les codeurs) : test réel 18,7 → **1,69 px**. Pendant un tri, arducam ~2 px immobile comme en
+mouvement. Protocole complet : [`docs/PROTOCOLE_REEL.md`](docs/PROTOCOLE_REEL.md).
+
+```bash
+# tri réel + panneau DREAM (extrinsèques ArUco)
+MYCOBOT_PI=10.10.0.223 /usr/bin/python3 scripts/lancer_pick_dashboard_final.py --svpro-dream --dream
+# même dashboard, extrinsèques calculées par DREAM, aucun marqueur
+MYCOBOT_PI=10.10.0.223 /usr/bin/python3 scripts/lancer_tri_extrinseque_dream.py --dream
+```
+
+- **Panneau** `scripts/dream_tri_panneau.py` (DREAM via `scripts/dream_service.py` sous
+  `venv_dream`) : DREAM ↔ codeurs **en 3D** par saisie, courbes, trajectoire en direct,
+  `tri_dream.csv` / `trajectoires.csv` / `session.json` dans `results/dream_reel/<date>_dashboard/`.
+- **Pointe DREAM** = `inv(T_réf) · T_DREAM(t) · pointe(q(t))`, comme `dream_point` en Gazebo.
+  L'erreur 3D (7-17 mm) est **surtout en Z** : profondeur d'un PnP mono-image (arducam zénithale)
+  + affaissement non modélisé. Les vues avec J5 hors de 45-93° (pose d'observation) sont écartées.
+- **Extrinsèque DREAM** : `scripts/extrinseque_dream_session.py <session> --ecrire` (un PnP empilé
+  sur les images d'un tri, aucun ArUco) → `training/calibration/*_extrinsic_dream_tri.yaml`.
+  Arducam à 4,7 mm / 1,14° de l'ArUco ; tri **4/4** avec. ⚠ C'est un **fichier figé** : si une
+  caméra bouge, le réestimer. Les labels du fine-tuning venaient de l'ArUco.
+- **Ne jamais modifier** `pick_dashboard.py` ni `pick_fsm.py` : tout passe par les lanceurs.
+- **Bacs à moins de ~400 mm de la base** : à 445-477 mm, le trieur largue à 150-184 mm du bac.
+
+---
+
 ## Gazebo — la réplique du banc réel (10/09/2026)
 
 `worlds/real_table.sdf` reproduit **le poste physique** et non une table

@@ -35,6 +35,14 @@ Options :
 
     --sans-question      ouvrir sans proposer aucune calibration
     --sans-svpro         calibrer l'arducam SEULE (la SVPRO garde son extrinseque)
+    --svpro-dream        SVPRO reservee a DREAM : ni calibree, ni utilisee par YOLO
+    --automatique        demarre seul la boucle automatique, 8 s apres l'ouverture
+    --dream              DREAM a cote du tri (protocole reel, etape 9) : la fenetre du
+                         tri a gauche, DREAM <-> YOLO <-> codeurs a droite, comme le
+                         dashboard Gazebo. Voir `dream_tri_panneau.py`.
+
+« demarrer la boucle » enchaine les pieces comme `tri_fluide.py` : un geste par
+piece, pose au fond du bac de sa couleur. « etape suivante » reste le pas a pas du FSM.
     --sans-yolo          revenir aux detecteurs couleur/forme (diagnostic)
     --modele <best.pt>   autres poids que le run `pieces_v3` (les deux cameras)
     --seuil 0.10         confiance minimale du modele entraine
@@ -61,6 +69,7 @@ RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / 'scripts'))
 
 from PyQt5.QtWidgets import QApplication, QMessageBox                   # noqa: E402
+from PyQt5.QtCore import QTimer                                         # noqa: E402
 
 import calibration_dialogue                                            # noqa: E402
 import yolo26_dashboard                                                # noqa: E402
@@ -172,6 +181,102 @@ def sans_test_de_saisie():
     calibration_dialogue.propose_test = lambda recalibree: False
 
 
+def branche_tri_fluide(fenetre):
+    """Bouton « tri fluide » : le geste de `tri_fluide.py`, avec les detections du dashboard.
+
+    Positions mesurees bras degage (pose d'observation), puis un geste par piece :
+    approche sans arret, prise, remontee, transfert direct, descente lente, pose au
+    fond du bac de SA couleur. Pas de recalage pendant l'approche, ou la camera de
+    dessus est masquee par le bras. STOP arrete la boucle entre deux pieces ; une
+    prise a vide l'arrete aussi, sans nouvel essai.
+    """
+    import json
+    import threading
+    import time
+
+    import numpy as np
+    from PyQt5.QtWidgets import QPushButton
+
+    import pick_fsm as fsm
+    import tri_fluide
+
+    arret = threading.Event()
+    en_cours = threading.Lock()
+
+    def pieces_a_trier():
+        with fenetre._verrou:
+            objets = list(fenetre._objets_vus)
+        bacs = {}
+        connus = (json.loads(tri_fluide.BACS_CONNUS.read_text())
+                  if tri_fluide.BACS_CONNUS.exists() else {})
+        for bac in yolo26_dashboard.BACS:
+            vu = fenetre.suivi_cartons[bac].position()
+            if vu is not None:
+                bacs[bac] = np.asarray(vu[0], float)
+                connus[bac] = [round(float(v), 1) for v in bacs[bac]]
+            elif bac in connus:
+                # Un bac ne bouge pas : yolo26 sort le bac jaune vide sous 0,5 une image
+                # sur deux. Sa derniere position sure tient lieu de detection.
+                bacs[bac] = np.asarray(connus[bac], float)
+                print(f'tri fluide : {bac} non vu, derniere position sure {connus[bac]}', flush=True)
+        tri_fluide.BACS_CONNUS.parent.mkdir(parents=True, exist_ok=True)
+        tri_fluide.BACS_CONNUS.write_text(json.dumps(connus))
+        # Hors portee = fausse detection : la poubelle verte au sol, vue « cylindre_vert »
+        # a (10 ; -845) mm le 14/10, lancait un essai sans pose atteignable a chaque tri.
+        hors_portee = [(p, xy) for p, xy in objets if p in tri_fluide.PIECES
+                       and not fsm.PORTEE_MIN <= float(np.hypot(*xy)) <= fsm.PORTEE_MAX]
+        for p, xy in hors_portee:
+            print(f'tri fluide : {p} ignore, hors portee ({xy[0]:.0f} ; {xy[1]:.0f}) mm', flush=True)
+        # Une piece deja posee reste visible AU FOND de son bac : elle n'est plus a trier.
+        return sorted((float(np.hypot(*xy)), piece, np.asarray(xy, float), bacs[tri_fluide.PIECES[piece]])
+                      for piece, xy in objets
+                      if piece in tri_fluide.PIECES and tri_fluide.PIECES[piece] in bacs
+                      and fsm.PORTEE_MIN <= float(np.hypot(*xy)) <= fsm.PORTEE_MAX
+                      and all(np.linalg.norm(np.asarray(xy, float) - b) > 50.0 for b in bacs.values()))
+
+    def boucle():
+        ctx = fenetre.ctx
+        ctx.z_rebord = yolo26_dashboard.HAUTEUR_BAC
+        if fsm.porte_objet(ctx):
+            print('tri fluide : la pince tient deja un objet — le deposer d abord', flush=True)
+            en_cours.release()
+            return
+        while not arret.is_set():
+            fsm.va_vers_par_etapes(ctx, fsm.POSE_OBSERVATION, nom='observation', stabilise=False)
+            time.sleep(2.0)
+            restantes = pieces_a_trier()
+            if not restantes:
+                print('tri fluide : plus rien a trier', flush=True)
+                break
+            _, piece, xy, bac = restantes[0]
+            if not tri_fluide.trie(ctx, piece, xy, bac, 'actuelle'):
+                print('tri fluide : arret', flush=True)
+                break
+        en_cours.release()
+
+    def lance():
+        if fenetre.ouvrier is not None and fenetre.ouvrier.isRunning():
+            print('tri fluide refuse : la boucle du dashboard tourne — STOP d abord', flush=True)
+            return
+        if not en_cours.acquire(blocking=False):
+            return
+        fenetre._assure_pont()
+        arret.clear()
+        threading.Thread(target=boucle, daemon=True).start()
+
+    # « demarrer la boucle » lance le TRI FLUIDE, plus la boucle du FSM : c'est le
+    # geste qui a trie les 4 pieces du premier coup le 13/10, alors que la boucle
+    # du FSM s'est bloquee en SAISIE sur le meme banc. Un seul chemin, pas deux.
+    fenetre.bouton_auto.clicked.disconnect()
+    fenetre.bouton_auto.clicked.connect(lance)
+    fenetre.bouton_auto.setToolTip('tri fluide : un geste par piece, pose au fond de son bac')
+    fenetre.mode.setCurrentText('automatique')
+    for b in fenetre.findChildren(QPushButton):
+        if 'STOP' in b.text():
+            b.clicked.connect(arret.set)
+    return lance
+
+
 def main():
     a = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -179,6 +284,12 @@ def main():
                    help='ouvrir le dashboard sans proposer de calibration')
     a.add_argument('--sans-svpro', action='store_true',
                    help='ne pas proposer la calibration de la SVPRO')
+    a.add_argument('--svpro-dream', action='store_true',
+                   help='SVPRO reservee a DREAM : ni calibree, ni utilisee par YOLO')
+    a.add_argument('--dream', action='store_true',
+                   help='DREAM (vgg_tri_reel_ft_e10) a cote du tri : pince DREAM, YOLO, codeurs')
+    a.add_argument('--automatique', action='store_true',
+                   help='demarrer seul la boucle automatique (le bras bouge sans clic)')
     a.add_argument('--sans-yolo', action='store_true',
                    help='detecteurs couleur/forme d origine (diagnostic)')
     a.add_argument('--modele', type=Path,
@@ -203,7 +314,7 @@ def main():
     # l'arducam, ou None si l'etape a ete sautee ou refusee : la SVPRO suit le
     # meme sort, sans seconde question.
     resultat = calibration_dialogue.demande(sauter=args.sans_question)
-    if resultat is not None and not args.sans_svpro:
+    if resultat is not None and not (args.sans_svpro or args.svpro_dream):
         calibre_svpro()
 
     import pick_dashboard
@@ -211,9 +322,10 @@ def main():
     if not args.sans_yolo:
         print('yolo26 : chargement du modele (quelques secondes)…', flush=True)
         service = yolo26_dashboard.branche(pick_dashboard, inventaire=inventaire,
-                                           poids=args.modele, seuil=args.seuil)
-        print(f'yolo26 : {service.poids}, seuil {service.seuil} — arducam ET SVPRO',
-              flush=True)
+                                           poids=args.modele, seuil=args.seuil,
+                                           arducam_seule=args.svpro_dream)
+        cameras = 'arducam SEULE (SVPRO reservee a DREAM)' if args.svpro_dream else 'arducam ET SVPRO'
+        print(f'yolo26 : {service.poids}, seuil {service.seuil} — {cameras}', flush=True)
         print('tri : chaque piece dans le bac de sa couleur — '
               + ', '.join(f'{p} -> {b}' for p, b in sorted(
                   yolo26_dashboard.DESTINATION.items())), flush=True)
@@ -222,8 +334,26 @@ def main():
 
     tient_l_exposition(pick_dashboard)
 
+    panneau = None
+    if args.dream:
+        import dream_tri_panneau
+        print('DREAM : chargement du modele (quelques secondes)…', flush=True)
+        panneau = dream_tri_panneau.installe(pick_dashboard)
+
     fenetre = pick_dashboard.Fenetre()
-    fenetre.show()
+    lance_tri = branche_tri_fluide(fenetre)
+    if panneau is not None:
+        vue = dream_tri_panneau.FenetreTriDream(panneau, fenetre)
+        vue.showMaximized()
+    else:
+        fenetre.show()
+    if args.automatique:
+        # Le delai laisse aux cameras et a yolo26 le temps de rendre leurs
+        # premieres detections : la boucle commence par DETECTION.
+        def demarre():
+            print('tri fluide demarre (--automatique)', flush=True)
+            lance_tri()
+        QTimer.singleShot(8000, demarre)
     sys.exit(application.exec_())
 
 

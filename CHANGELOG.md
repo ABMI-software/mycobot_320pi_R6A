@@ -9,6 +9,33 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — DREAM sur le banc reel : fine-tuning, dashboard de tri, extrinseque sans marqueur (13-14/10)
+
+Protocole : `docs/PROTOCOLE_REEL.md` (etapes 4 a 9 et section « Extrinseque DREAM »).
+
+- **Fine-tuning reel** `vgg_tri_reel_ft_e10` : 600 poses reelles arducam + SVPRO
+  etiquetees par les codeurs (`training/capture_real_tri.py`,
+  `training/dream/convert_real_tri_ndds.py`, labels SVPRO par
+  `scripts/calibre_svpro_labels.py`). Test reel hors echantillon :
+  84,8 % / 18,73 px -> **96,0 % / 1,69 px**.
+- **Dashboard de tri avec DREAM** : `lancer_pick_dashboard_final.py --dream`
+  branche `scripts/dream_tri_panneau.py` (DREAM par `scripts/dream_service.py`
+  sous `venv_dream`). Tableau par saisie (DREAM <-> codeurs en 3D), courbes
+  distance a la cible, trajectoire de la pince dessinee en direct sur chaque
+  camera, CSV `tri_dream.csv` / `trajectoires.csv` et `session.json` par essai.
+  Vues hors du domaine J5 (45-93 deg) ecartees mais enregistrees.
+- **Lanceur** : detections YOLO hors portee (170-430 mm) ignorees — une
+  poubelle au sol vue « cylindre_vert » lancait un essai a chaque tri.
+- **Analyses** : `analyse_tri_dream.py` (keypoints statique / dynamique),
+  `analyse_pose_dream.py` (T_DREAM contre ArUco, format du protocole Gazebo),
+  `analyse_fusion_dream.py` (triangulation des deux vues), `enregistre_tri_dream.py`,
+  `dream_test_decalage.py`.
+- **Extrinseque par DREAM seul** : `scripts/extrinseque_dream_session.py`
+  (un PnP empile sur les images d'un tri, aucun marqueur ; arducam a
+  4,7 mm / 1,14 deg de l'ArUco). `scripts/lancer_tri_extrinseque_dream.py` :
+  le meme dashboard avec les extrinseques DREAM des deux cameras — tri **4/4**
+  (YOLO <-> codeurs 7,5-11,6 mm). Cameras non deplacees depuis le calcul.
+
 ### Ajoute — tri des 4 pieces dans Gazebo pilote par yolo26 sur 4 cameras (29/09-02/10)
 
 Protocole complet : `docs/PROTOCOLE_YOLO_GAZEBO.md`.
