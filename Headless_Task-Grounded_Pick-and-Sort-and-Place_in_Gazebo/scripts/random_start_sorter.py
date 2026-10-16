@@ -23,6 +23,7 @@ import numpy as np
 import rclpy
 
 from mycobot_gateway.sim_sorting_grasp import SimSortingGrasp, tool_tip
+from mycobot_gateway.vision import tri_scene
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import random_start  # noqa: E402
@@ -46,15 +47,20 @@ class RandomStartSorter(SimSortingGrasp):
         self.attempts[target.model] += 1
         for _ in range(MAX_REDRAWS):
             q = random_start.sample(self.rng)
-            before = self.object_poses()
+            # dynamic_pose/info also carries the robot's own links, which move with the arm:
+            # only the four pieces count.
+            before = {n: p for n, p in self.object_poses().items() if n in tri_scene.OBJECTS}
             reached = self.transit(q, 'pose de depart aleatoire')
             after = self.object_poses()
-            moved = max((float(np.linalg.norm(after[n] - p)) for n, p in before.items() if n in after),
-                        default=float('nan'))
+            moved = {n: round(float(np.linalg.norm(after[n] - p)) * 1000, 2)
+                     for n, p in before.items() if n in after}
+            if len(moved) != len(tri_scene.OBJECTS):
+                raise RuntimeError(f'pieces missing from the Gazebo poses: {sorted(set(tri_scene.OBJECTS) - set(moved))}')
             entry = {'seed': self.start_seed, 'rng': 'numpy default_rng(seed)', 'draw': self.draws,
                      'piece': target.model, 'attempt': self.attempts[target.model],
                      'q_deg': np.round(q, 3).tolist(), 'tip': np.round(tool_tip(q), 4).tolist(),
-                     'reached': reached, 'pieces_moved_max_mm': round(moved * 1000, 2),
+                     'reached': reached, 'pieces_moved_max_mm': max(moved.values()),
+                     'pieces_moved_mm': moved,
                      'jitter': random_start.JITTER, 'reference': random_start.REFERENCE.name}
             self.draws += 1
             with open(self.start_log, 'a') as f:

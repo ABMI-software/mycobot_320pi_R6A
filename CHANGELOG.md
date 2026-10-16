@@ -50,7 +50,11 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `default_rng(<graine>)` ; chaque tirage est journalisé dans
   `start_poses.jsonl` avec le déplacement maximal des pièces pendant le
   mouvement (poses Gazebo avant/après), et chaque `ep_*.json` porte sa pose de
-  départ (`random_start`).
+  départ (`random_start`). Testé sur la graine 51 : 4/4 triées depuis des
+  départs aléatoires, aucune pièce déplacée (0,0 mm sur les 4 mouvements) ; la
+  mesure ne compte que les quatre pièces (`dynamic_pose/info` porte aussi les
+  maillons du bras, qui bougent avec lui) ; mêmes tirages et mêmes verdicts
+  sur deux passes.
 - **Corrigé** : `record_tri_seed.sh` attendait un contrôleur « active » en
   acceptant aussi « inactive ».
 
