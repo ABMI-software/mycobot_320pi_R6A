@@ -9,6 +9,29 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — départs aléatoires recalibrés sur les graines 21-50 (16/10)
+
+- **`scripts/random_start.py`** : l'échantillonneur des enregistrements du 14/10
+  a été perdu avec la machine, et ses poses ne suivent aucune règle simple (les
+  six articulations varient, répartitions non uniformes). Le nouveau tire une
+  des 120 poses de départ enregistrées
+  (**`config/random_start_poses_s021_050.csv`**, extraites de
+  `mycobot-tri-sort-160`, zip sha256 `0738a842…5c65`) plus un bruit gaussien de
+  0,25 × l'écart-type de chaque articulation, dans la plage enregistrée de
+  chaque articulation, pointe ≥ 13 cm, marge ≥ 20°. Sur 120 tirées contre 120
+  enregistrées : aucune articulation significativement différente (KS p
+  0,18-0,99), pointe la plus basse 13,2 cm des deux côtés ; un peu plus étroit
+  aux extrêmes (J2, J4, J6) et un peu moins de départs bas (11-14/120 sous
+  20 cm contre 19/120). Détail : `RUNNING.md`.
+- **`scripts/random_start_sorter.py`**, `record_tri_seed.sh` (`RANDOM_START=1`) :
+  le trieur scripté, chaque pièce partant d'une pose tirée par
+  `default_rng(<graine>)` ; chaque tirage est journalisé dans
+  `start_poses.jsonl` avec le déplacement maximal des pièces pendant le
+  mouvement (poses Gazebo avant/après), et chaque `ep_*.json` porte sa pose de
+  départ (`random_start`).
+- **Corrigé** : `record_tri_seed.sh` attendait un contrôleur « active » en
+  acceptant aussi « inactive ».
+
 ### Ajouté — contrôle en boucle ouverte des checkpoints SmolVLA (16/10)
 
 - **`scripts/smolvla_policy.py`** : un checkpoint en un appel (3 images RGB,

@@ -28,7 +28,9 @@ stage() { echo "[$(TZ=Europe/Paris date +%H:%M:%S)] $*" | tee -a "$D/stages.log"
 ros2 launch mycobot_gateway tri_yolo.launch.py seed:="$SEED" piece_reach:=0.28 \
     headless:=true yolo:=false > "$D/scene.log" 2>&1 &
 stage "seed $SEED: scene starting"
-until ros2 control list_controllers 2>/dev/null | grep -q 'gripper_position_controller.*active'; do
+# "inactive" contains "active": match the state as a whole word.
+until ros2 control list_controllers 2>/dev/null \
+        | grep -qE 'gripper_position_controller.*[[:space:]]active([[:space:]]|$)'; do
     sleep 5
 done
 stage "controllers active"
@@ -49,8 +51,15 @@ DRIVER=$!
 
 ONLY_ARGS=()
 [ -n "$ONLY" ] && ONLY_ARGS=(-p only:="$ONLY")
-stage "sorting ${ONLY:-all four}"
-ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true \
+# RANDOM_START=1: each piece starts from a random arm pose (random_start_sorter.py), drawn with
+# numpy default_rng(<seed>) and logged with the pieces' displacement in start_poses.jsonl.
+SORTER=(ros2 run mycobot_gateway sim_sorting_grasp)
+if [ "${RANDOM_START:-0}" = 1 ]; then
+    SORTER=(python3 "$HERE/random_start_sorter.py")
+    ONLY_ARGS+=(-p random_start_seed:="$SEED" -p random_start_log:="$D/start_poses.jsonl")
+fi
+stage "sorting ${ONLY:-all four}$([ "${RANDOM_START:-0}" = 1 ] && echo ', random starts')"
+"${SORTER[@]}" --ros-args -p use_sim_time:=true \
     -p world_name:=tri_yolo -p pose_source:=ground_truth -p max_attempts:=2 \
     -p wall_timeout_scale:=15.0 -p startup_timeout:=600.0 "${ONLY_ARGS[@]}" \
     -p csv_path:="$D/tri.csv" > "$D/sort.log" 2>&1 || true

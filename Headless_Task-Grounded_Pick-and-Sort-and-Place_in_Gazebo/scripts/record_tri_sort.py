@@ -85,6 +85,13 @@ class Recorder(Node):
             'sim_seconds': (self.get_clock().now() - self.started).nanoseconds / 1e9,
             'pose_source': 'ground_truth', 'scene': 'tri_yolo',
         }
+        # Random-start recordings: the start pose this episode began from, as logged by
+        # random_start_sorter.py (generator seed, draw index, pose, pieces' displacement).
+        starts = self.out / 'start_poses.jsonl'
+        if starts.exists():
+            drawn = [json.loads(line) for line in starts.read_text().splitlines()]
+            reached = [s for s in drawn if s['piece'] == self.piece and s['attempt'] == attempt and s['reached']]
+            meta['random_start'] = reached[-1] if reached else None
         path = self.out / f'ep_{self.piece}_a{attempt}.json'
         path.write_text(json.dumps(meta, indent=2, ensure_ascii=False) + '\n')
         self.episodes.append(meta)

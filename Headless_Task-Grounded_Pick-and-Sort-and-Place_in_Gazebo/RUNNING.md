@@ -211,6 +211,41 @@ pushed out of reach once; contact physics is not deterministic, so check every
 verdict with `summarise_tri_batch.py`), ~19 min per seed, 19.6 GB of bags;
 LeRobot 40 episodes / 7 049 frames, RLDS 40 episodes / 7 056 steps.
 
+### Random-start recordings (seeds 21-50 on 14/10, 51-100 from 16/10)
+
+`RANDOM_START=1` starts each piece from a random arm pose instead of the
+observation pose, so the joints alone no longer tell where the trajectory goes:
+
+    docker exec gazebo_to_lerobot bash -c 'RANDOM_START=1 /workspace/src/scripts/record_tri_seed.sh 51'
+    docker exec -d gazebo_to_lerobot bash -c 'RANDOM_START=1 /workspace/src/scripts/record_tri_batch.sh 52 100'
+
+`random_start_sorter.py` is the scripted sorter with one step added: after the
+positions are read at the observation pose, the arm moves to a pose drawn by
+`random_start.py` with numpy `default_rng(<seed>)`. Every draw goes to
+`seed_NNN/start_poses.jsonl` (seed, draw index, pose, tip, and the largest
+displacement of any piece during the move, from Gazebo poses before and after),
+and each `ep_*.json` carries the start pose its episode began from
+(`random_start`).
+
+**The sampler of seeds 21-50 was lost with the machine (15/10), and seeds
+51-100 use a different one.** Its poses fit no simple rule, so the new sampler
+draws from them: one of the 120 recorded start poses
+(`config/random_start_poses_s021_050.csv`, from `mycobot-tri-sort-160`, zip
+sha256 `0738a842…5c65`) plus Gaussian jitter of 0.25 × each joint's spread, kept
+inside each joint's recorded range, with the tip at least 13 cm above the board
+and every joint 20° from its limits. Compared on 120 drawn vs the 120 recorded
+poses, no joint differs significantly (KS p 0.18-0.99) and the lowest tip is
+13.2 cm in both. It is **not** identical:
+
+* slightly narrower at the extremes, mostly J2, J4 and J6 (for example J2 from
+  -18° instead of -30°, J4 -73/78° instead of -86/83°, J6 up to 122° instead of
+  153° in one draw of 120);
+* somewhat fewer low starts: tip below 20 cm in 11-14 of 120 draws, against 19 of
+  120 recorded (not significant, Fisher p 0.17-0.45).
+
+A dataset mixing seeds 21-50 and 51-100 therefore mixes two start-pose
+distributions; compare per seed range if a result depends on the start.
+
 Before a batch: Windows sleep off (`powercfg /change standby-timeout-ac 0`,
 `powercfg /change hibernate-timeout-ac 0`), keep a WSL2 terminal open, mains
 power. "Cannot connect to the Docker daemon" means WSL2 restarted: run the
