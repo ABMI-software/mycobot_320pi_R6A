@@ -9,6 +9,19 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — venv LeRobot aux versions d'entraînement SmolVLA (16/10)
+
+- **`requirements_lerobot.txt`** : ajout des 33 paquets SmolVLA (accelerate
+  1.15.0, transformers 5.5.4, tokenizers 0.22.2, num2words 0.5.14 et leurs
+  dépendances) aux versions du `pip freeze` du venv Kaggle qui a entraîné les
+  checkpoints du 13/10 (gelé, 20k) et du 14-15/10 (dégelé, 36k). Ces deux
+  freezes ne diffèrent que sur `cuda-bindings`, `filelock` et `gitpython`.
+  Aucun conflit avec les versions du 10/10 ; torch/torchvision/torchcodec
+  restent les builds CPU des mêmes versions, paquets CUDA exclus. Ces paquets
+  étaient installés à la main hors du venv et ont été perdus avec la machine.
+- Vérifié : le checkpoint 13/10-20k se charge dans l'image reconstruite,
+  450 046 176 paramètres, soit le `num_total_params` du journal Kaggle.
+
 ### Ajouté — reproduction depuis un clone sur machine Linux nue ; PR #17 intégrée (10/10)
 
 - **`Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/docker/`** :

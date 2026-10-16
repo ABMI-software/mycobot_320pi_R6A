@@ -1,10 +1,21 @@
-# Exact versions of /workspace/venv_lerobot that ported and reloaded the datasets on 2026-10-10
-# (pip freeze --local). torch/torchvision/torchcodec are the CPU builds.
+# Exact versions of /workspace/venv_lerobot. Two sources, which agree on every
+# package they share:
+#   - the venv that ported and reloaded the datasets on 2026-10-10 (pip freeze --local);
+#   - the Kaggle venv that trained the SmolVLA checkpoints of 13/10 (frozen, 20k) and
+#     14-15/10 (unfrozen, 36k): accelerate, transformers, tokenizers, num2words and
+#     their dependencies, at the 13/10 versions. The 14-15/10 freeze differs only in
+#     cuda-bindings, filelock and gitpython, none of which touches the model.
+# torch/torchvision/torchcodec are the CPU builds of the versions trained with (+cu130
+# on Kaggle). The CUDA-only packages (nvidia-*, cuda-*, triton) are left out.
 --extra-index-url https://download.pytorch.org/whl/cpu
+accelerate==1.15.0
 aiohappyeyeballs==2.7.1
 aiohttp==3.14.4
 aiosignal==1.4.0
+annotated-doc==0.0.5
+annotated-types==0.8.0
 anyio==4.15.1
+attrs==26.1.0
 av==15.1.0
 certifi==2026.7.22
 charset-normalizer==3.5.2
@@ -13,11 +24,15 @@ cloudpickle==3.1.2
 cmake==4.1.3
 datasets==4.8.5
 dill==0.4.1
+docopt==0.6.2
 draccus==0.11.6
 einops==0.8.2
 Farama-Notifications==0.0.6
+filelock==4.1.1
 frozenlist==1.8.0
 fsspec==2026.2.0
+gitdb==4.0.12
+gitpython==3.2.0
 grpcio==1.84.0
 gymnasium==1.4.0
 h11==0.16.0
@@ -26,35 +41,60 @@ httpcore==1.0.9
 httpx==0.28.1
 huggingface_hub==1.33.0
 idna==3.20
+jinja2==3.1.6
 jsonlines==4.0.0
 lerobot==0.6.1
+markdown-it-py==4.2.0
+markupsafe==3.0.4
+mdurl==0.1.2
 mergedeep==1.3.4
 mpmath==1.3.0
 multidict==6.9.1
 multiprocess==0.70.19
 mypy_extensions==1.1.0
 networkx==3.6.1
+num2words==0.5.14
 numpy==2.2.6
 opencv-python-headless==4.13.0.92
 packaging==25.0
 pandas==2.3.3
+pillow==12.3.0
+platformdirs==4.13.0
 propcache==0.5.4
 protobuf==7.36.2
+psutil==7.2.2
 pyarrow==26.0.0
+pydantic==2.14.1
+pydantic-core==2.50.1
+pygments==2.21.0
+python-dateutil==2.9.0.post0
+pytz==2026.5
+pyyaml==6.0.3
+regex==2026.9.29
 requests==2.34.2
+rich==15.0.0
 safetensors==0.8.0
 scipy==1.18.1
+sentry-sdk==2.72.0
 setuptools==78.1.0
+shellingham==1.5.4
+six==1.17.0
+smmap==5.0.3
 sympy==1.14.0
 termcolor==3.3.0
+tokenizers==0.22.2
 toml==0.10.2
 torch==2.11.0+cpu
 torchcodec==0.11.1+cpu
 torchvision==0.26.0+cpu
 tqdm==4.70.1
-typing-inspect==0.9.0
+transformers==5.5.4
+typer==0.27.3
 typing_extensions==4.16.0
+typing-inspect==0.9.0
+typing-inspection==0.4.4
 tzdata==2026.5
 urllib3==2.8.0
+wandb==0.27.2
 xxhash==4.0.1
 yarl==1.25.1

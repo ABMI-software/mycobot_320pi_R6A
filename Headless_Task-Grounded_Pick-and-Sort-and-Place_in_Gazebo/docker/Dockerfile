@@ -8,7 +8,9 @@
 #   python3-venv/pip      the LeRobot environment below
 #   python3-vcstool       cloning the pinned rosetta packages
 #   /workspace/venv_lerobot  lerobot 0.6.1 + CPU torch 2.11, the exact versions
-#       that ported and reloaded the datasets (requirements_lerobot.txt). It sees
+#       that ported and reloaded the datasets, plus the SmolVLA extras at the
+#       versions the Kaggle checkpoints were trained with, so they load and run
+#       here as trained (requirements_lerobot.txt). It sees
 #       ROS's Python (--system-site-packages) without changing it: numpy 2,
 #       recent protobuf/grpcio/scipy live only in the venv.
 FROM gazebo_to_lerobot:jazzy-harmonic
