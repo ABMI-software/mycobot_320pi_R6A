@@ -1,5 +1,62 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (16 octobre 2026 — soir, reconstruction après la perte de la machine)
+
+### Ce qui a été accompli aujourd'hui
+- **Machine reconstruite** après la perte de l'Ubuntu WSL (~15/10). Perdus : 7
+  commits SmolVLA jamais poussés (pilote Kaggle, évaluation Gazebo, départs
+  aléatoires, outils de trace), les enregistrements des graines 21-50.
+  Retrouvés : l'archive des graines 1-10 sur D: (20 Go, copiée et vérifiée
+  octet par octet sur le disque Linux), les deux entraînements Kaggle (13/10
+  gelé 20k ; 14-15/10 dégelé 36k, checkpoints 8k-36k), leurs notebooks, le jeu
+  de 160 épisodes (zip sha256 `0738a842…5c65`).
+- **Données vérifiées** : graines 1-10 reconverties = 40 épisodes / 7 049 trames,
+  200 statistiques de normalisation identiques au checkpoint 13/10 ; jeu de 160
+  épisodes = 28 359 trames, statistiques identiques au checkpoint 36k.
+- **Image Docker** : extras SmolVLA figés aux versions d'entraînement Kaggle
+  (71aa026a).
+- **Notebooks Kaggle** versionnés tels quels (27185865) ; **Run A** préparé
+  (17c6ce51) : code du 13/10, 160 épisodes, 20k pas, batch 32, encodeur gelé,
+  `SAVE_FREQ` 500, `KEEP_EVERY` 5000, arrêt à 10,5 h ; reprise testée sur CPU
+  (deux défauts corrigés).
+- **Évaluation réécrite** et validée : contrôle en boucle ouverte du 13/10,
+  fermeture de la pince à 0,7-9,8 mm du point enregistré (6270970c) ; Gazebo
+  graine 1, **4/4** (117ed0a1).
+- **Départs aléatoires** recalibrés sur les 120 poses des graines 21-50
+  (9ad81083, be38c15e) ; test graine 51 : 4/4, aucune pièce déplacée.
+- **Lot graines 52-100 lancé** à 19:48 (Paris), départs aléatoires.
+
+### Décisions prises
+- Run A = seul changement par rapport au 13/10 : les données (plus réglages de
+  sauvegarde/arrêt). Lancé par l'utilisateur sur Kaggle, samedi ~08:00 Paris
+  (quota remis à zéro samedi 04:00 Paris), en deux sessions.
+- Le résultat 36k n'est pas une preuve d'encodeur dégradé tant que la sonde ne
+  le montre pas : il était sous-entraîné (144k échantillons).
+- Graines d'évaluation fixées : 11-20 (criblage 11-15), réserve 101-120 ; jamais
+  enregistrées pour l'entraînement.
+- Échantillonneur des graines 51-100 ≠ celui des 21-50 (perdu) : un peu plus
+  étroit aux extrêmes, un peu moins de départs bas (`RUNNING.md`).
+- Pousser `feature/sort-episodes` après chaque contrôle réussi et en fin de
+  journée.
+
+### Prochaines actions
+1. [ROUGE] Samedi : Run A session 1 (~08:00 Paris), puis session 2 le soir
+   (liste de contrôle donnée le 16/10).
+2. [ROUGE] Fin du lot 52-100 (~samedi 13:00 Paris) : vérifier les verdicts,
+   les déplacements de pièces et les poses de départ.
+3. [JAUNE] Deuxième cycle graine 1 (13/10) ; comparaison des checkpoints 36k
+   (8k-36k) sur graines 11-15 + 3 et 21, boucle ouverte et points de saisie sur
+   le jeu de 160 épisodes.
+4. [VERT] Sonde de l'encodeur (protocole complet : 500-1 000 dispositions,
+   plancher/plafond, par caméra, seuil fixé d'avance).
+
+### Commande rapide de reprise
+```bash
+docker start gazebo_to_lerobot rlds_builder     # Docker Desktop doit tourner
+docker exec gazebo_to_lerobot tail -f /workspace/tri_sort/batch.log
+docker exec gazebo_to_lerobot /workspace/venv_lerobot/bin/python /workspace/src/scripts/summarise_eval.py /workspace/eval
+```
+
 ## État actuel (10 octobre 2026 — soir, lot de 40 épisodes et documentation)
 
 ### Ce qui a été accompli aujourd'hui
