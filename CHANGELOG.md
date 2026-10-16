@@ -9,6 +9,28 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — évaluation Gazebo des checkpoints SmolVLA, réécrite (16/10)
+
+- **`scripts/eval_smolvla_tri_sort.py`**, **`eval_tri_seed.sh`** : pour chaque
+  pièce, le bras part de la pose d'observation (ou d'une pose tirée par
+  `random_start.py`, `--start-pose random`), pince à −0,28 comme au premier
+  instant des 40 épisodes ; puis Gazebo en pause → 3 images + état → segment de
+  50 actions → reprise → lecture à 10 Hz de temps simulé. Pince commandée par
+  les 6 valeurs `[g, −g, −g, g, g, −g]`. Score par la vérité terrain Gazebo,
+  jamais vue par la politique, avec le test du trieur scripté (au-dessus de
+  6 cm, puis à 47 mm du centre du bac sous 6 cm). Trace par pas (état, action,
+  pointe) et positions des pièces toutes les 0,5 s.
+- **`scripts/summarise_eval.py`** (taux et intervalle de Wilson à 95 %, graines
+  d'entraînement contre nouvelles, par pièce) et **`scripts/grasp_spots.py`**
+  (où la pince se ferme : distance à la pièce réelle et au point de saisie
+  d'entraînement le plus proche).
+- Vérifié avec le checkpoint du 13/10 (20k), graine 1, pose d'observation :
+  **4/4 triées**, chaque pièce levée à 9,0-9,5 cm et posée dans son bac en 100
+  à 150 pas, ~11 s de calcul par segment, 18 min pour la graine ; même résultat
+  qu'avant la perte de la machine. Un seul cycle : le banc n'est pas
+  déterministe.
+- `docker/setup_workspace.sh` copie ces scripts et `config/`.
+
 ### Ajouté — départs aléatoires recalibrés sur les graines 21-50 (16/10)
 
 - **`scripts/random_start.py`** : l'échantillonneur des enregistrements du 14/10
