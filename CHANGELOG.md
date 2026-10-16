@@ -9,6 +9,25 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — notebook Kaggle du Run A (16/10)
+
+- **`smolvla_tri_sort_runA_frozen_20k.ipynb`** : le code d'entraînement du 13/10
+  (encodeur gelé, batch 32, 20 000 pas, même planning de LR, même graine), avec
+  seulement : le jeu de 160 épisodes (`mycobot-tri-sort-160`) au lieu de 40 ;
+  `SAVE_FREQ` 750 → 500 (750 ne divise pas 5 000) ; `KEEP_EVERY = 5000`
+  (mécanisme `kept/` repris du notebook 36k, sans sa partie TRAIN_VISION) ;
+  `SESSION_HOURS` 11 → 10,5.
+- Deux défauts corrigés, trouvés par un test CPU à deux sessions dans
+  `gazebo_to_lerobot` : une session coupée juste après un pas conservé perdait
+  ses poids (le checkpoint ne restait que dans l'entrée, que l'élagage ne voit
+  pas) ; un SIGINT pendant une écriture laissait un checkpoint incomplet plus
+  récent que `last`, dont la reprise serait repartie. Vérifié : coupure à 12
+  pendant l'écriture de 16, `000016` supprimé, reprise à 12, `kept/` complet
+  (4, 8, 12, 16), `TRAINING COMPLETE`, code de sortie 0 aux deux sessions.
+- Les métadonnées Kaggle du notebook du 13/10 (entrées : jeu de 40 épisodes et
+  sortie du 13/10, qui aurait repris ce run terminé) sont retirées, avec les
+  sorties.
+
 ### Ajouté — notebooks Kaggle des deux entraînements SmolVLA (16/10)
 
 - **`Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/training/smolvla_kaggle/`** :
