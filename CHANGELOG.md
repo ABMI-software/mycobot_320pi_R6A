@@ -9,6 +9,23 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — contrôle en boucle ouverte des checkpoints SmolVLA (16/10)
+
+- **`scripts/smolvla_policy.py`** : un checkpoint en un appel (3 images RGB,
+  état à 7 valeurs, consigne → 50 actions), processeurs sauvegardés rechargés
+  sur CPU ; partagé par le contrôle hors simulateur et l'évaluation Gazebo.
+- **`scripts/open_loop_check.py`** : images, état et consigne enregistrés →
+  segment prédit, comparé aux actions enregistrées : écart de pointe pas à pas,
+  écart à la trajectoire (sans le décalage temporel) et point de fermeture de
+  la pince.
+- Mesuré avec le checkpoint du 13/10 (20k) sur 32 segments des graines 1 et
+  10 : fermeture de la pince à **0,7-9,8 mm** du point enregistré (15 prises,
+  même pas ou un pas d'avance), trajectoire à 4,6 mm (médiane), articulations
+  0,89°, pince 0,004. Les écarts pas à pas en plein mouvement (jusqu'à 77 mm en
+  moyenne) tombent à 3,5-12 mm sur la trajectoire : avance ou retard, pas un
+  autre chemin. Ordre et couleur des caméras, taille d'image, normalisation et
+  unités reproduisent l'entraînement.
+
 ### Ajouté — notebook Kaggle du Run A (16/10)
 
 - **`smolvla_tri_sort_runA_frozen_20k.ipynb`** : le code d'entraînement du 13/10
