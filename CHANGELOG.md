@@ -9,6 +9,18 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — notebooks Kaggle des deux entraînements SmolVLA (16/10)
+
+- **`Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/training/smolvla_kaggle/`** :
+  les deux notebooks tels que téléchargés de Kaggle, sorties comprises,
+  octet pour octet (sha256 vérifié). `smolvla_tri_sort_1310_frozen_20k.ipynb`
+  (Kaggle `notebookc03f3e5a99`, version de la session 2 : reprise à 6 000,
+  fin à 20 000 ; 40 épisodes, encodeur gelé, batch 32) et
+  `smolvla_tri_sort_1415_unfrozen_36k.ipynb` (`smolvla-tri-sort-160`, version 1 :
+  160 épisodes, encodeur de vision entraîné, batch 4, 36 000 pas). Le code
+  d'entraînement d'origine était dans des commits jamais poussés, perdus avec
+  la machine.
+
 ### Modifié — venv LeRobot aux versions d'entraînement SmolVLA (16/10)
 
 - **`requirements_lerobot.txt`** : ajout des 33 paquets SmolVLA (accelerate
