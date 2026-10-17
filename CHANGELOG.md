@@ -9,6 +9,14 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — graines réservées exclues de la conversion (17/10)
+
+- **`convert_tri_sort.sh`** ne convertit plus les graines 11-20, 91-100 et
+  101-120 (jamais entraînées) : il ne voit les graines que par des liens dans
+  `/workspace/tri_sort_train_seeds` et affiche chaque graine écartée. Les
+  graines 91-100 (enregistrées le 17/10) servent au contrôle en boucle ouverte
+  de chaque checkpoint (`local/mycobot_tri_sort_heldout_s091_100`, 40 épisodes).
+
 ### Corrigé — total de fin de lot de `record_tri_batch.sh` (17/10)
 
 - La dernière ligne disait « 240 OK episodes over seeds 52-100 » alors que le

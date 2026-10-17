@@ -246,6 +246,11 @@ poses, no joint differs significantly (KS p 0.18-0.99) and the lowest tip is
 A dataset mixing seeds 21-50 and 51-100 therefore mixes two start-pose
 distributions; compare per seed range if a result depends on the start.
 
+**Held-out seeds, never trained on:** 11-20 (Gazebo evaluation, never recorded),
+**91-100** (recorded 17/10 with random starts, open-loop evaluation of every
+checkpoint, as `local/mycobot_tri_sort_heldout_s091_100`), 101-120 (reserve).
+`convert_tri_sort.sh` skips them and prints each one it leaves out.
+
 Before a batch: Windows sleep off (`powercfg /change standby-timeout-ac 0`,
 `powercfg /change hibernate-timeout-ac 0`), keep a WSL2 terminal open, mains
 power. "Cannot connect to the Docker daemon" means WSL2 restarted: run the

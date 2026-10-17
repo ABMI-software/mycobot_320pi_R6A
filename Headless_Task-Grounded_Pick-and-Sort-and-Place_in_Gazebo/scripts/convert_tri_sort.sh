@@ -20,10 +20,21 @@ source /opt/ros/jazzy/setup.bash
 source /workspace/install/setup.bash
 
 [ -e "$ROOT/$REPO_ID" ] && { echo "$ROOT/$REPO_ID exists -- never overwrite a dataset"; exit 2; }
+# Held-out seeds, never trained on: 11-20 (Gazebo evaluation), 91-100 (open-loop
+# evaluation, recorded 17/10), 101-120 (reserve). Only seen through symlinks in
+# TRAIN_SEEDS, so neither the LeRobot nor the RLDS conversion can pick them up.
+HELD_OUT=" $(seq -s ' ' 11 20) $(seq -s ' ' 91 120) "
+TRAIN_SEEDS=/workspace/tri_sort_train_seeds
+rm -rf "$TRAIN_SEEDS" && mkdir -p "$TRAIN_SEEDS"
+for d in "$TRI_HOME"/seed_[0-9][0-9][0-9]; do
+    s=$((10#${d##*seed_}))
+    case "$HELD_OUT" in *" $s "*) echo "held out, not converted: $d"; continue ;; esac
+    ln -s "$d" "$TRAIN_SEEDS/$(basename "$d")"
+done
 rm -rf "$STAGE" "$NPY"
 mkdir -p "$STAGE" "$NPY"
 n=0
-for meta in "$TRI_HOME"/seed_[0-9][0-9][0-9]/ep_*.json; do
+for meta in "$TRAIN_SEEDS"/seed_[0-9][0-9][0-9]/ep_*.json; do
     ok=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['ok'])" "$meta")
     if [ "$ok" != True ]; then echo "skipped (verdict not OK): $meta"; continue; fi
     bag=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['bag_path'])" "$meta")
@@ -49,6 +60,6 @@ PY2
 /workspace/venv_lerobot/bin/python -W ignore "$HERE/check_lerobot_dataset.py" \
     "$ROOT/$REPO_ID" "$REPO_ID" "$ROOT/$(basename "$REPO_ID")_sheet.png" 2>&1 | grep -v "^Svt\|INFO"
 
-python3 "$HERE/rlds/extract_tri_sort.py" --episodes "$TRI_HOME/seed_[0-9][0-9][0-9]/ep_*.json" --out "$NPY" 2>&1 \
+python3 "$HERE/rlds/extract_tri_sort.py" --episodes "$TRAIN_SEEDS/seed_[0-9][0-9][0-9]/ep_*.json" --out "$NPY" 2>&1 \
     | grep -E "steps|skipped|rror"
 echo "RLDS episodes: $(ls "$NPY" | wc -l) in $NPY"
