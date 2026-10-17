@@ -11,7 +11,11 @@ layouts:
   seeds: [5001, 5800]          # 800 layouts, disjoint from every recorded or evaluated seed
   arm: observation pose (0, 60, -70, 0, 0, 0) deg, gripper at -0.28, as in every first frame
   render: one Gazebo session, the 8 models moved with /world/tri_yolo/set_pose_vector,
-    0.3 s of sim time to settle, then one fresh frame per camera
+    0.3 s of sim time to settle, then the first frames that show the new layout: the renderer
+    picks a pose change up 0.1-1.1 s of sim time late (measured 17/10, before any probe result;
+    the 5-layout test had every image one layout behind), so a frame counts only once the top
+    camera shows each piece's colour at its projected centre, the side cameras from that stamp on.
+    A layout not seen within 5 s is dropped and counted (stale.jsonl).
   targets: x, y of the 4 pieces as Gazebo reports them after settling (8 values, metres)
   rejected: a layout whose piece moved more than 5 mm while settling is dropped and counted
 

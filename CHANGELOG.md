@@ -9,6 +9,21 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — rendu de la sonde : images en retard d'une disposition (17/10)
+
+- **`probe_render.py`** : au test sur 5 dispositions, chaque image montrait la
+  disposition **précédente** (les quatre couleurs tombaient sur les positions
+  k−1). Le moteur de rendu prend un déplacement en compte 0,1 à 1,1 s de temps
+  simulé plus tard, et une image horodatée après le déplacement peut encore
+  montrer l'ancienne scène. Une image ne compte plus qu'une fois que la caméra
+  du dessus montre la couleur de chaque pièce à son centre projeté ; les
+  caméras latérales sont prises à partir de cet horodatage. Une disposition non
+  vue en 5 s est écartée et comptée (`stale.jsonl`).
+- Les positions des bacs, statiques, sont lues sur `pose/info` :
+  `dynamic_pose/info` ne les donne pas (`KeyError: 'bac_rouge'`).
+  `set_pose_vector` déplace bien les bacs statiques (vérifié).
+- `probe_protocol.yaml` décrit ce critère ; aucun résultat de sonde n'existait.
+
 ### Ajouté — sonde de l'encodeur SmolVLA, protocole figé avant tout essai (17/10)
 
 - **`config/probe_protocol.yaml`** : 800 dispositions (graines 5001-5800),
