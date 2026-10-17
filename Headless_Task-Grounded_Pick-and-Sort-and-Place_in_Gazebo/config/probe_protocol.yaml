@@ -1,0 +1,67 @@
+# Encoder probe: does a SmolVLA image encoder still tell where the pieces are?
+# Fixed and committed BEFORE any probe is fitted (17/10/2026). Changing a number
+# below after results exist needs a new commit that says why.
+
+question: >
+  Did training the vision encoder and connector in the 36k run (batch 4, lr 1e-4)
+  damage what they encode about piece positions, compared with smolvla_base?
+
+layouts:
+  generator: tri_scene.sample_tri_scene, piece_reach 0.28, numpy default_rng(seed)
+  seeds: [5001, 5800]          # 800 layouts, disjoint from every recorded or evaluated seed
+  arm: observation pose (0, 60, -70, 0, 0, 0) deg, gripper at -0.28, as in every first frame
+  render: one Gazebo session, the 8 models moved with /world/tri_yolo/set_pose_vector,
+    0.3 s of sim time to settle, then one fresh frame per camera
+  targets: x, y of the 4 pieces as Gazebo reports them after settling (8 values, metres)
+  rejected: a layout whose piece moved more than 5 mm while settling is dropped and counted
+
+encoders:
+  smolvla_base: lerobot/smolvla_base, snapshot 5e8d12a6e2975b0e5e5fce7c8caf47c371d257b6
+  36k_008000: run_1415_unfrozen_36k kept/008000
+  36k_036000: run_1415_unfrozen_36k checkpoints/036000
+  control: >
+    13/10 (run_1310_frozen_20k 020000) vision + connector = smolvla_base value for value
+    (198 tensors, 98.2 M parameters, max difference 0, checked 17/10), so it is not probed.
+
+features:
+  # One camera at a time; each image through the policy's own preprocessing (resize with
+  # padding to 512x512), as the action expert receives it.
+  connector: the 64 connector tokens x 960, flattened (what the action expert attends to)
+  vision: last vision-tower hidden state, 32x32 patches x 768 average-pooled to 8x8, flattened
+  cameras: [top, left, right]
+
+probes:
+  linear: ridge regression, features standardised on the training folds, alpha chosen by
+    inner 5-fold CV over 10^-2 .. 10^5 (15 values)
+  mlp: PCA to 256 on the training folds, one hidden layer of 512 ReLU, Adam lr 1e-3,
+    weight decay 1e-4, 10 % of the training folds for early stopping (patience 50 epochs),
+    seed 0
+  split: 5-fold cross-validation by layout (one layout = one sample), same folds for every
+    encoder, camera and probe (numpy default_rng(0) permutation)
+
+metric:
+  error: per piece, Euclidean distance (mm) between predicted and true x, y on held-out folds
+  report: median and 90th percentile over the 800 x 4 piece predictions, per encoder,
+    camera, layer and probe
+  uncertainty: 95 % bootstrap interval (2000 resamples of layouts) of the paired
+    difference in median error, encoder minus smolvla_base
+
+baselines:
+  floor_mean: predict the training-fold mean position of each piece (no image)
+  floor_pixels: ridge on the raw image resized to 32x24 RGB
+  ceiling_pixel_position: ridge and MLP on each piece's true image position (its Gazebo
+    pose projected through that camera's model, tri_scene.box_centre) -- what the probe
+    can reach when the piece is located perfectly in the image. Colour masks were set
+    aside: each piece shares its colour with its bin.
+
+decision:
+  # Applied to the linear probe on the connector layer; the other cells are reported, not judged.
+  damaged: >
+    median error of the encoder exceeds smolvla_base by more than 5 mm AND by more than 20 %,
+    AND the 95 % bootstrap interval of the difference excludes 0, on at least 2 of the 3 cameras
+  improved: the same three conditions in the other direction
+  otherwise: no measurable difference
+  validity: >
+    the comparison is only judged if smolvla_base beats floor_pixels by at least 20 % on at
+    least 2 cameras; if not, the probe cannot see positions in any encoder and says nothing
+    about damage

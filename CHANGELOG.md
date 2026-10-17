@@ -9,6 +9,19 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — sonde de l'encodeur SmolVLA, protocole figé avant tout essai (17/10)
+
+- **`config/probe_protocol.yaml`** : 800 dispositions (graines 5001-5800),
+  sondes linéaire et MLP, validation croisée par disposition, plancher
+  (moyenne, pixels bruts) et plafond (position image vraie), résultats par
+  caméra, seuils de décision « endommagé / amélioré » fixés avant les essais.
+- **`probe_render.py`** (rendu des dispositions dans une seule session Gazebo),
+  **`probe_features.py`** (jetons du connecteur et sortie de la tour vision, poids
+  de l'encodeur échangés dans une même politique), **`probe_fit.py`** (sondes,
+  bootstrap, verdict).
+- Contrôle : l'encodeur du 13/10 est identique, valeur pour valeur, à celui de
+  smolvla_base (198 tenseurs, et caractéristiques identiques de bout en bout).
+
 ### Modifié — graines réservées exclues de la conversion (17/10)
 
 - **`convert_tri_sort.sh`** ne convertit plus les graines 11-20, 91-100 et
