@@ -54,7 +54,7 @@ cp "$HT"/scripts/{compare_camera_poses.py,grab_views_on_status.py,view_size_chec
 cp "$HT"/scripts/{export_lerobot_episode.py,replay_episode.py,replay_gui.sh,tri_cleanup.sh} "$S/scripts/"
 cp "$HT"/scripts/{smolvla_policy.py,open_loop_check.py,eval_smolvla_tri_sort.py,eval_tri_seed.sh} "$S/scripts/"
 cp "$HT"/scripts/{random_start.py,random_start_sorter.py,summarise_eval.py,grasp_spots.py} "$S/scripts/"
-cp "$HT"/scripts/{probe_render.py,probe_features.py,probe_fit.py} "$S/scripts/"
+cp "$HT"/scripts/{probe_render.sh,probe_render.py,probe_features.py,probe_fit.py} "$S/scripts/"
 rm -rf "$S/config" && mkdir -p "$S/config" && cp "$HT/config/random_start_poses_s021_050.csv" "$HT/config/probe_protocol.yaml" "$S/config/"
 cp "$REPO/scripts/run_sort_gui.sh" "$REPO/scripts/diff_ik.py" "$S/scripts/"
 cp "$REPO/training/dream/mycobot_fk.py" "$S/training/dream/"
