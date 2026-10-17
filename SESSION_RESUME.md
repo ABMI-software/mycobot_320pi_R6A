@@ -1,5 +1,28 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (17 octobre 2026 — midi, lot 52-100 terminé, Run A en cours)
+
+### Ce qui a été accompli aujourd'hui
+- **Lot graines 52-100 terminé** (départs aléatoires), du 16/10 19:48 au
+  17/10 12:32 (Paris) : **196/196 épisodes réussis, tous au premier essai**,
+  196 tirages de départ tous atteints du premier coup, **0,0 mm** de
+  déplacement des pièces pendant la mise en pose. 19-23 min par graine
+  (légère dérive vers la fin), 91 Go de bags. Avec les graines 1-10 et 51 :
+  240 épisodes, écart médian au centre du bac 7,1 mm (max 21,5 mm),
+  156-215 trames par épisode.
+- **Run A lancé sur Kaggle** (par l'utilisateur) à ~07:24 (Paris), GPU T4 x2.
+  Contrôles : 155 tenseurs entraînables, `epch` 0,06 au pas 50 (= 28 359
+  trames), lr conforme à la montée, `grdn` fini dès le pas 100, 2,88 s/pas
+  comme le 13/10. Arrêt de la session 1 attendu vers 17:55 (Paris), ~pas 13 000.
+- Deuxième cycle graine 1 avec le 13/10 lancé à 12:44 (Paris).
+
+### Prochaines actions
+1. [ROUGE] Session 2 de Run A après l'arrêt de la session 1 (sortie de la
+   session 1 en entrée, `resuming from step ~13000`, lr ≈ 3e-05).
+2. [JAUNE] Étape 4 : comparaison des checkpoints 8k-36k (boucle ouverte, puis
+   Gazebo graines 11-15 + 3 et 21). Étape 5 : sonde de l'encodeur.
+3. [VERT] Exclure `seed_051.test1_robot_links_in_displacement` de tout jeu.
+
 ## État actuel (16 octobre 2026 — soir, reconstruction après la perte de la machine)
 
 ### Ce qui a été accompli aujourd'hui

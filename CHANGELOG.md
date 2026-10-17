@@ -9,6 +9,12 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — total de fin de lot de `record_tri_batch.sh` (17/10)
+
+- La dernière ligne disait « 240 OK episodes over seeds 52-100 » alors que le
+  lot 52-100 compte 196 épisodes : le total parcourt tout `$TRI_HOME` (graines
+  1-10 et 51 comprises). Le libellé dit désormais ce qu'il compte.
+
 ### Ajouté — évaluation Gazebo des checkpoints SmolVLA, réécrite (16/10)
 
 - **`scripts/eval_smolvla_tri_sort.py`**, **`eval_tri_seed.sh`** : pour chaque

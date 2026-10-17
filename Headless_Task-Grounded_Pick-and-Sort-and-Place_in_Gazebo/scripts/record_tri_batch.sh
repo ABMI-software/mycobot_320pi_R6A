@@ -57,4 +57,4 @@ for seed in $(seq "$FIRST" "$LAST"); do
     say "seed $seed: done rc=$rc, episodes $n_all, OK $n_ok -- $(grep -h '"piece"\|"verdict"' "$D"/ep_*.json 2>/dev/null | tr -d '\n' | sed 's/  */ /g')"
 done
 total_ok=$(grep -l '"ok": true' "$TRI_HOME"/seed_[0-9][0-9][0-9]/ep_*.json 2>/dev/null | wc -l)
-say "batch end: $total_ok OK episodes over seeds $FIRST-$LAST"
+say "batch end: seeds $FIRST-$LAST done; $total_ok OK episodes in all of $TRI_HOME"
