@@ -16,6 +16,22 @@
   comme le 13/10. Arrêt de la session 1 attendu vers 17:55 (Paris), ~pas 13 000.
 - Deuxième cycle graine 1 avec le 13/10 lancé à 12:44 (Paris).
 
+- **Graine 1 (2e cycle, 13/10) : 4/4** ; **graine 11 (13/10) : 0/4**, pièces
+  intactes, fermetures à 11-40 cm de la pièce et près de positions
+  d'entraînement (graine 2) : le 0/40 d'avant la perte est reproduit, la
+  nouvelle évaluation est validée.
+- **Boucle ouverte, 160 épisodes** (graines 1, 24, 37, 50) : le 36k progresse
+  de 8k à 36k (bout de pince 106 → 44 mm) mais manque la saisie de ~5 cm
+  sur ses propres graines d'entraînement : preuve de sous-entraînement.
+  ⚠ Les graines 24/37/50 sont d'entraînement pour le 36k et nouvelles pour
+  le 13/10 : les deux colonnes ne sont pas comparables.
+
+### Décisions prises
+- **Graines 91-100 réservées en permanence** (jamais entraînées) : contrôle
+  en boucle ouverte du 13/10, du 36k@36k puis de Run A sur ces graines, à la
+  place de la plupart des essais Gazebo. Gazebo : seul 36k@36k sur la
+  graine 21, avec grasp_spots.
+
 ### Prochaines actions
 1. [ROUGE] Session 2 de Run A après l'arrêt de la session 1 (sortie de la
    session 1 en entrée, `resuming from step ~13000`, lr ≈ 3e-05).
