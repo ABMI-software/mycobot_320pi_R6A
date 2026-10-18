@@ -9,6 +9,13 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — comparaison appariée des boucles ouvertes (18/10)
+
+- **`scripts/open_loop_compare.py`** : compare des sorties de `open_loop_check.py` à un point
+  de référence, tronçon par tronçon (épisode, départ) ; différence des médianes et intervalle
+  à 95 % par bootstrap qui tire des épisodes entiers (les tronçons d'un épisode partagent sa
+  disposition). Le point de fermeture n'est comparé que là où les deux points ferment.
+
 ### Corrigé — rendu de la sonde : images en retard d'une disposition (17/10)
 
 - **`probe_render.py`** : au test sur 5 dispositions, chaque image montrait la

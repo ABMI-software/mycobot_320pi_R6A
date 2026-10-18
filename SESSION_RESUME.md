@@ -1,5 +1,56 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (18 octobre 2026 — après-midi, Run A terminé, courbe 5k-20k)
+
+### Ce qui a été accompli
+- **Run A terminé** (code du 13/10, 160 épisodes, encodeur gelé, 20 000 pas) : session 1
+  jusqu'au pas 13 000 (17/10 17:56), session 2 reprise au pas 13 000, fin le 18/10 à 10:15
+  (perte finale 0,034, rc 0, 12,5 Go GPU). Session 2 à 3,34 s/pas contre 2,88. Les
+  « Traceback » du journal Kaggle sont TorchCodec qui ne se charge pas (`libnppicc.so.13`) ;
+  LeRobot retombe sur pyav, déjà configuré : sans effet.
+- Sorties copiées et vérifiées (CRC du zip, sha256 identiques dans le conteneur,
+  `/workspace/checkpoints/run_A_frozen_20k/{005000,010000,015000,020000}`) ; l'encodeur
+  vision + connecteur de Run A est identique à smolvla_base (198 tenseurs, écart 0).
+- **Boucle ouverte sur les graines réservées 91-100** (120 tronçons, 40 épisodes), comparaison
+  appariée par `scripts/open_loop_compare.py`, IC 95 % par bootstrap sur les épisodes :
+
+  | Point | pointe | articulations | pince | point de fermeture |
+  |---|---|---|---|---|
+  | 13/10 | 100,2 mm | 17,06° | 0,071 | 90,8 mm |
+  | 36k@36k | 65,0 mm | 10,13° | 0,018 | 108,2 mm |
+  | Run A 5k | 64,8 mm | 10,06° | 0,022 | 85,1 mm |
+  | Run A 10k | 56,0 mm | 9,32° | 0,018 | 61,6 mm |
+  | Run A 15k | 50,2 mm | 8,03° | 0,016 | 66,5 mm |
+  | Run A 20k | 53,4 mm | 8,75° | 0,013 | 66,6 mm |
+
+  - Run A 20k − 36k@36k : pointe −11,6 mm [−24,3 ; +3,1], articulations −1,39° [−3,39 ; +0,89],
+    pince −0,005 [−0,008 ; −0,001]. Seule la pince est significative.
+  - 5k → 15k : pointe −14,5 mm [−23,1 ; −1,3], articulations −2,04° [−3,90 ; −0,07] : progrès réel.
+  - 10k → 20k : pointe −2,6 mm [−10,7 ; +7,1] ; 15k → 20k : +3,2 mm [−4,9 ; +7,5]. La position
+    est **plate à partir de 10-15k** ; seule la pince progresse encore (10k → 20k −0,005
+    [−0,008 ; −0,002]).
+  - Fermeture à moins de 20 mm : 1 à 2 sur 22-24 à tous les points ; les pièces font 25-30 mm.
+- Gazebo 36k@36k, graine d'entraînement 21 : 0/4, fermetures à 5-26 cm des pièces, sur des
+  emplacements d'autres graines d'entraînement (sous-entraînement).
+- Sonde : rendu de 799 dispositions (graine 5515 impossible à échantillonner), après deux
+  corrections (images en retard d'une disposition ; bacs statiques absents de
+  `dynamic_pose/info`). Caractéristiques smolvla_base faites, 36k en cours.
+
+### Décisions prises
+- Plus de pas ne servira pas la position : la courbe est plate après 10-15k.
+- Proposé (en attente d'accord) : vérification 80 contre 160 épisodes avant de choisir entre
+  « plus de données » et « perception ».
+
+### Prochaines actions
+1. [ROUGE] Fin des caractéristiques 36k@8k et 36k@36k, puis `probe_fit.py` et verdict.
+2. [ROUGE] Gazebo, Run A 20k sur les graines nouvelles 11-20.
+3. [JAUNE] Si accord : vérification 80 contre 160 épisodes sur Kaggle.
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot bash -c 'cat /workspace/probe/features.log; cd /workspace/eval/open_loop_heldout && python3 /workspace/src/scripts/open_loop_compare.py run_1415_unfrozen_36k_036000.json run_A_frozen_20k_020000.json'
+```
+
 ## État actuel (17 octobre 2026 — midi, lot 52-100 terminé, Run A en cours)
 
 ### Ce qui a été accompli aujourd'hui
