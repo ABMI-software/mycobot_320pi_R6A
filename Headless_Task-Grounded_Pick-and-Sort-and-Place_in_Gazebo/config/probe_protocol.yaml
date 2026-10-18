@@ -11,7 +11,7 @@ layouts:
   seeds: [5001, 5800]          # 800 layouts, disjoint from every recorded or evaluated seed
   arm: observation pose (0, 60, -70, 0, 0, 0) deg, gripper at -0.28, as in every first frame
   render: one Gazebo session, the 8 models moved with /world/tri_yolo/set_pose_vector,
-    0.3 s of sim time to settle, then the first frames that show the new layout: the renderer
+    0.3 s of sim time to settle, then the first frames that show the new layout; the renderer
     picks a pose change up 0.1-1.1 s of sim time late (measured 17/10, before any probe result;
     the 5-layout test had every image one layout behind), so a frame counts only once the top
     camera shows each piece's colour at its projected centre, the side cameras from that stamp on.
@@ -56,7 +56,7 @@ baselines:
   ceiling_pixel_position: ridge and MLP on each piece's true image position (its Gazebo
     pose projected through that camera's model, tri_scene.box_centre) -- what the probe
     can reach when the piece is located perfectly in the image. Colour masks were set
-    aside: each piece shares its colour with its bin.
+    aside; each piece shares its colour with its bin.
 
 decision:
   # Applied to the linear probe on the connector layer; the other cells are reported, not judged.
@@ -69,3 +69,27 @@ decision:
     the comparison is only judged if smolvla_base beats floor_pixels by at least 20 % on at
     least 2 cameras; if not, the probe cannot see positions in any encoder and says nothing
     about damage
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 18/10/2026, committed before any cropped feature was computed.
+crop_test:
+  question: >
+    Are the pieces too small in the model input for the frozen encoder to localise them? Same
+    799 renders, same folds and probes, smolvla_base only, each camera cropped to the table first.
+  crop: >
+    fixed per camera from geometry only: the table top (real_table.sdf) from z = 0 up to the
+    tallest item (0.05 m), projected through the camera model, clipped to the frame, plus 4 px.
+    Every item corner of the 799 layouts falls inside (right camera 99.8 %: the rest is already
+    outside the frame). u0, v0, u1, v1 in the 640 x 480 render:
+    top: [183, 0, 438, 272]
+    left: [279, 247, 640, 394]
+    right: [0, 252, 363, 409]
+  piece_size_in_patches: >
+    median projected box over the 799 layouts, in 16 px SigLIP patches after resize-with-pad to
+    512 x 512: full frame 0.91-1.95 patches per side (top 0.91-1.60, left 1.40-1.84,
+    right 1.39-1.95); cropped 2.15-3.77 (top 2.15-3.77, left 2.49-3.27, right 2.44-3.43).
+    Scale gain 2.35 (top), 1.77 (left), 1.76 (right).
+  floor: floor_pixels recomputed on the crops (each crop box-averaged to 32 x 24 RGB, ridge)
+  pass: >
+    top camera, linear probe on the connector: median <= 20 mm AND at least 20 % below the
+    cropped floor_pixels median. Left and right are reported, not judged.
