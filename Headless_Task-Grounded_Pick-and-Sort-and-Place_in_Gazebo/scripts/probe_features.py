@@ -2,19 +2,21 @@
 """Encoder features of the probe renders (config/probe_protocol.yaml), one encoder at a time.
 
   probe_features.py <render dir> <out .npz> --encoder <checkpoint dir | smolvla_base> \
-                    [--policy <checkpoint dir>]
+                    [--policy <checkpoint dir>] [--crop '{"top": [u0, v0, u1, v1], ...}']
 
 The images go through a SmolVLA checkpoint's own path (--policy, default the 13/10 one):
 its preprocessor (camera renaming), prepare_images (resize with padding to 512x512, [-1, 1]),
 then vision_model and connector, as embed_image does. Only the vision and connector weights
 are swapped in from --encoder, so the three encoders see identical inputs. Per camera:
 'connector' (64 x 960) and 'vision' (32 x 32 x 768 average-pooled to 8 x 8 x 768), float16,
-in render-seed order, with the seeds.
+in render-seed order, with the seeds. --crop cuts each camera's render to a fixed box first
+(probe_protocol.yaml, crop_test); the policy's own resize-with-pad then brings it to 512 x 512.
 
 Runs in /workspace/venv_lerobot (no ROS needed).
 """
 import argparse
 import glob
+import json
 from pathlib import Path
 
 import numpy as np
@@ -33,6 +35,13 @@ def encoder_tensors(encoder):
     return {k: v for k, v in load_file(path).items() if 'vision_model' in k or 'connector' in k}
 
 
+def crop(img, box):
+    if box is None:
+        return img
+    u0, v0, u1, v1 = box
+    return img[v0:v1, u0:u1]
+
+
 @torch.no_grad()
 def main():
     ap = argparse.ArgumentParser()
@@ -40,6 +49,7 @@ def main():
     ap.add_argument('out', type=Path)
     ap.add_argument('--encoder', required=True)
     ap.add_argument('--policy', default=POLICY)
+    ap.add_argument('--crop', type=json.loads, default={}, help='{camera: [u0, v0, u1, v1]}')
     args = ap.parse_args()
     torch.set_num_threads(max(1, torch.get_num_threads()))
     model = SmolVLA(args.policy)
@@ -54,8 +64,8 @@ def main():
     for i in range(0, len(seeds), BATCH):
         renders = [np.load(args.render / f'{s}.npz') for s in seeds[i:i + BATCH]]
         obs = {f'observation.images.{c}': torch.stack([
-            torch.from_numpy(np.ascontiguousarray(r[c])).permute(2, 0, 1).float() / 255.0 for r in renders])
-            for c in CAMERAS}
+            torch.from_numpy(np.ascontiguousarray(crop(r[c], args.crop.get(c)))).permute(2, 0, 1).float() / 255.0
+            for r in renders]) for c in CAMERAS}
         obs['observation.state'] = torch.zeros(len(renders), 7)
         obs['task'] = ['probe'] * len(renders)
         batch = model.pre(obs)
@@ -71,6 +81,7 @@ def main():
         print(f'{min(i + BATCH, len(seeds))}/{len(seeds)}', flush=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     np.savez(args.out, seeds=np.array(seeds), encoder=args.encoder, policy=args.policy,
+             crop=json.dumps(args.crop),
              **{k: np.concatenate(v) for k, v in feats.items()})
 
 

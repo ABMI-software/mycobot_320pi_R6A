@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Fit and judge the encoder probes exactly as config/probe_protocol.yaml fixes them.
 
-  probe_fit.py <render dir> <features dir> <out .json>
+  probe_fit.py <render dir> <features dir> <out .json> [--encoders smolvla_base ...] [--crop '{...}']
 
 <features dir> holds one probe_features.py output per encoder: smolvla_base.npz,
 36k_008000.npz, 36k_036000.npz. Targets: the four pieces' x, y as Gazebo reported them after
 settling (layouts.jsonl); layouts whose pieces drifted more than 5 mm are dropped and counted.
 Same 5 folds by layout everywhere. Per encoder, camera, layer and probe: median and 90th
 percentile of the per-piece error (mm); paired bootstrap of the median difference against
-smolvla_base; the protocol's verdict on the linear probe of the connector layer.
+smolvla_base; the protocol's verdict on the linear probe of the connector layer. With --crop
+(probe_protocol.yaml, crop_test), the raw-pixel floor is computed on the same crops as the
+features, and the verdict is the crop test's pass rule instead.
 
 /workspace/venv_lerobot/bin/python with ROS sourced (tri_scene and the camera models give the
 ceiling baseline), inside gazebo_to_lerobot.
@@ -19,6 +21,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from PIL import Image
 from ament_index_python.packages import get_package_share_directory
 
 from mycobot_gateway.vision import tri_scene
@@ -144,12 +147,17 @@ def paired_bootstrap(err, base):
     return [round(float(np.percentile(diffs, 2.5)), 2), round(float(np.percentile(diffs, 97.5)), 2)]
 
 
-def pixel_features(render, seeds, cam):
-    """Raw image block-averaged to 32 x 24 RGB (480 x 640 / 20)."""
+def pixel_features(render, seeds, cam, box=None):
+    """Raw image (or its crop) box-averaged to 32 x 24 RGB; uncropped, 480 x 640 / 20 exactly."""
     out = []
     for s in seeds:
-        img = np.load(render / f'{s}.npz')[cam].astype(np.float32)
-        out.append(img.reshape(24, 20, 32, 20, 3).mean(axis=(1, 3)).ravel())
+        img = np.load(render / f'{s}.npz')[cam]
+        if box is None:
+            out.append(img.astype(np.float32).reshape(24, 20, 32, 20, 3).mean(axis=(1, 3)).ravel())
+        else:
+            u0, v0, u1, v1 = box
+            small = Image.fromarray(img[v0:v1, u0:u1]).resize((32, 24), Image.Resampling.BOX)
+            out.append(np.asarray(small, dtype=np.float32).ravel())
     return np.array(out)
 
 
@@ -164,7 +172,10 @@ def main():
     ap.add_argument('render', type=Path)
     ap.add_argument('features', type=Path)
     ap.add_argument('out', type=Path)
+    ap.add_argument('--encoders', nargs='+', default=list(ENCODERS))
+    ap.add_argument('--crop', type=json.loads, default=None, help='{camera: [u0, v0, u1, v1]}')
     args = ap.parse_args()
+    encoders = args.encoders
     layouts = [json.loads(line) for line in (args.render / 'layouts.jsonl').read_text().splitlines()]
     kept = [l for l in layouts if l['drift_max_mm'] <= DRIFT_MAX_MM]
     seeds = np.array([l['seed'] for l in kept])
@@ -175,12 +186,14 @@ def main():
                            {'camera_layout': 'dream50k'})
     footprints = tri_scene.load_footprints(str(desc / 'models'))
     feats = {}
-    for enc in ENCODERS:
+    for enc in encoders:
         f = np.load(args.features / f'{enc}.npz')
         index = {int(s): i for i, s in enumerate(f['seeds'])}
         rows = [index[int(s)] for s in seeds]
+        if args.crop is not None and json.loads(str(f['crop'])) != args.crop:
+            raise SystemExit(f'{enc}.npz was computed with crop {f["crop"]}, not {args.crop}')
         feats[enc] = {k: f[k][rows].astype(np.float32) for k in f.files if k.endswith(LAYERS)}
-    result = {'layouts_rendered': len(layouts), 'layouts_dropped_drift': len(layouts) - len(kept),
+    result = {'crop': args.crop, 'layouts_rendered': len(layouts), 'layouts_dropped_drift': len(layouts) - len(kept),
               'layouts_used': len(kept), 'cells': {}}
     err_of = {}
 
@@ -193,21 +206,30 @@ def main():
 
     run('floor_mean', np.zeros((len(y), 1)), 'mean')
     for cam in CAMERAS:
-        px = pixel_features(args.render, seeds, cam)
+        px = pixel_features(args.render, seeds, cam, (args.crop or {}).get(cam))
         run(f'floor_pixels/{cam}/linear', px, 'linear')
         ceil = ceiling_features(kept, cam, cameras, footprints)
         for probe in ('linear', 'mlp'):
             run(f'ceiling_pixel_position/{cam}/{probe}', ceil, probe)
-        for enc in ENCODERS:
+        for enc in encoders:
             for layer in LAYERS:
                 for probe in ('linear', 'mlp'):
                     run(f'{enc}/{cam}/{layer}/{probe}', feats[enc][f'{cam}_{layer}'], probe)
     for name in list(result['cells']):
         enc = name.split('/')[0]
-        if enc in ENCODERS and enc != 'smolvla_base':
+        if enc in encoders and enc != 'smolvla_base':
             base = 'smolvla_base/' + name.split('/', 1)[1]
             result['cells'][name]['diff_vs_base_ci95_mm'] = paired_bootstrap(err_of[name], err_of[base])
 
+    if args.crop is not None:
+        top = result['cells']['smolvla_base/top/connector/linear']['median_mm']
+        floor = result['cells']['floor_pixels/top/linear']['median_mm']
+        result['verdict'] = {'top_median_mm': top, 'top_cropped_pixel_floor_mm': floor,
+                             'median_le_20mm': top <= 20.0, 'beats_floor_by_20pct': top <= 0.8 * floor,
+                             'pass': top <= 20.0 and top <= 0.8 * floor}
+        print(json.dumps(result['verdict'], indent=1))
+        args.out.write_text(json.dumps(result, indent=1) + '\n')
+        return
     verdict = {}
     base_ok = [cam for cam in CAMERAS
                if result['cells'][f'smolvla_base/{cam}/connector/linear']['median_mm']

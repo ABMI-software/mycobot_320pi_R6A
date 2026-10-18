@@ -9,6 +9,13 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — test de recadrage de la sonde (18/10)
+
+- **`probe_features.py --crop`** et **`probe_fit.py --crop --encoders`** : recadrage fixe de
+  chaque caméra sur la table avant l'encodeur (le redimensionnement avec marges de la
+  politique suit), plancher pixels recalculé sur les mêmes recadrages, verdict du test de
+  recadrage (`probe_protocol.yaml`, `crop_test`, figé dans 67a3d4ac avant tout calcul).
+
 ### Ajouté — modes d'échec par pièce ; corrigé — sonde MLP sur 8 entrées (18/10)
 
 - **`scripts/failure_modes.py`** : un mode d'échec par pièce d'une évaluation Gazebo (trié ;
