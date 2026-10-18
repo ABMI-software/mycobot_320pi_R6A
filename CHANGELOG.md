@@ -9,6 +9,16 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — modes d'échec par pièce ; corrigé — sonde MLP sur 8 entrées (18/10)
+
+- **`scripts/failure_modes.py`** : un mode d'échec par pièce d'une évaluation Gazebo (trié ;
+  saisi non posé ; jamais fermé ; fermé en l'air ; emplacement mémorisé ; mauvais endroit ;
+  raté de près), plus « poussé » ; écrit `failure_modes.json`. Vérifié sur les évaluations
+  36k@36k graine 21 et 13/10 graine 11 : mêmes lectures que `grasp_spots.py`.
+- **`probe_fit.py`** : la PCA de la sonde MLP demandait 256 composantes sur le plafond à
+  8 entrées ; elle est bornée à la largeur de l'entrée. Trouvé par un essai à blanc avant la
+  vraie sonde, aucun résultat n'en dépendait.
+
 ### Ajouté — comparaison appariée des boucles ouvertes (18/10)
 
 - **`scripts/open_loop_compare.py`** : compare des sorties de `open_loop_check.py` à un point

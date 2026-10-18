@@ -80,7 +80,7 @@ def mlp(xtr, ytr, xte):
     torch.manual_seed(0)
     a = torch.as_tensor(xtr, dtype=torch.float32)
     mean = a.mean(0)
-    k = min(256, len(a) - 1)
+    k = min(256, len(a) - 1, a.shape[1])
     _, _, v = torch.linalg.svd(a - mean, full_matrices=False)
     pca = lambda x: (torch.as_tensor(x, dtype=torch.float32) - mean) @ v[:k].T  # noqa: E731
     ptr, pte = pca(xtr), pca(xte)

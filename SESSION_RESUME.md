@@ -36,7 +36,32 @@
   corrections (images en retard d'une disposition ; bacs statiques absents de
   `dynamic_pose/info`). Caractéristiques smolvla_base faites, 36k en cours.
 
+- **Sonde de l'encodeur** (799 dispositions, protocole figé `probe_protocol.yaml`) : erreur de
+  localisation par pièce, linéaire sur le connecteur, médiane / p90 en mm :
+
+  | | dessus | gauche | droite |
+  |---|---|---|---|
+  | plancher moyenne | 106 / 189 | 106 / 189 | 106 / 189 |
+  | plancher pixels 32×24 | 48 / 120 | 43 / 112 | 44 / 120 |
+  | **smolvla_base (= 13/10 = Run A)** | **32 / 79** | **39 / 86** | **39 / 83** |
+  | 36k@8k | 71 / 160 | 81 / 173 | 81 / 168 |
+  | 36k@36k | 80 / 179 | 80 / 177 | 74 / 174 |
+  | plafond (position image vraie, MLP) | 1,4 / 3,4 | 1,6 / 4,1 | 1,6 / 4,2 |
+
+  - **Sonde invalide selon sa propre règle** : smolvla_base ne bat les pixels bruts de 20 %
+    que sur la caméra du dessus (34 %), pas à gauche (9 %) ni à droite (12 %). Donc aucun
+    verdict « endommagé » n'est prononcé, conformément au protocole.
+  - À titre descriptif seulement : les encodeurs 36k sont environ deux fois moins bons que
+    la base sur les trois caméras, IC du bootstrap apparié loin de 0 (+33 à +55 mm) ; pas
+    d'artefact de valeurs aberrantes (aucune valeur non finie, variance non concentrée).
+  - La sonde MLP fait moins bien que la linéaire partout (51-58 mm pour la base) : recette
+    MLP faible à 640 exemples, pas une preuve d'absence d'information non linéaire.
+  - Les caractéristiques gelées ne localisent **pas** sous 25 mm (32-39 mm médian, p90
+    79-86 mm), avec 640 dispositions d'apprentissage ; la politique n'en a vu que 40.
+
 ### Décisions prises
+- Pas de course à ~320 épisodes : la règle fixée le 18/10 la réservait au cas où les
+  caractéristiques gelées localisent nettement sous 25 mm. Place aux options de perception.
 - Plus de pas ne servira pas la position : la courbe est plate après 10-15k.
 - Proposé (en attente d'accord) : vérification 80 contre 160 épisodes avant de choisir entre
   « plus de données » et « perception ».
