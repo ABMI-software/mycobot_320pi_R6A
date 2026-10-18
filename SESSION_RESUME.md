@@ -1,5 +1,38 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (19 octobre 2026 — nuit, test d'échange d'images, lot B 1001-1050 en cours)
+
+### Ce qui a été accompli
+- **Test d'échange d'images** (`open_loop_check.py --swap-images`, graines réservées 91-100,
+  120 tronçons, 40 épisodes) : chaque épisode reçoit les images de la même pièce sur la graine
+  suivante, avec son propre état et sa consigne. IC 95 % par bootstrap sur les épisodes.
+
+  | | pointe, échangé − propre | point de fermeture | fermetures plus près du donneur, propre → échangé |
+  |---|---|---|---|
+  | Run A 15k (encodeur gelé) | **+16,7 mm [+5,0 ; +31,0]** | **+81,6 mm [+32,8 ; +122,3]** | **35 % → 81 %** [68 ; 94] |
+  | 36k@36k (encodeur entraîné) | −1,7 mm [−6,1 ; +7,2] | +2,3 mm [−27,5 ; +12,2] | 64 % → 70 % |
+
+  - **Run A se sert des images pour décider où aller** : avec les images d'une autre
+    disposition, 26 fermetures sur 32 vont vers la saisie de cette autre disposition.
+  - **36k@36k ignore les images** : les échanger ne change rien.
+  - Réserve : l'image échangée montre aussi le bras dans une autre pose que l'état ; le
+    glissement des fermetures vers la saisie du donneur est, lui, propre à la disposition.
+- **Lot B, un épisode par disposition** (`PREPLACE=1`, graines 1001-1400, cible
+  `PIECES[graine % 4]`, 0 à 3 autres pièces posées dans leur bac, jamais la cible). Graine 1001
+  enregistrée de bout en bout, 0 problème, image vérifiée. Lot 1002-1050 lancé à 23:31.
+- Estimation T4, couches de langage gelées (vision + connecteur + expert entraînés) : voir
+  le message du 19/10 ; à confirmer par une courte mesure sur Kaggle, sur accord.
+
+### Prochaines actions
+1. [ROUGE] Fin du lot 1002-1050, conversion, `verify_preplaced_batch.py` avec `--dataset`.
+2. [JAUNE] Puis le reste, 1051-1400, sur accord après vérification.
+3. [JAUNE] Run C : taille de lot mesurée avant d'écrire l'accumulation de gradient.
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot bash -c 'tail -3 /workspace/tri_sort_B/batch.log; python3 /workspace/src/scripts/verify_preplaced_batch.py /workspace/tri_sort_B 1001 1050'
+```
+
 ## État actuel (18 octobre 2026 — soir, Gazebo graine 11 et test de recadrage)
 
 ### Ce qui a été accompli
