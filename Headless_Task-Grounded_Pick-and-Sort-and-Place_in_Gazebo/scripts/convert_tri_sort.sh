@@ -4,6 +4,7 @@
 #   2. per-episode .npy for the RLDS builder (extract_tri_sort.py, MoveIt FK)
 #
 #   convert_tri_sort.sh [repo_id]          # default local/mycobot_tri_sort
+#   TRI_HOME=/workspace/tri_sort_B STAGE=... TRAIN_SEEDS=... SKIP_RLDS=1 convert_tri_sort.sh local/x
 #
 # rosetta_port finds bags with rglob, which does not follow symlinks, so the OK
 # bags are gathered with hard links (cp -al): no data is copied.
@@ -11,9 +12,9 @@
 set -e
 REPO_ID="${1:-local/mycobot_tri_sort}"
 TRI_HOME="${TRI_HOME:-/workspace/tri_sort}"
-STAGE=/workspace/tri_sort_ok
+STAGE="${STAGE:-/workspace/tri_sort_ok}"
 ROOT=/workspace/tri_datasets
-NPY=/workspace/rlds_tri_sort/data/train
+NPY="${NPY:-/workspace/rlds_tri_sort/data/train}"
 HERE="$(dirname "$(readlink -f "$0")")"
 set +u
 source /opt/ros/jazzy/setup.bash
@@ -23,10 +24,12 @@ source /workspace/install/setup.bash
 # Held-out seeds, never trained on: 11-20 (Gazebo evaluation), 91-100 (open-loop
 # evaluation, recorded 17/10), 101-120 (reserve). Only seen through symlinks in
 # TRAIN_SEEDS, so neither the LeRobot nor the RLDS conversion can pick them up.
-HELD_OUT=" $(seq -s ' ' 11 20) $(seq -s ' ' 91 120) "
-TRAIN_SEEDS=/workspace/tri_sort_train_seeds
+# 5001-5800 are the encoder-probe layouts (config/probe_protocol.yaml).
+HELD_OUT=" $(seq -s ' ' 11 20) $(seq -s ' ' 91 120) $(seq -s ' ' 5001 5800) "
+TRAIN_SEEDS="${TRAIN_SEEDS:-/workspace/tri_sort_train_seeds}"
 rm -rf "$TRAIN_SEEDS" && mkdir -p "$TRAIN_SEEDS"
-for d in "$TRI_HOME"/seed_[0-9][0-9][0-9]; do
+for d in "$TRI_HOME"/seed_[0-9][0-9][0-9] "$TRI_HOME"/seed_[0-9][0-9][0-9][0-9]; do
+    [ -d "$d" ] || continue
     s=$((10#${d##*seed_}))
     case "$HELD_OUT" in *" $s "*) echo "held out, not converted: $d"; continue ;; esac
     ln -s "$d" "$TRAIN_SEEDS/$(basename "$d")"
@@ -34,7 +37,7 @@ done
 rm -rf "$STAGE" "$NPY"
 mkdir -p "$STAGE" "$NPY"
 n=0
-for meta in "$TRAIN_SEEDS"/seed_[0-9][0-9][0-9]/ep_*.json; do
+for meta in "$TRAIN_SEEDS"/seed_*/ep_*.json; do
     ok=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['ok'])" "$meta")
     if [ "$ok" != True ]; then echo "skipped (verdict not OK): $meta"; continue; fi
     bag=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['bag_path'])" "$meta")
@@ -53,13 +56,14 @@ python3 - "$STAGE" "$ROOT/$REPO_ID/meta/tri_sort_sources.json" <<'PY2'
 import json, sys
 from pathlib import Path
 names = sorted(p.parent.name for p in Path(sys.argv[1]).rglob('metadata.yaml'))
-Path(sys.argv[2]).write_text(json.dumps([{'episode_index': i, 'source': n, 'seed': int(n[5:8]),
+Path(sys.argv[2]).write_text(json.dumps([{'episode_index': i, 'source': n, 'seed': int(n[5:].split('_')[0]),
     'piece': n.split('_ep_')[1].rsplit('_a', 1)[0]} for i, n in enumerate(names)], indent=1) + '\n')
 print(f'{len(names)} episode sources -> {sys.argv[2]}')
 PY2
 /workspace/venv_lerobot/bin/python -W ignore "$HERE/check_lerobot_dataset.py" \
     "$ROOT/$REPO_ID" "$REPO_ID" "$ROOT/$(basename "$REPO_ID")_sheet.png" 2>&1 | grep -v "^Svt\|INFO"
 
+[ "${SKIP_RLDS:-0}" = 1 ] && { echo "RLDS skipped (SKIP_RLDS=1)"; exit 0; }
 python3 "$HERE/rlds/extract_tri_sort.py" --episodes "$TRAIN_SEEDS/seed_[0-9][0-9][0-9]/ep_*.json" --out "$NPY" 2>&1 \
     | grep -E "steps|skipped|rror"
 echo "RLDS episodes: $(ls "$NPY" | wc -l) in $NPY"

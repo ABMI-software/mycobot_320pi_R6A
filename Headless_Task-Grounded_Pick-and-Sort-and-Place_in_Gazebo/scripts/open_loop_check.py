@@ -9,6 +9,11 @@ gripper-tip distance (FK of the predicted vs recorded joints, the sorter's own t
 error and gripper error. Catches what a live evaluation cannot separate from the policy itself:
 camera order, RGB order, image size, normalisation, action units.
 
+--swap-images feeds each episode the camera images of the same piece's episode on the next seed
+(cyclic, same frame index, clamped), with its own state and instruction: whether the policy uses
+the images at all. Every chunk that closes the gripper also reports how far that close is from
+the episode's own recorded grasp and from the image donor's.
+
 Run inside gazebo_to_lerobot with ROS sourced (tool_tip) and /workspace/venv_lerobot's python.
 """
 import argparse
@@ -35,6 +40,7 @@ def main():
     ap.add_argument('--per-piece', type=int, default=2, help='episodes per piece, spread over seeds')
     ap.add_argument('--starts', type=int, nargs='+', default=[0, 60, 120], help='frame of each chunk start')
     ap.add_argument('--out', type=Path)
+    ap.add_argument('--swap-images', action='store_true')
     args = ap.parse_args()
 
     ds = LeRobotDataset(f'local/{args.dataset_root.name}', root=args.dataset_root)
@@ -45,15 +51,36 @@ def main():
         eps = [s for s in sources if s['piece'] == piece]
         chosen += [eps[i] for i in np.linspace(0, len(eps) - 1, args.per_piece).round().astype(int)]
 
+    def frames(src):
+        return np.flatnonzero(episode_of == src['episode_index'])
+
+    def grasp_tip(src):
+        recorded = np.stack([ds.hf_dataset[int(i)]['action'] for i in frames(src)])
+        k = int(np.argmax(recorded[:, 6] <= recorded[:, 6].min() + 0.05))
+        return tips(recorded[k:k + 1])[0]
+
+    seeds = sorted({s['seed'] for s in sources})
+    by_key = {(s['seed'], s['piece']): s for s in sources}
+    donor_of = {s['episode_index']: by_key[(seeds[(seeds.index(s['seed']) + 1) % len(seeds)], s['piece'])]
+                for s in sources}
+
     model = SmolVLA(args.checkpoint)
     rows = []
     for src in chosen:
-        idx = np.flatnonzero(episode_of == src['episode_index'])
+        idx = frames(src)
         recorded = np.stack([ds.hf_dataset[int(i)]['action'] for i in idx])
+        donor = donor_of[src['episode_index']]
+        donor_idx = frames(donor)
+        own_grasp, donor_grasp = grasp_tip(src), grasp_tip(donor)
         for t in args.starts:
             if t >= len(idx):
                 continue
-            pred = model.predict_frame(ds[int(idx[t])], seed=src['episode_index'] * 1000 + t)
+            frame = ds[int(idx[t])]
+            if args.swap_images:
+                donor_frame = ds[int(donor_idx[min(t, len(donor_idx) - 1)])]
+                for k in [k for k in frame if k.startswith('observation.images.')]:
+                    frame[k] = donor_frame[k]
+            pred = model.predict_frame(frame, seed=src['episode_index'] * 1000 + t)
             n = min(len(pred), len(idx) - t)
             ref = recorded[t:t + n]
             pred_tip, ref_tip = tips(pred[:n]), tips(ref)
@@ -66,7 +93,8 @@ def main():
                    'tip_mean_mm': round(float(tip_mm.mean()), 1), 'tip_max_mm': round(float(tip_mm.max()), 1),
                    'path_mean_mm': round(float(path_mm.mean()), 1), 'path_max_mm': round(float(path_mm.max()), 1),
                    'joint_mean_deg': round(float(np.degrees(np.abs(pred[:n, :6] - ref[:, :6])).mean()), 2),
-                   'gripper_mean_abs': round(float(np.abs(pred[:n, 6] - ref[:, 6]).mean()), 3)}
+                   'gripper_mean_abs': round(float(np.abs(pred[:n, 6] - ref[:, 6]).mean()), 3),
+                   'images_from': donor['source'] if args.swap_images else src['source']}
             # Where the gripper closes on the piece: the step its action first reaches the
             # episode's most closed value, recorded vs predicted (within this chunk).
             close = recorded[:, 6].min() + 0.05
@@ -75,11 +103,20 @@ def main():
             if len(k_ref) and len(k_pred) and (k_ref[0] > 0 or t == 0 or recorded[t - 1, 6] > close):
                 row['grasp_point_mm'] = round(float(np.linalg.norm(pred_tip[k_pred[0]] - ref_tip[k_ref[0]]) * 1000), 1)
                 row['grasp_step_lag'] = int(k_pred[0] - k_ref[0])
+            if len(k_pred) and recorded[t, 6] > close:  # a chunk that starts holding the piece has no grasp
+                row['close_to_own_grasp_mm'] = round(float(np.linalg.norm(pred_tip[k_pred[0]] - own_grasp) * 1000), 1)
+                row['close_to_donor_grasp_mm'] = round(float(np.linalg.norm(pred_tip[k_pred[0]] - donor_grasp) * 1000), 1)
             rows.append(row)
             print(json.dumps(row), flush=True)
 
     tip = np.array([r['tip_mean_mm'] for r in rows])
+    closes = [r for r in rows if 'close_to_own_grasp_mm' in r]
     summary = {'checkpoint': str(args.checkpoint), 'dataset': str(args.dataset_root), 'chunks': len(rows),
+               'swap_images': args.swap_images,
+               'closes': len(closes),
+               'close_to_own_grasp_mm_median': round(float(np.median([r['close_to_own_grasp_mm'] for r in closes])), 1) if closes else None,
+               'close_to_donor_grasp_mm_median': round(float(np.median([r['close_to_donor_grasp_mm'] for r in closes])), 1) if closes else None,
+               'closes_nearer_donor': sum(r['close_to_donor_grasp_mm'] < r['close_to_own_grasp_mm'] for r in closes),
                'tip_mean_mm_median': round(float(np.median(tip)), 1),
                'tip_mean_mm_range': [float(tip.min()), float(tip.max())],
                'tip_max_mm_overall': max(r['tip_max_mm'] for r in rows),

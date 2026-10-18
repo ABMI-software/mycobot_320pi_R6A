@@ -3,6 +3,7 @@
 # pick-and-place, inside the gazebo_to_lerobot container.
 #
 #   record_tri_seed.sh <seed> [piece[,piece...]]
+#   PREPLACE=1 record_tri_seed.sh <seed>     # one piece, 0-3 others already in their bins
 #
 # Without a piece list, all four are sorted and recorded. Output in
 # $TRI_HOME/seed_<NNN>/ : bags/, ep_*.json, logs. Everything is stopped on exit.
@@ -31,6 +32,11 @@ stage "seed $SEED: scene starting"
 # "inactive" contains "active": match the state as a whole word.
 until ros2 control list_controllers 2>/dev/null \
         | grep -qE 'gripper_position_controller.*[[:space:]]active([[:space:]]|$)'; do
+    # tri_scene gives up on ~1 seed in 800 (5515): no scene, no controllers, ever.
+    if grep -q "could not sample a valid sorting scene" "$D/scene.log"; then
+        stage "FATAL: seed $SEED unsampleable"
+        exit 3
+    fi
     sleep 5
 done
 stage "controllers active"
@@ -45,6 +51,19 @@ ros2 run rosetta episode_recorder_node --ros-args -p use_sim_time:=true \
 timeout 120 python3 "$HERE/recorder_lifecycle.py" --timeout 60 > "$D/lifecycle.log" 2>&1 \
     || { stage "FATAL: recorder lifecycle"; cat "$D/lifecycle.log"; exit 1; }
 stage "recorder active"
+
+# PREPLACE=1: one episode per layout. preplace_pieces.py picks the target (seed % 4), puts 0-3 of
+# the other pieces in their bins (never the target) and checks they rest there; only the target
+# is then sorted and recorded.
+if [ "${PREPLACE:-0}" = 1 ]; then
+    if ! TARGET=$(python3 "$HERE/preplace_pieces.py" --seed "$SEED" --out "$D" 2>> "$D/preplace.log" | tail -1) \
+            || [ -z "$TARGET" ]; then
+        stage "FATAL: preplace failed: $(tail -1 "$D/preplace.log")"
+        exit 1
+    fi
+    ONLY="$TARGET"
+    stage "preplaced $(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d['n_presorted'], sorted(d['presorted']))" "$D/preplaced.json"); target $TARGET"
+fi
 
 python3 "$HERE/record_tri_sort.py" --seed "$SEED" --out "$D" > "$D/driver.log" 2>&1 &
 DRIVER=$!

@@ -9,6 +9,25 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — un épisode par disposition, pièces pré-triées ; test d'échange d'images (18/10)
+
+- **`PREPLACE=1 record_tri_seed.sh`** (et `record_tri_batch.sh`) : une seule pièce enregistrée
+  par disposition, la cible `PIECES[graine % 4]` ; `preplace_pieces.py` pose d'abord 0 à 3 des
+  autres pièces dans leur bac (`default_rng([graine, 1])`, jamais la cible), vérifie qu'elles y
+  reposent et que rien d'autre n'a bougé, sinon la graine n'est pas enregistrée.
+- `record_tri_sort.py` écrit dans chaque `ep_*.json` les positions Gazebo des quatre pièces et des
+  quatre bacs au début et à la fin de l'épisode (`gazebo_poses_start` / `_end`) et le
+  pré-placement ; métadonnées seulement, jamais une entrée de la politique.
+- `verify_preplaced_batch.py` : contrôle d'un lot (épisode complet, cible, pièces pré-triées dans
+  leur bac du début à la fin, rien de déplacé, consigne et nombre d'épisodes du jeu converti).
+- `convert_tri_sort.sh` : graines à 4 chiffres, `STAGE` / `TRAIN_SEEDS` / `SKIP_RLDS`, et les
+  dispositions de la sonde (5001-5800) exclues comme les graines réservées.
+- `record_tri_seed.sh` s'arrête aussitôt sur une graine que l'échantillonneur de scène ne sait
+  pas résoudre, au lieu d'attendre le chien de garde de 75 min.
+- **`open_loop_check.py --swap-images`** : chaque épisode reçoit les images de l'épisode de la
+  même pièce sur la graine suivante, avec son propre état et sa consigne ; chaque tronçon qui
+  ferme la pince donne sa distance à la saisie enregistrée de l'épisode et à celle du donneur.
+
 ### Ajouté — test de recadrage de la sonde (18/10)
 
 - **`probe_features.py --crop`** et **`probe_fit.py --crop --encoders`** : recadrage fixe de

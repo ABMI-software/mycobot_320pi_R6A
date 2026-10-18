@@ -13,8 +13,11 @@ sim_sorting_grasp has left the graph.
 import argparse
 import json
 import re
+import subprocess
 import time
 from pathlib import Path
+
+import sys
 
 import rclpy
 from rclpy.action import ActionClient
@@ -22,6 +25,11 @@ from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rosetta_interfaces.action import RecordEpisode
 from std_msgs.msg import String
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from preplace_pieces import BIN_OF, PIECES as PIECE_ORDER, model_poses  # noqa: E402
+
+TRACKED = list(PIECE_ORDER) + list(BIN_OF.values())
 
 # Same wording as the 60-episode dataset (config/tasks.jsonl), so the two
 # datasets share one instruction vocabulary.
@@ -68,7 +76,17 @@ class Recorder(Node):
             self.get_logger().error(f'record_episode goal rejected for {piece}')
             return
         self.goal_handle, self.piece, self.started = handle, piece, self.get_clock().now()
+        # After the goal is accepted, so the query never delays the first frames. The pieces
+        # do not move before the grasp; the target's own pose here is its pre-grasp position.
+        self.start_poses = self.gazebo_poses()
         self.get_logger().info(f'recording {piece}: {goal.prompt!r}')
+
+    def gazebo_poses(self):
+        try:
+            return {n: [round(float(v), 5) for v in xyz] for n, xyz in model_poses('tri_yolo', TRACKED).items()}
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as e:
+            self.get_logger().error(f'Gazebo poses unavailable: {e}')
+            return None
 
     def end(self, attempt, verdict):
         cancel = self.goal_handle.cancel_goal_async()
@@ -84,7 +102,12 @@ class Recorder(Node):
             'termination_reason': result.termination_reason,
             'sim_seconds': (self.get_clock().now() - self.started).nanoseconds / 1e9,
             'pose_source': 'ground_truth', 'scene': 'tri_yolo',
+            'gazebo_poses_start': self.start_poses, 'gazebo_poses_end': self.gazebo_poses(),
         }
+        preplaced = self.out / 'preplaced.json'
+        if preplaced.exists():
+            d = json.loads(preplaced.read_text())
+            meta['preplaced'] = {k: d[k] for k in ('target', 'n_presorted', 'presorted', 'rng')}
         # Random-start recordings: the start pose this episode began from, as logged by
         # random_start_sorter.py (generator seed, draw index, pose, pieces' displacement).
         starts = self.out / 'start_poses.jsonl'
