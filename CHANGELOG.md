@@ -15,6 +15,10 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   chaque caméra sur la table avant l'encodeur (le redimensionnement avec marges de la
   politique suit), plancher pixels recalculé sur les mêmes recadrages, verdict du test de
   recadrage (`probe_protocol.yaml`, `crop_test`, figé dans 67a3d4ac avant tout calcul).
+- Résultat (smolvla_base, linéaire sur le connecteur, médiane / p90) : dessus 28,5 / 72 mm,
+  gauche 30,5 / 74, droite 30,0 / 72, contre 32 / 79, 39 / 86, 39 / 83 en image entière.
+  Plancher pixels recadré 46 / 40 / 40 mm. **Échec** du critère : 28,5 mm > 20 mm (bat
+  bien le plancher de 38 %).
 
 ### Ajouté — modes d'échec par pièce ; corrigé — sonde MLP sur 8 entrées (18/10)
 

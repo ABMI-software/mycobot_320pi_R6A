@@ -1,5 +1,47 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (18 octobre 2026 — soir, Gazebo graine 11 et test de recadrage)
+
+### Ce qui a été accompli
+- **Gazebo, Run A 15k, graine nouvelle 11**, départ en pose d'observation (17:50-18:35,
+  `/workspace/eval/gate/runA_015000_s011_obs_c1`) : **0/4 trié**. `failure_modes.py` :
+  - cube rouge, pavé jaune, cylindre vert : **emplacement mémorisé** (fermeture à 163, 185 et
+    89 mm de la pièce, à 18, 7 et 7 mm d'un point de saisie d'une graine d'entraînement) ;
+  - **cube bleu : saisi, non déposé**. Première fermeture à 10,6 mm de la pièce, à hauteur de
+    saisie ; soulevé à ~115 mm trois fois puis reposé à 2-5 cm près, fin à 42 mm du départ ;
+    jamais transporté vers son bac (à ~17 cm). Première saisie sur une graine nouvelle.
+  - Pour mémoire, 13/10 sur la même graine : 0/4, rien saisi.
+- **Test de recadrage** (option 1, critère figé dans 67a3d4ac), smolvla_base, mêmes 799
+  dispositions, linéaire, médiane / p90 en mm :
+
+  | | dessus | gauche | droite |
+  |---|---|---|---|
+  | image entière, connecteur | 32,0 / 79 | 38,8 / 86 | 38,6 / 83 |
+  | **recadrée, connecteur** | **28,5 / 72** | **30,5 / 74** | **30,0 / 72** |
+  | recadrée, couche vision | 27,1 / 69 | 29,7 / 73 | 29,5 / 69 |
+  | plancher pixels recadré | 46,2 / 118 | 39,9 / 103 | 39,7 / 104 |
+
+  - **Échec** : dessus 28,5 mm > 20 mm, bien qu'il batte le plancher recadré de 38 %.
+  - Gain modeste : −11 % au-dessus (grossissement 2,35), −21 % sur les côtés (1,76).
+    Les pièces passent de ~1-2 à ~2-4 patchs, la localisation reste à ~30 mm.
+  - Recadrée, la base bat les pixels de ≥20 % sur les trois caméras (38 / 23 / 25 %).
+    Le critère de validité de la sonde serait donc rempli sur les recadrages, mais les
+    encodeurs 36k n'y ont pas été passés.
+
+### Décisions prises
+- Pas de course Kaggle préparée. L'option 2 (positions YOLO dans l'état) sera décidée à la
+  réunion du 19/10.
+
+### Prochaines actions
+1. [ROUGE] Réunion du 19/10 : choix parmi les options de perception (positions YOLO dans
+   l'état, caméra au poignet).
+2. [JAUNE] Ne pas construire le lot de 80 épisodes.
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot bash -c 'tail -25 /workspace/probe/fit_crop.log; cat /workspace/eval/gate/runA_015000_s011_obs_c1/failure_modes.json | head -40'
+```
+
 ## État actuel (18 octobre 2026 — après-midi, Run A terminé, courbe 5k-20k)
 
 ### Ce qui a été accompli
