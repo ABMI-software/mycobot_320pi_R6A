@@ -23,6 +23,11 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `dynamic_pose/info` ne les donne pas (`KeyError: 'bac_rouge'`).
   `set_pose_vector` déplace bien les bacs statiques (vérifié).
 - `probe_protocol.yaml` décrit ce critère ; aucun résultat de sonde n'existait.
+- Une graine que l'échantillonneur `tri_scene` ne sait pas résoudre (5515 :
+  « could not sample a valid sorting scene ») arrêtait tout le rendu, à 514
+  dispositions sur 800. Elle est maintenant écartée et notée dans
+  `unsampleable.jsonl`. Rendu complet : **799 dispositions**, aucune écartée
+  pour image périmée, dérive maximale 0,0 mm.
 
 ### Ajouté — sonde de l'encodeur SmolVLA, protocole figé avant tout essai (17/10)
 

@@ -9,7 +9,7 @@ the layout from tri_scene.sample_tri_scene (default_rng(seed), piece_reach 0.28)
 models moved with set_pose_vector while paused, 0.3 s of sim time to settle, then the first
 frames that show the new layout (a top frame with each piece's colour at its projected centre,
 and the side frames stamped no earlier); a layout not seen within 5 s goes to stale.jsonl and is
-skipped. Writes <out>/<seed>.npz (top, left, right uint8 RGB) and one line per seed in
+skipped; a seed the sampler rejects goes to unsampleable.jsonl. Writes <out>/<seed>.npz (top, left, right uint8 RGB) and one line per seed in
 <out>/layouts.jsonl: drawn x, y and Gazebo's x, y after settling, and the largest settling
 drift. A seed already rendered is skipped, so a stopped run resumes.
 
@@ -124,7 +124,14 @@ def main():
         npz = args.out / f'{seed}.npz'
         if npz.exists():
             continue
-        layout = sample(seed)
+        try:
+            layout = sample(seed)
+        except RuntimeError as e:
+            # tri_scene gives up on some seeds (seed 5515: no valid scene); tri_yolo.launch.py would too.
+            with open(args.out / 'unsampleable.jsonl', 'a') as f:
+                f.write(json.dumps({'seed': seed, 'error': str(e)}) + '\n')
+            node.status(f'[probe] seed {seed}: {e}, skipped')
+            continue
         node.gz_pause(True)
         set_poses(node.world, layout)
         node.gz_pause(False)
