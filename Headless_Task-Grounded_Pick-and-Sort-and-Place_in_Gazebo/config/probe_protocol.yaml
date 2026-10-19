@@ -144,3 +144,33 @@ run_c_gate:
       pieces of layouts 5001-5800 (never trained on, so no folds), from the three cameras
       together as the policy sees them, next to the linear probe of the same checkpoint's
       encoder (per camera). Reported, not judged.
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 19/10/2026, committed before any intermediate-layer feature was computed.
+layer_probe:
+  question: >
+    Run C can train the whole vision encoder (12 layers) or only its last 4. Training only the
+    last 4 makes sense if the frozen smolvla_base encoder still holds piece positions part-way
+    through and its last layers lose them; if no intermediate layer localises better than the
+    last, the first layers have to be trained too.
+  data: the same 799 full-frame renders of layouts 5001-5800, same 5 folds, probes, metric and
+    bootstrap as above; smolvla_base only
+  features: >
+    the output of vision encoder layers 4, 6, 8 and 12 (12 before post_layernorm), each
+    32 x 32 patches x 768 average-pooled to 8 x 8 and flattened exactly as the 'vision' layer.
+    Layer 8 is the input of the last 4 layers (9-12), layer 6 the input of the last 6.
+  reference: >
+    the 'vision' layer above (layer 12 after post_layernorm, what the connector receives),
+    linear probe: 32.8 / 39.2 / 38.7 mm (top / left / right), from probe_result.json of 18/10
+  judged: layers 4 and 8, linear probe
+  clearly_better: >
+    the "improved" rule against the reference: median error lower by more than 5 mm AND by more
+    than 20 %, AND the 95 % bootstrap interval of the paired difference (layer minus reference,
+    same layout resamples) excludes 0, on at least 2 of the 3 cameras. That is at most
+    26.2 / 31.3 / 30.9 mm.
+  decision: >
+    layer 8 clearly better -> propose training the last 4 layers in Run C. Neither layer 4 nor
+    layer 8 clearly better -> the whole encoder. Layer 4 clearly better but not layer 8 -> the
+    positions are already gone by layer 8, which is what the last 4 layers would start from, so
+    the whole encoder (reported as such, with the numbers).
+  reported_not_judged: layers 6 and 12, the MLP probe
