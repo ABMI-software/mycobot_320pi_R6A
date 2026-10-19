@@ -9,6 +9,26 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — Run C : tête auxiliaire de position, démarrage à chaud, calibration de λ (19/10, soir)
+
+- **`scripts/build_aux_labels.py`** : positions x, y des quatre pièces par trame (par `index` du
+  jeu), écrites dans `meta/aux_labels.npz` ; non-cible : position de départ (masquée si elle a
+  bougé de plus de 5 mm) ; cible : départ avant la première commande de fermeture, arrivée à
+  partir d'1 s après le relâchement, masquée entre les deux. Testé sur le lot B 1001-1050 :
+  0 écart avec les fichiers d'épisode, les 3970 trames où la pince tient la pièce sont masquées.
+- **`scripts/aux_warm_start.py`** : ridge de la sonde (`probe_fit.ridge`) sur les sorties du
+  connecteur de smolvla_base gelé, par pièce, erreur estimée par 5 plis par épisode à côté de
+  `floor_mean` ; replié en tête linéaire (`meta/aux_head_init.safetensors`), qui reproduit la
+  ridge à 6e-9.
+- **Pilote Kaggle** (note de conception D1-D6) : tête linéaire sur le connecteur des trois
+  caméras, hors du module de la politique (`pretrained_model/aux_head.safetensors` à chaque point
+  de contrôle, rechargée à la reprise) ; perte = action + λ × MSE masquée, normalisée sur tout le
+  lot pour que l'accumulation reste exacte ; groupes d'optimiseur vision (`lr_vision`), connecteur
+  + expert (base), tête (`lr_head`). Modes `auxfeatures` (caractéristiques gelées des trames
+  d'entraînement) et `auxcalibrate` (normes de gradient des deux pertes sur la vision ; graine
+  + 1 et part des trames déjà ajustées rapportée, car avec la même graine l'échantillonneur rendait
+  les trames du démarrage à chaud). `meta/` toujours recopié depuis la source au démarrage.
+
 ### Corrigé — contrôle d'accumulation du pilote Kaggle (19/10, fin d'après-midi)
 
 - L'état de l'optimiseur sauvé par `accumcheck` va dans `/tmp` et est effacé même en cas

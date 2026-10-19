@@ -44,6 +44,17 @@ CAMERA_RENAME = {
 # restarted at 65536 and the first updates could be skipped. The launcher writes its state to
 # training_state/grad_scaler.json with every checkpoint (before LeRobot's own files, so the last
 # of those, scheduler_state.json, still marks a complete checkpoint) and restores it on resume.
+#
+# Run C (design note D1-D6, 19/10/2026), with SMOLVLA_AUX_DIR set to the dataset's meta folder:
+# a linear auxiliary head on the connector output of the three cameras predicts the x, y of the
+# four pieces (labels from aux_labels.npz, looked up by the frame's dataset index, never seen by
+# the policy); total loss = action loss + SMOLVLA_AUX_LAMBDA x masked MSE on normalised
+# positions. The head is kept out of the policy module: saved as pretrained_model/
+# aux_head.safetensors next to each checkpoint, started from aux_head_init.safetensors (ridge
+# warm start), in its own optimizer group (SMOLVLA_LR_HEAD); SMOLVLA_LR_VISION puts the vision
+# encoder in its own group too. Two preparation modes run the same data path without training:
+# SMOLVLA_AUX_FEATURES (frozen connector features of training frames, for the warm start) and
+# SMOLVLA_AUX_CALIBRATE (gradient norms of both losses on the vision encoder, for lambda).
 FP32_LAUNCHER = '''import copy
 import json
 import os
@@ -69,9 +80,21 @@ SCALER_FILE = "grad_scaler.json"
 FREEZE = os.environ.get("SMOLVLA_FREEZE") or None
 MICRO_BATCH = int(os.environ.get("SMOLVLA_MICRO_BATCH") or 0)
 ACCUM_CHECK = os.environ.get("SMOLVLA_ACCUM_CHECK") or None
+AUX_DIR = os.environ.get("SMOLVLA_AUX_DIR") or None
+AUX_LAMBDA = float(os.environ.get("SMOLVLA_AUX_LAMBDA") or 0)
+AUX_FEATURES = os.environ.get("SMOLVLA_AUX_FEATURES") or None
+AUX_FEATURES_FRAMES = int(os.environ.get("SMOLVLA_AUX_FEATURES_FRAMES") or 0)
+AUX_CALIBRATE = os.environ.get("SMOLVLA_AUX_CALIBRATE") or None
+LR_VISION = float(os.environ.get("SMOLVLA_LR_VISION") or 0)
+LR_HEAD = float(os.environ.get("SMOLVLA_LR_HEAD") or 1e-3)
+AUX_HEAD_FILE = "aux_head.safetensors"
+AUX_INIT_FILE = "aux_head_init.safetensors"
+AUX = None
 
 
 def group(name):
+    if name.startswith("aux_head."):
+        return "aux head"
     if "vlm_with_expert.vlm." not in name:
         return "expert and projections"
     if "vision_model" in name:
@@ -81,13 +104,80 @@ def group(name):
     return "language"
 
 
+class AuxHead:
+    """The auxiliary position head and its labels (see the comment above FP32_LAUNCHER)."""
+
+    def __init__(self, policy, pretrained_path):
+        import numpy as np
+        from safetensors.torch import load_file
+        labels = np.load(Path(AUX_DIR) / "aux_labels.npz")
+        size = int(labels["index"].max()) + 1
+        idx = torch.from_numpy(labels["index"].astype("int64"))
+        self.xy = torch.zeros(size, labels["xy"].shape[1])
+        self.mask = torch.zeros(size, labels["mask"].shape[1], dtype=torch.bool)
+        self.xy[idx], self.mask[idx] = torch.from_numpy(labels["xy"]), torch.from_numpy(labels["mask"])
+        self.mean, self.std = torch.from_numpy(labels["mean"]), torch.from_numpy(labels["std"])
+        saved = Path(str(pretrained_path)) / AUX_HEAD_FILE
+        source = saved if saved.is_file() else Path(AUX_DIR) / AUX_INIT_FILE
+        state = load_file(str(source))
+        device = next(policy.parameters()).device
+        self.head = torch.nn.Linear(state["weight"].shape[1], state["weight"].shape[0]).to(device)
+        self.head.load_state_dict(state)
+        self.features = []
+        policy.model.vlm_with_expert.get_vlm_model().connector.register_forward_hook(
+            lambda _m, _i, out: self.features.append(out))
+        print(f"[fp32 launcher] aux head {tuple(state['weight'].shape)} from {source}, weight sum "
+              f"{float(state['weight'].double().sum()):.6g}; labels for {int(self.mask.any(1).sum())} frames, "
+              f"lambda {AUX_LAMBDA}", flush=True)
+
+    def count(self, batch):
+        return 2.0 * float(self.mask[batch["index"].long().view(-1).cpu()].sum())
+
+    def error_sum(self, batch):
+        """Sum of squared errors over the valid normalised coordinates of the forward just run."""
+        x = torch.cat([f.flatten(1) for f in self.features], 1)
+        self.features.clear()
+        if x.shape[1] != self.head.in_features:
+            raise SystemExit(f"aux head expects {self.head.in_features} features, the connector gave {x.shape[1]}")
+        i = batch["index"].long().view(-1).cpu()
+        target = ((self.xy[i] - self.mean) / self.std).to(x.device)
+        valid = self.mask[i].repeat_interleave(2, 1).to(x.device)
+        return (((self.head(x).float() - target) ** 2) * valid).sum()
+
+    def save(self, pretrained_dir):
+        from safetensors.torch import save_file
+        Path(pretrained_dir).mkdir(parents=True, exist_ok=True)
+        save_file({k: v.detach().contiguous().cpu() for k, v in self.head.state_dict().items()},
+                  str(Path(pretrained_dir) / AUX_HEAD_FILE))
+
+
+def trained_params(policy):
+    params = [p for p in policy.parameters() if p.requires_grad]
+    return params + (list(AUX.head.parameters()) if AUX else [])
+
+
 def make_policy_fp32(*args, **kwargs):
+    global AUX
     policy = _make_policy(*args, **kwargs).float()
     if FREEZE == "runC":
         # Language layers and lm_head frozen; gradients still flow through them to the vision encoder.
         for name, p in policy.named_parameters():
             if group(name) == "language":
                 p.requires_grad = False
+    if AUX_DIR:
+        AUX = AuxHead(policy, kwargs["cfg"].pretrained_path)
+    if LR_VISION or AUX:
+        named = [(n, p) for n, p in policy.named_parameters() if p.requires_grad]
+        # Same order in every session: the optimizer state of a resumed run is matched by position.
+        groups = [{"params": [p for n, p in named if group(n) != "vision"], "name": "connector, expert"},
+                  {"params": [p for n, p in named if group(n) == "vision"], "name": "vision",
+                   **({"lr": LR_VISION} if LR_VISION else {})}]
+        if AUX:
+            groups.append({"params": list(AUX.head.parameters()), "name": "aux head", "lr": LR_HEAD})
+        policy.get_optim_params = lambda: groups
+        print("[fp32 launcher] optimizer groups: " + "; ".join(
+            f"{g['name']} {sum(p.numel() for p in g['params']) / 1e6:.1f} M lr {g.get('lr', 'base')}"
+            for g in groups), flush=True)
     trained = Counter(str(p.dtype) for p in policy.parameters() if p.requires_grad)
     by_group = Counter()
     for name, p in policy.named_parameters():
@@ -108,14 +198,18 @@ def split_batch(batch, size):
 
 
 def update_policy_accumulated(train_metrics, policy, batch, optimizer, grad_clip_norm, accelerator,
-                              lr_scheduler=None, lock=None, sample_weighter=None):
+                              lr_scheduler=None, lock=None, sample_weighter=None, micro=None):
     if sample_weighter is not None or accelerator.num_processes > 1:
         raise SystemExit("gradient accumulation: one GPU and no sample weighting only")
     start_time = time.perf_counter()
     policy.train()
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
-    chunks = list(split_batch(batch, MICRO_BATCH))
+    chunks = list(split_batch(batch, micro or MICRO_BATCH or len(batch["action"])))
+    # The auxiliary loss is a mean over the whole batch's valid coordinates, so each micro-batch's
+    # squared errors are divided by that whole-batch count: their sum is then the whole batch's.
+    aux_count = max(AUX.count(batch), 1.0) if AUX else 0.0
+    aux_value = 0.0
     # SmolVLA's loss is a mean over the batch's unpadded action steps, so each micro-batch is
     # weighted by its share of them: the summed gradient is then the whole batch's.
     if "action_is_pad" in batch:
@@ -125,17 +219,26 @@ def update_policy_accumulated(train_metrics, policy, batch, optimizer, grad_clip
     total = sum(valid) or 1.0
     loss_value, outputs = 0.0, {}
     for chunk, v in zip(chunks, valid):
+        if AUX:
+            AUX.features.clear()
         with accelerator.autocast():
             loss, out = policy.forward(chunk)
-        accelerator.backward(loss * (v / total))
+            objective = loss * (v / total)
+            if AUX:
+                aux = AUX.error_sum(chunk) / aux_count
+                objective = objective + AUX_LAMBDA * aux
+                aux_value += aux.item()
+        accelerator.backward(objective)
         loss_value += loss.item() * v / total
         for k, x in (out or {}).items():
             if isinstance(x, (int, float)):
                 outputs[k] = outputs.get(k, 0.0) + x * v / total
+    if AUX:
+        outputs["aux_loss"] = aux_value
     if grad_clip_norm > 0:
-        grad_norm = accelerator.clip_grad_norm_(policy.parameters(), grad_clip_norm)
+        grad_norm = accelerator.clip_grad_norm_(trained_params(policy), grad_clip_norm)
     else:
-        grad_norm = torch.nn.utils.clip_grad_norm_(policy.parameters(), float("inf"), error_if_nonfinite=False)
+        grad_norm = torch.nn.utils.clip_grad_norm_(trained_params(policy), float("inf"), error_if_nonfinite=False)
     with lock if lock is not None else nullcontext():
         optimizer.step()
     if getattr(optimizer, "step_was_skipped", False):
@@ -213,6 +316,8 @@ def update_policy_checked(train_metrics, policy, batch, optimizer, grad_clip_nor
     weight update, overall and per parameter group."""
     inner = accelerator.unwrap_model(policy, keep_fp32_wrapper=True)
     params = {n: p for n, p in inner.named_parameters() if p.requires_grad}
+    if AUX:
+        params.update({f"aux_head.{n}": p for n, p in AUX.head.named_parameters()})
     w0 = {n: to_cpu(p) for n, p in params.items()}
     # The optimizer state (2 x the trained weights) goes to disk, not RAM: a CPU run of the check
     # would not fit in 12 GB with it. In /tmp, not next to the report: on Kaggle the report's
@@ -262,10 +367,13 @@ def update_policy_checked(train_metrics, policy, batch, optimizer, grad_clip_nor
             out[f"update_rel_{g}"] = rel(x["delta"], ref["delta"], names)
         return out
 
+    # Without the head, LeRobot's own update is the reference; with it, the same update as one chunk.
+    reference = _update_policy if AUX is None else (
+        lambda *a, **k: update_policy_accumulated(*a, micro=len(batch["action"]), **k))
     try:
-        whole = one(_update_policy)
+        whole = one(reference)
         restore()
-        floor = compare(one(_update_policy), whole)
+        floor = compare(one(reference), whole)
         restore()
         accumulated = one(update_policy_accumulated)
     finally:
@@ -283,6 +391,8 @@ def update_policy_checked(train_metrics, policy, batch, optimizer, grad_clip_nor
 
 
 def save_checkpoint_with_scaler(checkpoint_dir, *args, **kwargs):
+    if AUX:
+        AUX.save(Path(checkpoint_dir) / "pretrained_model")
     scaler = ACCELERATOR.scaler if ACCELERATOR is not None else None
     if scaler is not None and scaler.is_enabled():
         state_dir = Path(checkpoint_dir) / "training_state"
@@ -316,16 +426,87 @@ def with_scaler(update):
     return wrapped
 
 
+FEATURE_ROWS = {"index": [], "x": []}
+
+
+def update_policy_features(train_metrics, policy, batch, optimizer, grad_clip_norm, accelerator, **kwargs):
+    """No training: the frozen connector output of the three cameras for this batch's frames."""
+    import numpy as np
+    inner = accelerator.unwrap_model(policy, keep_fp32_wrapper=True)
+    inner.eval()
+    with torch.no_grad(), accelerator.autocast():
+        images, _ = inner.prepare_images(batch)
+        x = torch.cat([inner.model.vlm_with_expert.embed_image(img).flatten(1) for img in images], 1)
+    FEATURE_ROWS["index"].append(batch["index"].view(-1).cpu().numpy())
+    FEATURE_ROWS["x"].append(x.half().cpu().numpy())
+    done = sum(len(i) for i in FEATURE_ROWS["index"])
+    print(f"[aux features] {done} frames", flush=True)
+    if done >= AUX_FEATURES_FRAMES:
+        np.savez(AUX_FEATURES, index=np.concatenate(FEATURE_ROWS["index"]), x=np.concatenate(FEATURE_ROWS["x"]))
+        print(f"[aux features] saved {done} frames to {AUX_FEATURES}", flush=True)
+        os._exit(0)
+    train_metrics.loss, train_metrics.grad_norm, train_metrics.lr = 0.0, 0.0, 0.0
+    train_metrics.update_s = 0.0
+    return train_metrics, {}
+
+
+CALIBRATION = []
+
+
+def round_13(x):
+    import math
+    candidates = [m * 10.0 ** e for e in range(-6, 7) for m in (1, 3)]
+    return float(f"{min(candidates, key=lambda c: abs(math.log(c / x))):.3g}")
+
+
+def update_policy_calibrate(train_metrics, policy, batch, optimizer, grad_clip_norm, accelerator, **kwargs):
+    """No training: gradient norms on the vision encoder of the action loss and of the auxiliary
+    loss, from the starting weights (design note D4: lambda gives the auxiliary term about half
+    the action loss's vision gradient)."""
+    import statistics
+    inner = accelerator.unwrap_model(policy, keep_fp32_wrapper=True)
+    inner.train()
+    vision = [p for n, p in inner.named_parameters() if p.requires_grad and group(n) == "vision"]
+    AUX.features.clear()
+    with accelerator.autocast():
+        loss, _ = policy.forward(batch)
+        aux = AUX.error_sum(batch) / max(AUX.count(batch), 1.0)
+
+    def norm(t):
+        grads = torch.autograd.grad(t, vision, retain_graph=True, allow_unused=True)
+        return float(torch.sqrt(sum((g.float() ** 2).sum() for g in grads if g is not None)))
+    row = {"step": len(CALIBRATION) + 1, "index": batch["index"].view(-1).tolist(),
+           "action_loss": loss.item(), "aux_loss": aux.item(),
+           "vision_grad_norm_action": norm(loss), "vision_grad_norm_aux": norm(aux)}
+    CALIBRATION.append(row)
+    ga = statistics.median(r["vision_grad_norm_action"] for r in CALIBRATION)
+    gx = statistics.median(r["vision_grad_norm_aux"] for r in CALIBRATION)
+    report = {"batches": CALIBRATION, "median_vision_grad_norm_action": ga, "median_vision_grad_norm_aux": gx,
+              "lambda_exact": 0.5 * ga / gx, "lambda": round_13(0.5 * ga / gx),
+              "rule": "lambda = 0.5 x median action / median aux vision gradient norm, rounded to {1, 3} x 10^n"}
+    Path(AUX_CALIBRATE).write_text(json.dumps(report, indent=1))
+    print("[aux calibrate] " + json.dumps({k: v for k, v in row.items() if k != "index"}), flush=True)
+    train_metrics.loss, train_metrics.grad_norm, train_metrics.lr = loss.item(), 0.0, 0.0
+    train_metrics.update_s = 0.0
+    return train_metrics, {}
+
+
 # DataLoader workers start with "spawn" and re-import this file as __mp_main__.
 if __name__ == "__main__":
     lt.make_policy = make_policy_fp32
     _update_policy = lt.update_policy
-    if ACCUM_CHECK:
+    if AUX_FEATURES:
+        lt.update_policy = update_policy_features
+        print(f"[fp32 launcher] aux features: {AUX_FEATURES_FRAMES} frames to {AUX_FEATURES}", flush=True)
+    elif AUX_CALIBRATE:
+        lt.update_policy = update_policy_calibrate
+        print(f"[fp32 launcher] aux calibration to {AUX_CALIBRATE}", flush=True)
+    elif ACCUM_CHECK:
         lt.update_policy = update_policy_checked
         print(f"[fp32 launcher] accumulation check: whole batch against micro-batches of {MICRO_BATCH}", flush=True)
-    elif MICRO_BATCH:
+    elif MICRO_BATCH or AUX_DIR:
         lt.update_policy = update_policy_accumulated
-        print(f"[fp32 launcher] gradient accumulation: micro-batches of {MICRO_BATCH}", flush=True)
+        print(f"[fp32 launcher] gradient accumulation: micro-batches of {MICRO_BATCH or 'the whole batch'}", flush=True)
     lt.update_policy = with_scaler(lt.update_policy)
     lt.save_checkpoint = save_checkpoint_with_scaler
     lt.load_training_state = load_training_state_with_scaler
@@ -373,6 +554,10 @@ def stage_dataset(cfg):
     if not (dst / 'meta' / 'info.json').exists():
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src, dst, ignore=shutil.ignore_patterns('images'))
+    else:
+        # A copy staged earlier in the same session keeps its data, but meta/ always follows the
+        # source: Run C's aux_labels.npz and aux_head_init.safetensors may be newer than the copy.
+        shutil.copytree(src / 'meta', dst / 'meta', dirs_exist_ok=True)
     info = json.loads((dst / 'meta' / 'info.json').read_text())
     log(f'dataset {src} -> {dst}: {info["total_episodes"]} episodes, {info["total_frames"]} frames, '
         f'fps {info["fps"]}')
@@ -467,7 +652,12 @@ def run_lerobot(cfg, args, log_path, deadline=None, prune_dir=None, stop_after_s
         cmd = [str(Path(cfg['venv']) / 'bin' / 'lerobot-train')] + args
     env = dict(os.environ, HF_HOME=cfg['hf_home'], WANDB_MODE='disabled', PYTHONUNBUFFERED='1',
                SMOLVLA_FREEZE=cfg.get('freeze') or '', SMOLVLA_MICRO_BATCH=str(cfg.get('micro_batch') or ''),
-               SMOLVLA_ACCUM_CHECK=cfg.get('accum_check') or '')
+               SMOLVLA_ACCUM_CHECK=cfg.get('accum_check') or '',
+               SMOLVLA_AUX_DIR=cfg.get('aux_dir') or '', SMOLVLA_AUX_LAMBDA=str(cfg.get('aux_lambda') or ''),
+               SMOLVLA_LR_VISION=str(cfg.get('lr_vision') or ''), SMOLVLA_LR_HEAD=str(cfg.get('lr_head') or ''),
+               SMOLVLA_AUX_FEATURES=cfg.get('aux_features') or '',
+               SMOLVLA_AUX_FEATURES_FRAMES=str(cfg.get('aux_features_frames') or ''),
+               SMOLVLA_AUX_CALIBRATE=cfg.get('aux_calibrate') or '')
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log('run: ' + ' '.join(cmd))
     sampler = GpuMemSampler()
@@ -512,6 +702,7 @@ def run_lerobot(cfg, args, log_path, deadline=None, prune_dir=None, stop_after_s
             if prune_dir and (m or 'Checkpoint policy after step' in line):
                 prune_checkpoints(prune_dir, **keep)
             if m or 'Checkpoint' in line or '[fp32 launcher]' in line or '[accum check]' in line or (
+                    '[aux calibrate]' in line or ('[aux features]' in line and 'saved' in line)) or (
                     ('Traceback' in line or 'Error' in line) and 'torchcodec' not in line
                     and 'libnppicc' not in line and 'Could not load this library' not in line):
                 print(line.rstrip()[-300:], flush=True)
@@ -805,6 +996,66 @@ def resume_check(cfg, data_dir):
     print('\nRESUME CHECK ' + json.dumps(result, indent=2))
 
 
+def aux_features(cfg, data_dir):
+    """Frozen smolvla_base connector features of aux_features_frames training frames, through the
+    training data path (design note D4 warm start); fitted by scripts/aux_warm_start.py."""
+    work = Path(cfg['working'])
+    out = Path(cfg['scratch']) / 'aux_features_run'
+    shutil.rmtree(out, ignore_errors=True)
+    batch = cfg['aux_features_batch']
+    steps = -(-cfg['aux_features_frames'] // batch) + 1
+    target = work / 'aux_features.npz'
+    args = common_args(cfg, data_dir, batch, steps, cfg['train_amp'], schedule_steps=cfg['train_steps']) + [
+        '--log_freq=1', '--save_checkpoint=false', f'--output_dir={out}']
+    rc, *_ = run_lerobot(dict(cfg, aux_dir=None, aux_features=str(target)), args, work / 'logs' / 'aux_features.log')
+    shutil.rmtree(out, ignore_errors=True)
+    log(f'aux features rc {rc}: {target} {"written" if target.exists() else "MISSING"}')
+
+
+def aux_calibrate(cfg, data_dir):
+    """Gradient norms on the vision encoder of both losses at the starting weights, with the warm-
+    started head (design note D4); the suggested lambda is in aux_calibration.json. The batches are
+    drawn with seed + 1: with the same seed the sampler would hand over the very frames the warm
+    start was fitted on, where the head is nearly exact and its gradient tiny (CPU test, 19/10). The
+    share of calibration frames that were in the warm-start sample is reported; it must be ~0."""
+    work = Path(cfg['working'])
+    out = Path(cfg['scratch']) / 'aux_calibrate_run'
+    shutil.rmtree(out, ignore_errors=True)
+    report = work / 'aux_calibration.json'
+    calib = dict(cfg, aux_calibrate=str(report), seed=cfg['seed'] + 1)
+    args = common_args(calib, data_dir, cfg['aux_calibrate_batch'], cfg['aux_calibrate_batches'], cfg['train_amp'],
+                       schedule_steps=cfg['train_steps']) + [
+        '--log_freq=1', '--save_checkpoint=false', f'--output_dir={out}']
+    rc, *_ = run_lerobot(calib, args, work / 'logs' / 'aux_calibrate.log')
+    shutil.rmtree(out, ignore_errors=True)
+    if report.exists():
+        r = json.loads(report.read_text())
+        used = [i for b in r['batches'] for i in b['index']]
+        fitted = Path(cfg['aux_fitted_index']) if cfg.get('aux_fitted_index') else work / 'aux_features.npz'
+        if fitted.exists():
+            import zipfile
+            with zipfile.ZipFile(fitted) as z, z.open('index.npy') as f:
+                header = f.read(128)
+                fitted_index = set(int(v) for v in _npy_int_array(header + f.read()))
+            r['share_in_warm_start_sample'] = sum(i in fitted_index for i in used) / len(used)
+            report.write_text(json.dumps(r, indent=1))
+        log(f"aux calibration rc {rc}: {len(r['batches'])} batches, lambda {r['lambda']} (exact {r['lambda_exact']:.3g}), "
+            f"share of its frames in the warm-start sample {r.get('share_in_warm_start_sample', 'unknown')}")
+
+
+def _npy_int_array(raw):
+    """An integer .npy array, standard library only (the driver runs outside the venv)."""
+    import ast
+    import struct
+    major = raw[6]
+    hlen = struct.unpack('<H', raw[8:10])[0] if major == 1 else struct.unpack('<I', raw[8:12])[0]
+    start = 10 if major == 1 else 12
+    header = ast.literal_eval(raw[start:start + hlen].decode('latin1'))
+    code = {'<i8': 'q', '<i4': 'i', '<u8': 'Q', '<u4': 'I'}[header['descr']]
+    data = raw[start + hlen:]
+    return struct.unpack(f'<{len(data) // struct.calcsize(code)}{code}', data)
+
+
 def newest_log(work):
     return sorted((Path(work) / 'logs').glob('train_*.log'))[-1]
 
@@ -814,6 +1065,8 @@ def main():
     for k in ('working', 'scratch', 'data_root', 'hf_home'):
         Path(cfg[k]).mkdir(parents=True, exist_ok=True)
     data_dir = stage_dataset(cfg)
+    if cfg.get('aux'):
+        cfg['aux_dir'] = str(data_dir / 'meta')
     if cfg['mode'] == 'benchmark':
         benchmark(cfg, data_dir)
     elif cfg['mode'] == 'train':
@@ -822,8 +1075,13 @@ def main():
         accum_check(cfg, data_dir)
     elif cfg['mode'] == 'resumecheck':
         resume_check(cfg, data_dir)
+    elif cfg['mode'] == 'auxfeatures':
+        aux_features(cfg, data_dir)
+    elif cfg['mode'] == 'auxcalibrate':
+        aux_calibrate(cfg, data_dir)
     else:
-        sys.exit(f'unknown mode {cfg["mode"]!r}: use "benchmark", "train", "accumcheck" or "resumecheck"')
+        sys.exit(f'unknown mode {cfg["mode"]!r}: use "benchmark", "train", "accumcheck", "resumecheck", '
+                 '"auxfeatures" or "auxcalibrate"')
 
 
 if __name__ == '__main__':

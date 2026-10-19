@@ -1,5 +1,35 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (19 octobre 2026 — nuit, code de la tête auxiliaire de Run C ; tests en partie reportés)
+
+### Ce qui a été accompli
+- Note de conception D1-D6 approuvée, plus : démarrage à chaud de la tête par la ridge de la
+  sonde sur le connecteur de smolvla_base gelé, λ calibré après, erreur du démarrage (mm) et λ
+  consignés dans le protocole avant le lancement.
+- Code écrit (`build_aux_labels.py`, `aux_warm_start.py`, pilote). **Tests CPU passés** sur le lot
+  B 1001-1050 (taille de test, valeurs non retenues) :
+  - étiquettes : 0 écart avec les fichiers d'épisode ; 3970 / 3970 trames tenues masquées ;
+  - masquage de la perte : étiquette masquée changée → même perte, même gradient ;
+  - caractéristiques par le chemin d'entraînement (300 trames) ; ridge : 100 mm contre 143 mm pour
+    `floor_mean` (50 dispositions seulement) ; la tête reproduit la ridge à 6e-9 ;
+  - calibration : groupes d'optimiseur vision 1e-5 / base / tête 1e-3 ; λ = 0,3 (exact 0,27) sur
+    des trames non ajustées (part 0,0). **Défaut trouvé** : avec la même graine l'échantillonneur
+    rendait les trames du démarrage (perte aux. 0,0004, λ gonflé à 10) ; calibration désormais à
+    graine + 1 avec la part rapportée.
+- **Incident enregistrement** : le contrôle d'accumulation Run C sur CPU a saturé la mémoire
+  (4,4 Go d'échange) pendant l'enregistrement : graine 1098 en échec (vérification `gz topic`
+  hors délai) et 1099 bloquée (arrêtée à 21:55, sans COMPLETE). **À réenregistrer en fin de lot.**
+  Plus aucun test de la taille de Run C pendant l'enregistrement.
+
+### Prochaines actions
+1. [ROUGE] Fin de l'enregistrement (mercredi) : réenregistrer 1098 et 1099 (retirer
+   `seed_1098/COMPLETE`, relancer `record_tri_batch.sh 1098 1099` sous `reap_children.py`),
+   redémarrer le conteneur (zombies de mes tests), vérifier, convertir.
+2. [ROUGE] Puis tests CPU restants : accumulation et reprise avec la tête (réglage Run C), point
+   de contrôle Run C chargé par l'outil boucle ouverte.
+3. [ROUGE] Sur le jeu Run B complet : étiquettes, caractéristiques, démarrage à chaud, calibration
+   de λ ; consigner erreur et λ dans le protocole ; carnet Run C.
+
 ## État actuel (19 octobre 2026 — soir, accumulation validée sur T4 : Run C prêt côté contrôles)
 
 ### Ce qui a été accompli
