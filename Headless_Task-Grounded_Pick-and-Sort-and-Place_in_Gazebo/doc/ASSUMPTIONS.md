@@ -52,7 +52,7 @@ graph, on two separate world launches). Two live grasp attempts on this
 container both failed to lift `red_cube`, but the diagnosed cause is a
 timing bug (`move_to()`'s wall-clock settle logic vs. this container's
 measured RTF ≈ 0.143), not the grasp mechanism. Verdict: **A8 remains the
-adopted floor here**, with a recorded recommendation that Role B re-run
+adopted floor here**, with a recorded recommendation to re-run
 this same test on faster hardware before finalizing, since the mechanism
 itself is likely sound.
 
@@ -100,8 +100,8 @@ attempts on this container's hardware both failed to lift `red_cube`, for a
 diagnosed timing reason (not a mechanism failure — see A4 and
 `doc/GRASP_DECISION.md`). Per §3.5's decision table ("cannot be made to
 work within one day → keep the weld"), A8 stands for this acquisition, with
-a written recommendation to the robotics team (Appendix B item 2) that
-Role B re-attempt the same bounded test on faster hardware before treating
+a written recommendation to the robotics team (Appendix B item 2) to
+re-attempt the same bounded test on faster hardware before treating
 this as final, since the mechanism itself is not the suspected cause.
 
 ## A9 — Target volume is fifteen clean successful episodes per object
@@ -110,7 +110,7 @@ this as final, since the mechanism itself is not the suspected cause.
 This is a scheduling decision stated by the specification itself, not a
 locally-verifiable fact. Feeds Part 6's matrix (not yet built).
 
-## A10 — The acquisition batch does not run on the constrained workstation
+## A10 — The acquisition batch runs on a machine with memory headroom
 
 **ADOPTED** as specified, for the reasons given in §11.3 (3.4× RTF ratio,
 and the documented memory-exhaustion symptoms from the previous acquisition
@@ -142,8 +142,8 @@ self-caught mistakes in my own verification scripts along the way.
 **Residual risk, stated per §A11 rather than hidden**: the graphical Gazebo
 path has still never been exercised from this side — every verification so
 far, including both colcon builds and every live run, was headless/CLI.
-Display passthrough to Role B's Windows host is explicitly out of scope for
-Role A to test.
+Display passthrough to a Windows host was not tested on this machine
+(it was on 2026-10-04, on the WSL2 laptop: `DISPLAY=:0`, software OpenGL).
 
 ## A12 — The 0.63 mm figure is not the benchmark for this work
 
@@ -165,7 +165,7 @@ data collection).
 | A1 | CONFIRMED | — |
 | A2 | CONFIRMED | — |
 | A3 | CONFIRMED (shape note) | — |
-| A4 | CONFIRMED (mechanism); live grasp not yet achieved here | Recommend Role B re-test (Appendix B item 2) |
+| A4 | CONFIRMED (mechanism); live grasp not yet achieved here | Recommend a re-test on faster hardware (Appendix B item 2) |
 | A5 | ADOPTED — contract check deferred to Part 10 | — |
 | A6 | CONFIRMED | — |
 | A7 | CONFIRMED | — |

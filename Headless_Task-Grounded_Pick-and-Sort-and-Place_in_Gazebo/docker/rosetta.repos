@@ -1,0 +1,24 @@
+# The rosetta packages at the exact commits that recorded and converted the
+# 2026-10-10 datasets (Gazebo_to_LeRobot_Pipeline/src/rosetta.repos tracks
+# `main`, which moves). Used by setup_workspace.sh: vcs import src < rosetta.repos
+repositories:
+  lerobot_rosetta:
+    type: git
+    url: https://github.com/iblnkn/lerobot-rosetta.git
+    version: 1ea49d620fb344360e4982b9d59031c09efd4564
+  lerobot_teleoperator_rosetta:
+    type: git
+    url: https://github.com/iblnkn/lerobot-teleoperator-rosetta.git
+    version: 0ebd65b8856f53f1626512c0b5aa88de2530e001
+  lerobot_robot_rosetta:
+    type: git
+    url: https://github.com/iblnkn/lerobot-robot-rosetta.git
+    version: cd9b4c140ee5b6b02f3e57f76dfeb1a737646d86
+  rosetta:
+    type: git
+    url: https://github.com/iblnkn/rosetta.git
+    version: 294136dc435a040d608d9efd773d70ae0b421d00
+  rosetta_interfaces:
+    type: git
+    url: https://github.com/iblnkn/rosetta_interfaces.git
+    version: 17d06b639960b8a4de0d1970b4c42d306951d567

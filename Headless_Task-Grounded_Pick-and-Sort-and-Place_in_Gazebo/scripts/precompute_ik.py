@@ -73,10 +73,43 @@ def cmd_matrix(args):
         pick_seq, pick_phi = solve_column(pick_group, phi_deg=phi, q_ref=None,
                                            n_seeds=args.seeds)
         ok = pick_seq is not None
+        # Release yaw constraint (2026-10-04): the closing jaws square a cube to
+        # the gripper, so a box lands at the gripper's WORLD yaw at release,
+        # mod 90 -- measured 15.2 / -45.0 / -30.0 deg against 105 / 135 / 150 deg
+        # releases, exact on all three. With a free release phi a 50 mm cube
+        # landed up to 45 deg yawed, 70.7 mm across an 80 mm opening. Boxes
+        # therefore release axis-aligned with the bins; the cylinder's yaw is
+        # irrelevant and stays free. The solver takes the candidate with the
+        # least wrist travel among the landings that are EQUIVALENT for the
+        # shape: a square footprint (the cubes) lands the same at 0/90/180/270
+        # (offering only 0/90 spun the wrist up to 189 deg in transport); a
+        # non-square one only at its grasp phi and phi + 180, since phi + 90
+        # swaps its long axis from x to y. The yellow box (50 x 30 mm) has a
+        # fixed grasp phi of 90, so it releases at 90 or 270, landing exactly
+        # as it was spawned. A non-square box with a free grasp phi has no
+        # known landing orientation and is refused.
+        if o["shape"] != "box":
+            place_phis = [None]
+        elif o["size"][0] == o["size"][1]:
+            place_phis = [0.0, 90.0, 180.0, 270.0]
+        elif o.get("grasp_yaw_fixed"):
+            place_phis = [phi, phi + 180.0]
+        else:
+            raise SystemExit(f"{target}: non-square box with a free grasp yaw -- its landing "
+                             f"orientation is not determined; fix grasp_yaw in objects.yaml")
         bin_seq = None
         if ok:
-            bin_seq, _bin_phi = solve_column(bin_group, phi_deg=phi, q_ref=pick_seq[-1],
-                                              n_seeds=args.seeds)
+            best = None
+            for place_phi in place_phis:
+                seq_try, _ = solve_column(bin_group, phi_deg=place_phi, q_ref=pick_seq[-1],
+                                          n_seeds=args.seeds)
+                if seq_try is None:
+                    continue
+                travel = max(float(np.max(np.abs(b - a)))
+                             for a, b in zip([pick_seq[-1]] + seq_try, seq_try))
+                if best is None or travel < best[0]:
+                    best = (travel, seq_try)
+            bin_seq = best[1] if best else None
             ok = bin_seq is not None
         seq = ([[round(float(v), 4) for v in q] for q in (pick_seq + bin_seq)]
                if ok else None)

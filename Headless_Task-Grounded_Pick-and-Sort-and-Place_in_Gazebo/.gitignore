@@ -9,3 +9,4 @@ datasets/*/videos/
 datasets/*/meta/
 datasets/*/port_manifest.json
 *.bak*
+textures/

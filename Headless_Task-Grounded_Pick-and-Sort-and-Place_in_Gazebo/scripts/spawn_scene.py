@@ -8,6 +8,7 @@ not ~1, and a bare wall-clock sleep is nowhere near enough).
 """
 import argparse
 import csv
+import os
 import re
 import subprocess
 import sys
@@ -15,10 +16,16 @@ import time
 
 import yaml
 
+import weld
+
 
 def spawn(model_file, name, x, y, z, world):
+    # Absolute path: gz sim resolves -file against ITS OWN working directory,
+    # not this script's, and `create` still prints "Entity creation
+    # successful" when the server then fails to find the file -- that message
+    # only means the request was accepted. Found live on the first spawn.
     subprocess.run(["ros2", "run", "ros_gz_sim", "create",
-                    "-world", world, "-file", model_file, "-name", name,
+                    "-world", world, "-file", os.path.abspath(model_file), "-name", name,
                     "-x", str(x), "-y", str(y), "-z", str(z)],
                    check=True, timeout=90)
 
@@ -65,6 +72,18 @@ def main():
         z = cfg["table_top_z"] + half + 0.0005
         spawn(f"{args.models_dir}/{name}.sdf", name,
               float(row[f"{name}_x"]), float(row[f"{name}_y"]), z, world)
+        # gz-sim's DetachableJoint creates its joint as soon as the model
+        # loads: every object starts welded to link6 while resting on the
+        # table, which pins the arm -- found live, the arm could not leave
+        # HOME once the scene was spawned. Release each weld immediately;
+        # run_pick_and_place.py re-attaches only the target, at grasp time.
+        # weld.send waits for the plugin's subscription before publishing;
+        # an unheard release is a named, fatal error, not a silent loss.
+        try:
+            weld.send("detach", name)
+        except weld.WeldError as e:
+            print(f"FATAL: {e}")
+            sys.exit(1)
 
     rtf = measured_rtf(world)
     wait_s = cfg["spawn"]["settle_seconds_sim"] / max(rtf, 0.02)

@@ -389,6 +389,23 @@ footer {
       <a href="#s13"><span class="n">13</span>IK robustness for any position</a>
       <a href="#s14"><span class="n">14</span>The demo orchestrator</a>
       <a href="#s15"><span class="n">15</span>Two launch files</a>
+      <p class="rail-group-label">Addendum 2026-10-03</p>
+      <a href="#addendum2-head"><span class="n">&sect;</span>GUI demo on WSL2</a>
+      <a href="#s16"><span class="n">16</span>Where &amp; which terminal</a>
+      <a href="#s17"><span class="n">17</span>Start Docker</a>
+      <a href="#s18"><span class="n">18</span>Build the image</a>
+      <a href="#s19"><span class="n">19</span>Start the container</a>
+      <a href="#s20"><span class="n">20</span>Robot description</a>
+      <a href="#s21"><span class="n">21</span>Build the workspace</a>
+      <a href="#s22"><span class="n">22</span>Install moveit_py</a>
+      <a href="#s23"><span class="n">23</span>Copy the project</a>
+      <a href="#s24"><span class="n">24</span>Frozen sim: DISPLAY</a>
+      <a href="#s25"><span class="n">25</span>White window</a>
+      <a href="#s26"><span class="n">26</span>Tiny view, Follow</a>
+      <a href="#s27"><span class="n">27</span>run_gui_demo.sh</a>
+      <a href="#s28"><span class="n">28</span>Gazebo controls</a>
+      <a href="#s29"><span class="n">29</span>Reading the result</a>
+      <a href="#s30"><span class="n">30</span>Stop &amp; re-run</a>
       <a href="#ladder"><span class="n">&sect;</span>Verification ladder</a>
       <p class="rail-group-label">Reference</p>
       <a href="#bugs-env"><span class="n">&sect;</span>Bugs fixed &mdash; session</a>
@@ -410,6 +427,7 @@ footer {
         <span><b>Reproduced via</b> the <code>gazebo_to_lerobot</code> Docker container (Ubuntu 24.04, ROS2 Jazzy, Gazebo Harmonic)</span>
         <span><b>Commit</b> 5c92a565 on <code>main</code></span>
         <span><b>Written</b> 2026-09-22</span>
+        <span><b>Updated</b> 2026-10-03 (§16–30, GUI demo on WSL2)</span>
       </div>
     </div>
 
@@ -417,6 +435,7 @@ footer {
       <h2>Overview</h2>
       <p class="block-dek">This document is the implementation report for <code>headless_pick_and_place_specification.md</code> &mdash; the file in this same directory that was treated as a binding specification of design and verification <em>goals</em>, not of implementation details. Per the governing instruction under which this work was done, specific programming choices in that document were free to be replaced with better solutions; every goal had to be either achieved or explicitly reported as a problem.</p>
       <p class="prose">The short version: every numbered step in the specification (Parts 1&ndash;8) was implemented and verified, twenty LeRobot-format episodes were recorded and split into a 15-episode training set and a 5-episode held-out-camera validation set, and the pipeline is fully self-verifying (a CSV-based pass/fail check runs at the end of every episode). The one load-bearing deviation is in the grasp mechanism itself: after a deliberate, bounded physics experiment produced no friction hold, the block is carried by a Gazebo <code>DetachableJoint</code> weld triggered on gripper-close and released on gripper-open &mdash; labelled <b>SIMULATED ATTACHMENT, NOT a physical grasp</b> everywhere it appears, in code comments, log lines, and every episode's own metadata. Four bugs were fixed in the arm-and-gripper sequencing path, three more in the recording-batch infrastructure, three more in the demo-launch orchestrator added on 2026-09-22 (&sect;13&ndash;15), and four are flagged as worth reporting upstream.</p>
+      <p class="prose"><b>Addendum, 2026-10-03 (§16–30):</b> the GUI demo of §15 was finally run and watched in the Gazebo window, on a WSL2 laptop, from a machine with no image and no container. Five problems had to be solved on the way (Docker daemon, missing <code>moveit_py</code>, a frozen simulation caused by <code>DISPLAY</code>, a white Gazebo window, and a camera stuck far away). They are documented step by step, and a new script, <code>run_gui_demo.sh</code>, reduces the whole demo to one command.</p>
       <p class="prose"><b>Addendum, 2026-09-22 (&sect;13&ndash;15):</b> a manager asked for a single <code>ros2 launch</code> entry point to actually run and watch this demo, rather than the 7-step manual walkthrough (&sect;manual) that was the only way to run it before. Two launch files now wrap one orchestrator script, with <code>gui</code>, <code>record</code>, <code>block_x</code>/<code>block_y</code> and <code>attach_mode</code> exposed as ordinary, documented <code>ros2 launch</code> arguments &mdash; <code>attach_mode</code> deliberately, so the simulated-attachment limitation is visible at the point of use, not only in this document.</p>
       <p class="prose">This report follows the same structure as the runbooks in <code>Gazebo_to_LeRobot_Pipeline/docs/</code> and <code>ROS2_to_RLDS_Conversion_OpenVLA/docs/</code>: a step-by-step account pairing what was done with the concrete check that proves it, a reference section for bugs and limitations, and a manual, human-runnable walkthrough at the end.</p>
     </section>
@@ -744,7 +763,276 @@ ros2 launch pick_and_place_no_gui_demo.launch.py      <span class="c"># headless
       </div>
       <p class="callout"><b><code>gui:=true</code> stays open on purpose:</b> after printing the verdict, the GUI variant does not tear anything down &mdash; Gazebo and <code>move_group</code> keep running so the final scene stays on screen. Ctrl+C the launch to shut everything down; that does reach <code>run_demo.py</code>'s own signal handler, which runs the same cleanup as &sect;14.</p>
       <p class="callout warn"><b>Not visually verified:</b> GUI rendering itself was not checked &mdash; this machine has no display (same limitation as &sect;1's real-time-factor note). The no-GUI variant was verified twice end to end; the GUI variant shares the identical orchestrator and was checked for correct argument-passing and startup only.</p>
+      <p class="callout"><b>Update, 2026-10-03:</b> now visually verified. The GUI variant was run and watched end to end on a WSL2 laptop; on that kind of machine it needs the fixes of §24–26, all wrapped in <code>run_gui_demo.sh</code> (§27).</p>
     </article>
+
+    <!-- ============================================ ADDENDUM 2026-10-03 ============================================ -->
+    <section class="block" id="addendum2-head">
+      <h2>Addendum, 2026-10-03: watching the GUI demo on a WSL2 laptop, from an empty machine</h2>
+      <p class="block-dek">§15 shipped <code>pick_and_place_demo.launch.py</code> without anyone having watched it: the machine it was written on had no display. On 2026-10-03 it was run and <b>watched end to end in the Gazebo GUI</b> on a Windows laptop (Intel Iris Xe graphics) running Ubuntu 22.04.3 under WSL2 (kernel 6.18.40.1-microsoft-standard-WSL2), with Docker Engine 24.0.5 installed inside WSL itself (no Docker Desktop). Starting point: the Docker daemon was not running, and neither the <code>gazebo_to_lerobot</code> image nor the container existed. Five separate problems stood between the one-line command in §15 and a visible pick-and-place. Each step below gives the exact commands, which terminal to type them in, what you should see, and the symptom of each problem as it appears on screen, so you can recognise it. Every command was actually run; every output quoted is real.</p>
+      <h3 style="margin-top:22px;font-size:1.1rem">Short version, once the first-time setup (§17–§24) is done</h3>
+      <pre><span class="c"># In a normal Ubuntu (WSL) terminal, after every Windows reboot or `wsl --shutdown`:</span>
+sudo sh -c 'nohup dockerd &gt; /tmp/dockerd.log 2&gt;&amp;1 &amp;'
+docker start gazebo_to_lerobot
+
+<span class="c"># Then, every time you want to watch the demo (same terminal):</span>
+docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh
+<span class="c"># another block position:</span>
+docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh block_x:=0.28 block_y:=0.05
+<span class="c"># Ctrl+C in that terminal stops everything.</span></pre>
+    </section>
+
+    <article class="step" id="s16">
+      <div class="step-head"><span class="step-num">16</span><h3>Where the command lives, and which terminal it runs in</h3></div>
+      <p class="step-purpose">The first question anyone asks after reading §15: where is <code>pick_and_place_demo.launch.py</code>, and from which terminal do I type <code>ros2 launch pick_and_place_demo.launch.py</code>?</p>
+      <p class="prose">The file is <code>launch/pick_and_place_demo.launch.py</code> in this project, i.e. <code>~/tomislav/robotics/mycobot_320pi_R6A_tomislav_02_10_2026/Headless_Task-Grounded_Pick-and-Place_in_Gazebo/launch/pick_and_place_demo.launch.py</code> on the laptop (adapt the prefix to wherever you cloned the repository). Its neighbour <code>pick_and_place_no_gui_demo.launch.py</code> is the headless variant.</p>
+      <p class="prose"><b><code>ros2 launch pick_and_place_demo.launch.py</code></b><b> does not work as typed from an arbitrary directory.</b> This project is not a ROS package: it has no <code>package.xml</code> and is never built with <code>colcon</code>, so <code>ros2 launch</code> cannot find the file by name. It accepts a file path instead: either the full path, or the bare file name when your current directory is the <code>launch/</code> directory itself.</p>
+      <p class="prose"><b>It does not work from your normal Ubuntu terminal either.</b> The launch file starts <code>scripts/run_demo.py</code>, which needs ROS2 Jazzy, Gazebo Harmonic, MoveIt2, <code>moveit_py</code>, and the <code>gazebo_to_lerobot_bringup</code> and <code>mycobot_moveit_config</code> packages. All of these exist only inside the <code>gazebo_to_lerobot</code> Docker container. You will use two kinds of terminal, and the prompt tells you which one you are in:</p>
+      <div class="table-wrap"><table><thead><tr><th>Terminal</th><th>Prompt looks like</th><th>Used for</th></tr></thead><tbody><tr><td>Host terminal: a normal Ubuntu (WSL) terminal on the laptop</td><td><code>tilic@LAPTOP-7BFDQAO6:~$</code></td><td>Starting Docker, <code>docker build</code>, <code>docker cp</code>, <code>docker exec</code>, copying files</td></tr><tr><td>Container shell: opened with <code>docker exec -it gazebo_to_lerobot bash</code></td><td><code>root@c76def923a51:/workspace#</code></td><td><code>ros2 …</code>, <code>gz …</code>, <code>colcon</code>, and the launch file itself</td></tr></tbody></table></div>
+      <p class="prose">Inside the container, the launch files are at <code>/workspace/htgpp/launch/</code> once §23 has copied them there. The exact form of the §15 command then works:</p>
+      <pre><span class="c"># container shell</span>
+source /opt/ros/jazzy/setup.bash
+source /workspace/install/setup.bash
+cd /workspace/htgpp/launch
+ros2 launch pick_and_place_demo.launch.py</pre>
+      <p class="callout warn"><b>On a WSL2 laptop, that command alone is not enough.</b> The simulation freezes unless the shell was opened with <code>-e DISPLAY=:0</code> (§24), and the Gazebo window it opens stays white (§25). §27 wraps everything into one command that avoids both.</p>
+    </article>
+
+    <article class="step" id="s17">
+      <div class="step-head"><span class="step-num">17</span><h3>Start the Docker daemon</h3></div>
+      <p class="step-purpose">On this kind of WSL2 install, the Docker daemon does not start by itself, and the usual commands to start it do not work.</p>
+      <p class="prose"><b>Symptom.</b> Any <code>docker</code> command answers:</p>
+      <pre>Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?</pre>
+      <p class="prose"><b>Why the usual fixes fail.</b> WSL here runs without systemd (<code>ps -p 1 -o comm=</code> prints <code>init(Ubuntu)</code>), so <code>sudo systemctl start docker</code> answers <code>System has not been booted with systemd as init system (PID 1). Can't operate.</code>, and there is no <code>/etc/init.d/docker</code> script, so <code>sudo service docker start</code> does nothing either. The daemon must be started by hand.</p>
+      <p class="panel-tag" style="margin-top:16px">Procedure (host terminal)</p>
+      <pre>groups<span class="c">                 # must list 'docker'; otherwise: sudo usermod -aG docker $USER, then reopen WSL</span>
+sudo sh -c 'nohup dockerd &gt; /tmp/dockerd.log 2&gt;&amp;1 &amp;'
+<span class="c"># asks for your Linux password once; the daemon then keeps running in the background</span></pre>
+      <p class="panel-tag" style="margin-top:16px">Verify</p>
+      <pre>docker ps -a --format '{{.Names}}\t{{.Status}}'</pre>
+      <p class="prose">Any listing, even an empty one, means the daemon answers. If <code>docker</code> still cannot connect, read <code>/tmp/dockerd.log</code>.</p>
+      <p class="callout warn"><b>Repeat this after every Windows reboot or </b><b><code>wsl --shutdown</code></b><b>.</b> The daemon dies with the WSL VM. This was observed on 2026-10-03: the daemon started the day before was gone the next morning.</p>
+    </article>
+
+    <article class="step" id="s18">
+      <div class="step-head"><span class="step-num">18</span><h3>Build the image, if the container does not exist</h3></div>
+      <p class="step-purpose">On 2026-10-03 the listing in §17 showed only five unrelated containers from 2022: no <code>gazebo_to_lerobot</code>, and <code>docker images</code> showed no <code>gazebo_to_lerobot</code> image either.</p>
+      <p class="prose">If <code>gazebo_to_lerobot</code> <b>is</b> in the §17 listing, skip to §22: the image, the container and its workspace already exist. Otherwise build the image from the sibling project <code>Gazebo_to_LeRobot_Pipeline</code>, as its own runbook (step 01) describes.</p>
+      <p class="panel-tag" style="margin-top:16px">Procedure (host terminal)</p>
+      <pre>cd ~/tomislav/robotics/mycobot_320pi_R6A_tomislav_02_10_2026/Gazebo_to_LeRobot_Pipeline
+docker build -t gazebo_to_lerobot:jazzy-harmonic -f docker/Dockerfile docker</pre>
+      <p class="prose">This downloads the <code>ros:jazzy-ros-base</code> base image and installs ROS desktop, Gazebo Harmonic, ros2_control and MoveIt2 into it. The result is <b>4.77 GB</b>; expect tens of minutes, depending on your connection.</p>
+      <p class="panel-tag" style="margin-top:16px">Verify</p>
+      <pre>docker images gazebo_to_lerobot
+<span class="c"># gazebo_to_lerobot   jazzy-harmonic   ...   4.77GB</span></pre>
+      <p class="prose">The build log ends with <code>Successfully tagged gazebo_to_lerobot:jazzy-harmonic</code>.</p>
+    </article>
+
+    <article class="step" id="s19">
+      <div class="step-head"><span class="step-num">19</span><h3>Start the persistent container</h3></div>
+      <p class="step-purpose">One long-lived container, with the WSLg display sockets and the <code>/dev/dxg</code> GPU device passed in.</p>
+      <p class="panel-tag" style="margin-top:16px">Procedure (host terminal, still in Gazebo_to_LeRobot_Pipeline)</p>
+      <pre>bash docker/run.sh</pre>
+      <p class="prose"><code>run.sh</code> re-runs <code>docker build</code> (instant now, every layer is cached), then <code>docker run -d --name gazebo_to_lerobot …</code>, mounting <code>/tmp/.X11-unix</code>, <code>/mnt/wslg</code> and <code>/usr/lib/wsl</code>, and bind-mounting <code>Gazebo_to_LeRobot_Pipeline/src</code> to <code>/workspace/src</code>. It refuses to run if a container with that name already exists (remove it first with <code>docker rm -f gazebo_to_lerobot</code> only if you really want a clean start: that also deletes §22's install).</p>
+      <p class="panel-tag" style="margin-top:16px">Verify</p>
+      <pre>docker ps --format '{{.Names}}\t{{.Status}}'
+<span class="c"># gazebo_to_lerobot   Up ...</span></pre>
+      <p class="callout warn"><b><code>run.sh</code></b><b> copies your host </b><b><code>DISPLAY</code></b><b> into the container</b> (<code>-e DISPLAY="${DISPLAY:-:0}"</code>). On this laptop the host <code>DISPLAY</code> is <code>172.24.112.1:0</code>, which breaks the simulation (§24). That is why every later <code>docker exec</code> in this addendum passes <code>-e DISPLAY=:0</code> explicitly. <code>run.sh</code> itself was not modified.</p>
+    </article>
+
+    <article class="step" id="s20">
+      <div class="step-head"><span class="step-num">20</span><h3>Copy the robot description into the workspace</h3></div>
+      <p class="step-purpose"><code>Gazebo_to_LeRobot_Pipeline</code> keeps only three hand-modified files under <code>overrides/</code>, not the 135 MB mesh tree. The two robot packages must be copied in from the main repository, then the overrides applied on top (pipeline runbook, step 03).</p>
+      <p class="panel-tag" style="margin-top:16px">Procedure (host terminal, in Gazebo_to_LeRobot_Pipeline)</p>
+      <pre>mkdir -p src/mycobot_R6A
+cp -r ../mycobot_description ../mycobot_gateway src/mycobot_R6A/
+cp -r overrides/mycobot_description/* src/mycobot_R6A/mycobot_description/
+cp -r overrides/mycobot_gateway/* src/mycobot_R6A/mycobot_gateway/</pre>
+      <p class="panel-tag" style="margin-top:16px">Verify</p>
+      <pre>for f in $(cd overrides &amp;&amp; find . -type f); do diff -q overrides/$f src/mycobot_R6A/$f &amp;&amp; echo "OK $f"; done
+<span class="c"># OK ./mycobot_gateway/launch/mycobot_teleop.launch.py</span>
+<span class="c"># OK ./mycobot_description/config/controller.yaml</span>
+<span class="c"># OK ./mycobot_description/urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf</span>
+grep -c "&lt;always_on&gt;false" src/mycobot_R6A/mycobot_description/urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf
+<span class="c"># 3</span></pre>
+      <p class="prose"><code>src/mycobot_R6A/</code> is gitignored in <code>Gazebo_to_LeRobot_Pipeline</code>, so this copy leaves <code>git status</code> clean. Because <code>run.sh</code> bind-mounts <code>src/</code>, the container sees the copy immediately.</p>
+    </article>
+
+    <article class="step" id="s21">
+      <div class="step-head"><span class="step-num">21</span><h3>Build the ROS workspace inside the container</h3></div>
+      <p class="step-purpose">Import the five rosetta repositories, install their system dependencies, and build all nine packages.</p>
+      <p class="panel-tag" style="margin-top:16px">Procedure (host terminal; the command runs inside the container)</p>
+      <pre>docker exec gazebo_to_lerobot bash -c 'source /opt/ros/jazzy/setup.bash &amp;&amp; cd /workspace \
+  &amp;&amp; vcs import src &lt; src/rosetta.repos \
+  &amp;&amp; apt-get update \
+  &amp;&amp; rosdep install --from-paths src --ignore-src -r -y \
+  &amp;&amp; colcon build --symlink-install'</pre>
+      <p class="prose">A few minutes in total; <code>colcon build</code> itself took 21 s. <code>rosdep</code> prints an <code>ERROR</code> that is <b>expected and harmless</b>, because <code>-r</code> makes it continue:</p>
+      <pre>ERROR: the following packages/stacks could not have their rosdep keys resolved
+to system dependencies:
+lerobot_rosetta: Cannot locate rosdep definition for [ament_python]
+...  (same line for rosetta, lerobot_teleoperator_rosetta, gazebo_to_lerobot_bringup, lerobot_robot_rosetta)
+Continuing to install resolvable dependencies...</pre>
+      <p class="panel-tag" style="margin-top:16px">Verify</p>
+      <pre><span class="c"># last lines of the build:</span>
+Summary: 9 packages finished [21.3s]
+
+docker exec gazebo_to_lerobot bash -c 'source /opt/ros/jazzy/setup.bash; source /workspace/install/setup.bash; ros2 pkg list | grep -E "mycobot|gazebo_to_lerobot|rosetta"'
+<span class="c"># gazebo_to_lerobot_bringup, lerobot_robot_rosetta, lerobot_rosetta, lerobot_teleoperator_rosetta,</span>
+<span class="c"># mycobot_description, mycobot_gateway, mycobot_moveit_config, rosetta, rosetta_interfaces</span></pre>
+    </article>
+
+    <article class="step" id="s22">
+      <div class="step-head"><span class="step-num">22</span><h3>Install moveit_py, which the image does not contain</h3></div>
+      <p class="step-purpose">The Dockerfile installs <code>ros-jazzy-moveit</code>, which does <b>not</b> include MoveIt's Python bindings. <code>precompute_ik.py</code> (§3–4) cannot run without them. The container this project was developed in must have had them added by hand; that step was never written down until now.</p>
+      <p class="panel-tag" style="margin-top:16px">Procedure (host terminal)</p>
+      <pre>docker exec gazebo_to_lerobot bash -c 'apt-get install -y ros-jazzy-moveit-py'</pre>
+      <p class="prose">Installed version on 2026-10-03: <code>ros-jazzy-moveit-py 2.12.4-1noble.20260903.100911</code>.</p>
+      <p class="panel-tag" style="margin-top:16px">Verify</p>
+      <pre>docker exec gazebo_to_lerobot bash -c 'source /opt/ros/jazzy/setup.bash; python3 -c "import moveit; print(\"moveit_py OK\")"'
+<span class="c"># moveit_py OK</span></pre>
+      <p class="callout bug"><b>Misleading symptom if you skip this.</b> The demo stops about one second after <code>solving IK for the settled block pose</code> with: <code>FATAL: no reachable elbow-up IK solution for this block position (0.25, 0.0) -- try a position closer to (0.25, 0.00)</code>. The position is fine. The real error, visible only by running <code>python3 precompute_ik.py</code> by hand inside the container, is <code>ModuleNotFoundError: No module named 'moveit'</code>. <code>run_demo.py</code> prints only the standard output of <code>precompute_ik.py</code>, so the traceback (on standard error) is lost and every failure is reported as unreachable. Not fixed in <code>run_demo.py</code>; documented here.</p>
+      <p class="callout warn"><b>The install lives in the container, not the image.</b> Stopping and restarting the container keeps it. <code>docker rm</code> followed by <code>run.sh</code> produces a container without <code>moveit_py</code> again: redo this step.</p>
+    </article>
+
+    <article class="step" id="s23">
+      <div class="step-head"><span class="step-num">23</span><h3>Copy this project into the container</h3></div>
+      <p class="step-purpose">The container never sees this project's directory: only <code>Gazebo_to_LeRobot_Pipeline/src</code> is mounted. Everything is copied to <code>/workspace/htgpp/</code>.</p>
+      <p class="panel-tag" style="margin-top:16px">Procedure (host terminal, in Headless_Task-Grounded_Pick-and-Place_in_Gazebo)</p>
+      <pre>cd ~/tomislav/robotics/mycobot_320pi_R6A_tomislav_02_10_2026/Headless_Task-Grounded_Pick-and-Place_in_Gazebo
+docker exec gazebo_to_lerobot mkdir -p /workspace/htgpp
+for d in launch scripts models contracts; do docker cp $d gazebo_to_lerobot:/workspace/htgpp/; done
+<span class="c"># the scripts are ALSO needed flat in /workspace/htgpp/ itself:</span>
+for f in scripts/*.py scripts/*.sh; do docker cp $f gazebo_to_lerobot:/workspace/htgpp/; done</pre>
+      <p class="prose"><b>Why both copies of the scripts.</b> <code>run_demo.py</code> calls <code>/workspace/htgpp/precompute_ik.py</code>, not <code>/workspace/htgpp/scripts/precompute_ik.py</code>: the container was always deployed with every script flattened into the project root (§14's comment in the launch file). The launch file itself finds <code>run_demo.py</code> in either place. The second loop also installs <code>run_gui_demo.sh</code> (§27) at <code>/workspace/htgpp/run_gui_demo.sh</code>.</p>
+      <p class="panel-tag" style="margin-top:16px">Verify</p>
+      <pre>docker exec gazebo_to_lerobot ls /workspace/htgpp
+<span class="c"># batch.sh contracts episode.sh grab_frame.py ik_helper.py launch models port_bag.py</span>
+<span class="c"># precompute_ik.py run_demo.py run_gui_demo.sh run_pick_and_place.py scripts status.sh test_ik.py</span></pre>
+      <p class="prose">Redo this step after any change to the project's scripts, launch files or models on the host: the container holds copies, not links.</p>
+    </article>
+
+    <article class="step" id="s24">
+      <div class="step-head"><span class="step-num">24</span><h3>Headless check, and the frozen simulation (DISPLAY)</h3></div>
+      <p class="step-purpose">Run the headless variant first: it is the one §15 verified, it exits with a pass/fail code, and it isolates simulation problems from display problems.</p>
+      <p class="panel-tag" style="margin-top:16px">Procedure (host terminal)</p>
+      <pre>docker exec -e DISPLAY=:0 gazebo_to_lerobot bash -c 'source /opt/ros/jazzy/setup.bash; source /workspace/install/setup.bash
+  ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py; echo "exit code: $?"'</pre>
+      <p class="panel-tag" style="margin-top:16px">Verify</p>
+      <p class="prose">About 4 minutes later: <code>RESULT: motions_ok=True placed_on_plate=True grasp_held=True</code>. On 2026-10-03 the controllers became active 16–19 s after <code>launching sim</code>.</p>
+      <p class="callout bug"><b>Symptom without </b><b><code>-e DISPLAY=:0</code></b><b>: the simulation is frozen.</b> The log shows <code>controllers not all active yet -- respawning the missing ones sequentially</code>, then about 4.5 minutes later <code>FATAL: controllers never reached 'active' -- see sim.log</code>. In <code>/workspace/htgpp/demo/sim.log</code> the controller manager logs <code>Activating controllers: [ joint_state_broadcaster ]</code> again every 60 s and the spawners log <code>Failed getting a result from calling /controller_manager/switch_controller</code>; <code>mycobot_controller</code> is never even loaded. The simulation clock is not advancing: <code>gz topic -e -t /world/empty/clock -n 1</code> (inside the container) times out although the topic has a publisher.</p>
+      <p class="prose"><b>Cause.</b> On this laptop the host's <code>DISPLAY</code> is <code>172.24.112.1:0</code> (check with <code>echo $DISPLAY</code> in a host terminal), the address of an external X server (VcXsrv style) that nothing answers. <code>run.sh</code> passes it into the container. The camera sensor in the simulated world needs an OpenGL context; opening it blocks on that dead address, and since sensors are updated inside the simulation step, the whole simulation stops. The same hang is visible directly: <code>glxinfo -B</code> in the container never returns. WSLg's own display, <code>:0</code> (socket <code>/tmp/.X11-unix/X0</code>), works:</p>
+      <pre>docker exec -e DISPLAY=:0 gazebo_to_lerobot glxinfo -B | grep renderer
+<span class="c"># OpenGL renderer string: D3D12 (Intel(R) Iris(R) Xe Graphics)</span></pre>
+      <p class="prose"><b>Fix.</b> Pass <code>-e DISPLAY=:0</code> to <b>every</b> <code>docker exec</code> that runs the simulation, including <code>docker exec -it -e DISPLAY=:0 gazebo_to_lerobot bash</code> when you open a container shell. <code>run_gui_demo.sh</code> (§27) sets it itself.</p>
+    </article>
+
+    <article class="step" id="s25">
+      <div class="step-head"><span class="step-num">25</span><h3>The white Gazebo window: use software OpenGL</h3></div>
+      <p class="step-purpose">With <code>DISPLAY=:0</code>, <code>pick_and_place_demo.launch.py</code> runs and the Gazebo window opens, but its 3D view stays completely white for the whole run, while the log shows the arm doing the full sequence.</p>
+      <p class="prose"><b>Cause.</b> Through WSLg, the Intel GPU is reached via Mesa's D3D12 translation layer, which offers only OpenGL 4.1, without compute shaders. <code>~/.gz/rendering/ogre2.log</code> in the container shows <code>GL_RENDERER = D3D12 (Intel(R) Iris(R) Xe Graphics)</code>, <code>GL_VERSION = 4.1 (Core Profile)</code> and <code>Compute programs: no</code>. Gazebo's default <code>ogre2</code> engine draws a white viewport with that. The older engine (<code>gz sim -g --render-engine ogre</code>) was tried and was white too, so the problem is the D3D12 path, not the engine.</p>
+      <p class="prose"><b>Fix.</b> Make Mesa render on the CPU (llvmpipe), which offers OpenGL 4.5. Three environment variables; the third is set to an <b>empty</b> value to cancel the <code>MESA_LOADER_DRIVER_OVERRIDE=d3d12</code> that <code>run.sh</code> puts into the container:</p>
+      <pre>LIBGL_ALWAYS_SOFTWARE=1
+GALLIUM_DRIVER=llvmpipe
+MESA_LOADER_DRIVER_OVERRIDE=</pre>
+      <p class="panel-tag" style="margin-top:16px">Verify</p>
+      <pre>docker exec -e DISPLAY=:0 -e LIBGL_ALWAYS_SOFTWARE=1 -e GALLIUM_DRIVER=llvmpipe -e MESA_LOADER_DRIVER_OVERRIDE= \
+  gazebo_to_lerobot glxinfo -B | grep -E 'renderer string|core profile version'
+<span class="c"># OpenGL renderer string: llvmpipe (LLVM 20.1.2, 256 bits)</span>
+<span class="c"># OpenGL core profile version string: 4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.4</span></pre>
+      <p class="prose"><b>First test: a second window.</b> A second GUI started with these variables and connected to the already-running simulation showed the scene correctly:</p>
+      <pre>docker exec -e DISPLAY=:0 -e LIBGL_ALWAYS_SOFTWARE=1 -e GALLIUM_DRIVER=llvmpipe -e MESA_LOADER_DRIVER_OVERRIDE= \
+  gazebo_to_lerobot bash -c 'source /opt/ros/jazzy/setup.bash; gz sim -g --force-version 8'</pre>
+      <p class="callout warn"><b>Why this two-window approach was dropped.</b> It needs a second terminal opened at the right moment. <code>controllers active</code> scrolls past within 20 s of the start; by the time the second window was open and zoomed in, the arm had finished and only a static scene was left. §27 instead gives the variables to the launch itself, so the one window it opens renders from the start. Measured cost: none on startup (controllers active in 20 s, as with the GPU path); motion in the window is a little less fluid.</p>
+    </article>
+
+    <article class="step" id="s26">
+      <div class="step-head"><span class="step-num">26</span><h3>The tiny view, and the camera that zooms out by itself</h3></div>
+      <p class="step-purpose">Once the window renders, the arm is very small in the middle of the view. Two separate causes, and one of them looks like Gazebo zooming out on its own.</p>
+      <p class="prose"><b>Cause 1: the robot's bounding box includes the camera rig.</b> The four scene cameras (front, left, right, top) are links of the <code>mycobot_320</code> model, so its bounding box spans the whole rig. <b>Move to</b> on <code>mycobot_320</code> in the Entity Tree flies to the arm and then frames that whole box, which zooms back out. This is noted in the comments of <code>sim_full.launch.py</code>.</p>
+      <p class="prose"><b>Cause 2: Follow mode.</b> If <b>Follow</b> was ever chosen for <code>mycobot_320</code>, the GUI camera stays locked to it at an offset of 3 m back and 2 m up, and pulls itself back there after every zoom, even after <b>Move to</b> <code>red_block</code>. Checked inside the container:</p>
+      <pre>gz topic -e -t /gui/currently_tracked -n 1
+<span class="c"># track_mode: FOLLOW</span>
+<span class="c"># follow_target { name: "mycobot_320" }</span>
+<span class="c"># follow_offset { x: -3  z: 2 }</span></pre>
+      <p class="panel-tag" style="margin-top:16px">Fix by hand (in the Gazebo window)</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)"><li>Right-click an empty part of the 3D view and choose <b>Unfollow</b> (also available from the right-click menu of the entity in the Entity Tree).</li><li>Then right-click <code>red_block</code> (or <code>plate</code>) in the Entity Tree and choose <b>Move to</b>. Do not use <b>Move to</b> or <b>Follow</b> on <code>mycobot_320</code>.</li></ul>
+      <p class="panel-tag" style="margin-top:16px">Fix by command (container shell, opened with -e DISPLAY=:0)</p>
+      <pre><span class="c"># stop following</span>
+gz service -s /gui/follow --reqtype gz.msgs.StringMsg --reptype gz.msgs.Boolean --timeout 5000 --req 'data: ""'
+<span class="c"># place the camera at (0.65, -0.55, 0.45) m, looking at the work area around (0.18, -0.06, 0.05) m</span>
+gz service -s /gui/move_to/pose --reqtype gz.msgs.GUICamera --reptype gz.msgs.Boolean --timeout 5000 \
+  --req 'pose: {position: {x: 0.65, y: -0.55, z: 0.45}, orientation: {w: 0.37847, x: -0.24197, y: 0.10319, z: 0.88745}}'
+<span class="c"># each prints: data: true</span></pre>
+      <p class="prose">The orientation is the quaternion for roll 0, pitch 0.532 rad (looking down), yaw 2.335 rad (towards the work area). After the two commands, <code>gz topic -e -t /gui/currently_tracked -n 1</code> prints nothing, meaning no tracking, and the view stays close. <code>run_gui_demo.sh</code> (§27) sends the second command automatically.</p>
+    </article>
+
+    <article class="step" id="s27">
+      <div class="step-head"><span class="step-num">27</span><h3>run_gui_demo.sh: the whole GUI demo in one command</h3></div>
+      <p class="step-purpose">New file <code>scripts/run_gui_demo.sh</code>. It wraps <code>pick_and_place_demo.launch.py</code> with the three fixes above, so the person watching types one command in one terminal and sees the arm move from the beginning, close up.</p>
+      <p class="prose">What it does, in order:</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)"><li>Sets <code>DISPLAY=:0</code> (§24) and the three software-OpenGL variables (§25). The launch, <code>run_demo.py</code>, <code>sim_full.launch.py</code> and Gazebo's GUI all inherit them, so the single window that opens renders correctly.</li><li>Sources <code>/opt/ros/jazzy/setup.bash</code> and <code>/workspace/install/setup.bash</code>, so you do not type them.</li><li>Starts a background helper that waits until the GUI offers the <code>/gui/move_to/pose</code> service, waits 8 s more for the scene to load, then sends the §26 camera command and prints <code>[run_gui_demo] GUI camera framed on the arm</code>.</li><li>Runs <code>ros2 launch pick_and_place_demo.launch.py</code> from <code>/workspace/htgpp/launch</code>, passing on any extra arguments (<code>block_x:=…</code>, <code>block_y:=…</code>, <code>record:=…</code>).</li><li>On exit (Ctrl+C or end of the launch), stops the helper and kills any <code>move_group</code> or <code>gz sim</code> still running. On 2026-10-03 a Ctrl+C in an interactive terminal left a <code>move_group</code> behind, which would make the next run fail.</li></ul>
+      <p class="panel-tag" style="margin-top:16px">Install (host terminal, in Headless_Task-Grounded_Pick-and-Place_in_Gazebo)</p>
+      <pre>docker cp scripts/run_gui_demo.sh gazebo_to_lerobot:/workspace/htgpp/run_gui_demo.sh
+<span class="c"># (already done if you ran §23's second loop after this file existed)</span></pre>
+      <p class="panel-tag" style="margin-top:16px">Run (host terminal)</p>
+      <pre>docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh
+docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh block_x:=0.28 block_y:=0.05</pre>
+      <p class="prose">No <code>-e DISPLAY=:0</code> and no <code>source</code> lines are needed here: the script sets them itself. Keep <code>-it</code>, so that Ctrl+C reaches the launch.</p>
+      <p class="panel-tag" style="margin-top:16px">Verify: the run of 2026-10-03, minute by minute</p>
+      <div class="table-wrap"><table><thead><tr><th>Time</th><th>Terminal line</th><th>What you see in the Gazebo window</th></tr></thead><tbody><tr><td>04:25:27</td><td><code>gui=True record=False block=(0.25,0.0) attach_mode=simulated</code></td><td>Nothing yet</td></tr><tr><td>04:25:31</td><td><code>launching sim (GUI)...</code></td><td>The Gazebo window opens, rendered (ground grid, arm, camera rig)</td></tr><tr><td>a few s later</td><td><code>[run_gui_demo] GUI camera framed on the arm</code></td><td>The view jumps close to the arm</td></tr><tr><td>04:25:51</td><td><code>controllers active. Spawning plate and block...</code></td><td>The plate and the red cube appear</td></tr><tr><td>04:26:12</td><td><code>block settled at (0.25, 0.0, 0.02049)</code></td><td>The cube rests on the ground</td></tr><tr><td>04:26:12</td><td><code>solving IK for the settled block pose ...</code></td><td>Static scene (about 35 s)</td></tr><tr><td>04:26:48</td><td><code>starting move_group...</code></td><td>Static scene (about 60 s)</td></tr><tr><td>04:27:49</td><td><code>running the pick-and-place sequence...</code></td><td>The arm moves: approach, descend, close, lift, transport, place, release, retreat, home</td></tr><tr><td>04:30:00</td><td><code>RESULT: motions_ok=True placed_on_plate=True grasp_held=True</code></td><td>Cube on the plate, arm back at home</td></tr></tbody></table></div>
+      <p class="prose">Total: about 4.5 minutes, the arm moving for the last 2. Watched and confirmed on 2026-10-03: the window rendered, the view was close from the start, and the arm was seen carrying the red cube to the plate.</p>
+      <p class="callout"><b>The window stays open on purpose</b> after <code>RESULT</code>, on the final scene (§15). Press <b>Ctrl+C</b> in the terminal to stop everything; run the same command again to watch another run.</p>
+    </article>
+
+    <article class="step" id="s28">
+      <div class="step-head"><span class="step-num">28</span><h3>Moving around in the Gazebo window (including with a trackball)</h3></div>
+      <p class="step-purpose">Gazebo Harmonic's basic view controls. They move only your point of view, never the simulation.</p>
+      <div class="table-wrap"><table><thead><tr><th>Action</th><th>Mouse with a wheel</th><th>Trackball without a wheel</th></tr></thead><tbody><tr><td>Zoom</td><td>Scroll wheel (zooms towards the point under the cursor)</td><td>Hold the <b>right</b> button and roll the ball forward (in) or back (out)</td></tr><tr><td>Pan (slide the view)</td><td>Hold the left button and drag</td><td>Hold the left button and roll</td></tr><tr><td>Orbit (rotate around)</td><td>Hold the middle button (press the wheel) and drag</td><td><b>Shift</b> + left button, and roll</td></tr><tr><td>Select an object</td><td>Left click</td><td>Left click</td></tr><tr><td>Context menu</td><td>Short right click</td><td>Short right click (only press-and-drag zooms)</td></tr></tbody></table></div>
+      <ul style="max-width:70ch;color:var(--ink-soft)"><li>Put the cursor on the red cube <b>before</b> zooming: zoom heads towards the point under the cursor.</li><li><b>Move to</b> <code>red_block</code> or <code>plate</code> (right click in the Entity Tree) frames them closely. Avoid <b>Move to</b> and <b>Follow</b> on <code>mycobot_320</code> (§26).</li><li>Bottom left, <b>▶ / ⏸</b> plays or pauses the simulation: do not leave it paused, or the demo stalls. Bottom right, <b>RTF</b> is the real-time factor; well below 100% is normal on this laptop.</li><li>Many trackballs (Logitech Ergo/M575, Kensington Expert/Orbit and others) can emulate a scroll wheel (scroll ring, or hold a button + roll) through their Windows software (Logi Options+, KensingtonWorks).</li></ul>
+      <p class="callout warn"><b>Do not use the Translate (T) and Rotate (R) tools</b> of the top toolbar: they move objects in the simulation itself, not the camera. Dragging the cube or the arm spoils the run. Press <b>Esc</b> to return to selection mode.</p>
+    </article>
+
+    <article class="step" id="s29">
+      <div class="step-head"><span class="step-num">29</span><h3>Reading the result in the terminal</h3></div>
+      <p class="step-purpose">What the end of the log means, taken from the run you can reproduce (block at (0.25, 0.00)).</p>
+      <pre>[pick_and_place]: [place] correction 1: max_err=0.0057 rad
+[pick_and_place]: SIMULATED ATTACHMENT: releasing block from link6
+[pick_and_place]: [release] gripper reached -0.045 (target 0.0)
+[pick_and_place]: [retreat] move OK
+[pick_and_place]: [home_final] move OK
+All motions succeeded: True
+Block carried (dz constant AND block rose through lift+transport): True
+Grasp held (dz constant through lift+transport): True
+Block final pose: (0.19744, -0.151968, 0.068)  placed on plate: True
+RESULT: motions_ok=True placed_on_plate=True grasp_held=True</pre>
+      <ul style="max-width:70ch;color:var(--ink-soft)"><li><code>move OK</code>: the MoveGroup action reported success for that phase. <code>correction N: max_err=…</code> lines are the closed-loop fine-tuning of §5, not errors.</li><li><code>dz</code> is the gripper height minus the cube height. Constant through lift and transport while the cube rises means it was really carried (§6).</li><li>Final pose (0.197, −0.152, 0.068): about 3 mm from the plate centre (0.20, −0.15). The height checks out too: 0.068 m = plate top (0.044 + 0.004 = 0.048 m) + half the 4 cm cube (0.020 m), so the cube rests on the plate.</li><li><code>SIMULATED ATTACHMENT</code>: the cube is carried by a scripted Gazebo weld closed when the gripper closes and opened when it opens (§8–9), not by friction.</li><li>All three of <code>motions_ok</code>, <code>placed_on_plate</code> and <code>grasp_held</code> must be <code>True</code> for a pass. The same values are in <code>/workspace/htgpp/demo/grasp_meta.json</code>.</li></ul>
+    </article>
+
+    <article class="step" id="s30">
+      <div class="step-head"><span class="step-num">30</span><h3>Stopping, re-running, and leftover processes</h3></div>
+      <p class="step-purpose">A clean stop matters: a leftover <code>move_group</code> or Gazebo from the previous run makes the next one fail.</p>
+      <p class="prose"><b>Stop:</b> Ctrl+C in the terminal running <code>run_gui_demo.sh</code> (or the launch). <b>Check</b> from a host terminal that nothing is left:</p>
+      <pre>docker exec gazebo_to_lerobot pgrep -af "gz sim|move_group|ros2 launch"
+<span class="c"># nothing printed = clean (lines marked &lt;defunct&gt; are dead zombies, harmless)</span></pre>
+      <p class="prose">If something is left, for example the <code>ros2 launch mycobot_moveit_config move_group.launch.py</code> observed on 2026-10-03 after a Ctrl+C on the plain launch file:</p>
+      <pre>docker exec gazebo_to_lerobot pkill -INT -f move_group
+docker exec gazebo_to_lerobot pkill -INT -f "gz sim"
+<span class="c"># a few seconds later, if still there:</span>
+docker exec gazebo_to_lerobot pkill -9 -f move_group
+docker exec gazebo_to_lerobot pkill -9 -f "gz sim"</pre>
+      <p class="callout bug"><b>Do not wrap </b><b><code>pkill -f</code></b><b> in </b><b><code>bash -c</code></b><b>.</b> <code>docker exec gazebo_to_lerobot bash -c 'pkill -f move_group; …'</code> kills its own shell: the pattern appears in that shell's own command line, so <code>pkill</code> matches it, and the command ends with exit code 137 or 143 without finishing. This happened four times on 2026-10-03. Call <code>pkill</code> directly through <code>docker exec</code>, as above.</p>
+      <p class="prose"><b>Re-run:</b> run the same <code>docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh …</code> command again. Each run restarts the simulation from scratch.</p>
+      <p class="prose"><b>End of the session:</b> <code>docker stop gazebo_to_lerobot</code> (optional; the container keeps <code>moveit_py</code> and the built workspace). Next time, start with the short version at the top of this addendum.</p>
+    </article>
+
+    <section class="block" id="addendum2-trouble">
+      <h2>Troubleshooting summary</h2>
+      <div class="table-wrap"><table><thead><tr><th>What you see</th><th>Cause</th><th>Fix</th></tr></thead><tbody><tr><td><code>Cannot connect to the Docker daemon</code></td><td>Daemon not started (no systemd in WSL)</td><td>§17</td></tr><tr><td><code>docker ps -a</code> has no <code>gazebo_to_lerobot</code></td><td>Image and container never built on this machine</td><td>§18–§23</td></tr><tr><td><code>controllers not all active yet</code>, then <code>FATAL: controllers never reached 'active'</code></td><td>Host <code>DISPLAY=172.24.112.1:0</code> passed into the container freezes the simulation</td><td><code>-e DISPLAY=:0</code> (§24)</td></tr><tr><td><code>FATAL: no reachable elbow-up IK solution</code> about 1 s after <code>solving IK</code>, at a reachable position</td><td><code>moveit_py</code> not installed; real error hidden</td><td>§22</td></tr><tr><td>Gazebo window opens but stays white</td><td>D3D12 GPU path: OpenGL 4.1, no compute shaders</td><td>Software OpenGL (§25), built into <code>run_gui_demo.sh</code></td></tr><tr><td>Arm tiny; view zooms out again after every zoom-in</td><td>Follow on <code>mycobot_320</code> (offset 3 m back, 2 m up); bounding box includes the camera rig</td><td>Unfollow, Move to <code>red_block</code> (§26)</td></tr><tr><td>Second viewer window opens too late: arm already static</td><td>Two-terminal approach</td><td><code>run_gui_demo.sh</code> (§27)</td></tr><tr><td>No scroll wheel</td><td>Trackball</td><td>Right-button drag zooms (§28)</td></tr><tr><td>Next run fails right away after a Ctrl+C</td><td>Leftover <code>move_group</code> / <code>gz sim</code></td><td>§30</td></tr><tr><td><code>docker exec … bash -c 'pkill -f …'</code> ends with exit 137/143</td><td><code>pkill -f</code> matched its own shell</td><td>Call <code>pkill</code> without <code>bash -c</code> (§30)</td></tr></tbody></table></div>
+      <h3 style="margin-top:26px;font-size:1.1rem">What was not changed</h3>
+      <p class="prose">To keep this addendum a faithful record, the shared files were left as they were; the fixes live in the commands above and in the new <code>run_gui_demo.sh</code>. Three permanent fixes are proposed, not applied:</p>
+      <ul style="max-width:70ch;color:var(--ink-soft)"><li><code>Gazebo_to_LeRobot_Pipeline/docker/Dockerfile</code>: add <code>ros-jazzy-moveit-py</code>, which would make §22 unnecessary.</li><li><code>Gazebo_to_LeRobot_Pipeline/docker/run.sh</code>: pass <code>DISPLAY=:0</code> instead of the host's <code>DISPLAY</code> on WSLg, which would make §24's <code>-e DISPLAY=:0</code> unnecessary.</li><li><code>scripts/run_demo.py</code>: print the standard error of <code>precompute_ik.py</code> when it fails, so a missing module is no longer reported as an unreachable position (§22).</li></ul>
+    </section>
 
     <!-- ===================================================== LADDER ===================================================== -->
     <section class="block" id="ladder">
@@ -958,6 +1246,7 @@ ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py --show-
 <span class="c"># nothing printed = clean. Entries tagged &lt;defunct&gt; are already-dead zombie</span>
 <span class="c"># processes waiting to be reaped -- harmless, hold no resources, safe to ignore.</span></pre>
       <p class="callout warn"><b>Running this for the first time on a fresh container?</b> &sect;10's pre-solved <code>waypoints/</code> directory isn't needed here: &sect;13's live-detection path solves IK for wherever the block actually lands, every time, for any position you pass.</p>
+      <p class="callout"><b>Watching the GUI variant on a WSL2 laptop:</b> the plain GUI command above freezes or shows a white window there. Use <code>docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh</code> instead, after the one-time setup of §17–§23 (see §27).</p>
     </section>
 
     <section class="block" id="manifest">
@@ -981,7 +1270,8 @@ ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py --show-
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; episode.sh, batch.sh<span class="c">             # &sect;10, the per-episode recording driver</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; status.sh<span class="c">                        # &sect;11, disk-ground-truth batch status</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; port_bag.py<span class="c">                      # &sect;12, dataset conversion without torch</span><br>
-&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; run_demo.py<span class="c">                      # &sect;14, orchestrator behind both launch files</span><br>
+&#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; run_demo.py<span class="c">                      # &sect;14, orchestrator behind both launch files</span><br>
+&#9474;&nbsp;&nbsp; &#9492;&#9472;&#9472; run_gui_demo.sh<span class="c">                  # &sect;27, one-command GUI demo for WSL2 (2026-10-03)</span><br>
 &#9500;&#9472;&#9472; contracts/<span class="c">                          # &sect;10, front-camera and held-out-camera rosetta contracts</span><br>
 &#9500;&#9472;&#9472; datasets/<span class="c">                           # &sect;12, meta/README tracked; parquet/mp4 payload gitignored</span><br>
 &#9474;&nbsp;&nbsp; &#9500;&#9472;&#9472; mycobot_pick_place_train/<br>
@@ -990,6 +1280,6 @@ ros2 launch /workspace/htgpp/launch/pick_and_place_no_gui_demo.launch.py --show-
       <p class="prose">The recorded bags themselves (&asymp;1.7&nbsp;GB across 20 episodes) live only in the <code>gazebo_to_lerobot</code> container under <code>/workspace/htgpp/episodes/</code>, not in this repository and not in the dataset directories above &mdash; regenerable via <code>batch.sh</code>, not something to version-control.</p>
     </section>
 
-    <footer>Headless_Task-Grounded_Pick-and-Place_in_Gazebo report &middot; written 2026-09-22 &middot; commit 5c92a565 on main &middot; Tomislav Ilic</footer>
+    <footer>Headless_Task-Grounded_Pick-and-Place_in_Gazebo report &middot; written 2026-09-22 &middot; updated 2026-10-03 &middot; commit 5c92a565 on main &middot; Tomislav Ilic</footer>
   </main>
 </div>
