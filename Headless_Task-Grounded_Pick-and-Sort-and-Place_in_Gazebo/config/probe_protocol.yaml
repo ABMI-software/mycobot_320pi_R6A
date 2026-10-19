@@ -226,3 +226,20 @@ accumulation_check:
     but the floor's update difference is ~4 x smaller than the accumulated one, so "comparable" is
     not met on this step and the update limit is not accepted on it.
   pending: the rerun at batch 6 vs 2 x 3, 6 steps, with the floor's update difference per step
+  decision_amplification: >
+    Decided by the project owner on 19/10/2026, before the batch-6 rerun: if loss, gradient norm
+    and gradients pass their limits (1 %) but the weight update still exceeds 5 %, the
+    accumulation is accepted as correct when the amplification factor (weight-update difference
+    divided by gradient difference) of the accumulated pass is of the same order as the floor's.
+    Reason: a scaling or stepping bug in the accumulation would show as a large difference in
+    the pre-clip gradient norm, which at batch 8 was 7.2e-6.
+    Made concrete here, before any batch-6 result: "same order" means the accumulated factor is
+    between 0.1 x and 10 x the floor's, on every judged step (at least 3), overall and in every
+    group where the floor's gradient difference is measurable (at least 1e-4 relative; below
+    that the floor's gradients are identical to float32 rounding and have no factor: at batch 8
+    the connector and the expert, 1.5e-6). Loss, gradient-norm and gradient limits and the
+    3-step minimum are unchanged.
+    Batch-8 step 1, for reference (not judged by this decision, one step only): overall floor
+    1.38e-2 / 3.81e-4 = 36, accumulated 5.97e-2 / 2.62e-3 = 23 (0.63 x); vision floor
+    2.09e-2 / 6.21e-4 = 34, accumulated 7.99e-2 / 4.14e-3 = 19 (0.57 x); connector and expert
+    without a floor factor.
