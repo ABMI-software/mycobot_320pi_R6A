@@ -21,14 +21,27 @@
   hors délai) et 1099 bloquée (arrêtée à 21:55, sans COMPLETE). **À réenregistrer en fin de lot.**
   Plus aucun test de la taille de Run C pendant l'enregistrement.
 
+### Décisions prises
+- Règle confirmée : aucun calcul lourd sur CPU pendant un enregistrement.
+- Ordre de mercredi, fixé par l'utilisateur :
+  1. réenregistrer 1098 et 1099 ; `verify_preplaced_batch` doit confirmer qu'aucune donnée
+     partielle des tentatives ratées ne reste ; redémarrer le conteneur ; convertir ;
+  2. écrire le carnet Run B et demander le feu vert pour le lancer sur Kaggle (quota de cette
+     semaine) ;
+  3. pendant que Run B s'entraîne : préparation de Run C sur le jeu complet (étiquettes,
+     démarrage à chaud, λ, tests CPU restants), erreur du démarrage (mm) et λ consignés dans le
+     protocole.
+
 ### Prochaines actions
-1. [ROUGE] Fin de l'enregistrement (mercredi) : réenregistrer 1098 et 1099 (retirer
-   `seed_1098/COMPLETE`, relancer `record_tri_batch.sh 1098 1099` sous `reap_children.py`),
-   redémarrer le conteneur (zombies de mes tests), vérifier, convertir.
-2. [ROUGE] Puis tests CPU restants : accumulation et reprise avec la tête (réglage Run C), point
-   de contrôle Run C chargé par l'outil boucle ouverte.
-3. [ROUGE] Sur le jeu Run B complet : étiquettes, caractéristiques, démarrage à chaud, calibration
-   de λ ; consigner erreur et λ dans le protocole ; carnet Run C.
+1. [ROUGE] Mercredi, fin de l'enregistrement : retirer `seed_1098/COMPLETE` (1099 n'en a pas),
+   relancer `record_tri_batch.sh 1098 1099` sous `reap_children.py` (le script met les anciens
+   dossiers de côté en `seed_NNNN.incomplete_<heure>`, que `convert_tri_sort.sh` ignore : il ne
+   prend que `seed_` + 3 ou 4 chiffres) ; `verify_preplaced_batch.py ... 1001 1400` ; redémarrer
+   le conteneur ; convertir ; vérifier le jeu.
+2. [ROUGE] Carnet Run B, puis feu vert de l'utilisateur pour Kaggle.
+3. [ROUGE] Pendant Run B : préparation de Run C sur le jeu complet (voir décisions), tests CPU
+   restants (accumulation et reprise avec la tête, point de contrôle Run C chargé par l'outil
+   boucle ouverte), consignation dans le protocole, carnet Run C.
 
 ## État actuel (19 octobre 2026 — soir, accumulation validée sur T4 : Run C prêt côté contrôles)
 
