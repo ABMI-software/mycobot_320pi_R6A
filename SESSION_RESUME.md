@@ -1,5 +1,29 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (19 octobre 2026 — journée, mesure mémoire Run C prête, porte de Run C)
+
+### Ce qui a été accompli
+- Accord pour les graines 1051-1400 : **lancement quand le portable peut rester sur secteur
+  et éveillé** (confirmation attendue).
+- **Carnet de mesure mémoire T4** `training/smolvla_kaggle/smolvla_runC_memcheck_t4.ipynb` :
+  gel de Run C (198,1 M entraînables : vision 86,4, connecteur 11,8, expert 99,9 — vérifié sur
+  CPU), lots 16 / 20 / 24. Accord donné ; à lancer sur Kaggle.
+- **Porte de Run C** (addendum `run_c_gate` de `config/probe_protocol.yaml`) : sonde améliorée
+  **et** échange d'images qui déplace toujours la saisie. Recalculé sur les données du 19/10 :
+  Run A 15k passe (+81,6 mm [+32,8 ; +122,3] ; part donneur +46 % [+23 ; +67]), 36k@36k échoue
+  (+2,3 mm [−27,5 ; +12,2] ; +6 % [−4 ; +16]). La règle porte sur la variation de la part
+  donneur, pas sur la part seule : 36k est déjà à 64 % avec ses propres images.
+
+### Prochaines actions
+1. [ROUGE] Mesure mémoire sur Kaggle (lots 16 / 20 / 24), puis choix du lot et de l'accumulation.
+2. [ROUGE] Graines 1051-1400 dès confirmation (portable sur secteur, sans veille).
+3. [JAUNE] Code de Run C après la mesure.
+
+### Commande rapide de reprise
+```bash
+docker exec -d gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_B RANDOM_START=1 PREPLACE=1 /workspace/src/scripts/record_tri_batch.sh 1051 1400'
+```
+
 ## État actuel (19 octobre 2026 — matin, lot B 1001-1050 vérifié et converti)
 
 ### Ce qui a été accompli

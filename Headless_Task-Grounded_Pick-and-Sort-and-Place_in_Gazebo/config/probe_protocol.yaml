@@ -93,3 +93,54 @@ crop_test:
   pass: >
     top camera, linear probe on the connector: median <= 20 mm AND at least 20 % below the
     cropped floor_pixels median. Left and right are reported, not judged.
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 19/10/2026, committed before any Run C code or run exists.
+run_c_gate:
+  question: >
+    Run C trains the vision encoder (low learning rate), the connector and the action expert,
+    with an auxiliary piece-position loss during training only. Before any Run C checkpoint
+    goes to Gazebo, does its encoder localise the pieces better than smolvla_base (which is
+    Run A's frozen encoder), AND does the policy still use the images to choose where to grasp?
+    A checkpoint goes to Gazebo only if it passes BOTH parts below. Failing either is reported
+    with its numbers, and that checkpoint is not run in Gazebo.
+  checkpoints: every Run C checkpoint proposed for Gazebo; the probe is also reported for each kept one
+  part_1_probe:
+    data: the same 799 full-frame renders of layouts 5001-5800, same 5 folds, same linear
+      probe on the connector, same metric and bootstrap as above (full frame, because that is
+      what the policy sees)
+    pass: >
+      the "improved" rule above against smolvla_base: median error lower by more than 5 mm AND
+      by more than 20 %, AND the 95 % bootstrap interval of the paired difference excludes 0, on
+      at least 2 of the 3 cameras. With smolvla_base at 32.0 / 38.8 / 38.6 mm (top / left /
+      right) this means at most 25.6 / 31.0 / 30.9 mm. Those values are also at least 20 % below
+      the full-frame floor_pixels (48 / 43 / 44 mm), so an encoder that passes also passes the
+      validity rule the base failed.
+    reported_not_judged: the vision layer, the MLP probe, and the cropped renders (crop_test)
+  part_2_image_swap:
+    data: open_loop_check.py --swap-images on the reserved seeds 91-100 (120 chunks, 40
+      episodes), donor = the same piece on the next seed (cyclic), same frame index, as run on
+      19/10 for Run A 15k and 36k@36k
+    metrics: >
+      both from open_loop_compare.py <own .json> <swap .json> (own images as the reference).
+      Grasp-point shift = its grasp_point_mm difference: median over chunks of the distance
+      between the predicted close and the recorded close in the same chunk, swapped images
+      minus own images, on the chunks where both close (difference of medians). Donor share =
+      the fraction of predicted closes nearer the donor's grasp than the episode's own grasp,
+      over the chunks that start with the gripper open; its change = swapped minus own images,
+      both computed on the same bootstrap draw of episodes. 95 % intervals from 2000 bootstrap
+      resamples of whole episodes.
+    pass: >
+      grasp-point shift: lower end of its 95 % interval above 0 mm; AND donor-share change:
+      lower end of its 95 % interval above 0. (The change, not the swapped share alone: the
+      36k checkpoint already closes nearer the donor 64 % of the time with its own images, so
+      a swapped share above 50 % says nothing by itself.)
+      For reference, 19/10: Run A 15k passes (shift +81.6 mm [+32.8, +122.3]; donor share
+      36 % -> 81 %, change +46 % [+23, +67]); 36k@36k fails both (shift +2.3 mm [-27.5, +12.2];
+      64 % -> 70 %, change +6 % [-4, +16]).
+  auxiliary_head:
+    report: >
+      median and 90th percentile (mm) of the auxiliary head's x, y error over the 799 x 4
+      pieces of layouts 5001-5800 (never trained on, so no folds), from the three cameras
+      together as the policy sees them, next to the linear probe of the same checkpoint's
+      encoder (per camera). Reported, not judged.

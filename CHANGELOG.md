@@ -9,6 +9,21 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — mesure mémoire T4 pour Run C, porte de Run C (19/10)
+
+- **`training/smolvla_kaggle/smolvla_runC_memcheck_t4.ipynb`** : le carnet de Run A en mode
+  `benchmark`, avec le gel de Run C (`FREEZE = "runC"` : vision + connecteur + expert entraînés,
+  couches de langage gelées, 198,1 M paramètres entraînables), lots 16 / 20 / 24, 30 pas,
+  précision mixte ; le tableau ajoute `mem_gb` (pic alloué par PyTorch). Testé sur CPU dans le
+  conteneur.
+- **`config/probe_protocol.yaml`, addendum `run_c_gate`** : un point de contrôle de Run C ne va
+  dans Gazebo que si son encodeur localise mieux que smolvla_base (sonde linéaire, connecteur,
+  image entière, ≤ 25,6 / 31,0 / 30,9 mm sur 2 caméras sur 3) **et** si l'échange d'images
+  déplace encore sa saisie (décalage du point de fermeture et hausse de la part « plus près du
+  donneur », bornes basses des IC 95 % au-dessus de 0). Erreur de la tête auxiliaire rapportée en mm.
+- `open_loop_compare.py` donne la part des fermetures plus près du donneur et sa variation
+  appariée (bootstrap par épisode).
+
 ### Ajouté — un épisode par disposition, pièces pré-triées ; test d'échange d'images (18/10)
 
 - **`PREPLACE=1 record_tri_seed.sh`** (et `record_tri_batch.sh`) : une seule pièce enregistrée
