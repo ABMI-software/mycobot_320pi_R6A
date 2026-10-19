@@ -43,8 +43,24 @@ import camera_registry as registre                            # noqa: E402
 from mycobot_fk import forward_kinematics, KEYPOINT_NAMES     # noqa: E402
 
 KP = ['base', 'link1', 'link2', 'link3', 'link4', 'link5', 'link6']
-CAMERAS = {'arducam': {'calib': 'cam_3', 'juge': 'arducam_extrinsic_pick'},
-           'svpro': {'calib': 'cam_2', 'juge': 'svpro_extrinsic_4marqueurs'}}
+# `juges` est une LISTE : le premier sert de reference, les suivants sont
+# rapportes a titre de comparaison.
+#
+# Le SVPRO en a deux, et ils different de 41 mm / 6,1 deg — mesure du 03/09.
+# `montage_0901` est celui qui a produit la verite terrain de
+# `real_montage_0901_svpro_ndds` (ecart 3D verifie a 0,00 mm ; avec
+# `4marqueurs` l'ecart monte a 51,6 mm), donc c'est celui sur lequel le modele
+# a ete entrainé — d'ou sa place en tete. `4marqueurs` est un estime CHAINE
+# (« positions 3D retro-projetees depuis l'ARDUCAM », dit sa propre source) et
+# herite donc de l'erreur de l'arducam en plus de la sienne ; c'est aussi lui
+# qui affichait 28,3 px de residu contre 1,81 px pour l'arducam.
+#
+# Tant que le banc n'a pas tranche, l'ARDUCAM est la lecture de reference : son
+# juge est direct et propre. Sur le SVPRO, l'ecart entre ses deux calibrations
+# est du meme ordre que ce qu'on cherche a mesurer, donc il ne conclut rien.
+CAMERAS = {'arducam': {'calib': 'cam_3', 'juges': ['arducam_extrinsic_pick']},
+           'svpro': {'calib': 'cam_2', 'juges': ['svpro_extrinsic_montage_0901',
+                                                 'svpro_extrinsic_4marqueurs']}}
 
 
 def fk_points(q_deg):
@@ -96,6 +112,9 @@ def main():
     ap.add_argument('--modele', default='vgg_montage0901_ft_e30')
     ap.add_argument('--cameras', default='arducam,svpro',
                     help='cameras a traiter, separees par une virgule')
+    ap.add_argument('--par-image', action='store_true',
+                    help='resout AUSSI chaque image seule, et rend la '
+                         'distribution des ecarts au juge')
     ap.add_argument('--ecrire', action='store_true',
                     help='ecrire les extrinseques markerless en YAML')
     args = ap.parse_args()
@@ -113,17 +132,19 @@ def main():
         cfg = CAMERAS[nom]
         rangs = [r for r in lignes if r['camera'] == nom]
         K, dist = registre.load_intrinsics(cfg['calib'], 640, 480)
-        objs, dets, kidx, vus = [], [], [], []
+        objs, dets, kidx, vus, par_trame = [], [], [], [], []
         for r in rangs:
             q = [float(r[f'j{j}_deg']) for j in range(1, 7)]
             pts = fk_points(q)
             img = Image.open(capture / r['image_path']).convert('RGB')
             kps = np.array(reseau.keypoints_from_image(img)['detected_keypoints'], float)
-            n = 0
+            n, o_t, d_t = 0, [], []
             for k in range(7):
                 if kps[k, 0] > -900 and kps[k, 1] > -900:
                     objs.append(pts[k]); dets.append(kps[k]); kidx.append(k); n += 1
+                    o_t.append(pts[k]); d_t.append(kps[k])
             vus.append(n)
+            par_trame.append((np.array(o_t), np.array(d_t)))
         objs = np.array(objs); dets = np.array(dets); kidx = np.array(kidx)
 
         print(f'=== {nom} ===')
@@ -138,18 +159,58 @@ def main():
             if m.sum():
                 print(f'    {KP[k]:6s} n={m.sum():3d}  {np.median(err[m]):5.2f} px')
 
-        juge = yaml.safe_load((CALIB / f"{cfg['juge']}.yaml").read_text())
-        Tj = np.array(juge['T_cam_world'], float)
-        pj, _ = cv2.projectPoints(objs, cv2.Rodrigues(Tj[:3, :3])[0],
-                                  Tj[:3, 3].reshape(3, 1), K, dist)
-        ej = np.linalg.norm(pj.reshape(-1, 2) - dets, axis=1)
-        d_mm, d_deg = ecart_pose(T, Tj)
         c = -T[:3, :3].T @ T[:3, 3]
-        cj = -Tj[:3, :3].T @ Tj[:3, 3]
-        print(f'  juge marqueurs ({cfg["juge"]}) : residu median {np.median(ej):.2f} px')
         print(f'  position markerless : ({c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f}) m')
-        print(f'  position marqueurs  : ({cj[0]:.3f}, {cj[1]:.3f}, {cj[2]:.3f}) m')
-        print(f'  ECART : {d_mm:.1f} mm   {d_deg:.2f} deg\n')
+        Tj = None
+        for rang, nom_juge in enumerate(cfg['juges']):
+            juge = yaml.safe_load((CALIB / f'{nom_juge}.yaml').read_text())
+            Tk = np.array(juge['T_cam_world'], float)
+            if Tj is None:
+                Tj = Tk                                  # le premier fait foi
+            pj, _ = cv2.projectPoints(objs, cv2.Rodrigues(Tk[:3, :3])[0],
+                                      Tk[:3, 3].reshape(3, 1), K, dist)
+            ej = np.linalg.norm(pj.reshape(-1, 2) - dets, axis=1)
+            d_mm, d_deg = ecart_pose(T, Tk)
+            ck = -Tk[:3, :3].T @ Tk[:3, 3]
+            etiq = 'juge' if rang == 0 else 'comparaison'
+            print(f'  {etiq:11s} {nom_juge:32s} ({ck[0]:.3f}, {ck[1]:.3f}, {ck[2]:.3f}) m'
+                  f'   residu {np.median(ej):6.2f} px   ECART {d_mm:6.1f} mm  {d_deg:5.2f} deg')
+        print()
+
+        if args.par_image:
+            # L'objectif vise : pose de la camera sur UNE image, sans
+            # extrinseque. Chaque trame est resolue seule, puis comparee au
+            # juge marqueurs. On rend la DISTRIBUTION et pas une moyenne :
+            # sur une seule vue les 7 keypoints sont presque coplanaires et
+            # trois d'entre eux (base, link1, link2 — ces deux derniers etant
+            # le MEME point 3D) tiennent dans 16 cm, donc la rotation garde
+            # des branches concurrentes. Ce qui compte est de savoir sur
+            # quelle FRACTION des images la pose tombe juste, pas la moyenne
+            # d'un melange de reussites et de sauts de branche.
+            mm, dg, sautees = [], [], 0
+            for o_t, d_t in par_trame:
+                if len(o_t) < 4:
+                    sautees += 1
+                    continue
+                try:
+                    Ti, _, _ = resout(o_t, d_t, K, dist)
+                except SystemExit:
+                    sautees += 1
+                    continue
+                a, b = ecart_pose(Ti, Tj)      # contre le juge de reference
+                mm.append(a); dg.append(b)
+            mm, dg = np.array(mm), np.array(dg)
+            print(f'  --- une image a la fois ({len(mm)} resolues, '
+                  f'{sautees} sans solution) ---')
+            for etq, v, u in (('position', mm, 'mm'), ('orientation', dg, 'deg')):
+                q1, md, q3 = np.percentile(v, [25, 50, 75])
+                print(f'    {etq:12s} median {md:7.1f} {u}   '
+                      f'quartiles {q1:.1f} / {q3:.1f}   pire {v.max():.1f}')
+            for seuil_mm, seuil_deg in ((10, 1.0), (20, 2.0), (50, 5.0)):
+                bon = ((mm <= seuil_mm) & (dg <= seuil_deg)).mean()
+                print(f'    images sous {seuil_mm:3d} mm et {seuil_deg:.1f} deg : '
+                      f'{100*bon:5.1f} %')
+            print()
 
         if args.ecrire:
             sortie = CALIB / f'{nom}_extrinsic_markerless.yaml'
@@ -164,7 +225,8 @@ def main():
                 'n_poses': len(rangs),
                 'n_inliers': int(garde.sum()),
                 'residu_median_px': float(np.median(err[garde])),
-                'juge_marqueurs': cfg['juge'],
+                'juge_marqueurs': cfg['juges'][0],
+                'juges_compares': cfg['juges'],
                 'ecart_au_juge_mm': d_mm,
                 'ecart_au_juge_deg': d_deg,
                 'T_cam_world': T.tolist(),

@@ -164,7 +164,7 @@ Définies dans `GUIDED_PROTOCOL` en haut du fichier. Chaque phase est un `Scenar
 ```bash
 ros2 launch mycobot_gateway mycobot_teleop.launch.py \
     target:=sim          \   # {sim, real, both} — défaut both
-    pi_ip:=10.10.0.225   \   # IP du Raspberry Pi
+    pi_ip:=10.10.0.224   \   # IP du Raspberry Pi
     pi_port:=5005        \   # Port TCP bridge_tour
     rosbridge:=true      \   # Démarrer rosbridge_server automatiquement
     real_speed:=40       \   # Vitesse pymycobot (0-100)

@@ -4,7 +4,7 @@ The MyCobot 320 Pi can be commanded from the PC Tour over a TCP bridge. Mistakes
 
 ## Mandatory checklist
 
-1. Pi is on `10.10.0.223`. `ping -c 1 10.10.0.223` first.
+1. Pi is on `10.10.0.224`. `ping -c 1 10.10.0.224` first.
 2. Run [`scripts/real_robot_preflight.sh`](../../scripts/real_robot_preflight.sh) — five checks (ping, TCP port 5005, bridge TCP handshake, ROS graph, round-trip `get_angles`). Exit codes tell you which step failed.
 3. On the Pi, `python3 bridge_pi_simple.py` must be running.
 4. Servos at rest? `send_angles` commands return within 300 ms? If not — stop.

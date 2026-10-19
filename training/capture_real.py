@@ -26,7 +26,7 @@ Then on the PC Tour
     python3 training/capture_real.py \\
         --output /tmp/real_dataset \\
         --num-samples 200 \\
-        --pi-host 10.10.0.225
+        --pi-host 10.10.0.224
 
 Press Ctrl+C to stop early. The partial dataset will still be valid.
 """
@@ -288,7 +288,7 @@ def main():
                         help='Output directory (default: /tmp/real_dataset)')
     parser.add_argument('--num-samples', type=int, default=200,
                         help='Number of pose samples to collect')
-    parser.add_argument('--pi-host', default='10.10.0.225',
+    parser.add_argument('--pi-host', default='10.10.0.224',
                         help='Pi IP address')
     parser.add_argument('--bridge-port', type=int, default=5005,
                         help='Pi bridge port (robot commands)')

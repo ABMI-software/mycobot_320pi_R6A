@@ -1,6 +1,6 @@
 # Hand Teleoperation — MyCobot 320 Pi
 
-Pilotage du MyCobot 320 Pi par la main de l'opérateur, en simulation Gazebo et **sur le robot réel** (premier test validé 22/04/2026, Pi à 10.10.0.223). Adaptation du pipeline développé par l'équipe pour les robots ArmR5A et LeRobot (voir [ABMI-software/hand_controlLerobot](https://github.com/ABMI-software/hand_controlLerobot)).
+Pilotage du MyCobot 320 Pi par la main de l'opérateur, en simulation Gazebo et **sur le robot réel** (premier test validé 22/04/2026, Pi à 10.10.0.224). Adaptation du pipeline développé par l'équipe pour les robots ArmR5A et LeRobot (voir [ABMI-software/hand_controlLerobot](https://github.com/ABMI-software/hand_controlLerobot)).
 
 > **Documents liés**
 > - [TELEOP_ARCHITECTURE_VIZ.md](TELEOP_ARCHITECTURE_VIZ.md) — **visuel détaillé : détection → mouvement**
@@ -180,7 +180,7 @@ hand_teleop         # modules locaux (gripper_pose, hand_pose, tracking)
 ### Sur la Raspberry Pi (seulement pour le robot réel)
 
 ```bash
-ssh er@10.10.0.225
+ssh er@10.10.0.224
 python3 bridge_pi_simple.py
 ```
 
@@ -211,7 +211,7 @@ ros2 launch mycobot_gateway mycobot_teleop.launch.py
 # Variantes
 ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim     # Gazebo only
 ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=real    # Pi only
-ros2 launch mycobot_gateway mycobot_teleop.launch.py pi_ip:=10.10.0.225 rosbridge:=false
+ros2 launch mycobot_gateway mycobot_teleop.launch.py pi_ip:=10.10.0.224 rosbridge:=false
 
 # ================================================================
 # T3 — script de téléopération (webcam → joints via rosbridge)

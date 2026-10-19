@@ -71,6 +71,8 @@ setup(
             'sim_multicam_detector = mycobot_gateway.sim_multicam_detector:main',
             'sim_scene_control = mycobot_gateway.sim_scene_control:main',
             'sim_scene_panel = mycobot_gateway.sim_scene_panel:main',
+            'tri_scene_randomizer = mycobot_gateway.tri_scene_randomizer:main',
+            'tri_scene_panel = mycobot_gateway.tri_scene_panel:main',
             'sim_trajectory_preview = mycobot_gateway.sim_trajectory_preview:main',
 
             # YOLO / DREAM validation in Gazebo (docs/PROTOCOLE_YOLO_GAZEBO.md)

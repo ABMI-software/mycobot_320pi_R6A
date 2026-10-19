@@ -1,6 +1,6 @@
 # 🚀 Deployment Guide - Distributed MyCobot System
 
-> **Mis à jour le 20 août 2026.** L'IP de la Pi est `10.10.0.221` (ce document
+> **Mis à jour le 20 août 2026.** L'IP de la Pi est `10.10.0.224` (ce document
 > indiquait `10.10.0.218`, corrigé) et l'utilisateur est `er`, pas `pi`.
 >
 > ⚠️ **SSH est inutilisable** — mot de passe système oublié. Le Pi se pilote par
@@ -13,7 +13,7 @@
 > un second client le fige (connexion TCP acceptée, plus aucune réponse). Le
 > coupable habituel est un `bridge_tour` résiduel laissé par
 > `scripts/real_robot_preflight.sh` — vérifier `ps aux | grep bridge_tour` et
-> `ss -tn | grep 10.10.0.221` avant de conclure à une panne robot.
+> `ss -tn | grep 10.10.0.224` avant de conclure à une panne robot.
 
 ## Architecture Overview
 
@@ -32,7 +32,7 @@ Since the **camera is connected to the Raspberry Pi**, we use this architecture:
 │                                       │ TCP/IP                  │
 └───────────────────────────────────────┼─────────────────────────┘
                                         │
-                                        ▼ 10.10.0.221:5005
+                                        ▼ 10.10.0.224:5005
 ┌───────────────────────────────────────┼─────────────────────────┐
 │                      RASPBERRY PI     │                         │
 │                                       ▼                         │
@@ -54,10 +54,10 @@ Since the **camera is connected to the Raspberry Pi**, we use this architecture:
 ```bash
 # Copy the vision-enabled bridge to Pi
 scp /home/genji/ros_jazzy/src/mycobot_R6A/mycobot_gateway/scripts/bridge_pi_vision.py \
-    er@10.10.0.221:~/bridge_pi_vision.py
+    er@10.10.0.224:~/bridge_pi_vision.py
 
 # SSH to Pi and run
-ssh er@10.10.0.221
+ssh er@10.10.0.224
 python3 bridge_pi_vision.py
 ```
 
@@ -130,7 +130,7 @@ mycobot_gateway/
 ### Pi connection drops frequently
 The Pi bridge might be crashing. Check:
 ```bash
-ssh er@10.10.0.221
+ssh er@10.10.0.224
 python3 bridge_pi_vision.py
 # Watch for errors
 ```

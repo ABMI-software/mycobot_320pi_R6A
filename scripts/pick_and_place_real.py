@@ -38,6 +38,9 @@ POS_FILE = Path(__file__).resolve().parent / 'pick_place_positions.json'
 GRIPPER_ID = 14
 GRIP_GAP = 1.6
 WAYPOINTS = ['pick_approach', 'pick', 'place_approach', 'place']
+HANDOVER_WAYPOINTS = ['handover_approach', 'handover']
+UTILITY_WAYPOINTS = ['observation_clear']
+CAPTURE_WAYPOINTS = WAYPOINTS + HANDOVER_WAYPOINTS + UTILITY_WAYPOINTS
 STATUS_TXT = {0: "en mouvement", 1: "rien saisi", 2: "objet saisi", 3: "objet tombé"}
 
 
@@ -140,21 +143,33 @@ def run_sequence(b: Bridge, pos: dict, speed: int, grasp_angle: int, open_angle:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--host', default='10.10.0.221')
+    ap.add_argument('--host', default='10.10.0.224')
     ap.add_argument('--speed', type=int, default=30, help='vitesse robot 1-100 (défaut 30)')
     ap.add_argument('--grasp-angle', type=int, default=20, help='angle pince fermée sur objet')
     ap.add_argument('--open-angle', type=int, default=100, help='angle pince ouverte')
     ap.add_argument('--release', action='store_true', help='relâche les servos (déplacer à la main)')
     ap.add_argument('--power-on', action='store_true', help='re-tend les servos')
+    ap.add_argument('--home', action='store_true', help='ramène le robot à la pose home')
+    ap.add_argument('--clear-camera-view', action='store_true',
+                    help='pose haute validée qui dégage les quatre ArUco de table')
     ap.add_argument('--gripper-open', action='store_true', help='ouvre la pince')
     ap.add_argument('--gripper-close', action='store_true', help='ferme la pince')
-    ap.add_argument('--capture', choices=WAYPOINTS, help='capture la pose ARTICULAIRE courante')
+    ap.add_argument('--capture', choices=CAPTURE_WAYPOINTS,
+                    help='capture une pose ARTICULAIRE (pick/place ou remise en main)')
     ap.add_argument('--grip', type=int, metavar='ANGLE',
                     help='ferme la pince à ANGLE et affiche le statut (pour trouver le bon serrage)')
     ap.add_argument('--set-grasp', type=int, metavar='ANGLE',
                     help='enregistre l\'angle de fermeture à utiliser au --run')
-    ap.add_argument('--goto', choices=WAYPOINTS, help='amène le bras à une pose apprise')
+    ap.add_argument('--goto', choices=CAPTURE_WAYPOINTS, help='amène le bras à une pose apprise')
     ap.add_argument('--show', action='store_true', help='affiche les poses apprises')
+    ap.add_argument('--show-coords', action='store_true', help='affiche la pose cartésienne actuelle')
+    ap.add_argument('--jog', choices=['left', 'right', 'forward', 'back', 'up', 'down'],
+                    help='petit déplacement cartésien relatif dans le repère base')
+    ap.add_argument('--distance-mm', type=float, default=5.0,
+                    help='amplitude positive du --jog en mm (défaut 5)')
+    ap.add_argument('--coords', nargs=6, type=float,
+                    metavar=('X', 'Y', 'Z', 'RX', 'RY', 'RZ'),
+                    help='envoie une pose cartésienne absolue validée (mm/degrés)')
     ap.add_argument('--run', action='store_true', help='exécute la séquence pick-and-place')
     ap.add_argument('--step', action='store_true', help='--run pas-à-pas (confirme chaque mouvement)')
     args = ap.parse_args()
@@ -167,6 +182,12 @@ def main():
         return
     if args.power_on:
         print(b.send({'action': 'power_on'})); return
+    if args.home:
+        print(b.send({'action': 'go_home'})); return
+    if args.clear_camera_view:
+        coords = [-56.3, -144.8, 523.5, -88.2, 11.3, 178.6]
+        print(b.send({'action': 'send_coords', 'coords': coords,
+                      'speed': min(args.speed, 8), 'mode': 1})); return
     if args.gripper_open:
         print(b.grip({'action': 'pro_gripper_angle', 'angle': args.open_angle,
                       'gripper_id': GRIPPER_ID})); return
@@ -198,8 +219,39 @@ def main():
         return
     if args.show:
         pos = load_positions()
-        for w in WAYPOINTS:
+        for w in CAPTURE_WAYPOINTS:
             print(f'{w:15s}: {pos.get(w, "— non capturé")}')
+        return
+    if args.show_coords:
+        print(b.send({'action': 'get_coords'})); return
+    if args.jog:
+        if not 0.0 < args.distance_mm <= 20.0:
+            raise SystemExit('--distance-mm doit être dans ]0, 20] mm')
+        response = b.send({'action': 'get_coords'})
+        if 'COORDS:' not in response:
+            raise SystemExit(f'lecture pose impossible : {response}')
+        coords = json.loads(response.split('COORDS:', 1)[1].strip())
+        axis_sign = {
+            'forward': (0, 1.0), 'back': (0, -1.0),
+            'left': (1, 1.0), 'right': (1, -1.0),
+            'up': (2, 1.0), 'down': (2, -1.0),
+        }
+        axis, sign = axis_sign[args.jog]
+        coords[axis] += sign * args.distance_mm
+        print(b.send({'action': 'send_coords', 'coords': coords,
+                      'speed': min(args.speed, 8), 'mode': 1}))
+        return
+    if args.coords:
+        coords = list(args.coords)
+        if not (-350 <= coords[0] <= 350 and -350 <= coords[1] <= 350
+                and 100 <= coords[2] <= 550
+                and all(-180 <= v <= 180 for v in coords[3:])):
+            raise SystemExit('pose --coords hors limites de sécurité')
+        response = b.send({'action': 'send_coords', 'coords': coords,
+                           'speed': min(args.speed, 8), 'mode': 1})
+        print(response)
+        if not response.startswith('OK:'):
+            raise SystemExit(f'commande refusée : {response}')
         return
     if args.run:
         run_sequence(b, load_positions(), args.speed, args.grasp_angle, args.open_angle,

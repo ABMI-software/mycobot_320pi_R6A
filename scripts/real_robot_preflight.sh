@@ -7,7 +7,7 @@
 # starting the full teleop stack on the live robot to avoid surprises.
 #
 # Usage:
-#   bash scripts/real_robot_preflight.sh                       # 10.10.0.225
+#   bash scripts/real_robot_preflight.sh                       # 10.10.0.224
 #   bash scripts/real_robot_preflight.sh 192.168.1.50          # custom IP
 #   GO_HOME=1 bash scripts/real_robot_preflight.sh             # also go_home
 #
@@ -20,7 +20,7 @@
 # ============================================================================
 
 set -u
-PI_IP="${1:-10.10.0.225}"
+PI_IP="${1:-10.10.0.224}"
 PI_PORT=5005
 GO_HOME="${GO_HOME:-0}"
 

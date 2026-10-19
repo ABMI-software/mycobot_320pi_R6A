@@ -8,8 +8,8 @@
 chaque pose, extrinseques du 13/10 (`*.avant_1410*`, la capture date de ce jour-la).
 Une session du dashboard : `keypoints_<camera>.csv` d'`analyse_tri_dream.py`
 (keypoints DREAM deja calcules), images appariees a `APPARIEMENT_S` pres,
-extrinseques courantes. Trois fenetres : tri bras immobile, tri en mouvement (du
-depart vers la piece a la pose dans le bac), bras immobile sans tri.
+extrinseques courantes. Quatre fenetres : bras immobile / en mouvement, pendant le
+tri (du depart vers la piece a la pose dans le bac) ou hors tri.
 
 Fusion : un keypoint vu par les deux cameras est triangule (DLT sur points non
 distordus) a travers les deux extrinseques ArUco ; reference = FK des codeurs, en
@@ -86,7 +86,7 @@ def mesure(cams, poses):
                 e3d = float(np.linalg.norm(p - ref)) * 1000.0
                 for cam in CAMERAS:
                     rep[cam] = float(np.linalg.norm(reprojette(cams, cam, p) - reprojette(cams, cam, ref)))
-            ligne.append({'vus': len(vus), 'e3d': e3d, 'rep': rep})
+            ligne.append({'vus': len(vus), 'cams': vus, 'e3d': e3d, 'rep': rep})
         out.append(ligne)
     return out
 
@@ -96,26 +96,29 @@ def f(x):
 
 
 def tableau(titre, lignes):
+    """Erreur 3D sur les keypoints vus des deux cameras (seuls triangulables) ;
+    detection par camera, puis fusionnee (vu par l'une OU l'autre)."""
     n = len(lignes)
     print(f'\n### {titre} — {n} poses (une image par caméra)\n')
     print('| Keypoint | Moyenne (mm) | Médiane (mm) | Écart-type (mm) | Max (mm) | '
-          'Vu par les 2 caméras | Vu par ≥ 1 caméra (fusion) |')
-    print('|---|---|---|---|---|---|---|')
-    tout, deux, un, rep = [], 0, 0, {cam: [] for cam in CAMERAS}
+          'Détection arducam | Détection SVPRO | Détection fusion |')
+    print('|---|---|---|---|---|---|---|---|')
+    tout, det, rep = [], {'arducam': 0, 'svpro': 0, 'fusion': 0}, {cam: [] for cam in CAMERAS}
     for k in range(7):
         e = np.array([l[k]['e3d'] for l in lignes if l[k]['e3d'] is not None])
-        d2 = sum(l[k]['vus'] == 2 for l in lignes)
-        d1 = sum(l[k]['vus'] >= 1 for l in lignes)
+        d = {cam: sum(cam in l[k]['cams'] for l in lignes) for cam in CAMERAS}
+        d['fusion'] = sum(l[k]['vus'] >= 1 for l in lignes)
         tout += list(e)
-        deux += d2
-        un += d1
+        for c in det:
+            det[c] += d[c]
         for cam in CAMERAS:
             rep[cam] += [l[k]['rep'][cam] for l in lignes if cam in l[k]['rep']]
         st = (e.mean(), np.median(e), e.std(), e.max()) if e.size else (None,) * 4
-        print(f'| {NOMS[k]} | {" | ".join(f(v) for v in st)} | {f(100 * d2 / n)} % | {f(100 * d1 / n)} % |')
+        print(f'| {NOMS[k]} | {" | ".join(f(v) for v in st)} | '
+              + ' | '.join(f'{f(100 * d[c] / n)} %' for c in ('arducam', 'svpro', 'fusion')) + ' |')
     t = np.array(tout)
     print(f'| **GLOBAL** | {f(t.mean())} | {f(np.median(t))} | {f(t.std())} | {f(t.max())} | '
-          f'{f(100 * deux / (7 * n))} % | {f(100 * un / (7 * n))} % |')
+          + ' | '.join(f'{f(100 * det[c] / (7 * n))} %' for c in ('arducam', 'svpro', 'fusion')) + ' |')
     print('\n| ' + ' | '.join(f'< {s} mm' for s in SEUILS_MM) + ' |')
     print('|' + '---|' * len(SEUILS_MM))
     print('| ' + ' | '.join(f'{f(100 * np.mean(t < s))} %' for s in SEUILS_MM) + ' |')
@@ -151,7 +154,8 @@ def session(dossier):
     ta, ra = vues['arducam']
     ts, rs = vues['svpro']
     fenetres = {'2. Bras immobile pendant le tri': [], '3. Bras en mouvement pendant le tri': [],
-                'Bras immobile sans tri (pose d’observation)': []}
+                'Bras immobile sans tri (pose d’observation)': [],
+                'Bras en mouvement sans tri (retour, entre deux pièces)': []}
     for t, r in zip(ta, ra):
         i = int(np.argmin(np.abs(ts - t)))
         if abs(ts[i] - t) > APPARIEMENT_S:
@@ -163,8 +167,9 @@ def session(dossier):
         dans = any(a <= t <= b for a, b in cycles)
         if dans:
             fenetres['2. Bras immobile pendant le tri' if statique else '3. Bras en mouvement pendant le tri'].append((q, kp))
-        elif statique:
-            fenetres['Bras immobile sans tri (pose d’observation)'].append((q, kp))
+        else:
+            fenetres['Bras immobile sans tri (pose d’observation)' if statique
+                     else 'Bras en mouvement sans tri (retour, entre deux pièces)'].append((q, kp))
     cams = cameras(EXTR_COURANTES)
     print(f'# DREAM {s["modele"]} — arducam + SVPRO fusionnées — {dossier.name}\n')
     for titre, poses in fenetres.items():

@@ -12,7 +12,7 @@ Checkpoint courant : `vgg_ultimate_v4_mix_ft_e30`.
 
 # Lancer le dashboard de validation DREAM
 
-*Procédure vérifiée le 2026-07-16 sur le robot réel (`10.10.0.221`).*
+*Procédure vérifiée le 2026-07-16 sur le robot réel (`10.10.0.224`).*
 
 Le dashboard est un **pur consommateur** : il ne capture pas d'image, ne fait pas
 d'inférence, ne parle pas au robot. Lancé seul, il affiche une fenêtre vide
@@ -74,7 +74,7 @@ ros2 run mycobot_gateway dream_validation_dashboard
 ```
 
 Côté Pi, `bridge_pi_simple.py` doit tourner. Vérification :
-`ping -c1 10.10.0.221` puis `bash scripts/real_robot_preflight.sh`.
+`ping -c1 10.10.0.224` puis `bash scripts/real_robot_preflight.sh`.
 
 ## Alternative — un seul launch (auto-détection 1 ou 2 caméras)
 

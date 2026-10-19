@@ -194,7 +194,37 @@ class BridgePiSimple:
             elif action == 'gripper_close':
                 self.mc.set_gripper_state(1, 50)
                 return "OK: pince fermée"
-                
+
+            # --- Gripper Pro adaptatif (API set_pro_gripper_*, gripper_id=14) ---
+            # ⚠ Elephant impose >= 1.5 s entre deux commandes gripper : c'est au
+            # CLIENT (PC Tour) d'espacer les envois, pas au bridge.
+            elif action == 'pro_gripper_open':
+                gid = cmd.get('gripper_id', 14)
+                self.mc.set_pro_gripper_open(gid)
+                return "OK: pro gripper ouvert"
+
+            elif action == 'pro_gripper_close':
+                gid = cmd.get('gripper_id', 14)
+                self.mc.set_pro_gripper_close(gid)
+                return "OK: pro gripper fermé"
+
+            elif action == 'pro_gripper_angle':
+                gid = cmd.get('gripper_id', 14)
+                angle = int(cmd.get('angle', 100))
+                angle = max(0, min(100, angle))
+                self.mc.set_pro_gripper_angle(gid, angle)
+                return f"OK: pro gripper angle {angle}"
+
+            elif action == 'pro_gripper_calib':
+                gid = cmd.get('gripper_id', 14)
+                self.mc.set_pro_gripper_calibration(gid)
+                return "OK: pro gripper calibré (zéro)"
+
+            elif action == 'get_pro_gripper_angle':
+                gid = cmd.get('gripper_id', 14)
+                a = self.mc.get_pro_gripper_angle(gid)
+                return f"PRO_GRIPPER_ANGLE: {a}"
+
             elif action == 'power_on':
                 self.mc.power_on()
                 return "OK: moteurs allumés"

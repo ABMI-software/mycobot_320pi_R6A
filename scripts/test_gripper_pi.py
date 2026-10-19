@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test AUTONOME du gripper Pro adaptatif — À LANCER SUR LE PI (10.10.0.221).
+"""Test AUTONOME du gripper Pro adaptatif — À LANCER SUR LE PI (10.10.0.224).
 
 Pilote UNIQUEMENT le gripper (pas de mouvement du bras), via pymycobot en direct.
 API : docs Elephant myCobot320 (jiazhua_pi). gripper_id par défaut = 14.

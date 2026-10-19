@@ -58,6 +58,7 @@ sys.path.insert(0, str(RACINE / 'mycobot_gateway' / 'mycobot_gateway' / 'vision'
 import camera_registry as registre  # noqa: E402
 import pick_fsm as fsm  # noqa: E402
 import tri_fluide  # noqa: E402
+import yolo26_dashboard  # noqa: E402
 from mycobot_fk import KEYPOINT_NAMES, forward_kinematics  # noqa: E402
 
 VENV_DREAM = Path.home() / 'ros_jazzy' / 'venv_dream' / 'bin' / 'python'
@@ -71,6 +72,11 @@ ECART_CODEURS_MAX_S = 0.3
 # Un PnP sur 4 keypoints est mal conditionne : les poses DREAM aberrantes en viennent (Gazebo).
 KP_MIN = 5
 FUSION_S = 1.0
+# Au-dela, les deux vues se contredisent et l'arducam est gardee seule. Essai 7 (15/10) :
+# la SVPRO decroche au-dessus des bacs (79 mm), hors des portees d'entrainement, et la
+# mediane de 2 vues (= leur moyenne) emmenait le combine a 46 mm ; 30 mm garde la
+# moyenne la ou elle aide (6,5 mm vers le cylindre contre 12,3 arducam seule).
+ACCORD_MM = 30.0
 PORTEE_MAX_MM = 1000.0
 # J5 couvert par real_tri/train (46-92 deg). Hors de cette plage — pose d'observation,
 # J5 ~ 2 deg — link6 est faux et la pointe DREAM part a 240-390 mm (mediane, 14/10),
@@ -80,11 +86,13 @@ J5_DOMAINE_DEG = (45.0, 93.0)
 # Le serrage dure ~1,6 s, pince immobile sur la piece, avant « saisi ».
 SERRAGE_S = 2.0
 JOURNAL_LIGNES = 300
+FENETRE_FREQUENCE_S = 5.0
 MIN_TRACE_MM = 0.1
 COURBES = {'codeurs': ('codeurs (référence)', (60, 200, 90), Qt.SolidLine),
            'yolo': ('YOLO', (240, 200, 40), Qt.DashLine),
            'dream': ('DREAM', (255, 30, 230), Qt.SolidLine)}
 TOUS = 'tous les objets'
+TITRE = 'Tri — machine d\'état : Moore'
 # Couleurs BGR des traces sur l'image, celles des courbes.
 TRACE_BGR = {'codeurs': (90, 200, 60), 'dream': (230, 30, 255), 'yolo': (40, 200, 240)}
 
@@ -172,6 +180,10 @@ class Panneau:
         self.en_attente = deque()
         self.inference_ms, self.latence_ms = deque(maxlen=200), deque(maxlen=200)
         self.cycles = []
+        self.mesures = {}          # (source, camera) -> instants de chaque mesure (monotonic)
+        # Ce que YOLO et DREAM ont calcule EN DIRECT, pour les CSV : les recalculer apres le
+        # tri sur des milliers d'images montait le PC a 96-100 degres (15/10).
+        self.yolo_direct, self.kp_direct = [], []
         self.journal = deque(maxlen=JOURNAL_LIGNES)
         self.n_journal = 0
         self.ctx = None
@@ -204,7 +216,21 @@ class Panneau:
             a = (t - tc[i - 1]) / (tc[i] - tc[i - 1])
             return (1 - a) * self.codeurs_q[i - 1] + a * self.codeurs_q[i]
 
+    def compte(self, source, camera):
+        with self.verrou:
+            self.mesures.setdefault((source, camera), []).append(time.monotonic())
+
+    def frequence(self, source, camera):
+        maintenant = time.monotonic()
+        with self.verrou:
+            ts = self.mesures.get((source, camera), [])
+            n = sum(1 for t in reversed(ts[-500:]) if maintenant - t <= FENETRE_FREQUENCE_S)
+        return n / FENETRE_FREQUENCE_S
+
     def resultat(self, camera, t, r):
+        self.compte('dream', camera)
+        with self.verrou:
+            self.kp_direct.append({'t': t, 'camera': camera, 'kp': r['kp']})
         self.inference_ms.append(r['ms'])
         self.latence_ms.append((time.monotonic() - t) * 1000.0)
         self.en_attente.append((camera, t, r))
@@ -295,7 +321,10 @@ class Panneau:
 
     def trie(self, original):
         def enveloppe(ctx, piece, xy, bac_xy, variante='actuelle'):
-            self.cycles.append({'piece': piece, 'yolo': np.asarray(xy, float),
+            # Z du centre de la piece triangule par arducam + SVPRO (hauteur_triangulee) ;
+            # absent avec --svpro-dream, ou sans seconde vue fraiche : YOLO reste alors en XY.
+            z = yolo26_dashboard.HAUTEURS_MESUREES.get(piece)
+            self.cycles.append({'piece': piece, 'yolo': np.asarray(xy, float), 'yolo_z': z,
                                 'yolo_bac': np.asarray(bac_xy, float), 't0': time.monotonic(),
                                 'serre': None, 'pose': None, 'fin': None, 'ref_piece': None,
                                 'ref_bac': None, 'verdict': 'en cours'})
@@ -317,20 +346,12 @@ class Panneau:
         return (np.median(vues, axis=0), len(vues)) if vues else (None, 0)
 
     def dream_fusionne(self, t0, t1):
-        """[(t, pointe)] dans [t0, t1] : a chaque vue, mediane des vues de la seconde precedente."""
+        """[(t, pointe combinee)] dans [t0, t1], comme `DreamTips.fused` en Gazebo : a chaque
+        vue, mediane de la DERNIERE vue de chaque camera de moins de FUSION_S. La mediane de
+        toutes les vues de la seconde passee trainait derriere le bras en mouvement."""
         with self.verrou:
-            pts = [(t, p) for t, _, p, dom in self.pointes if dom]
-        if not pts:
-            return []
-        ts = np.array([t for t, _ in pts])
-        P = np.array([p for _, p in pts])
-        ordre = np.argsort(ts)
-        ts, P = ts[ordre], P[ordre]
-        out = []
-        for i in range(int(np.searchsorted(ts, t0)), int(np.searchsorted(ts, t1, side='right'))):
-            debut = int(np.searchsorted(ts, ts[i] - FUSION_S))
-            out.append((ts[i], np.median(P[debut:i + 1], axis=0)))
-        return out
+            pts = sorted((t, cam, p) for t, cam, p, dom in self.pointes if dom)
+        return fusionne(pts, t0, t1)
 
     def cible(self, c, t, source):
         apres = c['serre'] is not None and t >= c['serre']
@@ -376,6 +397,30 @@ class Panneau:
         dream, n = self.dream_entre(c['serre'] - SERRAGE_S, c['serre'])
         return c['ref_piece'], dream, n
 
+    def erreur_trajet(self, c):
+        """Mediane, sur le trajet (depart vers la piece -> pose dans le bac), de |pointe DREAM
+        combinee - pointe des codeurs| en 3D a chaque instant : la courbe DREAM de Gazebo."""
+        fin = c['pose'] or c['fin'] or time.monotonic()
+        e = []
+        for t, p in self.dream_fusionne(c['t0'], fin):
+            q = self.angles_a(t)
+            if q is not None:
+                e.append(float(np.linalg.norm(p - fsm.pointe(q))))
+        return (float(np.median(e)), len(e)) if e else (None, 0)
+
+    @staticmethod
+    def erreur_yolo_objet(c, enc):
+        """(erreur mm, '3D' ou 'XY') : 3D quand le Z de YOLO a ete triangule par les deux cameras."""
+        if enc is None:
+            return None, ''
+        if c.get('yolo_z') is None:
+            return float(np.linalg.norm(c['yolo'] - enc[:2])), 'XY'
+        return float(np.linalg.norm(np.array([*c['yolo'], c['yolo_z']]) - enc)), '3D'
+
+    @staticmethod
+    def erreur_yolo_bac(c):
+        return None if c['ref_bac'] is None else float(np.linalg.norm(c['yolo_bac'] - np.asarray(c['ref_bac'])[:2]))
+
     # ------------------------------------------------------------- fichiers
     def ecrit_fichiers(self):
         self.dossier.mkdir(parents=True, exist_ok=True)
@@ -388,7 +433,9 @@ class Panneau:
                        for t, cam, p, dom in self.pointes]
         (self.dossier / 'session.json').write_text(json.dumps({
             'codeurs': codeurs, 'cameras': self.images, 'tri': True, 'modele': self.modele,
-            'cycles': cycles, 'pointes_dream': pointes}))
+            'cycles': cycles, 'pointes_dream': pointes,
+            'mesures': {f'{src}_{cam}': ts for (src, cam), ts in list(self.mesures.items())},
+            'yolo_direct': list(self.yolo_direct), 'keypoints_direct': list(self.kp_direct)}))
         with (self.dossier / 'trajectoires.csv').open('w', newline='') as f:
             w = csv.writer(f)
             w.writerow(['cycle', 'piece', 'source', 't_s', 'x_mm', 'y_mm', 'z_mm', 'cible',
@@ -411,9 +458,12 @@ class Panneau:
             w.writerow(['piece', 'yolo_x_mm', 'yolo_y_mm', 'codeurs_x_mm', 'codeurs_y_mm', 'codeurs_z_mm',
                         'dream_x_mm', 'dream_y_mm', 'dream_z_mm', 'dream_codeurs_dx_mm', 'dream_codeurs_dy_mm',
                         'dream_codeurs_dz_mm', 'dream_codeurs_xy_mm', 'dream_codeurs_3d_mm',
-                        'yolo_codeurs_xy_mm', 'vues_dream', 'verdict'])
+                        'yolo_codeurs_xy_mm', 'vues_dream', 'verdict', 'dream_trajet_3d_mm',
+                        'yolo_bac_codeurs_xy_mm', 'yolo_z_mm', 'yolo_codeurs_3d_mm'])
             for c in self.cycles:
                 enc, dream, n = self.saisie(c)
+                trajet, _ = self.erreur_trajet(c)
+                bac = self.erreur_yolo_bac(c)
                 w.writerow([c['piece'], *np.round(c['yolo'], 1),
                             *(('',) * 3 if enc is None else np.round(enc, 1)),
                             *(('',) * 3 if dream is None else np.round(dream, 1)),
@@ -421,11 +471,17 @@ class Panneau:
                             '' if enc is None or dream is None else round(float(np.linalg.norm(dream[:2] - enc[:2])), 1),
                             '' if enc is None or dream is None else round(float(np.linalg.norm(dream - enc)), 1),
                             '' if enc is None else round(float(np.linalg.norm(c['yolo'] - enc[:2])), 1),
-                            n, c['verdict']])
+                            n, c['verdict'], '' if trajet is None else round(trajet, 1),
+                            '' if bac is None else round(bac, 1),
+                            '' if c.get('yolo_z') is None else round(c['yolo_z'], 1),
+                            '' if enc is None or c.get('yolo_z') is None else
+                            round(float(np.linalg.norm(np.array([*c['yolo'], c['yolo_z']]) - enc)), 1)])
 
     def ferme(self):
         self.service.ferme()
         self.ecrit_fichiers()
+        if getattr(self, 'ros_monitor', None) is not None:
+            self.ros_monitor.close()
 
 
 def installe(module, modele='vgg_tri_reel_ft_e10'):
@@ -450,11 +506,39 @@ def installe(module, modele='vgg_tri_reel_ft_e10'):
                 fenetre.captures[nom] = Mandataire(cap, nom, panneau)
 
     module.Fenetre._ouvre_cameras = ouvre_et_enveloppe
+    aller_retour = yolo26_dashboard.ServiceYOLO26._aller_retour
+
+    def aller_retour_compte(service, camera, image):
+        t = time.monotonic()
+        detections = aller_retour(service, camera, image)
+        if detections is not None:
+            panneau.compte('yolo', camera)
+            with panneau.verrou:
+                panneau.yolo_direct.append({'t': t, 'camera': camera, 'det': detections})
+        return detections
+
+    yolo26_dashboard.ServiceYOLO26._aller_retour = aller_retour_compte
     tri_fluide.trie = panneau.trie(tri_fluide.trie)
     tri_fluide.print = panneau.ecrit
     threading.Thread(target=panneau.lit_codeurs, daemon=True).start()
     threading.Thread(target=panneau.apparie, daemon=True).start()
     return panneau
+
+
+def fusionne(pts, t0, t1, fenetre=FUSION_S, accord=ACCORD_MM):
+    """pts : [(t, camera, pointe)] tries par t -> [(t, pointe combinee)] pour chaque vue dans
+    [t0, t1] : mediane des dernieres vues de chaque camera de moins de `fenetre` s, sauf
+    si arducam et SVPRO s'ecartent de plus de `accord` mm -> arducam seule."""
+    derniere, out = {}, []
+    for t, cam, p in pts:
+        derniere[cam] = (t, p)
+        if t0 <= t <= t1:
+            vues = {c: q for c, (s, q) in derniere.items() if t - s <= fenetre}
+            if len(vues) == 2 and np.linalg.norm(vues['arducam'] - vues['svpro']) > accord:
+                out.append((t, vues['arducam']))
+            else:
+                out.append((t, np.median(list(vues.values()), axis=0)))
+    return out
 
 
 def ajuste_lignes(table, lignes):
@@ -469,26 +553,31 @@ class FenetreTriDream(QWidget):
     def __init__(self, panneau, fenetre):
         super().__init__()
         self.p, self.f = panneau, fenetre
-        self.setWindowTitle('Tri réel : YOLO (objets) contre DREAM (pince)')
+        self.setWindowTitle(TITRE)
         grille = QGridLayout(self)
+        titre = QLabel(TITRE)
+        titre.setAlignment(Qt.AlignCenter)
+        titre.setStyleSheet('font-size: 18px; font-weight: bold; padding: 4px')
+        grille.addWidget(titre, 0, 0, 1, 2)
         fenetre.setWindowFlags(Qt.Widget)
-        boite_tri = QGroupBox('Tri réel (arducam + YOLO)')
+        boite_tri = QGroupBox('Tri réel (arducam + SVPRO, YOLO)')
         # Les libelles longs du tri (inventaire, journal) elargissent sa fenetre en
         # cours de cycle : sans defilement, l'ensemble deborde de l'ecran a droite.
         zone = QScrollArea()
         zone.setWidget(fenetre)
         zone.setWidgetResizable(True)
         QVBoxLayout(boite_tri).addWidget(zone)
-        grille.addWidget(boite_tri, 0, 0, 2, 1)
+        grille.addWidget(boite_tri, 1, 0, 2, 1)
 
         compare = QGroupBox('DREAM (pince) ↔ YOLO (objet) ↔ codeurs (référence)')
-        self.table = QTableWidget(0, 8)
-        self.table.setHorizontalHeaderLabels(['objet', 'YOLO objet x, y', 'codeurs pince x, y, z',
-                                              'DREAM pince x, y, z', 'DREAM ↔ codeurs', 'YOLO ↔ codeurs',
+        self.table = QTableWidget(0, 9)
+        self.table.setHorizontalHeaderLabels(['objet', 'YOLO objet x, y (z)\n(mm)', 'codeurs pince x, y, z\n(mm)',
+                                              'DREAM pince x, y, z\n(mm)', 'DREAM ↔ codeurs\n(3D, trajet, mm)',
+                                              'YOLO objet ↔ codeurs\n(saisie, mm)', 'YOLO bac ↔ codeurs\n(XY, dépôt, mm)',
                                               'vues DREAM', 'tri'])
-        self.table.setToolTip('Au serrage, la pince est sur la pièce. Positions en mm. DREAM ↔ codeurs '
-                              'en 3D, √(Δx²+Δy²+Δz²) ; YOLO ↔ codeurs dans le plan XY (YOLO ne donne '
-                              'pas de hauteur). Codeurs : pointe calculée par la FK des angles lus.')
+        self.table.setToolTip('mm. DREAM pince 3D : médiane sur le trajet objet → bac. YOLO objet : au '
+                              'serrage, 3D si z triangulé arducam + SVPRO, sinon XY. YOLO bac : à la '
+                              'pose, XY. Référence : codeurs.')
         ajuste_lignes(self.table, 4)
         self.trace = pg.PlotWidget(labels={'left': 'pince → cible (mm, log)',
                                            'bottom': 'temps depuis le départ vers la pièce (s)'})
@@ -510,7 +599,12 @@ class FenetreTriDream(QWidget):
         ligne.addWidget(self.choix)
         ligne.addStretch()
         self.latence = QLabel()
+        self.frequences = QLabel()
+        self.frequences.setStyleSheet('font-weight: bold')
+        self.frequences.setToolTip(f'Nombre de mesures par seconde, sur les {FENETRE_FREQUENCE_S:.0f} '
+                                   f'dernières secondes.')
         b = QVBoxLayout(compare)
+        b.addWidget(self.frequences)
         b.addWidget(self.table)
         self.onglets = QTabWidget()
         self.onglets.addTab(self.trace, 'distance à la cible')
@@ -527,7 +621,7 @@ class FenetreTriDream(QWidget):
         b.addWidget(self.onglets)
         b.addLayout(ligne)
         b.addWidget(self.latence)
-        grille.addWidget(compare, 0, 1)
+        grille.addWidget(compare, 1, 1)
 
         bas = QHBoxLayout()
         boite_journal = QGroupBox('Journal du tri')
@@ -541,15 +635,27 @@ class FenetreTriDream(QWidget):
         QVBoxLayout(boite_yolo).addWidget(self.yolo)
         bas.addWidget(boite_journal)
         bas.addWidget(boite_yolo)
-        grille.addLayout(bas, 1, 1)
+        grille.addLayout(bas, 2, 1)
         grille.setColumnStretch(0, 1)
         grille.setColumnStretch(1, 1)
-        grille.setRowStretch(0, 2)
-        grille.setRowStretch(1, 1)
+        grille.setRowStretch(1, 2)
+        grille.setRowStretch(2, 1)
         self.n_journal = 0
         self.minuterie = QTimer(self)
         self.minuterie.timeout.connect(self.redessine)
         self.minuterie.start(500)
+
+        self.p.ros_monitor = None
+        try:
+            from tri_ros_monitor import TriROSMonitor
+            self.p.ros_monitor = TriROSMonitor()
+            self.ros_minuterie = QTimer(self)
+            self.ros_minuterie.timeout.connect(
+                lambda: self.p.ros_monitor.publish(self.p, self.f))
+            self.ros_minuterie.start(500)
+            print('ROS 2 : telemetrie /tri_reel/{codeurs,dream,yolo,etat} active', flush=True)
+        except ImportError as exc:
+            print(f'ROS 2 indisponible : {exc} (sourcer /opt/ros/jazzy/setup.bash)', flush=True)
 
     def redessine(self):
         p = self.p
@@ -590,14 +696,21 @@ class FenetreTriDream(QWidget):
                                  f'{vues} vues ≥ {KP_MIN} keypoints (+{hors} hors domaine J5, écartées) ; '
                                  f'enregistré dans {p.dossier.name}')
 
+        self.frequences.setText('Fréquence de mesure — ' + '   |   '.join(
+            f'{src} : ' + ', '.join(f'{cam} {p.frequence(src.lower(), cam):.1f} Hz' for cam in EXTRINSEQUES)
+            for src in ('YOLO', 'DREAM')))
         self.table.setRowCount(len(p.cycles))
         for i, c in enumerate(p.cycles):
             enc, dream, n = p.saisie(c)
+            trajet, _ = p.erreur_trajet(c)
+            bac = p.erreur_yolo_bac(c)
             xyz = (lambda v: '—' if v is None else ', '.join(f'{x:.0f}' for x in v))
-            cellules = (c['piece'], xyz(c['yolo']), xyz(enc), xyz(dream),
-                        '—' if enc is None or dream is None else f'{np.linalg.norm(dream - enc):.1f}',
-                        '—' if enc is None else f'{np.linalg.norm(c["yolo"] - enc[:2]):.1f}',
-                        str(n), c['verdict'])
+            mm = (lambda v: '—' if v is None else f'{v:.1f}')
+            e_yolo, dim = p.erreur_yolo_objet(c, enc)
+            yolo = c['yolo'] if c.get('yolo_z') is None else [*c['yolo'], c['yolo_z']]
+            cellules = (c['piece'], xyz(yolo), xyz(enc), xyz(dream), mm(trajet),
+                        '—' if e_yolo is None else f'{e_yolo:.1f} ({dim})',
+                        mm(bac), str(n), c['verdict'])
             for j, v in enumerate(cellules):
                 self.table.setItem(i, j, QTableWidgetItem(v))
 

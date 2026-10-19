@@ -3,7 +3,7 @@
 *Protocole de travail de Claude pour l'intégration YOLO → localisation 3D →
 tri dans Gazebo Harmonic, avec DREAM en parallèle plus tard. On avance **une
 étape à la fois**. Chaque étape a un critère de sortie, et on ne passe à la
-suivante qu'une fois ce critère atteint et **validé par Osama**. L'état de chaque étape
+suivante qu'une fois ce critère atteint et **validé**. L'état de chaque étape
 est tenu dans le [journal](#journal) en fin de fichier.*
 
 Créé le 29/09/2026 · branche `feature/pick-and-place-osama`
@@ -203,7 +203,7 @@ z = 0, dans le monde DREAM comme dans `real_table`. DREAM ne dépend que de
 Si un jour on veut le robot au bord de la table, on déplace **la table et les
 objets**, pas le robot, et T_cam←base reste intact.
 
-### 2.3 Décisions ouvertes (à trancher par Osama avant l'étape indiquée)
+### 2.3 Décisions ouvertes (à trancher avant l'étape indiquée)
 
 | # | Question | Recommandation | Avant l'étape |
 |---|---|---|---|
@@ -482,7 +482,7 @@ Lecture :
 4. **Fausses détections** : le socle gris clair du robot est lu `bac_bleu` à 0,10–0,13 dans la vue gauche,
    à chaque graine, juste au-dessus du seuil de 0,10.
 
-## Correction des modèles Gazebo (29/09, validée par Osama)
+## Correction des modèles Gazebo (29/09, validée)
 
 Faite dans le **générateur** `scripts/generer_pieces_gazebo.py`, puis régénération des 8 modèles.
 Les `model.sdf` ne sont jamais édités à la main.
@@ -567,9 +567,9 @@ cylindre_vert 16 → 19/35, pave_jaune 18 → 20/34, bac_jaune 3 → 6/36, le re
 3. **Prochain levier possible, non appliqué** : caler aussi S et V rendus sur les images réelles.
    Pour les 8 pièces, ce serait un matériau plus sombre et plus saturé. Pour tout le banc, un éclairage
    ou une exposition de scène plus proche de l'arducam à 75. Cela touche aussi rouge et bleu,
-   qui marchent : **à décider par Osama.**
+   qui marchent : **à décider.**
 
-### Campagne v3 : vert assombri (d'après les photos d'Osama, 29/09)
+### Campagne v3 : vert assombri (d'après les photos du banc, 29/09)
 
 Les photos des vraies pièces et le jeu arducam s'accordent sur un point : **le vert est nettement plus
 sombre que le jaune** (V ~105 contre 160-220 sur photo, 107 contre 132 sur arducam). Dans Gazebo, les deux
@@ -581,7 +581,7 @@ Correction conservée, car elle rapproche le rapport jaune/vert de la réalité 
 **Arrêt des retouches de couleur** : ce n'est plus le levier. La confusion restante bac_jaune → bac_vert
 tient au modèle (appris sur du jaune arducam très saturé et sombre) face à un rendu Gazebo pâle et clair.
 Pour la supprimer, il faudrait soit ajouter des images Gazebo au jeu yolo26, soit caler l'éclairage
-de la scène sur l'exposition 75. **Décision réservée à Osama.**
+de la scène sur l'exposition 75. **Décision à prendre.**
 
 ## Étapes 3, 4 et 6 en ROS (29/09)
 
@@ -650,7 +650,7 @@ Autrement dit, les boîtes YOLO sont décalées de **−1,7 px en v**, vers le h
 
 ## Étape 5 en nœud : YOLO contre la vérité, affiché dans Gazebo (29/09)
 
-Demande d'Osama : voir **dans Gazebo** ce qu'on voit au banc réel (boîte, classe, score sur
+Demande : voir **dans Gazebo** ce qu'on voit au banc réel (boîte, classe, score sur
 chaque objet et chaque bac), **plus l'erreur** par rapport à la vérité Gazebo.
 
 ![Panneau YOLO vs vérité dans Gazebo, graine 2](protocole_yolo_gazebo/etape5_panneau_gazebo_seed2.png)
@@ -746,7 +746,7 @@ synth_camera_top     TOTAL            73/80                               4.2   
 - **pave_jaune, cylindre_vert, bac_bleu** : confiance 0,17-0,43 de côté, souvent sous le seuil.
 - Les nombres de détections 2D sont **identiques** à la campagne v3 (même graine, même rendu,
   même modèle) : la scène et yolo26 sont déterministes, ce qui rend ces campagnes comparables.
-- **Décision proposée pour la suite** (à trancher par Osama) : **sélection, pas fusion** — la top
+- **Décision proposée pour la suite** (à trancher) : **sélection, pas fusion** — la top
   pour localiser ; les côtés seulement en secours, quand la top ne voit pas une pièce (bras
   devant). Une fusion moyenne dégraderait la top (4 mm) avec des côtés à 6-46 mm.
 
@@ -828,7 +828,7 @@ ce pré-étiquetage avantage v5 sur la forme des boîtes).
 8. **Campagne Gazebo** graines 1 à 10, 4 caméras, une scène par graine évaluée avec v5, v6b et v6c
    (`yolo26_tri_eval.py --poids`, chemins de poids **absolus** : le service les résout depuis son
    propre dossier) ; départ de chaque graine sous 60 °C, arrêt à 88 °C.
-9. **Adoption** de v6c (validée par Osama le 01/10) : `yolo26_service.POIDS_DEFAUT`.
+9. **Adoption** de v6c (validée le 01/10) : `yolo26_service.POIDS_DEFAUT`.
 
 **Comment les images d'entraînement sont produites dans la simulation**
 (`scripts/yolo26_dataset_gazebo.py`, une seule session Gazebo) :
@@ -929,13 +929,14 @@ Une fois la géométrie corrigée, les erreurs des caméras partent dans des dir
 se compensent : **la fusion par la médiane divise l'erreur médiane par deux** par rapport à la
 caméra du dessus seule, au prix d'un max un peu plus haut (2,9 contre 2,3 mm). La décision de
 l'étape 7 (« sélection, pas fusion ») datait d'avant la correction, quand les côtés allaient
-jusqu'à 46 mm : **proposition révisée pour l'étape 8 : fusion par la médiane** (décision d'Osama).
+jusqu'à 46 mm : **proposition révisée pour l'étape 8 : fusion par la médiane** (décision prise).
 
 - Ce qui reste est l'erreur de yolo26 : centres de boîte décalés de **−0,47 px (u) et −0,51 px (v)**,
   dispersion ±0,2 px (1 px = 1,92 mm au sol vue du dessus). Piste : convention centre/coin de pixel
   à la génération des étiquettes ou au redimensionnement — **à vérifier**. Le retirer laisserait ~1,1 mm
   (dessus), 1,5 (avant), 2,9 (gauche), 4,2 mm (droite) au pire. Ne pas le soustraire comme constante
   apprise dans Gazebo (P5 : non transférable).
+  **Expliqué le 07/10 : c'est une troncature** (§ « Le −0,5 px de yolo26 » ci-dessous).
 - Avec v5 la correction **dégrade** les côtés : ses erreurs de boîte compensaient la géométrie fausse.
 - **Limite** : boîte 3D à lacet 0, comme la scène V1. Sur le banc réel une pièce tournée a une autre
   boîte ; à mesurer avant de compter sur ce gain au réel.
@@ -964,7 +965,7 @@ jusqu'à 46 mm : **proposition révisée pour l'étape 8 : fusion par la médian
 | En direct, graine 3 (`tri_yolo.launch.py`, comparaison à `/validation/gt/objects`) | 8/8 | **4/4** | **0,85 mm** | — | **1,94 mm** |
 
 Objets seuls : 0,61 mm médiane, 2,07 max ; bacs : 0,67 / 1,94. Avant la fusion (caméra du dessus seule,
-rayon simple) : 2,1 / 3,5 mm. **Critère de l'étape 8 atteint, validé par Osama le 05/10.** Suite : étape 9,
+rayon simple) : 2,1 / 3,5 mm. **Critère de l'étape 8 atteint, validé le 05/10.** Suite : étape 9,
 la FSM de `sim_sorting_grasp` prend ses cibles dans `/yolo/objects_3d` via `sorting_pairs`.
 
 ## Étape 9 : la FSM de simulation trie à partir de la perception (01/10)
@@ -997,22 +998,22 @@ la FSM de `sim_sorting_grasp` prend ses cibles dans `/yolo/objects_3d` via `sort
 **Toutes les pièces à portée (6/6) sont triées.** Les 34 échecs viennent de la portée de l'outil
 vertical (0,28 m, mesurée le 29/09) : la scène place pièces et bacs entre les marqueurs, jusqu'à
 0,46 m. Avant les corrections : 5/40, dont 1 prise ratée. Température max 81 °C, Gazebo fermé après
-chaque graine. **Critère de l'étape 9 (taux et cause de chaque échec) atteint, validé par Osama le 05/10.**
+chaque graine. **Critère de l'étape 9 (taux et cause de chaque échec) atteint, validé le 05/10.**
 
 **Suite proposée** : étendre la portée comme au banc réel — dépôt pince inclinée jusqu'à 45° (validé au
-réel le 30/09 et le 01/10 jusqu'à 445 mm), puis saisie inclinée. Décision d'Osama.
+réel le 30/09 et le 01/10 jusqu'à 445 mm), puis saisie inclinée. Décision prise.
 
 ## Étape 9, suite : portée étendue et lâcher au-dessus du bac (01-02/10)
 
 Les 34 échecs de la campagne précédente venaient de la portée de l'outil vertical. Trois changements,
-puis un défaut de lâcher repéré par Osama sur la vidéo :
+puis un défaut de lâcher repéré sur la vidéo :
 
 | Changement | Pourquoi | Où |
 |---|---|---|
 | `piece_reach:=0.28` (option de `tri_yolo.launch.py`) : les 4 **objets** tirés à moins de 0,28 m de la base, les bacs toujours entre les marqueurs | comme au banc réel, l'objet est posé là où la pince le saisit ; le défaut (`0.0`) garde l'ancienne scène | `tri_scene.sample_tri_scene`, `item_errors` |
 | **Lâcher incliné** si le bac est hors de portée verticale : pince inclinée de 15, 30 ou 45° vers l'extérieur | IK hors ligne : vertical jusqu'à 0,28 m, 15° de 0,30 à 0,36 m, 30° de 0,39 à 0,42 m, 45° à 0,45 m | `tilted_drop`, `DROP_TILTS_DEG` |
 | **2 essais** par objet, seulement après une prise à vide | prise ratée du cylindre, intermittente ; un autre échec laisse l'objet dans un état inconnu et n'est pas retenté | `max_attempts:=2` |
-| **Lâcher au-dessus du rebord pour TOUS les objets**, doigts écartés de 20 mm, 2 s d'attente, **puis** remontée lente (2 s) | vu par Osama sur la vidéo du 02/10 : la pince ne s'ouvrait qu'à la largeur de l'objet puis remontait — l'objet **glissait** entre les doigts. Pire pour le cube bleu (bac à portée verticale) : doigts **dans** le bac, la paroi (95 mm) les empêchait de s'ouvrir plus que le cube (50 mm) | `sort_one`, `RELEASE_ABOVE_RIM_EXTRA_MM`, `RELEASE_SETTLE_S` |
+| **Lâcher au-dessus du rebord pour TOUS les objets**, doigts écartés de 20 mm, 2 s d'attente, **puis** remontée lente (2 s) | vu sur la vidéo du 02/10 : la pince ne s'ouvrait qu'à la largeur de l'objet puis remontait — l'objet **glissait** entre les doigts. Pire pour le cube bleu (bac à portée verticale) : doigts **dans** le bac, la paroi (95 mm) les empêchait de s'ouvrir plus que le cube (50 mm) | `sort_one`, `RELEASE_ABOVE_RIM_EXTRA_MM`, `RELEASE_SETTLE_S` |
 
 Le lâcher, dans les deux cas (vertical ou incliné) :
 
@@ -1182,7 +1183,7 @@ la non-régression a tourné sans YOLO à 1 Hz : 78 et 81 °C.
 
 ### Dashboard v2 : DREAM contre YOLO, une seule fenêtre avec Gazebo (05/10)
 
-Demande d'Osama : comparer **DREAM directement à YOLO, pas à Gazebo**, et une seule fenêtre.
+Demande : comparer **DREAM directement à YOLO, pas à Gazebo**, et une seule fenêtre.
 
 ```bash
 ros2 launch mycobot_gateway tri_yolo.launch.py seed:=7 piece_reach:=0.28 dream:=true \
@@ -1254,9 +1255,9 @@ Mesuré sur la graine 7, run front + right : `dream_pose.csv` et `dream_vs_fk.cs
 Monter `dream_rate` ne donne que plus d'images, avec les mêmes erreurs. L'algorithme DREAM est
 inchangé.
 
-### Fine-tuning DREAM sur la scène de tri (05-06/10, en cours)
+### Fine-tuning DREAM sur la scène de tri (05-06/10)
 
-Décidé par Osama le 05/10 : la cause de l'écart DREAM ↔ YOLO est la scène, hors du domaine
+Décidé le 05/10 : la cause de l'écart DREAM ↔ YOLO est la scène, hors du domaine
 d'entraînement. On rend donc des images de la scène de tri avec la pince, puis on fine-tune.
 
 **1. Rendus** : `synthetic_data_collector_tri`, qui hérite du collecteur v4 pince. Les caméras
@@ -1307,12 +1308,234 @@ link3 50 % / 18,7 px, link4 67 % / 12,3 px, link5 66 % / 13,9 px, link6 61 % / 1
 - **Température** : l'entraînement est mis en pause (SIGSTOP) à 90 °C et repris sous 80 °C.
 - `DREAM_DIR` vaut maintenant `~/DREAM` par défaut : `/tmp/DREAM` a disparu au redémarrage.
 
-**4. Évaluation prévue** :
-- le même jeu de test, avant et après ;
-- le run de tri sur la graine 7, avec l'erreur de T_DREAM et l'écart DREAM ↔ YOLO ;
-- la non-régression sur le 50K et le réel.
+**4. Résultats (06/10)** : entraînement terminé à 16:35, en 405,8 min. Meilleure perte de
+validation : 0,000329, à l'époque 10. La validation est optimiste : le réel ×5 et la scène de tri ×2
+sont dupliqués, donc des copies tombent des deux côtés du découpage 80/10/10.
 
-Critères proposés : détection > 90 %, erreur médiane < 5 px, rotation de T_DREAM < 5°.
+`evaluate_dream.py`, sur les mêmes images avant et après (sous-échantillon régulier de 500 images,
+2 000 pour le 50K) :
+
+| jeu | modèle | détection | médiane | < 5 px | erreur moyenne par image |
+|---|---|---|---|---|---|
+| scène de tri, test 2001-2003 | v4_mix (avant) | 53,6 % | 15,38 px | 13,1 % | 35,00 px |
+| scène de tri, test 2001-2003 | **tri_mix_ft_e10** | **99,7 %** | **3,00 px** | **96,0 %** | 2,95 px |
+| réel | v4_mix (avant) | 87,6 % | 2,43 px | 54,9 % | 13,89 px |
+| réel | tri_mix_ft_e10 | 88,5 % | 3,18 px | 54,0 % | 14,32 px |
+| 50K synthétique | v4_mix (avant) | 99,4 % | 2,94 px | — | 2,77 px |
+| 50K synthétique | tri_mix_ft_e10 | 99,4 % | 2,91 px | — | 2,74 px |
+
+Le 87,6 % réel n'est pas le 91,6 % du rapport : ce n'est pas le même protocole, ici un
+sous-échantillon de 500 images. Réel : détection +0,9 point, médiane +0,75 px. Aucun test réel
+hors échantillon n'existe pour ce modèle.
+
+**Tri sur la graine 7** : caméras front et right, 1 Hz, dashboard. Mêmes réglages que le run du
+05/10, seul le modèle change (`dream_model:=vgg_tri_mix_ft_e10`). Résultats dans
+`results/yolo_gazebo/2026-10-06_dashboard_seed7_front_right_tri_mix_ft_e10/`.
+Tri **4/4**, avec des écarts au centre du bac de +7/−3, +8/−3, +1/−0 et +14/+7 mm. Tmax 86 °C.
+
+T_DREAM contre la vérité, médianes sur les vues à ≥ 5 keypoints, calculées comme le tableau du 05/10 :
+
+| caméra | modèle | vues ≥ 5 kp | translation | \|dz\| | \|dx\| / \|dy\| | rotation |
+|---|---|---|---|---|---|---|
+| front | v4_mix (05/10) | 43 / 75 | 36,8 mm | 29,1 mm | 16,4 / 6,2 mm | 32,1° |
+| front | **tri_mix_ft_e10** | **83 / 83** | **8,4 mm** | 6,0 mm | 4,1 / 3,2 mm | **1,6°** |
+| right | v4_mix (05/10) | 80 / 81 | 46,1 mm | 42,9 mm | 6,4 / 2,8 mm | 26,5° |
+| right | **tri_mix_ft_e10** | **86 / 86** | **12,2 mm** | 10,5 mm | 5,5 / 3,3 mm | **2,6°** |
+
+Sur toutes les vues, la rotation maximale passe de 179,6° à 7,4° (front) et de 158,7° à 8,4° (right).
+
+Keypoints contre la FK (`dream_vs_fk.csv`, keypoints dans l'image) :
+
+| caméra | modèle | détection | médiane | p90 | < 5 px |
+|---|---|---|---|---|---|
+| front | v4_mix (05/10) | 71,9 % | 17,45 px | 37,94 px | 19,9 % |
+| front | **tri_mix_ft_e10** | **99,3 %** | **2,81 px** | 3,38 px | **98,1 %** |
+| right | v4_mix (05/10) | 84,7 % | 12,26 px | 30,33 px | 15,7 % |
+| right | **tri_mix_ft_e10** | **100 %** | **3,01 px** | 3,76 px | **98,5 %** |
+
+Par keypoint, les deux caméras réunies, le nouveau modèle détecte 167 à 169 keypoints sur 169, avec
+une médiane de 1,5 à 3,7 px. Le pire est la base, à 3,74 px. L'ancien modèle détectait 112 à 149
+keypoints sur 167, avec une médiane de 6,6 à 20,9 px.
+
+**Critères proposés** : détection > 90 %, médiane < 5 px, rotation de T_DREAM < 5°. Ils sont
+**atteints dans la scène de tri**, puisque la rotation médiane est de 1,6 et 2,6°. Ils ne le sont
+**pas sur toutes les vues**, où le maximum atteint 8,4°.
+
+**DREAM ↔ YOLO par saisie** : le dashboard l'écrit maintenant dans `<log_dir>/dream_vs_yolo.csv`,
+une ligne par saisie. Le fichier est réécrit à chaque changement, parce que les poses DREAM arrivent
+environ 1 s après leur image. Colonnes :
+
+- objet ;
+- position YOLO ;
+- pointe DREAM en x, y, z ;
+- écarts XY DREAM ↔ YOLO et codeurs ↔ YOLO ;
+- nombre de vues DREAM ;
+- fenêtre d'immobilité ;
+- verdict.
+
+Graine 7, second run (`…_tri_mix_ft_e10_b/`) : 4/4, et DREAM ↔ YOLO = 7,4 / 14,9 / 9,4 / 8,8 mm. Avec
+l'ancien modèle, le cube rouge était à 44,5 mm. Codeurs ↔ YOLO : 1,6-2,7 mm. Tmax 91 °C, lu une seule fois.
+
+### Campagne 10 graines avec `vgg_tri_mix_ft_e10` (06/10)
+
+Réglages identiques à la graine 7 :
+
+- caméras front et right ;
+- 1 Hz ;
+- dashboard ;
+- `piece_reach:=0.28`, `max_attempts:=2`.
+
+Graines 1 à 10, de 18:26 à 19:54. Résultats dans `results/yolo_gazebo/2026-10-06_campagne10_tri_mix_ft_e10/seed_N/`.
+
+Garde thermique :
+
+- départ sous 60 °C ;
+- arrêt à 90 °C confirmé, ou après 5 lectures ≥ 88 °C ;
+- Gazebo sur les cœurs 16-19.
+
+Aucun arrêt. Tmax de 77 à 89 °C, 89 °C sur la graine 6.
+
+| graine | tri | Tmax | DREAM ↔ YOLO par saisie (mm) | codeurs ↔ YOLO médian |
+|---|---|---|---|---|
+| 1 | 4/4 | 77 °C | 9,2 · 4,4 · 8,0 · 8,9 | 2,2 mm |
+| 2 | 4/4 | 77 °C | 3,5 · 12,9 · 4,3 · 3,7 | 2,2 mm |
+| 3 | 4/4 | 79 °C | 11,3 · 7,5 · 12,2 · 9,4 | 2,0 mm |
+| 4 | 4/4 | 78 °C | 6,9 · 10,8 · 7,8 · 14,7 | 1,7 mm |
+| 5 | 4/4 | 84 °C | 9,2 · 10,1 · 12,5 · 3,4 | 2,3 mm |
+| 6 | 4/4 | 89 °C | 12,2 · 3,9 · 10,0 · 1,6 | 2,0 mm |
+| 7 | 4/4 | 79 °C | 7,4 · 14,7 · 6,0 · 8,8 | 2,4 mm |
+| 8 | 4/4 | 78 °C | 2,1 · 11,1 · 5,9 · 2,1 | 2,6 mm |
+| 9 | 4/4 | 79 °C | 8,3 · 4,9 · 3,7 · 10,5 | 2,1 mm |
+| 10 | 4/4 | 79 °C | 4,1 · 3,4 · 19,7 · 12,2 | 2,5 mm |
+
+L'ordre des saisies est cube rouge, pavé jaune, cylindre vert, cube bleu.
+
+- **Tri** : 40/40.
+- **DREAM ↔ YOLO** : 40 saisies sur 40 mesurées. Médiane **8,2 mm**, p90 12,5 mm, max 19,7 mm. Le
+  05/10, avec l'ancien modèle, l'écart allait de 10 à 315 mm. Par objet, les médianes vont de 7,9 à
+  8,9 mm, donc l'écart ne dépend pas de la pièce.
+- **Codeurs ↔ YOLO** : médiane 2,2 mm, p90 2,9 mm. DREAM ajoute donc environ 6 mm à la chaîne codeurs.
+- **T_DREAM**, médiane (p90) :
+  - front : 8,3 (18,2) mm, 1,8 (4,4)°, sur 859 poses ;
+  - right : 12,9 (21,1) mm, 2,6 (5,3)°, sur 853 poses.
+- **Keypoints contre la FK** :
+  - front : 99,4 % (5 977 / 6 013), 2,8 px médian, 3,4 px p90 ;
+  - right : 100 % (5 971 / 5 971), 3,1 px médian, 3,8 px p90.
+
+Les chiffres de la graine 7 se retrouvent sur les 10 graines. Le critère de rotation < 5° tient en
+médiane, et au p90 pour la caméra front ; il ne tient pas au p90 pour la caméra right, à 5,3°.
+Bilan : `scripts/bilan_campagne_dream_tri.py`.
+
+### Test réel hors échantillon : impossible avec les données existantes (06/10)
+
+Contrôle par md5 du contenu des images, et non par leur nom :
+
+| jeu | images | en commun avec `real_3cam_train_x5_ndds` (5 988 uniques) | utilisable ? |
+|---|---|---|---|
+| `real_3cam_val_ndds` | 1 498 uniques | 8 | non : mêmes sessions de capture que l'entraînement |
+| `real_3cam_session6_ndds` | 298 uniques | 0 | non : vérité terrain cassée (contrôle du 07/09 : points sur la plante et le bureau) |
+| `real_3cam_gripper` | — | — | non : angles articulaires seuls, aucun keypoint de vérité |
+
+Le chiffre réel du tableau d'évaluation (88,5 %) vient donc de la même distribution que
+l'entraînement. Il ne prouve pas que le modèle généralise au réel. Pour l'avoir, il faut une nouvelle
+capture sur le robot, avec une vérité terrain contrôlée.
+
+### Observabilité J1-J6 depuis les keypoints (06/10)
+
+Question : DREAM permet-il de retrouver les angles J1-J6 à partir des keypoints, avec les caméras
+connues ? Les caméras sont celles de la simulation, donc il n'y a pas d'erreur d'extrinsèque.
+
+Données : 206 images de la campagne. Une image est retenue si elle est vue par front et right, avec
+au moins 4 keypoints sur chaque vue.
+
+Ajustement :
+
+- moindres carrés sur la reprojection, sans a priori ni rappel vers les codeurs ;
+- départ « froid » : 6 départs (zéro et 5 tirés au hasard dans les butées) ;
+- départ « oracle » : sur le q vrai, ce qui ne mesure que la précision locale.
+
+Trois sources de keypoints :
+
+- les détections DREAM ;
+- la projection FK avec un bruit de 3 px ;
+- la projection FK exacte.
+
+Médiane (p90) de |q estimé − q vrai|, en degrés, départ froid :
+
+| keypoints | vues | J1 | J2 | J3 | J4 | J5 | J6 |
+|---|---|---|---|---|---|---|---|
+| DREAM | front seule | 1,6 (78) | 1,4 (31) | 3,6 (141) | 7,6 (73) | 5,7 (164) | 85 (162) |
+| DREAM | right seule | 1,7 (7,4) | 1,2 (3,1) | 1,3 (3,6) | 2,6 (7,9) | 6,6 (168) | 99 (163) |
+| DREAM | **front + right** | **0,4 (1,3)** | **0,6 (1,1)** | **1,2 (2,4)** | **1,8 (3,4)** | **1,6 (5,4)** | 87 (163) |
+| FK + 3 px | front + right | 0,8 (1,7) | 0,7 (1,9) | 1,6 (4,3) | 2,8 (7,1) | 4,0 (8,4) | 89 (163) |
+| FK exacte | front seule | 0,0 (91) | 0,0 (44) | 0,0 (152) | 0,0 (71) | 0,0 (168) | 91 (165) |
+| FK exacte | front + right | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 | 91 (163) |
+
+Lecture :
+
+- **J6 n'est pas observable** avec le schéma à 7 keypoints, même avec des keypoints parfaits : 91°
+  d'erreur médiane, soit une valeur au hasard. Depuis le départ oracle, J6 ne bouge pas (0,0°), parce
+  que la reprojection ne dépend pas de J6. Aucun réentraînement ne corrige cela. Il faut un keypoint
+  en aval de J6 (pince ou bride).
+- **J4** : avec 2 vues, 1,8° médian et 3,4° au p90. Avec la caméra front seule, 7,6° médian et 73°
+  au p90. J4 devient donc observable avec 2 vues.
+- **Une vue seule** : le départ froid tombe sur une autre solution qui se reprojette aussi bien. Le
+  p90 sur J1-J5 atteint 31-168° avec la caméra front, même avec la FK exacte (0 px d'erreur). C'est
+  l'ambiguïté monoculaire déjà mesurée sur le banc réel le 15/07. Elle vient de la géométrie, pas de
+  DREAM.
+- **Avec 2 vues**, DREAM fait au moins aussi bien que la FK + 3 px, alors que son erreur image est
+  d'environ 3 px. L'objectif de 0,5-0,9° est atteint sur J1 et J2, pas sur J3-J5 (1,2 à 1,8° médian).
+
+Script : `training/dream/observabilite_multivue.py` (une graine par processus, puis `--fusion`). Il a été lancé sur les cœurs E
+24-27. Un premier lancement sur 10 cœurs a été coupé par la garde thermique à 90 °C.
+
+### Non-régression de la pince avec `vgg_tri_mix_ft_e10` (07/10)
+
+Même mesure que le 05/10, seul le modèle change : `scripts/dream_balayage_pince.py` (14 poses), puis
+`scripts/dream_pince_compare.py`. Graine 1, `yolo:=false`, `dream_rate:=1.0`, 4 caméras,
+`dream_model:=vgg_tri_mix_ft_e10`, `headless:=true`, tout sur les cœurs 16-19. Tmax 77 °C sans
+pince, 87 °C avec. Résultats dans `results/yolo_gazebo/2026-10-07_pince_tri_mix_ft_e10_robot_dream_baseline/`
+et `…_robot_yolo_pickplace/` (2 359 et 2 380 lignes de `dream_vs_fk.csv`).
+
+| 4 caméras, 7 keypoints | v4_mix sans pince (05/10) | v4_mix avec pince (05/10) | **tri_mix_ft_e10 sans pince** | **tri_mix_ft_e10 avec pince** |
+|---|---|---|---|---|
+| Détection | 65,2 % | 49,5 % | **98,7 %** | **99,2 %** |
+| Erreur pixel médiane à la FK | 3,8 px | 11,2 px | **3,0 px** | **3,0 px** |
+| Aberrant (> 20 px) | 6,6 % | 22,7 % | **0,0 %** | **0,5 %** |
+
+Par caméra et keypoint, avec pince : détection 100 % partout, sauf link5 (93 %, caméra avant) et
+link6 (93 %, caméras avant et gauche) ; médianes de 1,5 à 4,7 px. Les aberrants (7-8 %) sont tous
+sur link5, caméras avant et gauche. La caméra du dessus, hors service le 05/10 (0-49 %, jusqu'à
+140 px), détecte maintenant les 7 keypoints à 100 %, à 1,4-4,7 px.
+
+**Lecture.**
+- **Plus de régression due à la pince** : 98,7 → 99,2 % et 3,0 → 3,0 px. Le 05/10, la pince coûtait
+  16 points de détection et triplait l'erreur.
+- Le seul effet visible de la pince est sur le keypoint distal : link6 passe de 1,4-2,2 px à
+  2,4-4,5 px selon la caméra, et link5 prend quelques aberrants. Il reste sous 5 px en médiane.
+- Ni la graine 1 ni ces 14 poses ne font partie de l'entraînement (graines 1001-1016, poses tirées
+  par le collecteur). Le monde, lui, est le même : c'est une mesure dans le domaine, pas un test de
+  généralisation.
+
+### Verdict de l'étape 10 (07/10)
+
+| Exigence du protocole | Mesure | État |
+|---|---|---|
+| DREAM sur les mêmes images que YOLO, sans modifier DREAM | `dream:=true`, un `dream_inference` par caméra ; seuls les poids changent | fait |
+| Non-régression de la pince | 98,7 → 99,2 %, 3,0 → 3,0 px (§ ci-dessus) | **tenue** |
+| Référence dynamique T_GT(t) contre T_DREAM(t), appariée sur le stamp | campagne 10 graines : front 8,3 mm / 1,8°, right 12,9 mm / 2,6° (médianes) | fait |
+| Critère proposé : détection > 90 % | 99,4 % / 100 % (campagne), 99,2 % (balayage) | **tenu** |
+| Critère proposé : médiane < 5 px | 2,8 / 3,1 px (campagne), 3,0 px (balayage) | **tenu** |
+| Critère proposé : rotation de T_DREAM < 5° | médiane 1,8 / 2,6° ; p90 4,4° (front), **5,3° (right)** | tenu en médiane, pas au p90 de la caméra droite |
+| Le tri n'en souffre pas | 40/40 avec DREAM en parallèle ; DREAM ↔ YOLO 8,2 mm médian | **tenu** |
+
+**Étape 10 : validée en simulation, avec quatre réserves.**
+1. **Rotation de T_DREAM** : 5,3° au p90 sur la caméra droite, juste au-dessus du critère de 5°.
+2. **J6 n'est pas observable** avec le schéma à 7 keypoints (91° même en FK exacte) : DREAM ne
+   remplace pas les codeurs pour J6, quel que soit le modèle.
+3. **Une vue seule est ambiguë** : la reconstruction des angles demande au moins deux caméras.
+4. **Aucun test réel hors échantillon** n'existe pour `vgg_tri_mix_ft_e10` (contrôle md5 du 06/10).
+   La validation porte sur la simulation ; elle ne dit rien du vrai banc.
 
 ## Étape 11 : journalisation CSV (05/10)
 
@@ -1344,6 +1567,396 @@ séparées : le bras qui masque les pièces, et les parois des bacs qui cachent 
 référence (boîte amodale, occultation entre pièces seulement) ne modélise ni l'un ni l'autre. Pour un
 taux de détection, ne garder que les lignes en pose d'observation.
 
+### Étape 11 : d'où viennent les détections manquées (07/10)
+
+Analyse hors ligne des 10 `yolo_vs_gt.csv` de la campagne du 06/10 (109 571 lignes, pièces seulement,
+bacs exclus). Chaque ligne est classée par la position vraie de la pièce : au fond d'un bac (dans
+l'ouverture de 95 mm, z < 50 mm), soulevée (z > 30 mm) ou posée sur la table.
+
+| Situation de la pièce | Lignes | FN | Taux FN |
+|---|---|---|---|
+| posée sur la table | 25 244 | 2 731 | **10,8 %** |
+| soulevée par la pince | 2 145 | 1 511 | **70,4 %** |
+| au fond d'un bac | 17 990 | 16 317 | **90,7 %** |
+| (cachée ou tronquée selon la référence, toutes situations) | 6 560 | 4 005 | 61,1 % |
+
+Par caméra, taux FN :
+
+| Situation | avant | gauche | droite | dessus |
+|---|---|---|---|---|
+| posée sur la table | 7 % | 7 % | 3 % | 21 % |
+| soulevée | 45 % | 67 % | 61 % | 99 % |
+| au fond d'un bac | 52 % | 93 % | 98 % | **100 %** |
+
+**Lecture.**
+- **Les pièces posées sur la table**, ce dont le tri a besoin, sont manquées 10,8 % du temps, et
+  surtout par la caméra du dessus (21 %), au-dessus de laquelle passe le bras. Les vues de côté
+  restent à 3-7 %.
+- **Au fond d'un bac, la caméra du dessus rate 100 % des pièces**, alors qu'elle voit l'intérieur
+  du bac sans paroi entre les deux, et sans aucun faux positif à la place : les parois n'expliquent
+  donc pas tout. Explication la plus probable, non vérifiée : yolo26 n'a jamais vu de pièce dans un
+  bac. Les images Gazebo de v6c sont prises en pose d'observation, avant le tri, et les images
+  réelles montrent les pièces sur la table. Pour les vues de côté, les parois s'y ajoutent.
+- **Soulevée**, la pièce est dans la pince : la pince et le bras la masquent, et vue du dessus elle
+  est sous la pince (99 %).
+- Le tri n'en souffre pas : il ne cherche que les pièces sur la table. Pour un taux de détection,
+  ne garder que les pièces posées, ou les lignes en pose d'observation.
+
+### Le −0,5 px de yolo26 : une troncature (07/10)
+
+`scripts/yolo26_service.py` convertissait les coins des boîtes en entiers (`int(v)`), ce qui
+retire en moyenne 0,5 px à chaque coin. Prévision pour le centre : −0,5 px en u et en v, avec un
+écart-type de √(2/12)/2 = 0,20 px. Mesuré le 01/10 : −0,47 et −0,51 px, ±0,2. Ce n'était ni le
+modèle ni la scène.
+
+**Correction, simulation seulement** : la variable `YOLO26_BOITES_PRECISES=1` garde les coins
+exacts. `tri_yolo.launch.py` l'active par défaut (`yolo_exact_boxes:=1`). Sans elle, le service
+se comporte comme avant : **le banc réel, calé avec les coins tronqués, n'est pas modifié.**
+
+**Mesure** : graines 1 et 2, pose d'observation, 4 caméras, pièces posées ni cachées ni tronquées,
+environ 60 s par lancement, même scène dans les deux cas.
+
+| Caméra | Biais du, dv : tronquées → **exactes** | Erreur 3D médiane / p90 : tronquées → **exactes** |
+|---|---|---|
+| avant | −0,35, −0,50 → **+0,00, +0,06 px** | 1,43 / 2,00 → **0,13 / 0,54 mm** |
+| gauche | −0,53, −0,39 → **−0,02, +0,07 px** | 2,09 / 6,38 → **0,57 / 1,30 mm** |
+| droite | −0,52, −0,47 → **+0,02, +0,00 px** | 2,06 / 4,39 → **0,48 / 1,02 mm** |
+| dessus | −0,56, −0,50 → **−0,04, +0,02 px** | 1,55 / 1,88 → **0,13 / 0,29 mm** |
+
+Le biais disparaît, la dispersion passe de ~0,2 à ~0,1 px, et l'erreur 3D médiane est divisée
+par 3 à 10. Exception : le cylindre vert de la graine 1, vu de la caméra gauche, est en partie
+caché derrière le cube bleu (boîtes qui se chevauchent, sous le seuil « caché » de 50 %) : 6,6 mm
+avec les coins tronqués, 11,7 mm avec les coins exacts. La troncature compensait par hasard une
+partie de cette occultation. La fusion par la médiane des caméras écarte ce genre de vue.
+
+**Pourquoi l'effet est si fort, sur un exemple.** yolo26 donne une boîte de 100,8 à 120,8 px ; son
+centre est à 110,8 px. Tronqués, les bords deviennent 100 et 120, et le centre 110 : 0,8 px d'erreur
+ajoutés par le calcul, soit ~1,6 mm vu du dessus (1 px ≈ 1,92 mm). Avant la correction, l'erreur
+était donc la somme de deux parts : celle de yolo26, ~0,07 px (0,13 mm), et le décalage de la
+troncature, ~0,75 px en moyenne (√(0,56² + 0,50²), soit ~1,4 mm). La correction retire la seconde, qui
+était presque toute l'erreur. Le calcul retombe sur la mesure : 0,75 px × 1,92 ≈ 1,4 mm (mesuré
+1,55) ; 0,07 px × 1,92 ≈ 0,13 mm (mesuré 0,13).
+
+**0,13 mm est une borne basse en monde parfait, pas une précision attendue au réel.** En simulation,
+la caméra est idéale (aucune distorsion), sa pose est connue exactement, les cotes des pièces sont
+exactes, l'éclairage est constant et yolo26 a été entraîné sur ces mêmes rendus. Il ne restait donc
+que la troncature. Au banc réel, l'extrinsèque seule coûte 1,4-2,7 mm (leave-one-out du 15/09) : le
+même ~1 mm de troncature s'y ajoute à des erreurs plus grandes, et la précision réelle reste à mesurer
+au banc.
+
+Le biais +x de l'étape 6 (29/09 : −1,7 px, +3,2 mm, avec v5 et un rayon simple) est donc entièrement
+expliqué : géométrie de la boîte (corrigée le 01/10 par la boîte recalée), modèle (v6c) et cette
+troncature.
+
+### Bouton « Randomiser » (étape 2, 07/10)
+
+`tri_scene_randomizer` sert `/tri_scene/randomize` (`std_srvs/Trigger`) : le bras revient en pose
+d'observation, puis les 4 pièces et les 4 bacs sont replacés en une seule requête
+`set_pose_vector`, sur une disposition tirée par `tri_scene.sample_tri_scene` (mêmes règles qu'au
+lancement, même `piece_reach`). Le tirage k utilise le générateur `[seed, k]`. Avec `log_dir`,
+chaque tirage est ajouté à `run.yaml` (`randomize_k` : générateur, temps simulé, disposition).
+`tri_scene_panel` est la fenêtre avec le bouton, lancée avec la fenêtre Gazebo
+(`randomize_panel:=false` pour la retirer). À utiliser entre deux tris : il n'interrompt pas un tri
+en cours.
+
+```bash
+ros2 service call /tri_scene/randomize std_srvs/srv/Trigger
+```
+
+- L'attente du bras est comptée en **temps simulé** (15 s) : juste après le lancement, la
+  simulation tourne plusieurs fois plus lentement que le temps réel, et une attente en temps réel
+  échouait.
+- **Vérification** : après un tirage, les 8 positions lues dans Gazebo (`/validation/gt/objects`)
+  sont à **0,03-0,05 mm** des positions tirées.
+- **Tri après un tirage** (graine 1, tirage 1 dès le départ, perception seule) : **4/4** au premier
+  essai, écarts au centre du bac +5/−1, +8/0, +15/+3, +14/−8 mm, Tmax 79 °C. YOLO saisit le cube
+  rouge à sa position tirée (194, −160) mm, et non à celle du lancement (180, −25) mm.
+
+### DREAM avec 4 caméras, comparé à YOLO et à Gazebo (07/10)
+
+Objectif : DREAM sur les mêmes 4 caméras que YOLO (front, right, left, top), et les deux comparés
+à la vérité terrain de Gazebo, et plus seulement l'un à l'autre.
+
+```bash
+ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1 piece_reach:=0.28 \
+    dream:=true dashboard:=true dream_rate:=1.0 dream_model:=vgg_tri_mix_ft_e10 \
+    dream_cameras:=front,right,left,top log_dir:=<dossier>
+ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true \
+    -p world_name:=tri_yolo -p pose_source:=perception -p max_attempts:=2 \
+    -p wall_timeout_scale:=20.0 -p csv_path:=<dossier>/tri.csv
+```
+
+**Dashboard** (`tri_dream_dashboard`) :
+
+- trois courbes par objet : Gazebo (vert), YOLO (jaune, pointillé), DREAM (magenta). Chaque courbe
+  couvre le cycle entier, de l'approche jusqu'au dépôt dans le bac ; elle s'arrête pendant le retour
+  du bras et reprend avec l'objet suivant ;
+- sélecteur « Visualiser » : objet en cours, tous les objets (cycles mis bout à bout, séparés par
+  une ligne au nom de l'objet), ou un objet ;
+- tableau de prise réduit à **DREAM ↔ Gazebo** et **YOLO ↔ Gazebo** ;
+- `tri_resultats.csv` dans `log_dir`, une ligne par objet : date, run, objet, bac, positions
+  Gazebo / YOLO / DREAM / codeurs, nombre de vues DREAM, détection YOLO (confiance, caméras), écarts
+  XY, verdict.
+
+La position Gazebo est la **base** de l'objet (z ≈ 0, ~18 mm une fois tenu) : la courbe 3D de Gazebo
+plafonne plus bas que celles de YOLO et de DREAM. Le CSV et le tableau comparent en XY et n'en
+dépendent pas.
+
+**Premier résultat** (graine 1, cube rouge, 4 caméras, trié OK, à +6/−1 mm du centre du bac) :
+
+| écart XY à la saisie | mm |
+|---|---|
+| YOLO ↔ Gazebo | 0,6 |
+| DREAM ↔ Gazebo | 3,7 |
+| DREAM ↔ YOLO | 4,2 |
+| codeurs ↔ Gazebo | 2,4 |
+
+Un essai antérieur avec 4 caméras donnait, pour DREAM ↔ YOLO, 5,5 mm sur le cube et 2,5 mm sur le
+pavé. La campagne avec 2 caméras du 06/10 (graine 1) donnait 9,2 et 4,4 mm. À confirmer sur la
+campagne complète : un seul objet est mesuré avec la vérité terrain.
+
+**Charge et garde thermique** (limite : jamais au-delà de 95 °C) :
+
+- avec 4 caméras DREAM et la fenêtre Gazebo visible, le PC atteint 88 °C en moins d'une minute ;
+- **mettre Gazebo en pause ne refroidit pas** : les autres nœuds (4 × DREAM, YOLO, dashboard,
+  trieur) tournent à vide sur l'horloge figée, ~600 % CPU, et la température reste à 87-88 °C. La
+  campagne est restée bloquée 8 min ainsi ;
+- **le gel par SIGSTOP de tous les processus refroidit** : 88 → 78 °C en 10 à 50 s. Garde
+  retenue : gel à 88 °C, reprise à 78 °C, arrêt au-delà de 95 °C, lecture chaque seconde. Les délais
+  en temps réel du trieur sont multipliés par `wall_timeout_scale` pour survivre aux gels ;
+- `tri_scene_randomizer` tournait à vide à ~100 % CPU (exécuteur multi-thread) : boucle
+  mono-thread, ~10 % ;
+- deux arrêts à 98 et 96 °C, tous deux sur un **cœur P** (Core 24, Core 20), alors que la campagne
+  est épinglée sur les cœurs E (16-27). Causes trouvées hors de la campagne : un `find` sur tout le
+  dossier personnel lancé pendant la graine, puis l'hôte d'extensions de VS Code à **106 % CPU en
+  continu** sur un cœur P (PC à 76 °C sans rien lancer). Pendant une campagne, ne rien lancer de
+  lourd à côté, et vérifier la température au repos avant de lancer.
+
+**Campagne 4 graines (07/10, 18:02-19:09)** : 4 caméras DREAM et YOLO, Gazebo sans fenêtre,
+dashboard actif, campagne sur les cœurs 16-25 (VS Code déplacé sur 26-27), gel à 85 °C, reprise à
+75 °C. Résultats dans `results/yolo_gazebo/2026-10-07_campagne_dream4cam_nuit_4graines/`, un
+`tri_resultats.csv` par graine et `bilan_4_graines.csv` (16 lignes).
+
+| graine | tri | Tmax | gels | DREAM ↔ Gazebo par saisie (mm) | YOLO ↔ Gazebo (mm) |
+|---|---|---|---|---|---|
+| 1 | 4/4 | 90 °C | 99 (110 s) | 6,1 · 2,2 · 6,3 · 4,4 | 0,6 · 0,2 · 0,4 · 0,5 |
+| 2 | 4/4 | 88 °C | 118 (138 s) | 3,1 · 7,5 · 4,9 · 4,8 | 0,3 · 0,3 · 0,4 · 0,4 |
+| 3 | 4/4 | 89 °C | 117 (137 s) | 7,0 · 4,4 · 3,4 · 3,8 | 0,3 · 0,6 · 0,4 · 0,4 |
+| 4 | 4/4 | 90 °C | 117 (149 s) | 4,7 · 8,0 · 4,3 · 5,0 | 0,1 · 0,5 · 0,6 · 0,6 |
+
+Ordre : cube rouge, pavé jaune, cylindre vert, cube bleu. Sur les 16 saisies :
+
+| écart XY à la saisie | médiane | p90 | max |
+|---|---|---|---|
+| **YOLO ↔ Gazebo** | **0,4 mm** | 0,6 mm | 0,6 mm |
+| **DREAM ↔ Gazebo** | **4,8 mm** | 7,0 mm | 8,0 mm |
+| DREAM ↔ YOLO | 4,5 mm | 6,7 mm | 7,7 mm |
+| codeurs ↔ Gazebo | 2,0 mm | 2,8 mm | 3,1 mm |
+
+- **Tri 16/16**, YOLO a vu chaque objet sur les 4 caméras, aucun arrêt thermique (Tmax 90 °C).
+- DREAM ↔ YOLO passe de **8,2 mm** médian avec 2 caméras (06/10, 40 saisies) à **4,5 mm** avec 4.
+- YOLO est 10 fois plus proche de la vérité que DREAM. DREAM reste au-dessus des codeurs
+  (2,0 mm) : il ajoute environ 3 mm à la chaîne codeurs.
+- Mesure dans la scène simulée, la même que celle de l'entraînement de `vgg_tri_mix_ft_e10`.
+
+**Tableau de référence : statique = bras arrêté en pose d'observation** (comme au lancement de
+Gazebo, quand on teste la détection), **dynamique = pendant le tri** (bras ailleurs, en mouvement
+ou en saisie). Mêmes 4 graines, 4 caméras. YOLO : pièces sur la table avant leur saisie et bacs,
+ni cachés par une autre pièce ni tronqués (le bras, lui, peut cacher en dynamique).
+
+| DREAM | statique : détection | statique : médiane | statique : p90 | dynamique : détection | dynamique : médiane | dynamique : p90 |
+|---|---|---|---|---|---|---|
+| base | 100 % | 3,42 px | 3,75 px | 99,9 % | 3,41 px | 3,77 px |
+| link1 | 100 % | 3,41 px | 3,45 px | 100 % | 3,32 px | 3,49 px |
+| link2 | 100 % | 3,41 px | 3,45 px | 100 % | 3,32 px | 3,49 px |
+| link3 | 100 % | 1,91 px | 3,95 px | 99,7 % | 1,70 px | 3,08 px |
+| link4 | 100 % | 1,91 px | 6,23 px | 100 % | 1,74 px | 3,30 px |
+| link5 | 99,2 % | 3,13 px | 6,14 px | 98,2 % | 1,57 px | 3,22 px |
+| link6 | 100 % | 4,02 px | 6,19 px | 99,4 % | 1,94 px | 4,45 px |
+| **global** | **99,9 %** (1 799) | **3,24 px** | 4,69 px | **99,6 %** (7 829) | **2,94 px** | 3,54 px |
+
+| YOLO | statique : détection | statique : médiane | dynamique : détection | dynamique : médiane |
+|---|---|---|---|---|
+| cube rouge | 100 % | 0,10 px · 0,23 mm | 79,1 % | 0,14 px · 0,49 mm |
+| pavé jaune | 100 % | 0,08 px · 0,15 mm | 85,6 % | 0,10 px · 0,21 mm |
+| cylindre vert | 100 % | 0,12 px · 0,25 mm | 86,6 % | 0,18 px · 0,45 mm |
+| cube bleu | 100 % | 0,07 px · 0,19 mm | 87,7 % | 0,14 px · 0,42 mm |
+| bac rouge | 100 % | 0,11 px · 0,26 mm | 90,4 % | 0,16 px · 0,45 mm |
+| bac jaune | 92,8 % | 0,17 px · 0,32 mm | 83,8 % | 0,21 px · 0,47 mm |
+| bac vert | 100 % | 0,10 px · 0,24 mm | 92,3 % | 0,14 px · 0,33 mm |
+| bac bleu | 100 % | 0,09 px · 0,33 mm | 89,7 % | 0,16 px · 0,43 mm |
+| **objets** | **100 %** (3 569) | **0,10 px · 0,21 mm** | **86,4 %** (16 736) | **0,14 px · 0,40 mm** |
+| **bacs** | **98,2 %** (5 310) | **0,11 px · 0,28 mm** | **89,1 %** (32 819) | **0,17 px · 0,43 mm** |
+| **global** | **99,0 %** (8 879) | **0,11 px · 0,25 mm** | **88,2 %** (49 555) | **0,16 px · 0,42 mm** |
+
+YOLO par caméra, statique / dynamique : avant 100 / 92,4 %, gauche 99,0 / 92,7 %, droite
+97,2 / 93,3 %, dessus 100 / 77,8 %.
+
+**Par graine** (statique = pose d'observation, dynamique = pendant le tri ; DREAM : 7 keypoints par
+image, 4 caméras à 1 image/s ; YOLO : une ligne par objet visible, par caméra et par image) :
+
+| graine | DREAM statique | DREAM dynamique | YOLO statique | YOLO dynamique |
+|---|---|---|---|---|
+| 1 | 60 images · 419/420 = 99,8 % · 3,22 px | 272 images · 1 899/1 903 = 99,8 % · 2,93 px | 2 027/2 068 = 98,0 % · 0,22 mm | 11 103/12 500 = 88,8 % · 0,34 mm |
+| 2 | 60 images · 420/420 = 100 % · 3,19 px | 296 images · 2 064/2 071 = 99,7 % · 2,96 px | 1 944/1 944 = 100 % · 0,25 mm | 11 592/12 988 = 89,3 % · 0,44 mm |
+| 3 | 74 images · 518/518 = 100 % · 3,35 px | 274 images · 1 906/1 917 = 99,4 % · 2,89 px | 2 679/2 702 = 99,1 % · 0,28 mm | 10 661/12 207 = 87,3 % · 0,53 mm |
+| 4 | 63 images · 440/441 = 99,8 % · 3,30 px | 277 images · 1 929/1 938 = 99,5 % · 2,98 px | 2 136/2 165 = 98,7 % · 0,25 mm | 10 350/11 860 = 87,3 % · 0,41 mm |
+| **total** | **257 images · 1 797/1 799 = 99,9 % · 3,24 px** | **1 119 images · 7 798/7 829 = 99,6 % · 2,94 px** | **8 786/8 879 = 99,0 % · 0,25 mm** | **43 706/49 555 = 88,2 % · 0,42 mm** |
+
+Les 4 graines donnent presque la même chose (DREAM 99,4-100 %, 2,9-3,4 px ; YOLO 98-100 % en
+statique, 87-89 % pendant le tri) : le résultat ne dépend pas de la scène tirée.
+
+Méthode : DREAM, `dream_vs_fk.csv` ; détection = keypoints détectés / keypoints dans l'image ;
+erreur = distance en pixels au point vrai (FK des angles de l'instant de l'image, projetée), médiane
+sur tous les keypoints détectés mélangés. YOLO, `yolo_vs_gt.csv` ; détection = vrais positifs /
+(vrais positifs + manqués + mauvaise classe) ; erreurs sur les vrais positifs (pixels : centre de
+boîte ; mm : position 3D localisée contre la position Gazebo). Statique = les 6 angles à moins de 2°
+de la pose d'observation (0, 60, −70, 0, 0, 0)°.
+
+- **DREAM** garde ~99,6 % et ~3 px pendant le tri. En pose d'observation, link5 et link6 sont repliés
+  près de la base et se chevauchent dans l'image : leur médiane y monte à 3-4 px.
+- **YOLO** passe de 99,0 % à 88,2 % pendant le tri : c'est le bras qui passe devant (voir le tableau
+  « bras compté comme obstacle » plus bas : 96,7 % sur les objets visibles, 100 % en fusionnant les 4
+  caméras). La précision reste sous 0,5 mm. Le seul raté statique est le bac jaune (92,8 %).
+
+**Détection statique et dynamique, DREAM et YOLO** (mêmes 4 graines, toutes les images, 4 caméras) :
+
+*DREAM, 7 keypoints contre la FK des angles au même instant.* Statique : le bras bouge de moins
+de 0,5 °/s entre deux images d'une même caméra ; dynamique : au-delà, jusqu'à 110 °/s (bras en
+mouvement 64 % du temps).
+
+| keypoint | statique : détection | statique : médiane | statique : p90 | dynamique : détection | dynamique : médiane | dynamique : p90 |
+|---|---|---|---|---|---|---|
+| base | 100,0 % | 3,41 px | 3,76 px | 99,9 % | 3,41 px | 3,76 px |
+| link1 | 100,0 % | 3,32 px | 3,47 px | 100,0 % | 3,34 px | 3,49 px |
+| link2 | 100,0 % | 3,32 px | 3,47 px | 100,0 % | 3,34 px | 3,49 px |
+| link3 | 99,8 % | 1,88 px | 3,81 px | 99,8 % | 1,74 px | 3,42 px |
+| link4 | 100,0 % | 1,65 px | 4,95 px | 100,0 % | 1,77 px | 3,54 px |
+| link5 | 99,0 % | 1,86 px | 4,19 px | 98,5 % | 1,62 px | 3,63 px |
+| link6 | 100,0 % | 2,29 px | 5,14 px | 99,7 % | 2,12 px | 5,37 px |
+| **global** | **99,8 %** (3 437 kp) | **3,02 px** | 3,76 px | **99,7 %** (6 083 kp) | **2,99 px** | 3,74 px |
+
+*YOLO, 8 objets contre la vérité Gazebo* (objets ni cachés par une autre pièce ni tronqués ;
+détection = vrais positifs / (vrais positifs + manqués + mauvaise classe) ; erreurs sur les vrais
+positifs). Statique : pièce posée sur la table avant sa saisie, et bacs ; dynamique : pièce
+soulevée et portée par la pince ; puis pièce posée au fond de son bac.
+
+| objet | statique : détection | statique : médiane px | statique : médiane 3D | dynamique : détection | dynamique : médiane px | au fond du bac : détection |
+|---|---|---|---|---|---|---|
+| cube rouge | 84,2 % | 0,13 px | 0,38 mm | 27,9 % | 2,97 px | 7,1 % |
+| pavé jaune | 88,1 % | 0,10 px | 0,19 mm | 29,5 % | 3,77 px | 5,6 % |
+| cylindre vert | 89,2 % | 0,16 px | 0,38 mm | 45,3 % | 4,59 px | 6,0 % |
+| cube bleu | 89,7 % | 0,13 px | 0,40 mm | 31,9 % | 5,52 px | 0,2 % |
+| bac rouge | 91,7 % | 0,16 px | 0,41 mm | — | — | — |
+| bac jaune | 85,1 % | 0,20 px | 0,45 mm | — | — | — |
+| bac vert | 93,4 % | 0,13 px | 0,30 mm | — | — | — |
+| bac bleu | 91,1 % | 0,15 px | 0,42 mm | — | — | — |
+| **global** | **89,9 %** (58 329) | **0,15 px** | **0,39 mm** | **34,5 %** (2 045) | **4,51 px** | **6,2 %** (14 741) |
+
+*YOLO, objets et bacs séparés :*
+
+| | nb | détection | médiane px | médiane 3D | p90 3D |
+|---|---|---|---|---|---|
+| **objets posés sur la table** (statique) | 20 200 | **88,9 %** | 0,13 px | **0,34 mm** | 1,87 mm |
+| objets portés par la pince (dynamique) | 2 045 | 34,5 % | 4,51 px | — | — |
+| objets au fond de leur bac | 14 741 | 6,2 % | 1,49 px | 6,05 mm | 9,90 mm |
+| **bacs** (statiques) | 38 129 | **90,4 %** | 0,16 px | **0,40 mm** | 8,00 mm |
+
+Par caméra, objets sur la table / bacs : avant 89,9 / 97,5 %, gauche 94,0 / 93,5 %, droite
+97,2 / 92,3 %, dessus 76,6 / 83,8 %. La caméra du dessus détecte le moins mais localise le mieux
+(0,18 mm sur les objets, 0,21 mm sur les bacs, p90 ≤ 1,2 mm) ; le p90 des bacs vu de côté
+(8-15 mm) vient des caméras gauche et droite.
+
+Lecture :
+
+- **DREAM ne se dégrade pas en mouvement** : 99,8 → 99,7 %, 3,02 → 2,99 px. Gazebo rend chaque
+  image sans flou de bougé, et l'angle comparé est celui de l'instant de l'image (décalage 0 ms).
+  Sur le vrai robot, le flou et le décalage caméra ↔ codeurs changeraient ce résultat. Ce qui
+  limite DREAM en dynamique est sa cadence : 1 image par seconde et par caméra, ~170 ms de calcul.
+- **YOLO perd les pièces dès qu'elles sont portées** : 89,9 → 34,5 %, 0,15 → 4,5 px. La pince et
+  le bras masquent la pièce (le drapeau « caché » ne compte que l'occultation par une autre pièce),
+  et yolo26 n'a pas été entraîné sur des pièces tenues. L'erreur 3D n'a pas de sens sur une pièce
+  portée : la localisation suppose l'objet posé sur la table et le projette sur ce plan (médiane
+  145 mm). Seule l'erreur en pixels compte en dynamique.
+- **Au fond d'un bac, YOLO ne voit presque plus rien** : 6,2 %, déjà relevé à l'étape 11.
+- Le tri n'en souffre pas : il ne localise les pièces que posées sur la table, là où YOLO est à
+  89,9 % et 0,39 mm.
+
+**YOLO : le bras compté comme obstacle, et les 4 caméras fusionnées.** Le drapeau « caché » de
+`yolo_vs_gt.csv` ne compte que les pièces entre elles, pas le bras. Bras reconstruit à chaque image
+(angles interpolés, FK des 7 points et pointe de la pince, tubes de 40 mm de rayon) ; un objet est
+« caché par le bras » si plus de la moitié de ses points sont derrière le bras vu de la caméra. Pièces
+sur la table avant leur saisie, et bacs ; script : `yolo_bras_cache.py` (hors dépôt, session du 08/10).
+
+| | objets | bacs | **objets + bacs** |
+|---|---|---|---|
+| visibles (ni pièce ni bras devant) | 96,8 % (17 521) | 96,7 % (34 577) | **96,7 %** (52 098) |
+| cachés par le bras | 38,7 % (2 784) | — | 33,0 % (6 336) |
+| cachés par une autre pièce | 82,1 % (636) | — | 79,2 % (667) |
+| **fusion des 4 caméras** (au moins une caméra détecte l'objet, par seconde) | **100 %** (687) | **100 %** (1 392) | **100 %** (2 079) |
+
+Visibles, par caméra : avant 99,1 %, gauche 97,1 %, droite 96,4 %, dessus 95,7 %.
+
+- Les ~10 % manqués du tableau précédent viennent surtout du **bras**, qui passe devant les objets
+  pendant le tri. Bras en pose d'observation, YOLO détecte 97,1 à 100 % selon la caméra.
+- **Avec les 4 caméras fusionnées, aucun objet n'est perdu** : à chaque seconde, au moins une caméra
+  voit et détecte chaque objet et chaque bac (4 cas sur 2 083 où l'objet est caché pour les 4).
+- Les 3 % restants sur les objets visibles : occultations partielles sous le seuil de 50 %, et le
+  modèle du bras en tubes, approché (la pince n'est qu'un segment).
+- Ce qui reste propre à YOLO : 228 confusions bac ↔ pièce de même couleur (bac bleu → cube bleu 121,
+  bac jaune → pavé jaune 99) ; le bac jaune vu par la caméra droite (81 %).
+
+Modèles utilisés, publiés sur la branche : DREAM `vgg_tri_mix_ft_e10/best_network.pth` (89 Mo),
+YOLO `pieces_v6c_gazebo_yolo26s/weights/best.pt` (20 Mo).
+
+### CSV par essai : la campagne du 07/10 remise au propre (08/10)
+
+Les fichiers bruts de la campagne 4 graines (`dream_vs_fk.csv`, `yolo_vs_gt.csv`, `dream_pose.csv`,
+`tri.csv`, `tri_resultats.csv`, `campagne.log`) ont été réduits, **sans relancer de tri**, à 5 CSV
+lisibles par essai. Copie : `results/yolo_gazebo/2026-10-07_campagne_dream4cam_nuit_4graines_propre/`
+(l'original est inchangé), un dossier par graine `2026-10-07_tri_essai<k>_dream_yolo_gazebo/`,
+les bruts dans `brut_campagne/`. Valeurs en `float`, non arrondies ; positions en mm, repère de la
+base du robot.
+
+| fichier | une ligne = | colonnes |
+|---|---|---|
+| `essai.csv` | un objet ou un bac (8) | bac cible, tri réussi Oui/Non, durée du tri ; Gazebo x, y, z ; YOLO x, y, confiance, erreur YOLO − Gazebo x, y et xy ; DREAM x, y, z à la saisie, erreur DREAM − Gazebo x, y, z |
+| `trajectoire.csv` | une image d'une caméra pendant le tri (~1 200) | temps, caméra, objet, cible (l'objet puis son bac) ; erreur YOLO − Gazebo x, y sur la cible ; nombre de points DREAM, erreur DREAM − Gazebo x, y, z sur la pointe de la pince |
+| `dream.csv` | un point du bras (base … link6) + global | statique / dynamique : détection %, erreur médiane px |
+| `yolo.csv` | un objet, un bac, objets, bacs, global | statique / dynamique : détection %, erreur médiane px et mm (xy) |
+| `temperature.csv` | un événement thermique | heure, secondes depuis le départ, °C, gel oui/non (départ, gels ≥ 85 °C, reprises ≤ 75 °C, fin) |
+
+Statique = bras en pose d'observation (`OBSERVATION_Q_DEG` à 2° près), comme au lancement et entre
+deux objets ; dynamique = le reste du tri (`tri_bilan.ArmTimeline`).
+
+**YOLO : x et y seulement.** `locate_from_box` fixe z à la demi-hauteur de la classe (pièce posée
+sur la table) et ne cherche que (X, Y). Le z de YOLO est supposé, pas mesuré : son erreur vaut 0
+par construction, elle n'est pas écrite. Dans la trajectoire, la cible YOLO est toujours posée
+(l'objet avant la saisie, son bac après), donc l'hypothèse tient.
+
+**DREAM : x, y et z.** PnP sur les points DREAM contre les mêmes points calculés par FK aux angles
+des codeurs → pose du robot par rapport à la caméra ; la pointe de la pince, connue par les codeurs,
+est placée à travers cette pose (`dream_point`). Le z est donc mesuré ; l'erreur sur la pince est
+l'effet de l'erreur de pose caméra ↔ robot à l'endroit de la pince, pas une mesure sans codeurs.
+Pour `trajectoire.csv`, le PnP de `dream_inference` (EPnP + raffinement LM) est refait hors ligne
+sur les points enregistrés : 904 des 910 poses de `dream_pose.csv` retrouvées à 0,012 mm près
+(médiane), 6 (0,7 %) à plus de 1 mm, jusqu'à 160 mm, non expliquées.
+
+**`trajectoire.csv` est par caméra, sans fusion** : ses erreurs sont plus grandes que les valeurs
+fusionnées à la saisie (YOLO 0,4 mm, DREAM 4,8 mm, § ci-dessus).
+
+| essai | tri | images YOLO | YOLO − Gazebo xy, médiane / p90 | images DREAM | DREAM − Gazebo xyz, médiane / p90 | DREAM − Gazebo x / y / z, médianes |
+|---|---|---|---|---|---|---|
+| 1 | 4/4 | 1 132 | 1,76 / 12,6 mm | 224 | 10,7 / 20,7 mm | +3,3 / −0,8 / −1,7 mm |
+| 2 | 4/4 | 1 333 | 2,07 / 26,0 mm | 244 | 10,1 / 21,5 mm | +2,9 / +0,1 / −1,4 mm |
+| 3 | 4/4 | 1 075 | 1,84 / 12,2 mm | 218 | 11,8 / 22,5 mm | +3,4 / +0,1 / −1,4 mm |
+| 4 | 4/4 | 1 077 | 1,93 / 16,5 mm | 224 | 12,5 / 21,1 mm | +3,7 / −0,9 / −2,0 mm |
+
+Limites : `temperature.csv` ne contient que les événements de `campagne.log` (pas de relevé par
+seconde) ; une image par caméra toutes les ~0,6 s pour DREAM. Le bouton « Démarrer » écrit encore
+l'ancien format (`scene.csv`, `trajectoire.csv`, `resultat.csv`, `temperature.csv`, `bilan_tris.csv`).
+Scripts de conversion : hors dépôt (session du 08/10).
+
 ## Journal
 
 | Date | Étape | État | Preuve / mesure |
@@ -1352,32 +1965,46 @@ taux de détection, ne garder que les lignes en pose d'observation.
 | 29/09/2026 | 0 — masses | fait | défauts 1,58 / 0,22 ; xacro contre HEAD : 18 liens, 0 écart, 1,840 kg |
 | 29/09/2026 | 0 — `load_cameras` | fait | lit l'URDF après xacro ; `tests/test_sim_multicam.py` 7/7 (0/7 avant) ; `real_table` headless graine 1 : cube vu par les 4 caméras, localisé à **2,2 mm** de la position tirée |
 | 29/09/2026 | 1 — caméras du 50K | fait | `camera_layout:=dream50k` ; `legacy` produit un URDF identique à l'ancien ; `tests/test_cameras_dream50k.py` 7/7, et il échoue bien si la top est décalée de 1 cm ; Gazebo : TF 0,800/0,950 m, K = 493,7925 ; images : `protocole_yolo_gazebo/etape1_cameras_dream50k.png` |
-| 29/09/2026 | 2 — scène (en cours) | premier essai OK, **en attente de l'observation d'Osama** | `tri_yolo.launch.py` + `vision/tri_scene.py`. Le monde est reconstruit à chaque lancement depuis `real_table.sdf` (pas de `tri_yolo.sdf` figé qui pourrait diverger). Graine 1 : les 8 pièces sont en place à ≤ 0,5 mm du tirage, z = 0, rien n'a bougé ; images : `protocole_yolo_gazebo/etape2_seed1.png` |
+| 29/09/2026 | 2 — scène | fait (mis à jour le 07/10 : scène utilisée par toutes les campagnes des étapes 7 à 11, tri 40/40) | `tri_yolo.launch.py` + `vision/tri_scene.py`. Le monde est reconstruit à chaque lancement depuis `real_table.sdf` (pas de `tri_yolo.sdf` figé qui pourrait diverger). Graine 1 : les 8 pièces sont en place à ≤ 0,5 mm du tirage, z = 0, rien n'a bougé ; images : `protocole_yolo_gazebo/etape2_seed1.png` |
 | 29/09/2026 | 2 — mesures | fait | **portée** : colonne de prise (110 mm → prise → levée) et colonne de dépôt atteignables jusqu'à r = 0,28 m, pas à 0,30 m, quel que soit l'azimut (0, ±50, ±100°) → `REACH_MAX = 0,28`. **Place disponible** : avec 30 mm entre bacs, seuls 3 bacs tiennent dans la bande atteignable ; d'où 10 mm entre bacs et 30 mm autour des objets. Tirage : ~1 s médian, 5 s au pire. **Pose d'observation** q = (0, 60, −70, 0, 0, 0)° : 4,3 % du plateau masqué dans la vue top (13,4 % à q = 0), ombre du bras à x ≈ −0,15 m, hors plateau |
-| 29/09/2026 | 2 — zone de travail | fait (consigne d'Osama) | objets et bacs **entre les marqueurs, devant 19/23**, comme sur le banc réel : bande x ∈ [0,146 ; 0,494] m, calculée depuis les poses des marqueurs dans le monde. La portée 0,28 m n'est **plus imposée** ; elle est **signalée** au lancement (en moyenne 4,9 pièces sur 8 au-delà) → l'IK outil vertical devra être étendue à l'étape 9, puisque le vrai bras atteint ~0,39 m avec l'outil incliné. Tirage : 134 ms médian. `tests/test_tri_scene.py` : 6 tests, dont 300 tirages vérifiés contrainte par contrainte |
-| — | 2 — plus tard | demandé par Osama | bouton **« Randomiser »** qui redéplace objets et bacs sans relancer Gazebo (sur le modèle de `sim_scene_panel` et du service `/real_table/randomize`) |
+| 29/09/2026 | 2 — zone de travail | fait (consigne) | objets et bacs **entre les marqueurs, devant 19/23**, comme sur le banc réel : bande x ∈ [0,146 ; 0,494] m, calculée depuis les poses des marqueurs dans le monde. La portée 0,28 m n'est **plus imposée** ; elle est **signalée** au lancement (en moyenne 4,9 pièces sur 8 au-delà) → l'IK outil vertical devra être étendue à l'étape 9, puisque le vrai bras atteint ~0,39 m avec l'outil incliné. Tirage : 134 ms médian. `tests/test_tri_scene.py` : 6 tests, dont 300 tirages vérifiés contrainte par contrainte |
+| — | 2 — plus tard | **fait le 07/10** (§ « Bouton Randomiser ») | bouton **« Randomiser »** qui redéplace objets et bacs sans relancer Gazebo (sur le modèle de `sim_scene_panel` et du service `/real_table/randomize`) |
 | 29/09/2026 | 4-5 (version rapide) — yolo26 contre la GT | fait | `scripts/yolo26_tri_eval.py` (outil de VALIDATION : il lit la GT). yolo26 `pieces_v5_yolo26s`, seuil 0,10, service inchangé. Boîtes GT = boîte 3D du `model.sdf` projetée (amodale, rognée au bord de l'image ; « cachée » si > 50 % couverte par une pièce plus proche). 10 graines, CSV : `protocole_yolo_gazebo/campagne_10_graines/` |
 | 29/09/2026 | modèles Gazebo | fait | bacs aux cotes du plan (parois 5 mm, ouverture 95, retraits d'angle) ; teinte du matériau vert 39 → 47, jaune 21 → 22, pour que le rendu tombe sur les teintes réelles mesurées ; graine 1 caméra top : 7/8 → 8/8. Détail : § « Correction des modèles Gazebo » |
 | 29/09/2026 | campagne v3 (vert assombri) | fait | aucun changement (top 73/80, bac_jaune 4/10) ; arrêt des retouches de couleur |
 | 29/09/2026 | 3 — vérité terrain | fait | `gazebo_ground_truth` → `/validation/gt/objects` ; `tests/test_gazebo_ground_truth.py` (5), `tests/test_gt_isolation.py` (garde I4) |
 | 29/09/2026 | 4 — nœud YOLO | fait | `yolo_gazebo_node` → `/yolo/<cam>/detections` + image annotée ; 8/8 en direct |
-| 29/09/2026 | 6 — localisation 3D | fait (V1 top) | `yolo_localizer` → `/yolo/objects_3d` ; 3,5-4,7 mm en direct ; biais +x à expliquer |
+| 29/09/2026 | 6 — localisation 3D | fait (V1 top) | `yolo_localizer` → `/yolo/objects_3d` ; 3,5-4,7 mm en direct ; biais +x **expliqué le 07/10** (boîte recalée, v6c, troncature des coins) |
 | 29/09/2026 | 5 — comparateur en nœud (3D, top) | fait | `yolo_gt_overlay` → panneau dans Gazebo : classe, score, erreur XY par pièce ; graine 2 : 8/8, médiane 3,8 mm, max 4,7 mm ; `tests/test_yolo_gt_overlay.py` (6). La version 2D hors ligne reste `scripts/yolo26_tri_eval.py` |
 | 29/09/2026 | campagne yolo26 après correction | fait | top 71 → 73/80 ; bac_vert 0,89 → 0,97 ; bac_jaune 2 → 4/10 (teinte juste, reste S/V) ; gauche 53 → 62 % |
 | 29/09/2026 | 7 — quatre caméras sans fusion | fait | 10 graines : top 73/80 (4,2 / 6,3 mm), avant 33/47, droite 42/78, gauche 48/78 (max 46 mm) ; tableau caméra × classe § « Étape 7 » ; campagne bridée `taskset -c 16-23`, 70-76 °C. Décision sélection / fusion : à trancher |
 | — | 2 — pour l'étape 9 | à retenir | `sort_one` ouvre la pince en grand (±81 mm de demi-encombrement) avant de descendre à 18 mm, sous le rebord des bacs (30 mm). Avec 30 mm d'écart autour des objets, les doigts peuvent toucher un bac voisin : il faudra une ouverture juste suffisante, ou un écart plus grand, à mesurer |
-| 01/10/2026 | réentraînement yolo26 | fait, **v6c adopté** (validé par Osama) | v6c (réelles ×10 + 1 036 Gazebo) : 4 caméras 283/283, e_3d max 3,5 mm (top) ; réel 0,990 contre 0,967 (v5) ; v6b écarté (bac rouge réel coupé). § « yolo26 réentraîné avec les images Gazebo » |
+| 01/10/2026 | réentraînement yolo26 | fait, **v6c adopté** (validé) | v6c (réelles ×10 + 1 036 Gazebo) : 4 caméras 283/283, e_3d max 3,5 mm (top) ; réel 0,990 contre 0,967 (v5) ; v6b écarté (bac rouge réel coupé). § « yolo26 réentraîné avec les images Gazebo » |
 | 01/10/2026 | localisation 3D recalée | fait (hors ligne) | `tri_scene.locate_from_box` dans `yolo_localizer` : max 3,5 → 2,3 mm (dessus), 7,2 → 2,6 (avant), 5,6 → 5,0 (gauche), 6,6 → 6,3 (droite) ; reste le −0,5 px de yolo26, à expliquer. 37 tests OK |
 | 01/10/2026 | 4 caméras ensemble | mesuré (hors ligne) | fusion par la médiane : 0,70 mm médiane, 2,92 max ; dessus seule 1,41 / 2,28 ; moyenne des 4 médianes 1,69 mm. Proposition révisée : fusion (au lieu de sélection) |
-| 01/10/2026 | 8 — tri par la perception seule | fait, **validé par Osama (05/10)** | `/yolo/objects_3d` = fusion médiane des 4 caméras, objets et bacs ; paires par la classe (`sorting_pairs`). Hors ligne 10 graines : 80/80, 40/40 paires, 0,65 / 2,07 mm ; en direct graine 3 : 8/8, 4/4, 0,85 / 1,94 mm. 40 tests OK |
-| 01/10/2026 | 9 — tri piloté par la perception | fait, **validé par Osama (05/10)** | `pose_source:=perception` : 6/40 triés, **6/6 des pièces à portée**, 0 échec de perception ou de prise ; 34 échecs de portée (outil vertical 0,28 m). Corrections : ouverture d'approche, cubes à 0/90°, dépôt résolu avant saisie |
-| 02/10/2026 | 9 suite — portée et lâcher | fait (graine 1), campagne en cours | `piece_reach:=0.28`, lâcher incliné 15/30/45°, 2 essais ; lâcher au-dessus du rebord pour tous, doigts écartés **avant** la remontée (glissement vu par Osama). Graine 1 : **4/4**, objets au fond avant la remontée, écart max +12/−10 mm (pavé). `--switch-timeout 30` |
-| 05/10/2026 | 9 suite — campagne 10 graines | fait, **validé par Osama (05/10)** | **40/40**, 0 deuxième essai ; lâcher vertical 10 / 15° 19 / 30° 11 ; écart au centre médiane 7 mm, max 17 mm ; Tmax 86 °C |
+| 01/10/2026 | 8 — tri par la perception seule | fait, **validé (05/10)** | `/yolo/objects_3d` = fusion médiane des 4 caméras, objets et bacs ; paires par la classe (`sorting_pairs`). Hors ligne 10 graines : 80/80, 40/40 paires, 0,65 / 2,07 mm ; en direct graine 3 : 8/8, 4/4, 0,85 / 1,94 mm. 40 tests OK |
+| 01/10/2026 | 9 — tri piloté par la perception | fait, **validé (05/10)** | `pose_source:=perception` : 6/40 triés, **6/6 des pièces à portée**, 0 échec de perception ou de prise ; 34 échecs de portée (outil vertical 0,28 m). Corrections : ouverture d'approche, cubes à 0/90°, dépôt résolu avant saisie |
+| 02/10/2026 | 9 suite — portée et lâcher | fait (graine 1) ; campagne 10 graines terminée le 05/10 (ligne suivante, 40/40) | `piece_reach:=0.28`, lâcher incliné 15/30/45°, 2 essais ; lâcher au-dessus du rebord pour tous, doigts écartés **avant** la remontée (glissement vu). Graine 1 : **4/4**, objets au fond avant la remontée, écart max +12/−10 mm (pavé). `--switch-timeout 30` |
+| 05/10/2026 | 9 suite — campagne 10 graines | fait, **validé (05/10)** | **40/40**, 0 deuxième essai ; lâcher vertical 10 / 15° 19 / 30° 11 ; écart au centre médiane 7 mm, max 17 mm ; Tmax 86 °C |
 | 05/10/2026 | 11 — journalisation CSV | fait (graine 1) | `log_dir:=` → `run.yaml` (md5 des poids, masse, commit), `yolo_vs_gt.csv` (colonnes du protocole, en continu), `tri.csv` ; `vision/yolo_vs_gt.py` partagé avec `yolo26_tri_eval.py` ; 21 tests OK |
-| 05/10/2026 | 10 — DREAM en parallèle + non-régression pince | fait, **à valider par Osama** | `dream:=true`, `dream_fk_compare` ; sans → avec pince : détection 65,2 → 49,5 %, médiane 3,8 → 11,2 px, aberrant 6,6 → 22,7 % ; caméra du dessus en échec **même sans pince** ; graine 2 avec DREAM : 4/4 mais 95 °C (garde durcie) |
+| 05/10/2026 | 10 — DREAM en parallèle + non-régression pince | fait ; mesure v4_mix **remplacée** par celle du 07/10 avec `vgg_tri_mix_ft_e10` | `dream:=true`, `dream_fk_compare` ; sans → avec pince : détection 65,2 → 49,5 %, médiane 3,8 → 11,2 px, aberrant 6,6 → 22,7 % ; caméra du dessus en échec **même sans pince** ; graine 2 avec DREAM : 4/4 mais 95 °C (garde durcie) |
 | 05/10/2026 | 10 — monde du 50K contre scène de tri | fait | sans pince, mêmes poses : détection 99,2 % / 3,0 px dans le monde du 50K contre 65,2 % / 3,8 px dans la scène de tri ; caméra du dessus 100 % dans le monde du 50K → **la cause est la scène, pas la caméra ni la pince** |
 | 05/10/2026 | 10 — modèle montage0901 | fait | même balayage : 99,0 % monde du 50K, 61,5 % tri sans pince, 49,8 % tri avec pince — identique au v4_mix ; l'écart est propre au rendu Gazebo, seul un fine-tuning sur des rendus de la scène de tri le comblerait |
 | 05/10/2026 | 10 — ablation ArUco / pièces | fait | sans pince : 50K 99,2 % → plateau seul 71,4 % (dessus 10 %) → sans ArUco 66,6 % → complète 65,2 % ; ArUco négligeables, pièces = caméra avant, plateau/monde real_table = l'essentiel |
-| 05/10/2026 | 10 — dashboard YOLO + DREAM | fait, **à valider par Osama** | `dashboard:=true` → `tri_dream_dashboard` ; T_DREAM contre T_GT, trajectoire de la bride, dXYZ, rotation, latence ; PnP de `dream_inference` sur les angles de l'instant de l'image |
-| 05/10/2026 | 10 — dashboard v2 DREAM ↔ YOLO, une seule fenêtre | fait, **à valider par Osama** | Gazebo reparenté dans la case 3D du dashboard (`embed_gazebo`) ; trajectoires colorées par objet + DREAM dans Gazebo ; pointe = `tool_tip` du trieur (codeurs ↔ YOLO 1,8-2,8 mm) ; `dream_cameras:=front,right` : 4/4 à 88 °C ; écart DREAM ↔ YOLO 10-315 mm, dû à T_DREAM (rotation 27-32°, profondeur 29-43 mm, keypoints 7-37 px) |
-| 05-06/10/2026 | 10 — fine-tuning DREAM scène de tri | rendus faits, entraînement en cours | `synthetic_data_collector_tri` : 12 080 images train (1001-1016) + 1 200 test (2001-2003), Tmax 84 °C ; v4_mix sur le test : 52,6 % / 16,7 px ; `v5_geo` depuis v4_mix sur 104 160 images, 10 époques → `vgg_tri_mix_ft_e10` |
+| 05/10/2026 | 10 — dashboard YOLO + DREAM | fait, **à valider** | `dashboard:=true` → `tri_dream_dashboard` ; T_DREAM contre T_GT, trajectoire de la bride, dXYZ, rotation, latence ; PnP de `dream_inference` sur les angles de l'instant de l'image |
+| 05/10/2026 | 10 — dashboard v2 DREAM ↔ YOLO, une seule fenêtre | fait, **à valider** | Gazebo reparenté dans la case 3D du dashboard (`embed_gazebo`) ; trajectoires colorées par objet + DREAM dans Gazebo ; pointe = `tool_tip` du trieur (codeurs ↔ YOLO 1,8-2,8 mm) ; `dream_cameras:=front,right` : 4/4 à 88 °C ; écart DREAM ↔ YOLO 10-315 mm, dû à T_DREAM (rotation 27-32°, profondeur 29-43 mm, keypoints 7-37 px) |
+| 05-06/10/2026 | 10 — fine-tuning DREAM scène de tri | fait | `synthetic_data_collector_tri` : 12 080 images train (1001-1016) + 1 200 test (2001-2003), Tmax 84 °C ; v4_mix sur le test : 52,6 % / 16,7 px ; `v5_geo` depuis v4_mix sur 104 160 images, 10 époques → `vgg_tri_mix_ft_e10` |
+| 06/10/2026 | 10 — évaluation de `vgg_tri_mix_ft_e10` | fait, pris en compte dans le verdict du 07/10 | test tri 2001-2003 : 53,6 → 99,7 %, 15,4 → 3,0 px ; réel 87,6 → 88,5 %, 2,43 → 3,18 px ; 50K inchangé (99,4 %) ; graine 7 front + right : 4/4, rotation de T_DREAM 32,1 / 26,5° → 1,6 / 2,6°, translation 36,8 / 46,1 → 8,4 / 12,2 mm, keypoints 17,5 / 12,3 → 2,8 / 3,0 px ; DREAM ↔ YOLO par saisie relevé ensuite (ligne suivante) |
+| 06/10/2026 | 10 — campagne 10 graines avec `vgg_tri_mix_ft_e10` | fait, pris en compte dans le verdict du 07/10 | **40/40**, aucun arrêt thermique, Tmax 89 °C ; `dream_vs_yolo.csv` par saisie : DREAM ↔ YOLO médiane **8,2 mm**, p90 12,5, max 19,7 (05/10 : 10-315 mm) ; codeurs ↔ YOLO 2,2 mm ; T_DREAM front 8,3 mm / 1,8°, right 12,9 mm / 2,6° ; keypoints 99,4 / 100 %, 2,8 / 3,1 px ; observabilité (206 images) : 2 vues J1-J5 0,4-1,8° médian, J6 non observable (91° même en FK exacte), 1 vue ambiguë ; test réel hors échantillon impossible (md5 : val partage les sessions, session6 vérité cassée) |
+| 07/10/2026 | 10 — non-régression pince avec `vgg_tri_mix_ft_e10` | fait | mêmes 14 poses, graine 1, 4 caméras : sans → avec pince 98,7 → **99,2 %**, 3,0 → **3,0 px**, aberrant 0,0 → 0,5 % (05/10 avec v4_mix : 65,2 → 49,5 %, 3,8 → 11,2 px) ; caméra du dessus 100 % ; Tmax 77 / 87 °C |
+| 07/10/2026 | **10 — verdict** | **validé en simulation**, avec réserves | les trois exigences du protocole sont remplies ; critères détection > 90 % et médiane < 5 px tenus ; rotation < 5° tenue en médiane, pas au p90 de la caméra droite (5,3°) ; J6 non observable ; une vue seule ambiguë ; aucun test réel hors échantillon |
+| 07/10/2026 | 2 — bouton « Randomiser » | fait | `tri_scene_randomizer` + `tri_scene_panel` ; 8 positions à 0,03-0,05 mm du tirage ; tri après tirage 4/4 au premier essai, Tmax 79 °C |
+| 07/10/2026 | 6 — le −0,5 px de yolo26 | expliqué, corrigé en simulation | troncature `int()` des coins dans `yolo26_service.py` ; `yolo_exact_boxes:=1` (défaut de `tri_yolo`), réel inchangé ; graines 1-2 : biais −0,5 → ±0,07 px, erreur 3D médiane 1,4-2,1 → 0,13-0,57 mm |
+| 07/10/2026 | 11 — détections manquées par situation | fait (hors ligne, 10 graines) | FN : table 10,8 %, soulevée 70,4 %, fond de bac 90,7 % ; caméra du dessus 100 % au fond d'un bac sans paroi entre les deux → yolo26 n'a jamais vu de pièce dans un bac (hypothèse) |
+| 07/10/2026 | 10 — DREAM 4 caméras contre YOLO et Gazebo | fait (4 graines, 16/16) | dashboard : courbes Gazebo / YOLO / DREAM par cycle jusqu'au dépôt, vue « tous les objets », tableau DREAM ↔ Gazebo et YOLO ↔ Gazebo, `tri_resultats.csv` ; graine 1 cube rouge : YOLO ↔ Gazebo 0,6 mm, DREAM ↔ Gazebo 3,7 mm, DREAM ↔ YOLO 4,2 mm ; garde par SIGSTOP (la pause Gazebo ne refroidit pas) ; arrêts à 98 / 96 °C causés hors campagne (cœurs P : `find`, VS Code à 106 %) ; campagne 3 graines à relancer |
+| 07/10/2026 | 10 — campagne 4 graines, 4 caméras, vérité Gazebo | fait | **16/16** ; YOLO ↔ Gazebo médiane **0,4 mm** (max 0,6) ; DREAM ↔ Gazebo médiane **4,8 mm** (p90 7,0, max 8,0) ; DREAM ↔ YOLO 4,5 mm (8,2 mm avec 2 caméras) ; codeurs ↔ Gazebo 2,0 mm ; Tmax 90 °C, aucun arrêt ; `bilan_4_graines.csv` |
+| 08/10/2026 | 10 — détection statique / dynamique, DREAM et YOLO | fait (4 graines) | DREAM statique 99,8 % / 3,02 px, dynamique 99,7 % / 2,99 px, link6 le moins bon (p90 5,4 px) ; YOLO statique 89,9 % / 0,15 px / 0,39 mm, portée 34,5 % / 4,5 px, fond de bac 6,2 % ; Gazebo sans flou de bougé |
+| 08/10/2026 | 10 — YOLO, bras compté comme obstacle, fusion 4 caméras | fait (4 graines) | objets + bacs visibles **96,7 %** (au lieu de ~90 % avec le bras) ; cachés par le bras 33 % ; **fusion 4 caméras : 100 %** des objets et bacs détectés chaque seconde ; reste propre à YOLO : 228 confusions bac ↔ pièce |
+| 08/10/2026 | 10 — tableau de référence statique (pose d'observation) / dynamique (tri) | fait (4 graines) | DREAM 99,9 % / 3,24 px → 99,6 % / 2,94 px ; YOLO 99,0 % / 0,25 mm → 88,2 % / 0,42 mm (bras devant les objets) |
+| 08/10/2026 | 10 — statique / dynamique par graine, DREAM et YOLO | fait | DREAM statique 99,8-100 % / 3,19-3,35 px, dynamique 99,4-99,8 % / 2,89-2,98 px ; YOLO statique 98,0-100 % / 0,22-0,28 mm, dynamique 87,3-89,3 % / 0,34-0,53 mm ; méthode de calcul écrite |
+| 08/10/2026 | 11 — CSV par essai (campagne du 07/10) | fait (hors ligne) | 5 CSV par essai dans `…_4graines_propre/` : `essai`, `trajectoire`, `dream`, `yolo`, `temperature` ; YOLO en x, y seulement (z supposé) ; DREAM x, y, z par PnP refait (904/910 poses à 0,012 mm) ; par caméra, YOLO − Gazebo 1,8-2,1 mm, DREAM − Gazebo 10-12 mm (médianes) |

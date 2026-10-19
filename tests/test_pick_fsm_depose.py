@@ -177,6 +177,13 @@ class AvantDeSaisir(unittest.TestCase):
         self.assertEqual(ctx.roulis_appris.get("carton@375"), 30)
 
 
+def au_dessus_du_carton(ctx):
+    sol = fsm.resout_ik(np.array([*ctx.carton_xy, fsm.Z_TRANSFERT]),
+                        ctx.R_carton if ctx.R_carton is not None
+                        else fsm.orientation(ctx.carton_xy))
+    ctx.pont.q = sol[0].copy()
+
+
 class AuDessusDuCarton(unittest.TestCase):
     """Une fois le bras au-dessus du carton, il largue.
 
@@ -188,10 +195,16 @@ class AuDessusDuCarton(unittest.TestCase):
     def _machine(self, vu, r_carton=True):
         ctx = fsm.Contexte()
         ctx.pont = FauxPont(2)
-        ctx.carton_xy = np.array([280.0, -130.0])
+        # 224 mm : dans la portee VERTICALE de la pince sur support (260 mm,
+        # 30/09). A 309 mm, seule la pince de cote tenait verticale.
+        ctx.carton_xy = np.array([200.0, -100.0])
         ctx.R_carton = fsm.orientation(ctx.carton_xy) if r_carton else None
         ctx.detecteur_carton = lambda patience=1.0: (np.asarray(vu, float), None)
         machine = fsm.MachineEtats(ctx)
+        # L'etat TRANSFERT a deja amene le bras au-dessus du carton. Depuis
+        # POSE_OBSERVATION (bras dresse depuis la pince sur support, 30/09), la
+        # garde anti-plongeon refuserait la descente d'un seul ordre.
+        au_dessus_du_carton(ctx)
         machine.etat = "LARGAGE"
         return machine
 
@@ -1000,11 +1013,22 @@ class LaPinceNOuvrePasSiLeBrasNEstPasArrive(unittest.TestCase):
     def _machine(self, pont):
         ctx = fsm.Contexte()
         ctx.pont = pont
-        ctx.carton_xy = np.array([280.0, -130.0])
+        # 224 mm : dans la portee VERTICALE de la pince sur support (260 mm,
+        # 30/09). A 309 mm, seule la pince de cote tenait verticale.
+        ctx.carton_xy = np.array([200.0, -100.0])
         ctx.R_carton = fsm.orientation(ctx.carton_xy)
         ctx.classe_objet = "robot"
         ctx.en_main = "robot"
         machine = fsm.MachineEtats(ctx)
+        if isinstance(pont, self.PontQuiNObeitPas):
+            # Bras bloque EN CHEMIN : il part d'un survol execute le 30/09, a
+            # hauteur de travail mais a ~160 mm du carton. Depuis POSE_OBSERVATION
+            # (bras dresse depuis la pince sur support), la garde anti-plongeon
+            # refuserait l'ordre avant meme de savoir s'il est suivi.
+            pont.q = np.array([31.99, -20.12, -54.84, -17.66, 89.64, -58.27])
+        else:
+            # L'etat TRANSFERT a deja amene le bras au-dessus du carton.
+            au_dessus_du_carton(ctx)
         machine.etat = "LARGAGE"
         return machine
 
@@ -1025,7 +1049,7 @@ class LaPinceNOuvrePasSiLeBrasNEstPasArrive(unittest.TestCase):
         self.assertIsNone(machine.ctx.carton_resolu)
         # Et le même point ne ressort pas de la résolution suivante.
         ctx = machine.ctx
-        cible, _, R = fsm.carton_atteignable(ctx, np.array([280.0, -130.0]), None)
+        cible, _, R = fsm.carton_atteignable(ctx, np.array([200.0, -100.0]), None)
         self.assertTrue(cible is None
                         or float(np.linalg.norm(cible - ctx.largages_rates[0])) >= 20.0)
         del rate
@@ -1497,19 +1521,45 @@ class LesDoigtsNeTouchentPasLaPlanche(unittest.TestCase):
         """Le plancher ne borne que la CONSIGNE : en Z la descente n'est pas
         asservie. On verifie donc la hauteur REELLEMENT atteinte."""
         ctx = _contexte_de_prise()
+        cible = np.array([ctx.balle_xy[0], ctx.balle_xy[1], fsm.GARDE_PLANCHE])
         bas = _pose_a_la_hauteur(ctx, -4.0)
         ctx.pont.q = bas.copy()
-        rendu = fsm.releve_les_doigts(ctx, bas, ctx.balle_xy)
+        rendu = fsm.cale_les_doigts(ctx, bas, cible)
         self.assertGreaterEqual(float(fsm.pointe(rendu)[2]), fsm.GARDE_PLANCHE - 1.0)
         self.assertIn("send_angles", ctx.pont.envois)
 
-    def test_une_arrivee_CORRECTE_ne_declenche_aucun_mouvement(self):
-        """Remonter systematiquement couterait un mouvement par prise."""
+    def test_une_arrivee_TROP_HAUTE_est_redescendue(self):
+        """Le cas COURANT, mesure le 28/08 : consigne 2,5 -> 7,10 mm atteints a
+        306 mm d'allonge, consigne 9,0 -> 16,74 a 351 mm. Le bras arrive 3 a
+        8 mm trop haut et la pince se referme au-dessus de l'objet."""
         ctx = _contexte_de_prise()
-        bonne = _pose_a_la_hauteur(ctx, fsm.GARDE_PLANCHE + 6.0)
+        cible = np.array([ctx.balle_xy[0], ctx.balle_xy[1], fsm.GARDE_PLANCHE])
+        haut = _pose_a_la_hauteur(ctx, fsm.GARDE_PLANCHE + 9.0)
+        ctx.pont.q = haut.copy()
+        rendu = fsm.cale_les_doigts(ctx, haut, cible)
+        atteint = float(fsm.pointe(rendu)[2])
+        self.assertLess(atteint, fsm.GARDE_PLANCHE + 9.0)
+        self.assertGreaterEqual(atteint, fsm.GARDE_PLANCHE - 1.0,
+                                "le calage ne doit JAMAIS passer sous la garde")
+
+    def test_le_calage_ne_vise_jamais_sous_la_garde(self):
+        """Meme si la hauteur demandee est negative, la garde prime."""
+        ctx = _contexte_de_prise()
+        cible = np.array([ctx.balle_xy[0], ctx.balle_xy[1], -8.0])
+        haut = _pose_a_la_hauteur(ctx, 20.0)
+        ctx.pont.q = haut.copy()
+        rendu = fsm.cale_les_doigts(ctx, haut, cible)
+        self.assertGreaterEqual(float(fsm.pointe(rendu)[2]), fsm.GARDE_PLANCHE - 1.0)
+
+    def test_une_arrivee_CORRECTE_ne_declenche_aucun_mouvement(self):
+        """Recaler systematiquement couterait un mouvement par prise."""
+        ctx = _contexte_de_prise()
+        voulu = fsm.GARDE_PLANCHE + 6.0
+        cible = np.array([ctx.balle_xy[0], ctx.balle_xy[1], voulu])
+        bonne = _pose_a_la_hauteur(ctx, voulu)
         ctx.pont.q = bonne.copy()
         ctx.pont.envois.clear()
-        rendu = fsm.releve_les_doigts(ctx, bonne, ctx.balle_xy)
+        rendu = fsm.cale_les_doigts(ctx, bonne, cible)
         self.assertIs(rendu, bonne)
         self.assertNotIn("send_angles", ctx.pont.envois)
 
@@ -1539,7 +1589,7 @@ def _pose_a_la_hauteur(ctx, z):
 class LEtatDESCENTEVaJusquAuBout(unittest.TestCase):
     """`_descente` doit rendre un etat, pas lever.
 
-    Les tests de `LesDoigtsNeTouchentPasLaPlanche` appellent `releve_les_doigts`
+    Les tests de `LesDoigtsNeTouchentPasLaPlanche` appellent `cale_les_doigts`
     directement : ils n'auraient pas vu qu'un `or q` sur un tableau numpy leve
     ValueError des la premiere descente reelle. Celui-ci traverse l'etat entier.
     """
@@ -1579,4 +1629,4 @@ class LEtatDESCENTEVaJusquAuBout(unittest.TestCase):
         self.hauteur = fsm.GARDE_PLANCHE - 5.0
         ctx = self._contexte()
         self.assertEqual(fsm._descente(ctx), "SAISIE")
-        self.assertIn("sous la garde", " ".join(ctx.journal))
+        self.assertIn("au lieu de", " ".join(ctx.journal))

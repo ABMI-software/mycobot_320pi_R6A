@@ -9,7 +9,7 @@ A full session has a rhythm. Skipping steps breaks things the session after next
 
 ## 0. Before you start
 
-- Pi is powered and on `10.10.0.223` (NOT `.225` — older docs lie)
+- Pi is powered and on `10.10.0.224` (NOT `.223` or `.225` — older docs lie)
 - Physical arm is secured — nothing will hit the table, no cables wrapped
 - Operator is at ~50 cm from the Astra, if doing teleop
 - **The current physical robot has no gripper.** Any launch must include `--no-gripper` or skip gripper bridges.
@@ -25,7 +25,7 @@ Five steps, exit code says which failed. Do not advance if any fail. See [`.clau
 ## 2. Start the Pi-side bridge
 
 ```bash
-ssh er@10.10.0.223
+ssh er@10.10.0.224
 # on the Pi:
 python3 bridge_pi_simple.py
 ```

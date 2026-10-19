@@ -1,10 +1,8 @@
-source: '15/09/2026 — 19 et 23 MESURES AU ROBOT (pince placee a la main, marqueur
-  au milieu des doigts, codeurs lus sans ordre moteur) : 19 (87,1 ; 212,4), 23 (110,9
-  ; -163,0). Forme de la planche = positions relatives des 4 centres vues par l arducam
-  (distances entre centres justes a 0,04 %), posee rigidement sur ces deux points
-  (residu 3,3 mm). 25 et 26 hors de portee du bras : deduits de cette forme. La forme
-  au ruban (workspace_markers.yaml) donnait 9,1 mm en leave-one-out sur le 25 et a
-  ete refusee.'
+source: '13/10/2026 — forme arducam reposee sur 19 et 23 MESURES AU ROBOT le 15/09
+  (19 (87,1 ; 212,4), 23 (110,9 ; -163,0)), meme methode que le 15/09, 2 passes, residu
+  2,9 mm. Corrige surtout 25 (1,6 mm) et 26 (3,0 mm), deduits et non mesures : leave-one-out
+  25 passe de 8,3 a 2,7 mm, 26 de 4,5 a 0,6. Precedente : planche_actuelle.avant_1310.yaml
+  (15/09).'
 pourquoi: 'Les deux cameras voyaient les marqueurs a 40-100 mm (arducam) et 62-97
   mm (SVPRO) de leur position mesuree au robot. Le robot ne passe pas par la camera
   : il est la reference. Releve precedent (14/09, a travers une extrinseque fausse)
@@ -20,17 +18,17 @@ marker_size_NE_PAS_CORRIGER: Les marqueurs font 50 mm. Le cote mesure a l'image 
 markers:
   19:
   - 86.9
-  - 215.8
+  - 215.3
   - 0.0
   23:
   - 111.1
-  - -166.3
+  - -165.9
   - 0.0
   25:
-  - 523.0
-  - 240.3
+  - 523.4
+  - 238.7
   - 0.0
   26:
-  - 528.7
-  - -147.9
+  - 528.3
+  - -150.9
   - 0.0

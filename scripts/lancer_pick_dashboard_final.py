@@ -223,15 +223,17 @@ def branche_tri_fluide(fenetre):
         tri_fluide.BACS_CONNUS.write_text(json.dumps(connus))
         # Hors portee = fausse detection : la poubelle verte au sol, vue « cylindre_vert »
         # a (10 ; -845) mm le 14/10, lancait un essai sans pose atteignable a chaque tri.
+        # Borne HAUTE seulement : avec PORTEE_MIN aussi, le vrai cylindre a 164 mm de la
+        # base n'etait plus tente (15/10), alors que tri_fluide le prenait avant ce filtre.
         hors_portee = [(p, xy) for p, xy in objets if p in tri_fluide.PIECES
-                       and not fsm.PORTEE_MIN <= float(np.hypot(*xy)) <= fsm.PORTEE_MAX]
+                       and float(np.hypot(*xy)) > fsm.PORTEE_MAX]
         for p, xy in hors_portee:
             print(f'tri fluide : {p} ignore, hors portee ({xy[0]:.0f} ; {xy[1]:.0f}) mm', flush=True)
         # Une piece deja posee reste visible AU FOND de son bac : elle n'est plus a trier.
         return sorted((float(np.hypot(*xy)), piece, np.asarray(xy, float), bacs[tri_fluide.PIECES[piece]])
                       for piece, xy in objets
                       if piece in tri_fluide.PIECES and tri_fluide.PIECES[piece] in bacs
-                      and fsm.PORTEE_MIN <= float(np.hypot(*xy)) <= fsm.PORTEE_MAX
+                      and float(np.hypot(*xy)) <= fsm.PORTEE_MAX
                       and all(np.linalg.norm(np.asarray(xy, float) - b) > 50.0 for b in bacs.values()))
 
     def boucle():

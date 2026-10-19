@@ -27,12 +27,9 @@ from std_msgs.msg import Float64MultiArray, String
 
 from .dream_fk_compare import PREFIXES
 from .joint_history import JointHistory
-from .tri_dream_dashboard import DreamTips, encoder_tip, pose_matrix
+from .tri_dream_dashboard import COLOURS, DreamTips, encoder_tip, pose_matrix
 from .vision.sim_multicam_geometry import load_cameras
 
-COLOURS = {'cube_rouge': (0.9, 0.1, 0.1), 'pave_jaune': (0.95, 0.85, 0.1),
-           'cylindre_vert': (0.1, 0.75, 0.2), 'cube_bleu': (0.1, 0.35, 1.0),
-           'transit': (0.55, 0.55, 0.55), 'dream': (1.0, 0.1, 0.9)}
 DREAM_ID = 1000
 MIN_STEP_M = 0.003
 MAX_POINTS = 1500

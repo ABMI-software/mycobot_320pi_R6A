@@ -687,15 +687,139 @@ dégradé la saisie sur ces essais.
 - le modèle n'a vu que deux positions de caméra : un grand déplacement (autre angle, autre
   distance) sort de son domaine.
 
+## Tri réel du 15/10 — CSV par essai, fusion mixte, sans marqueurs
+
+### CSV pendant le tri, comme en Gazebo
+
+`scripts/essai_reel_csv.py` (sous `.venv`) en deux temps :
+
+```bash
+# 1. avant le tri : run.yaml (commit, branche, extrinsèques, modèles) + température chaque seconde
+.venv/bin/python scripts/essai_reel_csv.py --journal results/dream_reel/journal_$(date +%Y-%m-%d_%H-%M-%S)
+# 2. après le tri (Ctrl+C sur le journal) : conversion de la session du dashboard
+nice -n 19 taskset -c 0-1 .venv/bin/python scripts/essai_reel_csv.py \
+    results/dream_reel/<date>_dashboard --journal results/dream_reel/journal_<date> --essai <k> [--sans-marqueurs]
+```
+
+Sortie `results/dream_reel/<date>_tri_essai<k>_dream_yolo_reel/` : `essai.csv`, `trajectoire.csv`,
+`yolo.csv`, `dream.csv`, `temperature.csv`, `frequences.csv`, `run.yaml`. Référence = codeurs (pointe
+au serrage pour l'objet, à la pose pour le bac). Le dashboard enregistre en direct YOLO et les
+keypoints DREAM (`session.json`) : la conversion ne refait aucune inférence. `--sans-marqueurs`
+calcule tout avec les extrinsèques DREAM et l'écrit dans `run.yaml`.
+
+Dashboard (`dream_tri_panneau.py`) : titre « Tri — machine d'état : Moore », colonnes courtes
+« DREAM pince 3D (trajet) », « YOLO objet (saisie) », « YOLO bac (dépôt) », et la fréquence de
+mesure en direct.
+
+| mesure (essai 7) | fréquence |
+|---|---|
+| YOLO arducam | 17,5 Hz |
+| DREAM, par caméra | 8,8 Hz |
+| codeurs (`get_angles`) | 4,7 Hz |
+
+**YOLO sur l'arducam seule** (`--svpro-dream`) : la SVPRO ne sert qu'à DREAM. YOLO est en **XY**
+(plan fixe `HAUTEUR_OBJET`). « YOLO bac » à 1-4 mm n'est pas une précision : le bras va où YOLO dit.
+Le filtre de portée de `lancer_pick_dashboard_final.py` ne garde que la borne haute
+(`PORTEE_MAX`) : le cylindre à 164 mm de la base était écarté par `PORTEE_MIN`.
+
+### SVPRO recalibrée (15/10 18:09)
+
+La SVPRO a bougé dans l'après-midi : l'extrinsèque des labels (13/10) était à 4-6 mm des marqueurs
+à 15:28, à 13-19 mm à 17:12. Recalibrée par `calibrate_svpro_readonly.py` sur 40 images du tri de
+17:12 (4 marqueurs, détection ×2) → `svpro_extrinsic_labels.yaml` (ancienne :
+`svpro_extrinsic_labels.avant_1510.yaml`).
+
+| contrôle | 13/10 | 15/10 | arducam |
+|---|---|---|---|
+| 4 marqueurs | 12,7-19,1 mm | **0,8-2,1 mm** | 0,5-2,2 mm |
+| FK projetée contre keypoints DREAM (820 images) | 6,2 px | **2,6 px** | ~2 px |
+| leave-one-out | — | 5,2-9,1 mm | 1,4-2,7 mm |
+
+### Fusion des deux caméras : règle mixte
+
+Erreur par phase, essai 7 (cylindre, pavé, cube bleu), ancienne fusion (médiane de la dernière vue
+de chaque caméra, comme `DreamTips.fused` en Gazebo) :
+
+| phase | arducam | SVPRO | combiné |
+|---|---|---|---|
+| vers l'objet | 13,5 mm | 12,0 mm | 11,1 mm |
+| transport | 13,8 mm | 20,1 mm | 13,7 mm |
+| 4 dernières s, au-dessus du bac | 16,9 mm | **78,9 mm** | **46,4 mm** |
+
+Au-dessus des bacs (400-450 mm de la base, au-delà des 400 mm de `capture_real_tri.py`), la SVPRO
+décroche ; la médiane de deux vues est leur moyenne et l'emmène. **Règle mixte**
+(`ACCORD_MM = 30`) : moyenne des deux caméras si elles sont à moins de 30 mm l'une de l'autre, sinon
+l'arducam seule. Choisie sur l'essai 7, vérifiée sur les essais 8 et 9 (même tri, deux fusions,
+colonne `erreur_dream_trajet_3d_ancienne_fusion_mm`) :
+
+| objet | essai 8 ancienne → mixte | essai 9 ancienne → mixte |
+|---|---|---|
+| cylindre_vert | 17,8 → 16,8 | 11,6 → 6,9 |
+| pave_jaune | 18,8 → 15,5 | 11,4 → 11,1 |
+| cube_bleu | 17,6 → 15,4 | 15,4 → 12,5 |
+| cube_rouge | 38,4 → 26,6 | 19,5 → 14,2 |
+
+Couverture (essai 7, tranches de 0,5 s) : bras vu par l'arducam 59,0 %, par la SVPRO 62,7 %, par
+l'une ou l'autre 62,7 %. Le reste est hors domaine J5 (pose d'observation, transits).
+
+L'erreur à la saisie (médiane des vues des 2 s avant « saisi ») n'utilise pas la règle mixte.
+
+### Gazebo contre réel : la même mesure
+
+Le « 4,8 mm » de Gazebo (07/10) est l'écart **XY à la saisie**, pince immobile, médiane de **4
+caméras**, contre la position Gazebo de l'objet. Sur le trajet, les CSV du 07/10 donnent :
+
+| trajet, 3D | Gazebo (4 essais) | réel (essai 7, sans cube_rouge) |
+|---|---|---|
+| par caméra | 9,4 / 10,6 / 12,7 / 11,3 mm | arducam 13,6-14,9 mm |
+| saisie 3D | 6,5 mm (16 saisies) | 2,2-16 mm |
+
+Écart sim-réel sur le trajet : 2 à 4 mm (600 poses réelles contre 50 000, 2 caméras contre 4,
+référence codeurs + extrinsèque). Le **cube_rouge** reste à 21-30 mm : son trajet passe 51 % du
+temps à J1 > 65°, hors de `real_tri/train` (J1 −13 à +65°).
+
+### Tri sans marqueurs (essai 9, 18:52)
+
+`lancer_tri_extrinseque_dream.py --svpro-dream --dream`. Extrinsèque arducam : celle du 14/10 (caméra
+non déplacée, 7,4 mm de l'ArUco sur la table). Extrinsèque SVPRO réestimée sur le tri de 18:35
+(272 images, 1 539 correspondances, résidu 1,9 px) : 5,5 mm de l'ArUco sur la table.
+
+| objet | tri | YOLO objet (XY) | DREAM trajet 3D | ArUco, essai 8 |
+|---|---|---|---|---|
+| cylindre_vert | OK | 9,8 mm | **6,9 mm** | 16,8 mm |
+| pave_jaune | OK | 10,6 mm | **11,1 mm** | 15,5 mm |
+| cube_bleu | OK | 9,2 mm | **12,5 mm** | 15,4 mm |
+| cube_rouge | OK | 10,2 mm | **14,2 mm** | 26,6 mm |
+
+**Ce que ça mesure** : avec l'extrinsèque DREAM, la référence T_réf vient de DREAM ; l'erreur
+DREAM ↔ codeurs mesure sa **stabilité**, pas son exactitude (l'extrinsèque absorbe son biais
+moyen). L'exactitude sans marqueur se juge par la saisie réelle (4/4) et par YOLO ↔ codeurs
+(9-11 mm, comme avec l'ArUco).
+
+**SVPRO déplacée, retrouvée par DREAM** : l'extrinsèque DREAM du 15/10 est à 10,7 mm / 0,52° de
+l'ArUco du 15/10 et à 14,1 mm / 0,72° de celui du 13/10 qui a servi aux labels (la caméra a bougé
+de 8,6 mm). Indice que DREAM ne restitue pas l'extrinsèque d'entraînement ; déplacement trop petit
+pour une preuve.
+
+**Labels du fine-tuning réel** : `capture_real_tri.py` projette la FK des codeurs par l'extrinsèque
+ArUco. NVlabs entraîne DREAM sur du synthétique seul (`~/DREAM/README.md`) ; en Gazebo, la pose de
+la caméra dans chaque label est celle du SDF. L'ArUco a servi **une fois**, pour les labels réels,
+jamais pendant le tri.
+
+**À faire** : test de déplacement de l'arducam (bras en poses sans objet → extrinsèque DREAM →
+contrôle ArUco → tri) ; capture J1 65-115° et portée 400-460 mm pour le fine-tuning.
+
 ## Limites de la référence
 
 - **Extrinsèque valable dans le plan de la table seulement** : tous les marqueurs sont à Z = 0.
   1,92 mm sur la table, mais l'erreur croît en hauteur (> 150 mm mesurés à 17 cm). Les keypoints du
   bras sont en hauteur : leur projection de référence est d'autant moins sûre. Pour lever cette
-  limite, recalibrer avec des marqueurs à 2-3 hauteurs.
+  limite, recalibrer avec des marqueurs à 2-3 hauteurs. Essai 7 (15/10) : l'erreur DREAM arducam
+  ne croît pas avec la hauteur de la pince (13,5 mm à 0-30 mm, 12,2 mm à 100-150 mm).
 - **Codeurs ≠ position réelle du bras** : J2 s'affaisse d'environ 1,9° sous la consigne ;
-  affaissement gravitaire de ~13 mm à vide, ~15 mm chargé à la pointe. La FK des codeurs porte ce
-  biais.
+  affaissement gravitaire de ~13 mm à vide, ~15 mm chargé à la pointe. C'est un écart consigne →
+  angle **lu** : la FK des angles lus le contient déjà (`pick_fsm.affaissement_largage`). Une
+  flexion en aval des codeurs n'est pas mesurée.
 - **Pas de vérité objet** sur le banc : seulement la mesure au robot.
 - **Dynamique** : la lecture des codeurs passe par le bridge TCP ; sa latence n'est pas mesurée.
 
@@ -732,3 +856,7 @@ dégradé la saisie sur ces essais.
 | 14/10/2026 | 4-5-6 — tri de 16:17 | mesuré | keypoints arducam 1,87 / 1,97 px (immobile / mouvement), SVPRO 5,18 / 5,30 px (caméra déplacée) ; T_DREAM arducam 7,8 / 9,0 mm, 1,4 / 1,8° ; pointe 3D 13-17 mm, surtout Z ; triangulation 2 vues 4,5 mm (test) |
 | 14/10/2026 | — extrinsèque DREAM | fait | `extrinseque_dream_session.py` : arducam 4,7 mm / 1,14° de l'ArUco, 7,4 mm sur la table ; décalage d'image suivi à 96-98 % |
 | 14/10/2026 | — tri sans marqueur | **4/4** (18:16 et 18:48) | `lancer_tri_extrinseque_dream.py` : extrinsèques DREAM sur les deux caméras, YOLO ↔ codeurs 7,5-11,6 mm ; caméras non déplacées depuis le calcul |
+| 15/10/2026 | — CSV par essai | fait | `essai_reel_csv.py` : essais 1 (14:30, 4/4), 2 (14:55, 2/3), 4 (16:05, 3/3), 5 (16:13, 3/3), 6 (17:12, 4/4), 7 (18:15, 4/4), 8 (18:35, 4/4), 9 (18:52, 4/4, sans marqueurs) ; essai 3 non converti |
+| 15/10/2026 | — SVPRO recalibrée | fait | marqueurs 0,8-2,1 mm (12,7-19,1 avant), FK ↔ DREAM 2,6 px (6,2) |
+| 15/10/2026 | — fusion mixte | fait | ACCORD_MM 30 ; essai 8 trajet 15,4-26,6 mm (ancienne 17,6-38,4) |
+| 15/10/2026 | — tri sans marqueur | **4/4** (essai 9) | DREAM trajet 6,9-14,2 mm (stabilité), YOLO ↔ codeurs 9,2-10,6 mm |
