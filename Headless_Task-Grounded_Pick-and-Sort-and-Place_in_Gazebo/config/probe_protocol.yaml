@@ -202,3 +202,27 @@ run_c_midway_stop:
     OR the policy no longer uses the images: either part-2 criterion fails (lower end of the 95 %
     interval of the grasp-point shift, or of the donor-share change, at or below 0).
   otherwise: run the second session; the full run_c_gate applies to its checkpoints.
+
+# ---------------------------------------------------------------------------------------------
+# Record, 19/10/2026: Run C's gradient-accumulation check (smolvla_kaggle_driver.py, accumcheck).
+accumulation_check:
+  rule: >
+    fixed before the first GPU run (driver CHECK_LIMITS, commit f68b04cb): on every step not
+    skipped by the fp16 loss scaler, at least 3 of them, accumulated against whole batch from the
+    same state, batch, noise and times: loss, pre-clip gradient norm and gradients (overall and
+    per group) within 1 %, weight update (overall and per group) within 5 %
+  acceptance_of_the_update_limit: >
+    agreed 19/10: a weight-update difference above 5 % is accepted as Adam's first steps
+    amplifying rounding (each weight moves by about +/- lr whatever its gradient) only if the floor
+    (the same whole batch run twice) shows a comparable difference. Future checks judge the update
+    after several steps, or leave out weights whose gradient is near zero.
+  t4_batch_8_vs_2x4: >
+    one step judged, out of memory at step 2 (the optimizer state appears there): FAIL as written.
+    Step 1, relative difference, floor / accumulated: loss 0 / 6.5e-5; gradients 0.038 % / 0.26 %
+    (vision 0.062 / 0.41, connector 0.0002 / 0.16, expert 0.0002 / 0.08); weight update 1.4 % /
+    6.0 % (vision 2.1 / 8.0, connector ~1e-4 / 5.1, expert ~1e-4 / 3.5). Gradients pass by 4x.
+    The update difference is ~20-45 x the gradient difference in both (the step-1 amplification
+    shows in the floor: 0.062 % -> 2.1 % in the vision encoder, the only non-deterministic part),
+    but the floor's update difference is ~4 x smaller than the accumulated one, so "comparable" is
+    not met on this step and the update limit is not accepted on it.
+  pending: the rerun at batch 6 vs 2 x 3, 6 steps, with the floor's update difference per step
