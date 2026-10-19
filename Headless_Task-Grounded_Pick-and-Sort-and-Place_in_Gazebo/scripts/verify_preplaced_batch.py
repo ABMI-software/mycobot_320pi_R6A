@@ -9,7 +9,7 @@ piece rested inside its bin before the episode and is still inside it at the end
 pieces did not move between the preplacement and the episode start, and the target ends in its
 own bin. With --dataset: one LeRobot episode per OK seed, its instruction is the target's, and
 its frame count is in the recorded range. Prints one line per problem, then a summary;
-exit 1 if any. Plain python3 (pandas for --dataset).
+exit 1 if any. Plain python3; --dataset needs pandas (/workspace/venv_lerobot/bin/python).
 """
 import argparse
 import json

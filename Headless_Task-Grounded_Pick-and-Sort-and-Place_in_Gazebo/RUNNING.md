@@ -269,8 +269,10 @@ start and end of the episode. Kept apart from the older seeds, in
     docker exec -d gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_B RANDOM_START=1 PREPLACE=1 /workspace/src/scripts/record_tri_batch.sh 1001 1050'
     docker exec gazebo_to_lerobot python3 /workspace/src/scripts/verify_preplaced_batch.py /workspace/tri_sort_B 1001 1050
     docker exec gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_B STAGE=/workspace/tri_sort_B_stage TRAIN_SEEDS=/workspace/tri_sort_B_train_seeds SKIP_RLDS=1 /workspace/src/scripts/convert_tri_sort.sh local/mycobot_tri_sort_B_s1001_1050'
-    docker exec gazebo_to_lerobot python3 /workspace/src/scripts/verify_preplaced_batch.py /workspace/tri_sort_B 1001 1050 --dataset /workspace/tri_datasets/local/mycobot_tri_sort_B_s1001_1050
+    docker exec gazebo_to_lerobot /workspace/venv_lerobot/bin/python /workspace/src/scripts/verify_preplaced_batch.py /workspace/tri_sort_B 1001 1050 --dataset /workspace/tri_datasets/local/mycobot_tri_sort_B_s1001_1050
 
-About 6-7 min per layout on the laptop (seed 1001: 11.5 min with two other CPU
-jobs running). Seeds 5001-5800 are the encoder-probe layouts and are never
+`--dataset` needs pandas, so it runs in the LeRobot venv; the container's
+system python3 has none. Measured on 1001-1050: median 6.2 min per layout
+(5.4-6.9) once nothing else ran, 0.48 GB of bags per layout, 50 layouts ->
+147 MB dataset (seed 1001: 11.5 min with two other CPU jobs running). Seeds 5001-5800 are the encoder-probe layouts and are never
 converted.

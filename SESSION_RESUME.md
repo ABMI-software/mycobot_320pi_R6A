@@ -1,5 +1,27 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (19 octobre 2026 — matin, lot B 1001-1050 vérifié et converti)
+
+### Ce qui a été accompli
+- **Lot 1002-1050 terminé à 05:04** (Paris), sans incident : 50 graines, 50 épisodes OK.
+  Médiane 6,2 min par disposition (5,4-6,9) hors concurrence CPU ; 24 Go de bags.
+- **`verify_preplaced_batch.py` 1001-1050 : 0 problème**, sur les enregistrements puis sur le
+  jeu converti. Pièces déjà triées 0/1/2/3 : 11/11/10/18 (compatible avec l'uniforme, khi² p ≈ 0,35).
+  Cibles : pavé jaune 13, cylindre vert 13, cube bleu 12, cube rouge 12. Aucune cible déplacée,
+  chaque pièce pré-triée dans son bac au début et à la fin, aucune autre pièce bougée de plus d'1 mm.
+- **Jeu `local/mycobot_tri_sort_B_s1001_1050`** : 50 épisodes, 8 954 images, 159-214 images par
+  épisode (médiane 178), pas de temps 0,1 s, la bonne consigne par épisode, 147 Mo.
+- Le contrôle `--dataset` demande pandas : il tourne dans `/workspace/venv_lerobot` (RUNNING.md corrigé).
+
+### Prochaines actions
+1. [ROUGE] Graines 1051-1400 (350 dispositions, ~37 h, ~170 Go de bags), sur accord.
+2. [JAUNE] Run C : taille de lot à confirmer sur Kaggle (lot 16 / 20 / 24), sur accord.
+
+### Commande rapide de reprise
+```bash
+docker exec -d gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_B RANDOM_START=1 PREPLACE=1 /workspace/src/scripts/record_tri_batch.sh 1051 1400'
+```
+
 ## État actuel (19 octobre 2026 — nuit, test d'échange d'images, lot B 1001-1050 en cours)
 
 ### Ce qui a été accompli
