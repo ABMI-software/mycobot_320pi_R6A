@@ -225,7 +225,17 @@ accumulation_check:
     shows in the floor: 0.062 % -> 2.1 % in the vision encoder, the only non-deterministic part),
     but the floor's update difference is ~4 x smaller than the accumulated one, so "comparable" is
     not met on this step and the update limit is not accepted on it.
-  pending: the rerun at batch 6 vs 2 x 3, 6 steps, with the floor's update difference per step
+  t4_batch_6_vs_2x3: >
+    19/10/2026, 6 steps: PASS under the rule as committed (decision_amplification not needed).
+    Steps 2 and 4 skipped by the fp16 loss scaler (overflow at the initial scale 65536, halved
+    each time); 4 steps judged. Relative difference, accumulated (floor): step 1 gradients 0.12 %
+    (0.040 %), update 3.8 % (1.4 %), vision 4.3 % (2.1 %); step 3 gradients 0.069 % (0.031 %),
+    update 0.29 % (0.20 %); step 5 0.10 % (0.011 %), 0.14 % (0.063 %); step 6 0.097 % (0.013 %),
+    0.13 % (0.063 %). Gradient norm within 1.3e-4, loss within 1.0e-4 on every step. The
+    update/gradient amplification is ~30 x at step 1 (accumulated 32, floor 35: 0.9 x) and falls
+    to ~4 x at step 3 and ~1.4 x at steps 5-6, as Adam's first-step effect predicts; the 6.0 %
+    at batch 8 step 1 was that effect on a larger gradient difference. Peak nvidia-smi 12441 MB.
+    Verdict: the gradient accumulation is correct on the T4 path Run C uses.
   decision_amplification: >
     Decided by the project owner on 19/10/2026, before the batch-6 rerun: if loss, gradient norm
     and gradients pass their limits (1 %) but the weight update still exceeds 5 %, the

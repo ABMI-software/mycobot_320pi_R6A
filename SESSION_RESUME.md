@@ -1,5 +1,25 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (19 octobre 2026 — soir, accumulation validée sur T4 : Run C prêt côté contrôles)
+
+### Ce qui a été accompli
+- **Accumulation, lot 6 contre 2 × 3 sur T4 : PASS** selon la règle engagée (le critère
+  d'amplification décidé avant n'a pas servi). Pas 2 et 4 sautés par le facteur d'échelle fp16
+  (débordement à 65536, divisé par 2), 4 pas jugés. Gradients 0,07-0,12 % (limite 1 %), mise à
+  jour 3,8 % au pas 1 puis 0,13-0,29 % (limite 5 %), norme ≤ 1,3e-4, perte ≤ 1,0e-4.
+  L'amplification mise à jour / gradient vaut ~30 au pas 1 (accumulé 32, plancher 35) et tombe à
+  ~4 puis ~1,4 : l'effet du premier pas d'Adam, comme prévu ; les 6,0 % du lot 8 en venaient.
+  Pic nvidia-smi 12 441 Mo.
+- **Les deux contrôles de Run C sont passés sur T4** : accumulation et reprise (facteur d'échelle
+  restauré). Résultats dans `config/probe_protocol.yaml` (`accumulation_check`).
+
+### Prochaines actions
+1. [ROUGE] Reste du code de Run C : LR de vision bas, tête auxiliaire de position, carnet
+   d'entraînement (lot 30 = 6 × 5, poids gardés tous les 2 500 pas).
+2. [JAUNE] Tableau mémoire 4 / 6 / 8 : facultatif désormais (micro-lot 6 mesuré à 13 285 Mo avec
+   l'état de l'optimiseur).
+3. [JAUNE] Fin de l'enregistrement 1051-1400 (mercredi) : vérifier, convertir ; puis Run B.
+
 ## État actuel (19 octobre 2026 — fin d'après-midi, contrôles T4 de Run C ; enregistrement 1051-1400 lancé)
 
 ### Ce qui a été accompli
