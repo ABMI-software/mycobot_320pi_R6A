@@ -48,6 +48,7 @@ FP32_LAUNCHER = '''import copy
 import json
 import os
 import sys
+import tempfile
 import time
 from collections import Counter
 from contextlib import nullcontext
@@ -214,8 +215,9 @@ def update_policy_checked(train_metrics, policy, batch, optimizer, grad_clip_nor
     params = {n: p for n, p in inner.named_parameters() if p.requires_grad}
     w0 = {n: to_cpu(p) for n, p in params.items()}
     # The optimizer state (2 x the trained weights) goes to disk, not RAM: a CPU run of the check
-    # would not fit in 12 GB with it.
-    opt0 = ACCUM_CHECK + ".optimizer.pt"
+    # would not fit in 12 GB with it. In /tmp, not next to the report: on Kaggle the report's
+    # folder is the session output, and a check cut by an out-of-memory error left 1.5 GB there.
+    opt0 = os.path.join(tempfile.gettempdir(), "accum_check_optimizer.pt")
     torch.save(optimizer.state_dict(), opt0)
     sched0 = to_cpu(lr_scheduler.state_dict()) if lr_scheduler else None
     scaler0 = copy.deepcopy(accelerator.scaler.state_dict()) if accelerator.scaler else None
@@ -260,13 +262,15 @@ def update_policy_checked(train_metrics, policy, batch, optimizer, grad_clip_nor
             out[f"update_rel_{g}"] = rel(x["delta"], ref["delta"], names)
         return out
 
-    whole = one(_update_policy)
-    restore()
-    floor = compare(one(_update_policy), whole)
-    restore()
-    accumulated = one(update_policy_accumulated)
-    hook.remove()
-    os.remove(opt0)
+    try:
+        whole = one(_update_policy)
+        restore()
+        floor = compare(one(_update_policy), whole)
+        restore()
+        accumulated = one(update_policy_accumulated)
+    finally:
+        hook.remove()
+        os.remove(opt0)
     row = {"step": len(CHECK_ROWS) + 1, "batch": len(batch["action"]), "micro_batch": MICRO_BATCH,
            "loss": whole["loss"], "grad_norm": whole["grad_norm"],
            "missing_grads": sorted(set(params) - set(whole["grads"]))[:5] if not whole["skipped"] else [],
@@ -666,16 +670,18 @@ def accum_check(cfg, data_dir):
     judged, failures = 0, []
     print(f"\n accumulation check: batch {cfg['check_batch']} against {cfg['check_batch'] // cfg['check_micro']} x "
           f"{cfg['check_micro']}; rc {rc}, oom {oom}, nvidia-smi peak {peak} MB")
-    print(' step   loss   grad_norm   floor grads   loss_rel  grad_norm_rel  grads_rel  update_rel   per group grads / update')
+    print(' step   loss   grad_norm   floor grads  floor update   loss_rel  grad_norm_rel  grads_rel  update_rel   per group grads / update (floor update)')
     for r in rows:
         a, f = r['accumulated_vs_whole'], r['whole_again_vs_whole']
         if a.get('skipped'):
             print(f" {r['step']:4d}   skipped by the fp16 loss scaler")
             continue
         judged += 1
-        groups = ', '.join(f"{k[10:]} {a[k]:.1e}/{a['update_rel_' + k[10:]]:.1e}"
+        groups = ', '.join(f"{k[10:]} {a[k]:.1e}/{a['update_rel_' + k[10:]]:.1e} "
+                           f"({f.get('update_rel_' + k[10:], float('nan')):.1e})"
                            for k in sorted(a) if k.startswith('grads_rel_'))
         print(f" {r['step']:4d}  {r['loss']:.4f}  {r['grad_norm']:9.3f}   {f.get('grads_rel', float('nan')):.1e}      "
+              f"{f.get('update_rel', float('nan')):.1e}      "
               f"{a['loss_rel']:.1e}    {a['grad_norm_rel']:.1e}       {a['grads_rel']:.1e}    {a['update_rel']:.1e}     {groups}")
         for k, v in a.items():
             limit = CHECK_LIMITS.get(next((b for b in ('grads_rel', 'update_rel') if k.startswith(b)), k))

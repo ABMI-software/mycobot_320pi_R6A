@@ -1,5 +1,46 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (19 octobre 2026 — fin d'après-midi, contrôles T4 de Run C ; enregistrement 1051-1400 lancé)
+
+### Ce qui a été accompli
+- **Enregistrement 1051-1400 lancé à 16:07** (Paris) sous `reap_children.py` ; graine 1051 OK en
+  6,8 min, 0 zombie. Fin attendue mercredi ~04:00-08:00.
+- **Premier passage T4 de `smolvla_runC_checks_t4.ipynb`** (~26 min) :
+  - **Reprise : PASS.** Coupée après 100, reprise du point 100 : pas final 200 / 200, calendrier
+    identique, aucun pas manquant, perte moyenne après reprise 0,4043 contre 0,4042 (marge
+    ±0,030). **Facteur d'échelle fp16 restauré** (compteur de croissance 200 des deux côtés ; 100
+    s'il ne l'avait pas été), aucune mise à jour sautée. Deux courses neuves de même graine
+    diffèrent déjà un peu (pas 97-100) : le GPU n'est pas déterministe.
+  - **Accumulation, lot 8 contre 2 × 4 : ÉCHEC selon la règle engagée**, un seul pas jugé avant
+    l'épuisement mémoire du pas 2 (l'état de l'optimiseur y apparaît). Pas 1 : perte 6,5e-5,
+    norme 7e-6, gradients 0,26 % (vision 0,41 %, connecteur 0,16 %, expert 0,08 %), tous sous
+    1 % ; mise à jour des poids 6,0 % (vision 8,0 %, connecteur 5,1 %) au-dessus de 5 %.
+    Explication probable : au premier pas d'Adam chaque poids bouge d'environ ± lr, les poids de
+    gradient quasi nul changent de sens sur l'arrondi fp16. **Elle ne sera acceptée que si le
+    plancher (le même lot entier deux fois) montre un écart comparable** ; consigné dans le
+    protocole dans les deux cas.
+  - **Mémoire** : pic nvidia-smi **13 285 Mo** au micro-lot 6 avec l'état de l'optimiseur, soit
+    ~2,0 Gio libres sur 15 360 Mio ; Run C (lot de 30 entier sur le GPU, +0,2 Go) ~1,8 Gio :
+    **micro-lot 6 retenu** (règle ≥ 1,5 Gio). Mon estimation précédente (« sous 1,5 ») était trop
+    pessimiste. 4,8 échantillons/s : 10 000 pas de 30 ≈ 17,5 h.
+- **Pilote corrigé** : l'état de l'optimiseur du contrôle d'accumulation allait dans la sortie
+  Kaggle (1,5 Go laissés par l'épuisement mémoire) ; il va dans /tmp et est effacé même en cas
+  d'échec ; le tableau affiche l'écart de mise à jour du plancher. Carnet par défaut :
+  `MODES = ["accumcheck"]`, lot 6 contre 2 × 3. Testé sur CPU.
+
+### Décisions prises
+- Accumulation relancée à 6 contre 2 × 3 (~10 min, approuvé). Critère de mise à jour accepté
+  seulement si le plancher montre un écart comparable. Contrôles futurs : juger la mise à jour
+  après plusieurs pas ou en excluant les poids de gradient quasi nul.
+- Run C : micro-lot 5 (× 6 = 30) sans autre discussion si le pic et le tableau 4 / 6 / 8
+  laissent moins de 1,5 Gio au micro-lot 6.
+
+### Prochaines actions
+1. [ROUGE] `accum_check.json` du passage à lot 8 (écart de mise à jour du plancher au pas 1).
+2. [ROUGE] Relance de l'accumulation (carnet réimporté), puis consigner le résultat dans le protocole.
+3. [ROUGE] Tableau mémoire 4 / 6 / 8.
+4. [JAUNE] Fin de l'enregistrement mercredi : vérifier, convertir, vérifier le jeu.
+
 ## État actuel (19 octobre 2026 — après-midi, Run C : encodeur entier, accumulation et reprise testées sur CPU)
 
 ### Ce qui a été accompli

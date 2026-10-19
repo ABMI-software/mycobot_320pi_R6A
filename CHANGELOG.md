@@ -9,6 +9,14 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — contrôle d'accumulation du pilote Kaggle (19/10, fin d'après-midi)
+
+- L'état de l'optimiseur sauvé par `accumcheck` va dans `/tmp` et est effacé même en cas
+  d'échec (il restait 1,5 Go dans la sortie Kaggle après un épuisement mémoire) ; le tableau
+  affiche l'écart de mise à jour du plancher à côté de celui de l'accumulation.
+- `smolvla_runC_checks_t4.ipynb` : par défaut l'accumulation seule, lot 6 contre 2 × 3 (le lot 8
+  épuise la mémoire au pas 2 ; la reprise a passé sur T4 le 19/10).
+
 ### Ajouté — facteur d'échelle fp16 sauvé à chaque reprise ; zombies du conteneur (19/10, soir)
 
 - **Pilote Kaggle** : le lanceur écrit l'état du facteur d'échelle fp16 (`GradScaler`) dans
