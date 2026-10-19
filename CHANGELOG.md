@@ -13,9 +13,10 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - **`training/smolvla_kaggle/smolvla_runC_memcheck_t4.ipynb`** : le carnet de Run A en mode
   `benchmark`, avec le gel de Run C (`FREEZE = "runC"` : vision + connecteur + expert entraînés,
-  couches de langage gelées, 198,1 M paramètres entraînables), lots 16 / 20 / 24, 30 pas,
-  précision mixte ; le tableau ajoute `mem_gb` (pic alloué par PyTorch). Testé sur CPU dans le
-  conteneur.
+  couches de langage gelées, 198,1 M paramètres entraînables), 30 pas, précision mixte ; le
+  tableau ajoute `mem_gb` (pic alloué par PyTorch). Testé sur CPU dans le conteneur. Première
+  version (lots 16 / 20 / 24) : mémoire épuisée dès le lot 16 sur Kaggle ; lots ramenés à
+  4 / 6 / 8, avec `expandable_segments` comme la course 36k.
 - **`config/probe_protocol.yaml`, addendum `run_c_gate`** : un point de contrôle de Run C ne va
   dans Gazebo que si son encodeur localise mieux que smolvla_base (sonde linéaire, connecteur,
   image entière, ≤ 25,6 / 31,0 / 30,9 mm sur 2 caméras sur 3) **et** si l'échange d'images

@@ -1,5 +1,22 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (19 octobre 2026 — matin, mesure mémoire Run C : lot 16 épuise la mémoire)
+
+### Ce qui a été accompli
+- **Mesure mémoire sur Kaggle (lots 16 / 20 / 24) : mémoire épuisée dès le lot 16**
+  (pic nvidia-smi 14 903 Mo). Bon gel vérifié sur T4 : 198,1 M entraînables, langage gelé.
+- **Erreur de l'estimation** : elle supposait que la course 36k entraînait les 450 M
+  paramètres. En fait la 36k avait **déjà le gel de Run C** (`TRAIN_VISION`, 198,1 M) et
+  culminait à 9,21 Gio au lot 4. Recalculé : ~4,7 Gio fixes + ~1,1 Gio par échantillon, donc
+  lot 6 ≈ 11,5 Gio, lot 8 ≈ 13,7 Gio (limite), lot 16 ≈ 22,7 Gio.
+- Carnet ramené aux lots 4 / 6 / 8, avec `expandable_segments` comme la 36k. **Pas relancé.**
+
+### Prochaines actions
+1. [ROUGE] Relancer la mesure (lots 4 / 6 / 8, ~15 min) — sur accord.
+2. [ROUGE] Graines 1051-1400 dès confirmation (portable sur secteur, sans veille).
+3. [JAUNE] Run C : lot effectif 32 = 8 × 4 ou 4 × 8 ; ~6,7 s par pas de 32 (36k : 4,8 échantillons/s),
+   10 000 pas ≈ 19 h, 15 000 ≈ 28 h.
+
 ## État actuel (19 octobre 2026 — journée, mesure mémoire Run C prête, porte de Run C)
 
 ### Ce qui a été accompli
