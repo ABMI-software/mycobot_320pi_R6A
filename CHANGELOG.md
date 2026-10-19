@@ -9,6 +9,34 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — Run C : accumulation de gradient, reprise vérifiée, sonde par couche (19/10, après-midi)
+
+- **`training/smolvla_kaggle/smolvla_kaggle_driver.py` restauré** (perdu avec le crash WSL, les
+  carnets y renvoient), repris du carnet memcheck, avec :
+  - **accumulation de gradient** (`micro_batch` → `SMOLVLA_MICRO_BATCH`) : lerobot-train charge
+    le lot entier, le lanceur fait avant/arrière par micro-lots puis un seul pas d'optimiseur ;
+    chaque micro-lot pèse sa part des pas d'action non masqués (la perte SmolVLA est une moyenne
+    sur ceux du lot entier), donc le gradient sommé est celui du lot entier ; pas, calendrier de
+    LR, points de contrôle et journaux restent comptés en lots entiers ;
+  - mode **`accumcheck`** : à chaque pas, depuis les mêmes poids, optimiseur, calendrier et
+    facteur d'échelle fp16, même lot, même bruit et mêmes temps : lot entier (deux fois : plancher)
+    contre lot accumulé ; règle fixée avant tout passage GPU (`CHECK_LIMITS`) ;
+  - mode **`resumecheck`** : la même course d'un trait, puis coupée (SIGINT) et reprise depuis sa
+    sortie rattachée en entrée, comme entre deux sessions Kaggle ;
+  - **correction** : un point de contrôle n'est complet que si les cinq fichiers de
+    `training_state` existent ; une session coupée pendant une sauvegarde laissait un point de
+    contrôle partiel que la session suivante tentait de reprendre (plantage, vu sur CPU) ;
+  - une session lancée sur une course déjà terminée le dit au lieu d'échouer ; une ligne signale
+    toute mise à jour sautée par le facteur d'échelle fp16 ; le pas est lu dans le champ `step:`
+    sous 1000 (la barre tqdm repart de 1 après une reprise).
+- **`smolvla_runC_checks_t4.ipynb`** : les deux contrôles sur T4 (lot 8 contre 2 × 4, puis
+  200 pas à 2 × 6 coupés après le pas 101 et repris). Pas encore lancé.
+- `probe_features.py --layers` (sortie des couches de l'encodeur de vision, avant
+  `post_layernorm`), `probe_fit.py --layers ... --layer-test` (verdict de l'addendum `layer_probe`).
+- `config/probe_protocol.yaml` : addenda **`layer_probe`** (règle fixée avant les mesures) et
+  **`run_c_midway_stop`** (arrêt de Run C entre ses deux sessions si l'encodeur localise moins
+  bien que smolvla_base ou si la politique n'utilise plus les images).
+
 ### Ajouté — mesure mémoire T4 pour Run C, porte de Run C (19/10)
 
 - **`training/smolvla_kaggle/smolvla_runC_memcheck_t4.ipynb`** : le carnet de Run A en mode

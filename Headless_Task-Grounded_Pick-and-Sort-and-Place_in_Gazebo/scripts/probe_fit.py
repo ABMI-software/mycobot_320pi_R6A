@@ -2,6 +2,7 @@
 """Fit and judge the encoder probes exactly as config/probe_protocol.yaml fixes them.
 
   probe_fit.py <render dir> <features dir> <out .json> [--encoders smolvla_base ...] [--crop '{...}']
+               [--layers vision layer4 layer8 ...] [--layer-test]
 
 <features dir> holds one probe_features.py output per encoder: smolvla_base.npz,
 36k_008000.npz, 36k_036000.npz. Targets: the four pieces' x, y as Gazebo reported them after
@@ -10,7 +11,9 @@ Same 5 folds by layout everywhere. Per encoder, camera, layer and probe: median 
 percentile of the per-piece error (mm); paired bootstrap of the median difference against
 smolvla_base; the protocol's verdict on the linear probe of the connector layer. With --crop
 (probe_protocol.yaml, crop_test), the raw-pixel floor is computed on the same crops as the
-features, and the verdict is the crop test's pass rule instead.
+features, and the verdict is the crop test's pass rule instead. With --layer-test
+(probe_protocol.yaml, layer_probe; smolvla_base features from probe_features.py --layers), each
+intermediate layer is compared with the 'vision' layer and the verdict is that addendum's rule.
 
 /workspace/venv_lerobot/bin/python with ROS sourced (tri_scene and the camera models give the
 ceiling baseline), inside gazebo_to_lerobot.
@@ -31,6 +34,7 @@ PIECES = tri_scene.OBJECTS
 CAMERAS = ('top', 'left', 'right')
 ENCODERS = ('smolvla_base', '36k_008000', '36k_036000')
 LAYERS = ('connector', 'vision')
+LAYER_TEST_JUDGED = ('layer4', 'layer8')
 DRIFT_MAX_MM = 5.0
 FOLDS = 5
 ALPHAS = np.logspace(-2, 5, 15)
@@ -167,6 +171,28 @@ def ceiling_features(layouts, cam, cameras, footprints):
                                      for p in PIECES]) for l in layouts])
 
 
+def layer_test(result, err_of, layers):
+    """probe_protocol.yaml, layer_probe: each smolvla_base layer against its 'vision' layer, linear probe."""
+    cells, better = result['cells'], {}
+    for layer in layers:
+        if layer == 'vision':
+            continue
+        better[layer] = []
+        for cam in CAMERAS:
+            ref, name = f'smolvla_base/{cam}/vision/linear', f'smolvla_base/{cam}/{layer}/linear'
+            lo, hi = paired_bootstrap(err_of[name], err_of[ref])
+            cells[name]['diff_vs_vision_ci95_mm'] = [lo, hi]
+            b, d = cells[ref]['median_mm'], cells[name]['median_mm'] - cells[ref]['median_mm']
+            if -d > 5 and -d > 0.2 * b and hi < 0:
+                better[layer].append(cam)
+    clear = {layer: len(cams) >= 2 for layer, cams in better.items()}
+    verdict = {'cameras_clearly_better': better, 'clearly_better': clear}
+    verdict['proposal'] = ('last 4 layers' if clear['layer8'] else 'whole encoder')
+    verdict['judged'] = list(LAYER_TEST_JUDGED)
+    result['verdict'] = verdict
+    print(json.dumps(verdict, indent=1))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('render', type=Path)
@@ -174,6 +200,8 @@ def main():
     ap.add_argument('out', type=Path)
     ap.add_argument('--encoders', nargs='+', default=list(ENCODERS))
     ap.add_argument('--crop', type=json.loads, default=None, help='{camera: [u0, v0, u1, v1]}')
+    ap.add_argument('--layers', nargs='+', default=list(LAYERS))
+    ap.add_argument('--layer-test', action='store_true')
     args = ap.parse_args()
     encoders = args.encoders
     layouts = [json.loads(line) for line in (args.render / 'layouts.jsonl').read_text().splitlines()]
@@ -192,7 +220,8 @@ def main():
         rows = [index[int(s)] for s in seeds]
         if args.crop is not None and json.loads(str(f['crop'])) != args.crop:
             raise SystemExit(f'{enc}.npz was computed with crop {f["crop"]}, not {args.crop}')
-        feats[enc] = {k: f[k][rows].astype(np.float32) for k in f.files if k.endswith(LAYERS)}
+        feats[enc] = {f'{c}_{layer}': f[f'{c}_{layer}'][rows].astype(np.float32)
+                      for c in CAMERAS for layer in args.layers}
     result = {'crop': args.crop, 'layouts_rendered': len(layouts), 'layouts_dropped_drift': len(layouts) - len(kept),
               'layouts_used': len(kept), 'cells': {}}
     err_of = {}
@@ -212,7 +241,7 @@ def main():
         for probe in ('linear', 'mlp'):
             run(f'ceiling_pixel_position/{cam}/{probe}', ceil, probe)
         for enc in encoders:
-            for layer in LAYERS:
+            for layer in args.layers:
                 for probe in ('linear', 'mlp'):
                     run(f'{enc}/{cam}/{layer}/{probe}', feats[enc][f'{cam}_{layer}'], probe)
     for name in list(result['cells']):
@@ -221,6 +250,10 @@ def main():
             base = 'smolvla_base/' + name.split('/', 1)[1]
             result['cells'][name]['diff_vs_base_ci95_mm'] = paired_bootstrap(err_of[name], err_of[base])
 
+    if args.layer_test:
+        layer_test(result, err_of, args.layers)
+        args.out.write_text(json.dumps(result, indent=1) + '\n')
+        return
     if args.crop is not None:
         top = result['cells']['smolvla_base/top/connector/linear']['median_mm']
         floor = result['cells']['floor_pixels/top/linear']['median_mm']

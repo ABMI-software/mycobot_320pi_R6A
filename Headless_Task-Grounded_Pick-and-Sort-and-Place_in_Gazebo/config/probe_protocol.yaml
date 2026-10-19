@@ -174,3 +174,23 @@ layer_probe:
     positions are already gone by layer 8, which is what the last 4 layers would start from, so
     the whole encoder (reported as such, with the numbers).
   reported_not_judged: layers 6 and 12, the MLP probe
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 19/10/2026, committed before any Run C code was run on a GPU.
+run_c_midway_stop:
+  question: >
+    Run C (whole vision encoder, batch 6 x 5 accumulated, two Kaggle sessions) keeps weights every
+    2 500 steps. Between the two sessions, is the recipe already failing, so the second session's
+    ~10 h of quota can be saved?
+  checkpoint: the newest kept checkpoint of the first session
+  tests: >
+    the run_c_gate probe (part 1 data, probe and metric) and the image-swap test (part 2 data and
+    metrics), as written above
+  stop_if: >
+    EITHER the encoder localises worse than smolvla_base: linear probe on the connector, median
+    error above smolvla_base's with the 95 % bootstrap interval of the paired difference entirely
+    above 0, on at least 2 of the 3 cameras (no size threshold: mid-run, any reliable loss of
+    localisation counts);
+    OR the policy no longer uses the images: either part-2 criterion fails (lower end of the 95 %
+    interval of the grasp-point shift, or of the donor-share change, at or below 0).
+  otherwise: run the second session; the full run_c_gate applies to its checkpoints.

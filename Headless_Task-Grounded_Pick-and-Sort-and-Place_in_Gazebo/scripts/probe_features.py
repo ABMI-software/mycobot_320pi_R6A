@@ -2,7 +2,7 @@
 """Encoder features of the probe renders (config/probe_protocol.yaml), one encoder at a time.
 
   probe_features.py <render dir> <out .npz> --encoder <checkpoint dir | smolvla_base> \
-                    [--policy <checkpoint dir>] [--crop '{"top": [u0, v0, u1, v1], ...}']
+                    [--policy <checkpoint dir>] [--crop '{"top": [u0, v0, u1, v1], ...}'] [--layers 4 8]
 
 The images go through a SmolVLA checkpoint's own path (--policy, default the 13/10 one):
 its preprocessor (camera renaming), prepare_images (resize with padding to 512x512, [-1, 1]),
@@ -11,6 +11,8 @@ are swapped in from --encoder, so the three encoders see identical inputs. Per c
 'connector' (64 x 960) and 'vision' (32 x 32 x 768 average-pooled to 8 x 8 x 768), float16,
 in render-seed order, with the seeds. --crop cuts each camera's render to a fixed box first
 (probe_protocol.yaml, crop_test); the policy's own resize-with-pad then brings it to 512 x 512.
+--layers adds 'layer<k>': the output of vision encoder layer k (1-12, before post_layernorm),
+pooled as 'vision' (probe_protocol.yaml, layer_probe).
 
 Runs in /workspace/venv_lerobot (no ROS needed).
 """
@@ -35,6 +37,11 @@ def encoder_tensors(encoder):
     return {k: v for k, v in load_file(path).items() if 'vision_model' in k or 'connector' in k}
 
 
+def pool(hidden):
+    grid = hidden.reshape(len(hidden), 32, 32, -1).permute(0, 3, 1, 2)
+    return torch.nn.functional.avg_pool2d(grid, 4).permute(0, 2, 3, 1).flatten(1).half().numpy()
+
+
 def crop(img, box):
     if box is None:
         return img
@@ -50,6 +57,7 @@ def main():
     ap.add_argument('--encoder', required=True)
     ap.add_argument('--policy', default=POLICY)
     ap.add_argument('--crop', type=json.loads, default={}, help='{camera: [u0, v0, u1, v1]}')
+    ap.add_argument('--layers', type=int, nargs='*', default=[])
     args = ap.parse_args()
     torch.set_num_threads(max(1, torch.get_num_threads()))
     model = SmolVLA(args.policy)
@@ -60,7 +68,12 @@ def main():
     model.policy.load_state_dict({k: v.to(own[k].dtype) for k, v in swap.items()}, strict=False)
     vlm = model.policy.model.vlm_with_expert.get_vlm_model()
     seeds = sorted(int(p.stem) for p in args.render.glob('*.npz'))
-    feats = {f'{c}_{layer}': [] for c in CAMERAS for layer in ('connector', 'vision')}
+    names = ['connector', 'vision'] + [f'layer{k}' for k in args.layers]
+    feats = {f'{c}_{layer}': [] for c in CAMERAS for layer in names}
+    hooked = {}
+    for k in args.layers:
+        vlm.vision_model.encoder.layers[k - 1].register_forward_hook(
+            lambda _m, _i, out, k=k: hooked.__setitem__(k, out[0] if isinstance(out, tuple) else out))
     for i in range(0, len(seeds), BATCH):
         renders = [np.load(args.render / f'{s}.npz') for s in seeds[i:i + BATCH]]
         obs = {f'observation.images.{c}': torch.stack([
@@ -74,10 +87,10 @@ def main():
         for cam, img in zip(CAMERAS, images):
             hidden = vlm.vision_model(pixel_values=img.to(vlm.vision_model.dtype)).last_hidden_state
             tokens = vlm.connector(hidden)
-            grid = hidden.reshape(len(renders), 32, 32, -1).permute(0, 3, 1, 2)
-            pooled = torch.nn.functional.avg_pool2d(grid, 4).permute(0, 2, 3, 1)
             feats[f'{cam}_connector'].append(tokens.flatten(1).half().numpy())
-            feats[f'{cam}_vision'].append(pooled.flatten(1).half().numpy())
+            feats[f'{cam}_vision'].append(pool(hidden))
+            for k in args.layers:
+                feats[f'{cam}_layer{k}'].append(pool(hooked[k]))
         print(f'{min(i + BATCH, len(seeds))}/{len(seeds)}', flush=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     np.savez(args.out, seeds=np.array(seeds), encoder=args.encoder, policy=args.policy,
