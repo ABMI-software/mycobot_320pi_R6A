@@ -39,6 +39,11 @@ CAMERA_RENAME = {
 # the whole --batch_size batch, and update_policy is replaced by one that runs forward and
 # backward on micro-batches of that size, then clips and steps once. Steps, the LR schedule,
 # checkpoints and logs all count whole batches, as without accumulation.
+#
+# The fp16 loss scaler: LeRobot saves neither it nor restores it, so after a resume its scale
+# restarted at 65536 and the first updates could be skipped. The launcher writes its state to
+# training_state/grad_scaler.json with every checkpoint (before LeRobot's own files, so the last
+# of those, scheduler_state.json, still marks a complete checkpoint) and restores it on resume.
 FP32_LAUNCHER = '''import copy
 import json
 import os
@@ -47,10 +52,17 @@ import time
 from collections import Counter
 from contextlib import nullcontext
 
+from pathlib import Path
+
 import torch
 import lerobot.scripts.lerobot_train as lt
 
 _make_policy = lt.make_policy
+_save_checkpoint = lt.save_checkpoint
+_load_training_state = lt.load_training_state
+ACCELERATOR = None
+SCALER_STATE = None
+SCALER_FILE = "grad_scaler.json"
 
 
 FREEZE = os.environ.get("SMOLVLA_FREEZE") or None
@@ -266,6 +278,40 @@ def update_policy_checked(train_metrics, policy, batch, optimizer, grad_clip_nor
     return train_metrics, {}
 
 
+def save_checkpoint_with_scaler(checkpoint_dir, *args, **kwargs):
+    scaler = ACCELERATOR.scaler if ACCELERATOR is not None else None
+    if scaler is not None and scaler.is_enabled():
+        state_dir = Path(checkpoint_dir) / "training_state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / SCALER_FILE).write_text(json.dumps(scaler.state_dict()))
+    return _save_checkpoint(checkpoint_dir, *args, **kwargs)
+
+
+def load_training_state_with_scaler(checkpoint_dir, *args, **kwargs):
+    global SCALER_STATE
+    out = _load_training_state(checkpoint_dir, *args, **kwargs)
+    saved = Path(checkpoint_dir) / "training_state" / SCALER_FILE
+    if saved.is_file():
+        SCALER_STATE = json.loads(saved.read_text())
+        print(f"[fp32 launcher] fp16 loss scaler state read from the checkpoint: {SCALER_STATE}", flush=True)
+    else:
+        print(f"[fp32 launcher] no {SCALER_FILE} in the checkpoint: the fp16 loss scaler starts afresh", flush=True)
+    return out
+
+
+def with_scaler(update):
+    def wrapped(*args, accelerator, **kwargs):
+        global ACCELERATOR, SCALER_STATE
+        ACCELERATOR = accelerator
+        if SCALER_STATE is not None:
+            if accelerator.scaler is not None and accelerator.scaler.is_enabled():
+                accelerator.scaler.load_state_dict(SCALER_STATE)
+                print(f"[fp32 launcher] fp16 loss scaler restored: scale {accelerator.scaler.get_scale()}", flush=True)
+            SCALER_STATE = None
+        return update(*args, accelerator=accelerator, **kwargs)
+    return wrapped
+
+
 # DataLoader workers start with "spawn" and re-import this file as __mp_main__.
 if __name__ == "__main__":
     lt.make_policy = make_policy_fp32
@@ -276,6 +322,9 @@ if __name__ == "__main__":
     elif MICRO_BATCH:
         lt.update_policy = update_policy_accumulated
         print(f"[fp32 launcher] gradient accumulation: micro-batches of {MICRO_BATCH}", flush=True)
+    lt.update_policy = with_scaler(lt.update_policy)
+    lt.save_checkpoint = save_checkpoint_with_scaler
+    lt.load_training_state = load_training_state_with_scaler
     sys.exit(lt.main())
 '''
 # lerobot prints the step through format_big_number ("step:950", then "step:1K"), so from 1000 on
@@ -692,9 +741,15 @@ def resume_check(cfg, data_dir):
     def final(work):
         step, ckpt = complete_checkpoints(Path(work) / 'run')[-1]
         state = ckpt / 'training_state'
+        scaler = state / 'grad_scaler.json'
         return {'step': step, 'weights': load_file(ckpt / 'pretrained_model' / 'model.safetensors'),
                 'optimizer': load_file(state / 'optimizer_state.safetensors'),
-                'scheduler': json.loads((state / 'scheduler_state.json').read_text())}
+                'scheduler': json.loads((state / 'scheduler_state.json').read_text()),
+                'scaler': json.loads(scaler.read_text()) if scaler.is_file() else None}
+
+    def skipped(*works):
+        return sum(p.read_text().count('update skipped by the fp16 loss scaler')
+                   for w in works for p in (Path(w) / 'logs').glob('train_*.log'))
     a, b = final(one['working']), final(second['working'])
 
     def rel_diff(x, y):
@@ -724,6 +779,11 @@ def resume_check(cfg, data_dir):
     result = {'one_go_s': round(one_go_s), 'resumed_from_step': resumed_from,
               'final_step': [a['step'], b['step']], 'scheduler_equal': a['scheduler'] == b['scheduler'],
               'scheduler_one_go': a['scheduler'], 'scheduler_resumed': b['scheduler'],
+              'fp16_scaler_one_go': a['scaler'], 'fp16_scaler_resumed': b['scaler'],
+              'fp16_scaler_restored': 'fp16 loss scaler restored' in ''.join(
+                  p.read_text() for p in (Path(second['working']) / 'logs').glob('train_*.log')),
+              'updates_skipped': {'one_go': skipped(one['working']), 'first_session': skipped(first['working']),
+                                  'second_session': skipped(second['working'])},
               'weights_rel_diff': w_rel, 'weights_tensors': w_n, 'weights_tensors_unmatched': w_extra,
               'optimizer_rel_diff': o_rel, 'optimizer_tensors_unmatched': o_extra,
               'steps_logged_one_go': len(la), 'steps_logged_resumed': len(lb),

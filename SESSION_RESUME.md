@@ -5,10 +5,15 @@
 ### Ce qui a été accompli
 - **Sonde par couche de smolvla_base** (règle `layer_probe` engagée avant les mesures,
   3640c357) : sonde linéaire, médiane mm haut / gauche / droite. Dernière couche (référence)
-  32,8 / 39,2 / 38,7 ; couche 4 27,6 / 35,7 / 36,7 ; couche 6 25,1 / 32,7 / 32,9 ;
-  **couche 8 26,7 / 33,2 / 33,1** ; couche 12 avant normalisation 32,1 / 38,0 / 36,8. La couche 8
-  gagne ~6 mm sur les 3 caméras (IC hors de 0) mais 14-19 %, sous les 20 % requis : **verdict
-  « encodeur entier »**. Les dernières couches perdent un peu de position, pas assez pour la règle.
+  32,8 / 39,2 / 38,7 ; couche 4 27,6 / 35,7 / 36,7 ; **couche 6 (la meilleure) 25,1 / 32,7 /
+  32,9** ; couche 8 26,7 / 33,2 / 33,1 ; couche 12 avant normalisation 32,1 / 38,0 / 36,8.
+  La règle engagée : bornes **≤ 26,2 / 31,3 / 30,9 mm** (IC de la différence hors de 0) sur au
+  moins 2 caméras sur 3, jugée sur les couches 4 et 8. Couches 4 et 8 : aucune caméra sous sa
+  borne. Couche 6 (rapportée, non jugée) : sous la borne sur la caméra du haut seulement (1 sur
+  3). **Verdict : encodeur entier.** Les couches du milieu localisent un peu mieux que la
+  dernière (~6 mm, IC hors de 0), pas assez pour la règle.
+  *(Corrigé le 19/10 au soir : la première version de cette entrée présentait la couche 8 comme
+  la meilleure et la règle en pourcentage.)*
 - **Accumulation de gradient** dans le lanceur du pilote Kaggle (pilote restauré :
   `training/smolvla_kaggle/smolvla_kaggle_driver.py`). Sur CPU, gel de Run C, fp32 :
   gradients identiques au lot entier à 4e-7 près (groupes ~1,5e-6), avec des remplissages
@@ -24,8 +29,9 @@
   - **Tracé** : l'ordre des données après reprise est exact (mêmes trames aux pas 5-8) ; le bruit
     et les temps du flow matching diffèrent (le nouveau chargeur tire une fois dans l'état
     aléatoire restauré). Sans conséquence, d'où la comparaison des pertes en moyenne.
-  - LeRobot ne sauve pas le facteur d'échelle fp16 : il repart à 65536 après reprise ; les mises
-    à jour sautées sont désormais signalées. À mesurer sur T4.
+  - LeRobot ne sauve pas le facteur d'échelle fp16 : il repartait à 65536 après reprise.
+    **Corrigé le soir** : le lanceur l'écrit dans `training_state/grad_scaler.json` et le restaure
+    (aller-retour testé sur CPU avec un vrai `GradScaler`) ; mises à jour sautées signalées.
 - Carnet **`smolvla_runC_checks_t4.ipynb`** (~40 min de T4) : lot 8 contre 2 × 4 (seuils fixés
   avant : gradients et perte à 1 %, mise à jour à 5 %), puis reprise à 2 × 6 sur 200 pas.
   **Pas lancé.**
@@ -44,7 +50,9 @@
 ### Prochaines actions
 1. [ROUGE] Tableau de mémoire 4 / 6 / 8 (en attente) → confirmer le lot 6.
 2. [ROUGE] Carnet `smolvla_runC_checks_t4.ipynb` sur T4 — sur accord.
-3. [ROUGE] Graines 1051-1400 — sur confirmation (portable sur secteur, sans veille), ~37 h.
+3. [ROUGE] Graines 1051-1400 — sur confirmation (portable sur secteur, sans veille), ~37 h,
+   fin mercredi acceptée. Conteneur nettoyé le 19/10 (redémarré : 1052 zombies) ; lancer sous
+   `reap_children.py` (commande ci-dessous).
 4. [JAUNE] Reste du code de Run C : LR de vision bas, tête auxiliaire de position (seulement
    pendant l'entraînement), carnet d'entraînement (lot 30 = 6 × 5, `KEEP_EVERY` 2500).
 5. [JAUNE] Carnet Run B (réglages de Run A, ≥ 400 dispositions) après l'enregistrement.
@@ -53,8 +61,8 @@
 ```bash
 # Résultats de la sonde par couche
 docker exec gazebo_to_lerobot cat /workspace/probe/fit_layer.log
-# Enregistrement 1051-1400 (sur confirmation seulement)
-docker exec -d gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_B RANDOM_START=1 PREPLACE=1 /workspace/src/scripts/record_tri_batch.sh 1051 1400'
+# Enregistrement 1051-1400 (sur confirmation seulement), sous le récolteur de zombies
+docker exec -d gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_B RANDOM_START=1 PREPLACE=1 python3 /workspace/src/scripts/reap_children.py /workspace/src/scripts/record_tri_batch.sh 1051 1400'
 ```
 
 ## État actuel (19 octobre 2026 — matin, mesure mémoire Run C : lot 16 épuise la mémoire)

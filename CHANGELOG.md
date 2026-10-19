@@ -9,6 +9,20 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — facteur d'échelle fp16 sauvé à chaque reprise ; zombies du conteneur (19/10, soir)
+
+- **Pilote Kaggle** : le lanceur écrit l'état du facteur d'échelle fp16 (`GradScaler`) dans
+  `training_state/grad_scaler.json` à chaque point de contrôle (avant les fichiers de LeRobot,
+  `scheduler_state.json` reste le marqueur de complétude) et le restaure avant la première mise à
+  jour d'une reprise ; LeRobot ne le sauvait pas, il repartait à 65536. `resumecheck` rapporte
+  l'état des deux points de contrôle finaux et les mises à jour sautées par session.
+- **`scripts/reap_children.py`** : lance une commande en « child subreaper » ; les processus
+  qu'elle rend orphelins sont récoltés au lieu de rester zombies sous le PID 1 de
+  gazebo_to_lerobot (`sleep infinity`, qui ne récolte jamais : 1052 zombies, ~10 par graine).
+  À utiliser pour `record_tri_batch.sh`.
+- `config/probe_protocol.yaml`, `layer_probe` : résultat consigné (couche 6 la meilleure, sous la
+  borne sur une caméra seulement ; couches 4 et 8 sur aucune ; encodeur entier).
+
 ### Ajouté — Run C : accumulation de gradient, reprise vérifiée, sonde par couche (19/10, après-midi)
 
 - **`training/smolvla_kaggle/smolvla_kaggle_driver.py` restauré** (perdu avec le crash WSL, les
