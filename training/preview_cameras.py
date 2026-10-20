@@ -13,7 +13,7 @@ Controls (in the OpenCV window):
 Usage::
 
     python3 training/preview_cameras.py
-    python3 training/preview_cameras.py --pi-host 10.10.0.225
+    python3 training/preview_cameras.py --pi-host 10.10.0.224
 """
 
 import argparse
@@ -154,7 +154,7 @@ def draw_overlay(frame, cam_name, fps, grid_mode):
 # ---------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser(description='Live preview of Pi cameras')
-    ap.add_argument('--pi-host', default='10.10.0.225')
+    ap.add_argument('--pi-host', default='10.10.0.224')
     ap.add_argument('--camera-port', type=int, default=5006)
     ap.add_argument('--quality', type=int, default=50,
                     help='JPEG quality for preview (lower = faster, default 50)')

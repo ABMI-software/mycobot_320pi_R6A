@@ -145,7 +145,92 @@ la pose dégagée `[164.53, 19.24, -32.95, 10.63, 2.37, -38.93]`.
 
 ---
 
-## 6. Plan de reprise de la FSM (`scripts/pick_fsm.py`)
+## 6. Reprise de la FSM (`scripts/pick_fsm.py`) — faite le 30/09, pas encore testée sur le robot
+
+**Déport d'outil recalé sur les quatre saisies réussies.** Pour chacune, les
+angles relus aux codeurs à la fermeture et le centre de l'objet vu par
+l'arducam, à mi-hauteur connue, donnent le vecteur t = Rᵀ (centre − bride) :
+
+| Saisie | t (mm, repère bride) |
+|---|---|
+| cube_rouge | [−17,8 ; −5,5 ; 147,6] |
+| pave_jaune | [−15,9 ; −4,6 ; 147,2] |
+| cylindre_vert | [−15,3 ; −1,5 ; 149,3] |
+| cube_bleu | [−18,1 ; −6,7 ; 146,3] |
+| **retenu** | **[−16,8 ; −4,6 ; 147,6]**, écarts-types 1,2 / 1,9 / 1,1 |
+
+`tool_offset.json` désigne désormais le **centre de prise**, et non plus le bout
+des doigts. L'ancien vecteur est archivé dans `remplace_4`.
+
+**Changements dans `pick_fsm.py`**, chacun avec l'ancienne valeur en commentaire :
+
+| Constante | Avant | Maintenant | Justification |
+|---|---|---|---|
+| `R_REFERENCE` | lue sur la prise du 20/08 | posée : axe Z bride vers le bas | plus d'orientation imposée |
+| `Q_REFERENCE` | prise du 20/08 | prise du cube rouge du 30/09 | amorce d'IK et autotest |
+| `_AMORCES_MESUREES` | poses de la pince de côté | 9 poses exécutées le 30/09 (J5 ≈ 90) | `autotest_ik` passe |
+| `_AMORCES_SYNTHETIQUES` | J5 = 0 | 8 amorces à J5 ≈ 90, plus 4 anciennes | — |
+| `POSE_OBSERVATION` | `[-27.5, -61.61, …]` | `[164.53, 19.24, -32.95, 10.63, 2.37, -38.93]` | vue arducam dégagée |
+| `PLANCHER_POINTE` | 13,9 | 20,0 | prise la plus basse exécutée |
+| `Z_TRANSFERT` | 186,9 | 126,9 | 187 mm refusait la pince verticale dès 220 mm |
+| `PORTEE_VERTICALE_MAX` | 355 | 260 | balayage du modèle |
+| `INCLINAISONS_PAR_PORTEE` | (320, 0) … | (260, 0), (335, −15), (∞, −30) | balayage du modèle |
+| `INCLINAISONS_CARTON_PAR_PORTEE` | (355, 0) … | (260, 0), (370, −15), (430, −30), (∞, −45) | transfert et lâcher résolus ensemble |
+
+Contrôle hors ligne : les quatre prises du 30/09 et les quatre bacs se
+planifient. Pince verticale pour trois pièces, −15° pour le cube bleu (271 mm).
+Largage à −30° pour les bacs jaune, vert et bleu, à −45° pour le rouge (433 mm).
+
+**Pas encore fait :**
+- **aucun cycle réel par la FSM** avec ces valeurs ;
+- le bout des doigts n'a pas été mesuré au réglet ;
+- l'enchaînement continu (§ 5) n'est pas porté dans la FSM ;
+- la correction de dépôt (+19, −13) n'est pas portée non plus.
+
+⚠ **Avant de lancer le tableau de bord, recalibrer la SVPRO.** La hauteur de
+prise est **triangulée par les deux caméras**. Avec l'extrinsèque SVPRO
+actuelle, fausse depuis que la caméra a bougé, la hauteur visée est fausse.
+Il faut d'abord réorienter la SVPRO pour qu'elle voie les 4 marqueurs, puis
+accepter la calibration des deux caméras proposée par
+`lancer_pick_dashboard_final.py`.
+
+### Deuxième série, fin d'après-midi : les quatre pièces encore triées, et le bac jaune
+
+Positions prises à l'arducam (exposition manuelle 75), cycles par
+`cycle_pince_axe_j6.py`. Les quatre pièces sont saisies (statut 2) puis lâchées
+(statut 3), et l'arducam les montre toutes dans leur bac, à **13 à 22 mm** du
+centre. Les écarts n'ont pas de direction commune : c'est de la dispersion, pas
+un biais à corriger.
+
+| Bac | Écart de la pièce au centre (mm) |
+|---|---|
+| rouge | (−4, +17) |
+| jaune | (+13, +13) |
+| vert | (−1, +22) |
+| bleu | (−10, −9) |
+
+**Pourquoi le tableau de bord ne posait pas le pavé.** Sur l'arducam,
+**yolo26 prend le bac jaune vide pour un bac vert**. L'image contient alors
+deux « bac_vert », dont un (0,86) à la place exacte du bac jaune. Quand le
+pavé est dedans, le même bac sort « bac_jaune » (0,86). Faute de bac jaune à
+l'arducam, le tableau de bord se rabattait sur la SVPRO, dont l'extrinsèque
+était fausse.
+
+**Correction** dans `yolo26_dashboard.py` : `_recolore_bacs` renomme chaque
+bac détecté d'après la couleur de ses pixels. Il réutilise les bandes de
+teinte et les saturations de `tri_couleur`, qui empêchent le bois de voter.
+Il ne garde ensuite que le plus sûr de chaque couleur. Vérifié sur cinq images
+arducam, à travers le vrai service : les deux erreurs sont corrigées et
+aucune détection juste n'est renommée.
+
+**SVPRO recalibrée sur 3 marqueurs** (19, 23, 25). Le 26 reste trop petit et
+trop oblique, même en agrandissant l'image. Reprojection 1,84 px, marqueurs
+retrouvés à 0,5–1,2 mm. La validation « un marqueur exclu » est impossible
+avec 3 marqueurs. Contrôle croisé avec l'arducam sur trois pièces : 14 à
+21 mm d'écart. C'est acceptable parce que l'arducam fait foi sur le XY.
+Ancienne extrinsèque : `svpro_extrinsic_servo.avant_3009_1723.yaml`.
+
+### Plan d'origine
 
 Dans l'ordre. Chaque étape se valide sur le robot avant de passer à la
 suivante.

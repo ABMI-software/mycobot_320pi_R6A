@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!--
+  Camera libre : le capteur que le collecteur deplace a CHAQUE echantillon.
+
+  Pourquoi un modele separe, et non un lien de plus dans l'URDF du robot. Les 4
+  cameras synthetiques (front/right/left/top) sont des liens rattaches a `world`
+  par un joint fixe DANS l'URDF du robot : elles font partie du modele robot, et
+  `set_pose` ne s'applique qu'a un modele entier — le deplacer bougerait le
+  robot avec, sans rien changer a la geometrie relative. Un modele autonome est
+  la seule facon de faire varier la pose camera<->robot en cours de collecte.
+
+  Verifie le 02/09/2026 : spawn par `create` puis `set_pose` a chaud, le RENDU
+  suit (difference moyenne 12,8/255 entre les deux trames).
+
+  horizontal_fov = 1.15 rad a 640x480 donne fx = 320/tan(0.575) = 494, soit
+  l'intrinseque de l'arducam reelle (cam_3, fx ~495). On ne randomise PAS la
+  focale : le defaut qu'on corrige porte sur les EXTRINSEQUES, et melanger les
+  deux empecherait d'attribuer le resultat.
+-->
+<sdf version="1.9">
+  <model name="cam_libre">
+    <static>true</static>
+    <link name="link">
+      <visual name="corps">
+        <geometry><box><size>0.06 0.04 0.04</size></box></geometry>
+        <material>
+          <ambient>0.15 0.15 0.18 1</ambient>
+          <diffuse>0.15 0.15 0.18 1</diffuse>
+        </material>
+      </visual>
+      <sensor name="cam_libre_sensor" type="camera">
+        <always_on>true</always_on>
+        <update_rate>10</update_rate>
+        <camera>
+          <horizontal_fov>1.15</horizontal_fov>
+          <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+          <clip><near>0.05</near><far>10.0</far></clip>
+        </camera>
+        <topic>cam_libre/image</topic>
+      </sensor>
+    </link>
+  </model>
+</sdf>

@@ -68,34 +68,38 @@ REAL_CAMERA_INTRINSICS = np.array([
 ], dtype=np.float64)
 
 # Real camera extrinsics (approximate — needs calibration for production)
-# cam0: front-facing camera looking at the robot from ~0.5m
-# For now we use a placeholder that will be refined via PnP during inference
 #
-# ⚠️ The real 3-cam rig (arducam/svpro/astra) extrinsics below are UNCALIBRATED
-# placeholders matching the rough observed viewpoints. They make the projection
-# well-formed but the projected_location (GT) is NOT pixel-accurate. On real data,
-# trust DETECTION RATE only, not pixel error, until a proper hand-eye calibration
-# (camera↔robot-base) exists. Intrinsics, by contrast, ARE calibrated — see
-# CALIBRATION_MAP below (astra excepted).
+# ⚠️ ALL entries below come from the same quick MANUAL recalage method
+# (2026-07-03): a handful of frames per camera were visually annotated
+# (base + link6 pixel positions) and solved with cv2.solvePnP (seeded from
+# the previous rough placeholders to stay in the physically-plausible
+# solution branch). Mean reprojection error ~43-66 px (real_3cam rig) /
+# ~53-55 px (cam0/cam3) — far better than the original "not even on the
+# robot" placeholders, but still approximate (2 landmark points per pose,
+# hand-picked pixel coordinates, no proper hand-eye calibration rig).
+# Re-run with a real ChArUco-on-flange hand-eye calibration for
+# production-grade accuracy. Intrinsics, by contrast, ARE calibrated — see
+# CALIBRATION_MAP below (astra, cam0, cam3 excepted).
 REAL_CAMERA_TRANSFORMS = {
-    "cam0": {
-        "xyz": (0.5, 0.0, 0.3),
-        "rpy": (0.0, 0.2, math.pi),
-    },
-    "cam3": {
-        "xyz": (0.0, 0.5, 0.3),
-        "rpy": (0.0, 0.2, -math.pi / 2),
-    },
-    # --- real 3-cam rig (approximate, UNCALIBRATED extrinsics) ---
-    "arducam": {"xyz": (0.0, 0.0, 0.70), "rpy": (0.0, math.pi / 2, 0.0)},   # top-down
-    "svpro":   {"xyz": (0.45, 0.0, 0.30), "rpy": (0.0, 0.25, math.pi)},      # front-ish
-    "astra":   {"xyz": (0.0, 0.45, 0.30), "rpy": (0.0, 0.25, -math.pi / 2)}, # side-ish
+    # --- cam0/cam3 rig (manual PnP recalage, 2026-07-03 — still approximate) ---
+    "cam0": {"xyz": (0.2437, 0.7009, 0.0041), "rpy": (-0.1418, -0.2095, -1.9188)},
+    "cam3": {"xyz": (0.0902, 1.0449, -0.2080), "rpy": (-0.2796, -0.2834, -1.6911)},
+    # NOTE: training/calibration/camera_extrinsic.yaml (§3.2, ros_jazzy repo,
+    # 0.59px reproj) was tried here for arducam on 2026-07-03 and made results
+    # WORSE (base 84.9px -> 123.5px) — that calibration is for the pick-and-place
+    # rig's fixed overhead arducam mount, a different physical position than the
+    # one used to capture real_3cam. Same camera/intrinsics, different mount ->
+    # extrinsic does not transfer. Reverted to the manual PnP recalage below.
+    "arducam": {"xyz": (-0.3170, -0.6978, 1.0660), "rpy": (0.6339, 0.9941, 0.9094)},
+    # --- svpro/astra (manual PnP recalage, 2026-07-03 — still approximate) ---
+    "svpro":   {"xyz": (0.5493, 1.3796, 0.3110), "rpy": (0.0449, 0.2318, -2.1443)},
+    "astra":   {"xyz": (-1.0331, -0.3908, 0.4162), "rpy": (0.5049, 0.2185, 0.3181)},
 }
 
 # Calibrated intrinsics per real camera, from training/calibration/<stem>.npz
 # (key 'mtx'). astra is NOT calibrated → falls back to REAL_CAMERA_INTRINSICS.
 CALIBRATION_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration")
-CALIBRATION_MAP = {"arducam": "cam_0", "svpro": "cam_2"}
+CALIBRATION_MAP = {"arducam": "cam_0", "svpro": "cam_2", "cam0": "cam_0", "cam3": "cam_3"}
 
 
 def load_real_intrinsics(cam_name):

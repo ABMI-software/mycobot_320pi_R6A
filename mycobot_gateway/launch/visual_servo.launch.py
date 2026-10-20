@@ -23,7 +23,7 @@ seul le premier répond à `get_pro_gripper_status`. Sans ce retour, la saisie n
 jamais confirmée (GRASP expire) et surtout la vérification de prise au levage
 n'a rien à vérifier. Le contrôleur le signale explicitement s'il tombe dessus.
 
-⚠ Préalables : `conda deactivate`, gripper_bridge.py côté Pi, `ping 10.10.0.221`,
+⚠ Préalables : `conda deactivate`, gripper_bridge.py côté Pi, `ping 10.10.0.224`,
 extrinsèques calibrées et VALIDÉES (training/calibration/calibrate_camera_base_extrinsic.py
 --camera arducam, puis --camera svpro).
 

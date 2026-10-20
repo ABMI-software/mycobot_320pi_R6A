@@ -24,7 +24,13 @@ import tri_couleur as tc
 
 MODELES = RACINE / 'mycobot_description' / 'models'
 DENSITE = 500.0          # kg/m3 — bois peint / impression 3D remplie
-EPAISSEUR_BAC = 0.002    # m — paroi du bac
+# Bac aux cotes du dossier de fabrication (plans_cotes, feuilles 6 et 7) :
+# parois 5 mm, fond 2 mm, ouverture 95 x 95, retrait exterieur 2,5 x 2,5 mm a
+# chaque coin sur toute la hauteur. BIN_INNER_HALF_MM = 47,5 de sim_sorting_grasp
+# suppose deja ces 95 mm ; les anciennes parois de 2 mm en laissaient 101.
+EPAISSEUR_BAC = 0.005    # m — paroi du bac
+EPAISSEUR_FOND = 0.002   # m
+RETRAIT_COIN = 0.0025    # m
 
 GABARIT_CONFIG = """<?xml version="1.0"?>
 <!-- Genere par scripts/generer_pieces_gazebo.py — regenerer plutot qu'editer. -->
@@ -42,6 +48,19 @@ GABARIT_CONFIG = """<?xml version="1.0"?>
 # milieu de la bande. La valeur est celle d'une peinture mate bien eclairee.
 SATURATION_PEINTURE = 240
 VALEUR_PEINTURE = 165
+# Teinte a donner au MATERIAU pour que le RENDU Gazebo tombe sur la teinte des
+# vraies images. L'eclairage de la scene decale la teinte rendue (mesure du
+# 29/09, camera top dream50k : vert 39 -> 36, jaune 21 -> 24). Le vert rendu a
+# 36 etait a mi-chemin du jaune reel (25) et du vert reel (44), mesures sur les
+# bacs du jeu pieces_v5 : yolo26 lisait le bac jaune `bac_vert` 8 fois sur 10.
+# Rouge et bleu, reconnus 10/10, gardent la teinte de tri_couleur.
+TEINTE_MATERIAU = {'vert': 47, 'jaune': 22}
+# Le vert peint est nettement plus SOMBRE que le jaune : V 107 contre 132 sur
+# l'arducam (pieces_v5), ~105 contre 160-220 sur photo (29/09). Rendus a la meme
+# valeur, jaune et vert sortaient tous deux a V 212 et le bac jaune restait lu
+# `bac_vert` 6 fois sur 10 malgre une teinte juste. Le rendu multiplie V par
+# ~1,28 : 130 donne ~166, soit le rapport jaune/vert de l'arducam (~1,25).
+VALEUR_MATERIAU = {'vert': 130}
 
 
 def rgb(couleur):
@@ -55,8 +74,9 @@ def rgb(couleur):
     les couleurs de trace : le bac jaune n'etait alors pas reconnu du tout.
     """
     import numpy as np
-    h = tc.TEINTES[couleur]
-    hsv = np.uint8([[[h, SATURATION_PEINTURE, VALEUR_PEINTURE]]])
+    h = TEINTE_MATERIAU.get(couleur, tc.TEINTES[couleur])
+    v = VALEUR_MATERIAU.get(couleur, VALEUR_PEINTURE)
+    hsv = np.uint8([[[h, SATURATION_PEINTURE, v]]])
     b, g, r = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)[0][0]
     return r / 255.0, g / 255.0, b / 255.0
 
@@ -132,13 +152,15 @@ def piece(couleur):
 def bac(couleur):
     """Bac ouvert : un fond et quatre parois, aux cotes de tri_couleur.BAC."""
     cote_x, cote_y, haut = (d / 1000.0 for d in tc.BAC)
-    e = EPAISSEUR_BAC
+    e, f, r = EPAISSEUR_BAC, EPAISSEUR_FOND, RETRAIT_COIN
+    # Chaque paroi s'arrete a `r` du bord exterieur : les quatre coins restent
+    # vides sur 2,5 x 2,5 mm, les parois se recouvrent a l'interieur de l'angle.
     murs = [
-        ('fond', cote_x, cote_y, e, 0.0, 0.0, e / 2.0),
-        ('paroi_x_plus', e, cote_y, haut, (cote_x - e) / 2.0, 0.0, haut / 2.0),
-        ('paroi_x_moins', e, cote_y, haut, -(cote_x - e) / 2.0, 0.0, haut / 2.0),
-        ('paroi_y_plus', cote_x - 2 * e, e, haut, 0.0, (cote_y - e) / 2.0, haut / 2.0),
-        ('paroi_y_moins', cote_x - 2 * e, e, haut, 0.0, -(cote_y - e) / 2.0, haut / 2.0),
+        ('fond', cote_x - 2 * e, cote_y - 2 * e, f, 0.0, 0.0, f / 2.0),
+        ('paroi_x_plus', e, cote_y - 2 * r, haut, (cote_x - e) / 2.0, 0.0, haut / 2.0),
+        ('paroi_x_moins', e, cote_y - 2 * r, haut, -(cote_x - e) / 2.0, 0.0, haut / 2.0),
+        ('paroi_y_plus', cote_x - 2 * r, e, haut, 0.0, (cote_y - e) / 2.0, haut / 2.0),
+        ('paroi_y_moins', cote_x - 2 * r, e, haut, 0.0, -(cote_y - e) / 2.0, haut / 2.0),
     ]
     blocs = []
     for nom, sx, sy, sz, px, py, pz in murs:
@@ -154,7 +176,8 @@ def bac(couleur):
             f'      </visual>')
     return f"""<?xml version="1.0"?>
 <!-- Genere par scripts/generer_pieces_gazebo.py — regenerer plutot qu'editer.
-     Cotes lues dans tri_couleur.BAC : {tc.BAC} mm, paroi {EPAISSEUR_BAC * 1000:.0f} mm.
+     Cotes lues dans tri_couleur.BAC : {tc.BAC} mm, paroi {EPAISSEUR_BAC * 1000:.0f} mm,
+     fond {EPAISSEUR_FOND * 1000:.0f} mm, retrait d'angle {RETRAIT_COIN * 1000:.1f} mm (plans_cotes f. 6-7).
      Fixe (static) : un bac deplace par un choc invaliderait le largage. -->
 <sdf version="1.9">
   <model name="bac_{couleur}">

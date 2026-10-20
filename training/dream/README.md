@@ -303,6 +303,41 @@ Fixed the same day by requiring pose diversity (≥3 distinct poses, ≥15° spr
 on ≥2 joints) before pooling correspondences across the whole accumulation
 window into one fit — see `CHANGELOG.md` [1.16.0].
 
+## J5/J6 measured on the real robot (2026-09-07)
+
+The 2026-07-13 section above reasons about observability from geometry. On
+2026-09-07 both joints were swept on the physical robot, arm over the marker
+board, ground truth from encoders + FK projected through the marker-derived
+extrinsic, checkpoint `vgg_v5_geo_ft_e30`, SVPRO camera.
+
+**J5 — strong effect, with a cliff.** Detection is flat and accurate down to
+about -60 deg, then collapses:
+
+| J5 | detection | pixel error |
+|-----|-----------|-------------|
+| 0 deg | 100.0% | 6.8 px |
+| -20 deg | 100.0% | 5.4 px |
+| -40 deg | 85.7% | 6.7 px |
+| -60 deg | 100.0% | 7.2 px |
+| -80 deg | 85.7% | 24.8 px |
+| -100 deg | 42.9% | 47.7 px |
+
+**Operating envelope: keep J5 between 0 and -60 deg.** Past -80 deg detection
+decays and pixel error grows 4-7x.
+
+**J6 — no effect, as predicted.** Swept at J5 = -20 deg (the good band) over
+-52.6 to +46.7 deg: **14/14 keypoints detected at every one of the 8 poses**,
+no variation at all. The reason was then verified numerically offline: when J6
+rotates across that range, the displacement of all 7 FK keypoints is exactly
+**0.0000 mm**. The ground truth itself does not move. J6 is not poorly
+estimated, it is out of reach by construction — the direct numerical
+confirmation of the structural limit stated above.
+
+**Method note worth keeping.** A first J6 sweep was run at J5 = -100 deg and
+showed 21-86% variation, which reads like a J6 effect. It is not: it is noise
+inside the collapsed-J5 regime. Sweeping a weakly-observable joint is only
+meaningful where the *other* joints are in their good band.
+
 ## Files
 
 ### Kinematics & angle recovery

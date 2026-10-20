@@ -1,5 +1,40 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (14 octobre 2026 — soir, DREAM sur le banc réel)
+
+### Ce qui a été accompli aujourd'hui
+
+- **DREAM réel** : `vgg_tri_reel_ft_e10` passe de 18,7 px à **1,69 px** sur le
+  test réel. Pendant un tri : arducam ~2 px, bras immobile comme en mouvement.
+- **Dashboard de tri avec DREAM** (étape 9 du protocole réel) : tableau par
+  saisie, courbes, trajectoire de la pince en direct sur les deux caméras, CSV.
+- **Extrinsèque calculée par DREAM, sans marqueur** : tri **4/4** avec elle sur
+  les deux caméras (`lancer_tri_extrinseque_dream.py`).
+- Tout est écrit dans `docs/PROTOCOLE_REEL.md` (+ docx local, non poussé).
+
+### Décisions prises
+
+- La colonne « DREAM ↔ codeurs » est en **3D** ; YOLO ↔ codeurs reste en XY.
+- Les vues DREAM hors du domaine J5 (45-93°, pose d'observation) sont écartées
+  des courbes et de la saisie, mais gardées dans les CSV.
+- `pick_dashboard.py` et `pick_fsm.py` ne sont pas modifiés : tout passe par les lanceurs.
+
+### Prochaines actions
+
+1. [ROUGE] Intégrer la branche distante (10 commits d'avance, conflit probable
+   sur `docs/PROTOCOLE_YOLO_GAZEBO.md`) avant tout push.
+2. [JAUNE] Réestimation continue de l'extrinsèque DREAM pendant le tri, puis
+   test avec une caméra légèrement déplacée.
+3. [JAUNE] PnP commun aux deux caméras (la SVPRO fixe le Z que l'arducam voit mal).
+4. [VERT] Garder les bacs à moins de ~400 mm de la base (445-477 mm = largage à côté).
+
+### Commande rapide de reprise
+
+```bash
+MYCOBOT_PI=10.10.0.223 /usr/bin/python3 scripts/lancer_tri_extrinseque_dream.py --dream
+# avec les ArUco : scripts/lancer_pick_dashboard_final.py --svpro-dream --dream
+```
+
 ## État actuel (7 octobre 2026 — après-midi, étape 10 validée en simulation)
 
 ### Ce qui a été accompli aujourd'hui
@@ -96,11 +131,6 @@ ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1 piece_reach:=0.28 dream:=
 ```
 
 
-> **Date de dernière mise à jour :** 5 octobre 2026 (essai des PR #14 et #15 sous Gazebo, analyse du dataset de la PR #15)
-> **Version :** 2.2.0 (téléop) · 1.10.0 (sorting) · 1.14.0 (calibration) · 1.15.2 (pick-and-place ArUco)
-> **Branche :** `fix/tool-offset-and-test-collection`, issue de `main`
-> **Repository :** https://github.com/ABMI-software/mycobot_320pi_R6A
-> **Pi réelle :** `10.10.0.221` (pas `.223`/`.225` comme certains anciens docs)
 ## État actuel (6 octobre 2026 — après-midi, fine-tuning DREAM sur la scène de tri)
 
 ### Ce qui a été accompli (05/10 → 06/10)

@@ -11,7 +11,7 @@ Se connecte au bridge (gripper_bridge.py sur le Pi) en TCP et :
 Elephant impose >= 1.5 s entre deux commandes gripper : le client les espace tout
 seul (file d'attente + intervalle mini), donc l'UI ne bloque jamais.
 
-Lancer :  python3 gripper_gui.py --host 10.10.0.221
+Lancer :  python3 gripper_gui.py --host 10.10.0.224
 Prérequis : PyQt5 (déjà installé pour le dashboard)
 """
 import argparse
@@ -280,7 +280,7 @@ class GripperGUI(QWidget):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--host", default="10.10.0.221", help="IP du Pi")
+    ap.add_argument("--host", default="10.10.0.224", help="IP du Pi")
     ap.add_argument("--id", type=int, default=14, help="gripper_id")
     args = ap.parse_args()
     app = QApplication([])

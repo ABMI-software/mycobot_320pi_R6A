@@ -84,3 +84,33 @@ Le robot doit être **auto-adaptatif** : la vision détecte la balle *où qu'ell
 ---
 
 *Chaîne : `scripts/pick_and_place_vision_live.py` (perception) + `scripts/pick_and_place_real.py` (contrôle socket, poses apprises) + `gripper_bridge.py` (Pi).*
+
+---
+
+## 7. Boucle d'asservissement multi-cycle (17/08/2026)
+
+Le mode `--servo-loop` exécute une machine d'états bornée : pose articulaire
+d'observation → localisation → approche → relocalisation/corrections XY →
+descente → prise confirmée → dépose → retrait → cycle suivant.
+
+Commande de validation sans mouvement :
+
+```bash
+.venv/bin/python scripts/pick_and_place_vision_live.py \
+  --camera-source v4l2 \
+  --extrinsic markers \
+  --marker-extrinsic training/calibration/arducam_extrinsic_session_live.yaml \
+  --servo-loop --cycles 3 --dry-run
+```
+
+Pour le réel, retirer `--dry-run` et ajouter `--robot-via socket`. La boucle :
+
+- initialise chaque cycle par la pose articulaire `pick_approach` ;
+- corrige à partir de 5 mm d'erreur XY, au maximum `--max-replans` fois ;
+- attend au maximum `--miss-retries + 1` observations quand la balle est absente ;
+- applique la correction validée `X=+2 mm, Y=0` ;
+- effectue l'observation et les corrections à 80 mm au-dessus de la prise afin
+  de limiter l'occlusion de la balle par la pince ;
+- refuse les cibles hors de la limite contrôleur ±350 mm ;
+- arrête immédiatement sur toute réponse mouvement/pince différente de `OK:` ;
+- interdit la dépose si le statut pince n'est pas `2`.

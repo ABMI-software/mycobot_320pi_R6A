@@ -25,7 +25,7 @@ Then in a separate terminal (conda env hand-teleop activated):
 
 Launch arguments:
   target       : sim | real | both   (default: both)
-  pi_ip        : Raspberry Pi IP      (default: 10.10.0.225)
+  pi_ip        : Raspberry Pi IP      (default: 10.10.0.224)
   rosbridge    : Start rosbridge ws   (default: true)
   real_speed   : MyCobot servo speed  (default: 40)
   real_rate_hz : max JSON send rate   (default: 15)
@@ -66,7 +66,7 @@ def generate_launch_description():
         "target", default_value="both", choices=["sim", "real", "both"],
         description="Where trajectories go: sim (Gazebo only), real (Pi only), or both.",
     )
-    pi_ip_arg = DeclareLaunchArgument("pi_ip", default_value="10.10.0.225")
+    pi_ip_arg = DeclareLaunchArgument("pi_ip", default_value="10.10.0.224")
     pi_port_arg = DeclareLaunchArgument("pi_port", default_value="5005")
     rosbridge_arg = DeclareLaunchArgument("rosbridge", default_value="true")
     real_speed_arg = DeclareLaunchArgument("real_speed", default_value="40")

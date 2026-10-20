@@ -201,7 +201,7 @@ Ce document décortique **chaque étape** du pipeline de téléopération, avec 
 │   ▼                            │   │   ▼                               │
 │ /joint_states                  │   │ bridge_tour (ROS2 node)           │
 │   → dashboard actual           │   │   │                               │
-│                                │   │   │ TCP socket vers Pi 10.10.0.223│
+│                                │   │   │ TCP socket vers Pi 10.10.0.224│
 │                                │   │   │   msg.data + '\n' encodé UTF-8│
 │                                │   │   ▼                               │
 │                                │   │ Raspberry Pi : bridge_pi_simple.py│

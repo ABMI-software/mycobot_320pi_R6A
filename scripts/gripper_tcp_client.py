@@ -19,7 +19,7 @@ import json
 import socket
 import time
 
-PI_HOST = "10.10.0.221"
+PI_HOST = "10.10.0.224"
 PI_PORT = 5005
 GAP = 2.0   # s entre commandes gripper (> 1.5 s imposé par Elephant)
 

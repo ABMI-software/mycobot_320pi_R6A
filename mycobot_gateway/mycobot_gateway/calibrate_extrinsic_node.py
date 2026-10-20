@@ -46,7 +46,7 @@ def _resolve_default(rel: str) -> str:
         cand = p / "training" / "calibration" / rel
         if cand.exists():
             return str(cand)
-    return f"/home/genji/ros_jazzy/src/mycobot_R6A/training/calibration/{rel}"
+    return f"/home/genji/Osama_ws/src/mycobot_R6A/training/calibration/{rel}"
 
 
 def _aruco_dict(name: str) -> int:

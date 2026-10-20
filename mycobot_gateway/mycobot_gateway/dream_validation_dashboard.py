@@ -48,7 +48,7 @@ from std_msgs.msg import Float64MultiArray, String
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QIcon, QImage, QPixmap
-from PyQt5.QtWidgets import (
+from PyQt5.QtWidgets import (QSizePolicy, 
     QApplication, QCheckBox, QDoubleSpinBox, QFrame, QGridLayout, QGroupBox,
     QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QRadioButton,
     QScrollArea, QSpinBox, QVBoxLayout, QWidget,
@@ -163,6 +163,13 @@ JOINT_CONFIDENCE_PX_THRESHOLD = 15.0
 # the windowed MAE/RMS is computed over), so the two can never silently
 # drift apart the way the old single "MAE totale" (a session-wide, since
 # node-start running counter) did against the 30s-windowed graphs.
+# Appariement des vues pour le taux de FUSION. Chaque trame de la caméra
+# primaire est appariée à la dernière trame de l'autre vue si elle date de moins
+# que ça. La SVPRO publie vers 2,3 Hz avec des trous mesurés a 1,2 s : une
+# tolérance plus courte compterait « rien vu » entre deux de ses trames, et
+# c'est exactement le faux zéro qui la faisait paraître à 43 % quand elle
+# affichait 5/7.
+_DET_APPARIEMENT_S = 2.0
 CURVE_WINDOW_S = 30.0
 
 # Hard per-frame bound on the camera pose delta (solve_joint_angles_and_pose's
@@ -330,7 +337,15 @@ _CONSISTENCY_REG_VEC = [10.0, 40.0, 40.0, 40.0, 40.0, 1.5]
 # les détecte souvent pas (4/7), donc rien ne les raffine et un poids trop
 # faible les ferait dériver. J6 reste à 1.5 (structurellement inobservable).
 _FUSION_REG_VEC = [3.0, 3.0, 3.0, 8.0, 8.0, 1.5]
-_KF_OUTLIER_GATE_SIGMA = 3.0  # reject an update whose innovation exceeds this many predicted std devs
+_KF_OUTLIER_GATE_SIGMA = 1.8  # reject an update whose innovation exceeds this many predicted std devs
+                              # (3.0->2.0->1.8, sweep 2026-07-27 : STABILITÉ prioritaire
+                              # quand l'utilisateur choisit Kalman. Porte plus serrée +
+                              # q_pos bas => jitter au repos 7.2->6.5°. Le Kalman reste
+                              # moins plat que le passe-bas (~4°) — structurel. Prix
+                              # assumé : un gros mouvement commandé retarde/gèle (la
+                              # porte rejette le grand saut) — reset_kalman() sur SET
+                              # Angles ré-amorce. Ne PAS descendre sous 1.5 : sortie
+                              # parfaitement plate mais qui rejette AUSSI les vrais mvts.)
 
 # Bruit de process sur la VITESSE. Mesuré 2026-07-20 sur un signal réaliste
 # (bras immobile + plateaux parasites de 20-45° dus aux bascules de branche) :
@@ -341,20 +356,64 @@ _KF_OUTLIER_GATE_SIGMA = 3.0  # reject an update whose innovation exceeds this m
 # que les excursions qu'on supprime. Ne PAS descendre la porte a 1.5 en plus :
 # la sortie devient parfaitement plate (ecart-type 0.00°) parce que le filtre
 # rejette aussi les vrais mouvements — courbe flatteuse, mesure vide.
-_KF_Q_VEL_DEG = np.radians(0.1)
+# 2026-07-27 : abaissé 0.1 -> 0.02 pour tuer l'OVERSHOOT de vitesse (le filtre
+# accumulait une vitesse et dépassait -> J5 sautait à +13° puis redescendait).
+# Mesuré hors-ligne : overshoot sur échelon 90° 2.6° -> 0.0°, jitter au repos
+# 10.1 -> 8.3°. Le Kalman reste moins plat que le passe-bas (3.9°) — c'est
+# structurel (sa porte laisse passer plus de mesure) — mais plus de dents.
+_KF_Q_VEL_DEG = np.radians(0.02)
+
+# Seuil de « mouvement encodeur » par frame pour piloter le Kalman : au-dessus,
+# le joint bouge réellement -> porte outlier ouverte + suivi rapide ; en dessous
+# (bras immobile), porte serrée -> stable. Un vrai mouvement fait des degrés par
+# frame ; le bruit encodeur statique est < 0.1°, donc 0.7° sépare proprement.
+_KF_MOVE_THRESH_RAD = np.radians(0.7)
+# Après un mouvement encodeur, on garde la porte OUVERTE ce nombre de frames :
+# la médiane-9 en amont retarde la mesure de ~4.5 s, donc si la porte se refermait
+# dès l'arrêt encodeur elle rejetterait le saut retardé (le Kalman gelait). ~12
+# frames couvrent le retard médiane -> suit en ~4 s ET reste plat au repos (testé).
+_KF_MOVE_HOLD_FRAMES = 12
+# Bruit de process injecté PENDANT le mouvement (porte ouverte). Grand = suit vite
+# mais épouse le bruit image -> dents de scie ; petit = lisse mais plus lent. 5°
+# = compromis mesuré : dents de scie /2 (10.6->5.75) en suivant en ~6.5 s. C'est
+# ce qui rend la courbe stable AUSSI pendant le changement d'angle, pas seulement
+# au repos.
+_KF_MOVE_QPOS_DEG = 5.0
 
 # Filtre passe-bas (moyenne exponentielle / EMA) : y = a·x + (1−a)·y_prev.
 # a bas = plus lisse mais plus de retard. Filtre moyenne glissante : moyenne
 # des N dernières estimations (lisse le bruit haute fréquence).
-_EMA_ALPHA = 0.06   # ~2-3 s de constante de temps à la cadence DREAM : très lisse
-                    # au repos, coupe le tremblement image-à-image. Retard visible
-                    # sur un vrai mouvement (assumé : outil de validation à l'arrêt).
-_MA_WINDOW = 20     # ~1.5-2 s de fenêtre : lisse fortement (retard = fenêtre/2).
+_EMA_ALPHA = 0.02   # Passe-bas (EMA) : réglé pour la platitude au repos (jitter
+                    # J1/J2 20->4° sur 68 segments statiques réels, sweep 2026-07-27).
+                    # C'EST un filtre de repos : un vrai mouvement franc est retardé
+                    # (assumé). Pour suivre vite un mouvement, préférer 'Aucun' ou le
+                    # Kalman. Aucun filtre unique ne fait plat+rapide (mesuré : une
+                    # excursion solveur et un vrai mouvement ont la même signature),
+                    # d'où le choix entre les 3 filtres selon l'usage. Une médiane-5
+                    # en amont tue les pics isolés (1-2 frames) sans coût.
+_MA_WINDOW = 60     # ~5 s de fenêtre : lisse très fortement (retard = fenêtre/2
+                    # ~ 15 s). jitter 13.5->7.6° sur le banc statique (40->60 le
+                    # 27/07 pour plus de platitude). Fenêtre = seul réglage de ce
+                    # filtre ; plus grande = plus plat mais plus de retard.
+_EMA_MEDIAN_WINDOW = 9  # Médiane anti-pic ET anti-oscillation devant le passe-bas
+                    # et le Kalman. Tue les pics isolés (1-2 frames) ET écrase
+                    # l'oscillation rapide haut/bas des joints distaux (J3/J4/J5),
+                    # MAIS préserve les MARCHES (édge-preserving : dès que la moitié
+                    # de la fenêtre a franchi, la médiane saute) -> suit un step 90°
+                    # en ~3.5 s, contrairement à un EMA large qui traîne 15 s.
+                    # Élargie 5 -> 9 le 27/07 pour l'oscillation distale. 9 @ ~2 Hz
+                    # = ~2.5 s de latence sur un vrai mouvement (assumé).
 
 # Half-height of the per-joint plot window, in degrees around the encoder value.
 # 10 deg keeps the 0.5-0.9 deg target and the measured J2 bias (~11 deg) both
 # legible; see the autoscale note in CurvePanel.refresh().
 _PLOT_HALF_SPAN_DEG = 10.0
+
+# Maintien d'affichage du tableau d'erreurs keypoints : quand une frame n'a pas
+# assez de détection (bref mouvement, flou), on GARDE les dernières valeurs
+# pendant ce délai au lieu de tout vider en « — » (même philosophie que le
+# maintien 0.8 s des keypoints secondaires). Au-delà, on blanke vraiment.
+_KP_TABLE_HOLD_S = 1.5
 
 
 class KalmanAngle1D:
@@ -376,7 +435,7 @@ class KalmanAngle1D:
     # case that matters: tracking lag J5 0.1->1.0 s, J4 0.3->1.3 s, and MAE
     # J5 2.70->4.75 deg. At ~1.5 Hz there is no smoothing left to buy without
     # paying for it in lag.
-    def __init__(self, r_deg: float, q_pos: float = np.radians(0.5) ** 2, q_vel: float = _KF_Q_VEL_DEG ** 2):
+    def __init__(self, r_deg: float, q_pos: float = np.radians(0.1) ** 2, q_vel: float = _KF_Q_VEL_DEG ** 2):
         self.x = None            # (2,) [angle_rad, velocity_rad_s]
         self.P = None            # (2,2)
         self.R = np.radians(r_deg) ** 2
@@ -389,8 +448,17 @@ class KalmanAngle1D:
         self.P = np.diag([self.R, np.radians(90.0) ** 2])
         self._last_t = t
 
-    def step(self, measurement_rad, t: float) -> float:
-        """Predict to time t, optionally update with measurement_rad (None = predict-only). Returns filtered angle (rad)."""
+    def step(self, measurement_rad, t: float, moving: bool = False) -> float:
+        """Predict to time t, optionally update with measurement_rad (None = predict-only). Returns filtered angle (rad).
+
+        `moving` : l'ENCODEUR de ce joint bouge en ce moment (mouvement commandé
+        connu-réel). Dans ce cas on OUVRE la porte outlier (le grand saut n'est
+        pas une excursion, c'est le vrai mouvement) et on injecte du bruit de
+        process pour suivre vite. Immobile -> porte serrée + peu de bruit ->
+        stable, pas de saut. C'est ainsi que le filtre est À LA FOIS stable au
+        repos et rapide en mouvement : l'encodeur tranche ce que l'image seule ne
+        peut pas. N'utilise l'encodeur QUE pour régler la confiance, jamais comme
+        valeur affichée (la sortie reste l'estimation DREAM)."""
         if self.x is None:
             if measurement_rad is None:
                 return None
@@ -400,14 +468,18 @@ class KalmanAngle1D:
         dt = max(t - self._last_t, 1e-3)
         self._last_t = t
         F = np.array([[1.0, dt], [0.0, 1.0]])
-        Q = np.diag([self.q_pos * dt, self.q_vel * dt])
+        # En mouvement : bruit de process modéré -> suit la tendance en lissant le
+        # bruit image (évite les dents de scie d'une porte grande ouverte).
+        q_pos_eff = max(self.q_pos, np.radians(_KF_MOVE_QPOS_DEG) ** 2) if moving else self.q_pos
+        Q = np.diag([q_pos_eff * dt, self.q_vel * dt])
         self.x = F @ self.x
         self.P = F @ self.P @ F.T + Q
 
         if measurement_rad is not None:
             innovation = measurement_rad - self.x[0]
             S = self.P[0, 0] + self.R
-            if abs(innovation) <= _KF_OUTLIER_GATE_SIGMA * np.sqrt(S):
+            gate = 1e9 if moving else _KF_OUTLIER_GATE_SIGMA
+            if abs(innovation) <= gate * np.sqrt(S):
                 H = np.array([1.0, 0.0])
                 K = (self.P @ H) / S  # (2,)
                 self.x = self.x + K * innovation
@@ -593,6 +665,10 @@ class DashboardNode(Node):
         self.filter_mode = 'aucun'   # 'aucun' | 'kalman' | 'passe_bas' | 'moyenne'
         self._kf_joints = [KalmanAngle1D(r_deg) for r_deg in _KF_MEASUREMENT_MEDIAN_DEG]
         self._ema_state = None       # état passe-bas (EMA) par joint (6,)
+        self._ema_median_buffers = [deque(maxlen=_EMA_MEDIAN_WINDOW) for _ in range(6)]  # anti-pic devant l'EMA
+        self._kf_median_buffers = [deque(maxlen=_EMA_MEDIAN_WINDOW) for _ in range(6)]   # anti-pic devant le Kalman
+        self._prev_enc_for_kf = None    # encodeur frame précédente, pour détecter le mouvement (pilote le Kalman)
+        self._kf_move_since = np.full(6, 999, dtype=int)  # frames depuis le dernier mvt encodeur, par joint
         self._ma_buffers = [deque(maxlen=_MA_WINDOW) for _ in range(6)]  # moyenne glissante
 
         # estimate_dream_angles() is called from both record_curve_sample()
@@ -664,6 +740,26 @@ class DashboardNode(Node):
         self._angle_err_sq_sum = np.zeros(6)
         self._angle_err_count = 0
 
+        # ── Taux de DETECTION cumulé depuis le lancement ──────────────────
+        # Les 91,6 % publiés sont une évaluation HORS LIGNE, sur 1500 trames
+        # figées et nettes de `real_3cam_val_ndds`. Rien ne mesurait la
+        # détection EN MOUVEMENT, où s'ajoutent le flou, les poses traversées
+        # entre deux points d'apprentissage, et l'enveloppe articulaire (la
+        # détection chute hors de J5 ∈ [0, −60°], et les poses du pick sont
+        # toutes rejetées par la garde au sol du synthétique, donc jamais
+        # apprises). Le bandeau n'affichait qu'un `N/7` INSTANTANÉ.
+        # On compte donc, comme un odomètre : par caméra seule, et en union.
+        self._det_vus = {}          # {nom: keypoints vus, cumulés}
+        self._det_trames = {}       # {nom: trames où cette caméra a estimé}
+        self._det_union_vus = 0
+        self._det_union_trames = 0
+        self._det_dernier = {}     # {nom: (instant, masque valid)}
+        # Trace periodique : le taux de detection EN MOUVEMENT ne se lit
+        # autrement qu'en ouvrant une fenetre de l'interface. Journalise, il
+        # se releve apres coup et se compare d'une session a l'autre.
+        self._det_journal_t = 0.0
+        self._det_journal_periode_s = 10.0
+
         # ── Acquisition CSV (mode manuel) ──
         self.acquisition_enabled = False
         self.session_index = 1
@@ -711,6 +807,65 @@ class DashboardNode(Node):
             views = [CameraView('arducam', topic, '/dream/keypoints', K, dist)]
         return views
 
+    def _compte_trame(self, nom, valid):
+        """Compte UNE trame publiée par une caméra, et la fusion si c'est la primaire.
+
+        Par TRAME PUBLIÉE, et non à cadence fixe : c'est la définition de
+        `evaluate_dream` (keypoints détectés / 7 × trames), donc la seule qui se
+        compare à ses 87,6 % arducam et 91,6 % trois caméras.
+
+        Échantillonner à cadence fixe comptait « rien vu » chaque fois qu'un
+        relevé tombait entre deux trames d'une caméra plus lente — la SVPRO
+        tombait à 43 % alors qu'elle affichait 5/7.
+
+        La FUSION est rapportée aux trames de la primaire, chacune appariée à la
+        dernière trame de l'autre vue si elle date de moins de
+        `_DET_APPARIEMENT_S`. Sans cet appariement, deux cadences différentes ne
+        donnent aucun dénominateur commun.
+        """
+        valid = np.asarray(valid, bool)
+        self._det_vus[nom] = self._det_vus.get(nom, 0) + int(np.sum(valid))
+        self._det_trames[nom] = self._det_trames.get(nom, 0) + 1
+        self._det_dernier[nom] = (time.time(), valid)
+        if nom != self.primary.name:
+            return
+        maintenant = time.time()
+        union = valid.copy()
+        for autre, (t, masque) in self._det_dernier.items():
+            if autre != nom and maintenant - t <= _DET_APPARIEMENT_S:
+                union |= masque
+        self._det_union_vus += int(np.sum(union))
+        self._det_union_trames += 1
+
+        if maintenant - self._det_journal_t >= self._det_journal_periode_s:
+            self._det_journal_t = maintenant
+            stats = self.detection_stats()
+            detail = '  '.join(
+                f'{n} {stats[n][0]:.1f}% ({stats[n][1]:.2f}/7)'
+                for n in sorted(stats) if n != 'union')
+            u = stats['union']
+            self.get_logger().info(
+                f'DETECTION par trame — {detail}  |  FUSION {u[0]:.1f}% '
+                f'({u[1]:.2f}/7) sur {u[2]} trames arducam')
+
+    def detection_stats(self):
+        """{nom|'union': (pourcentage, keypoints par trame, trames)} cumulé.
+
+        Directement comparable aux 91,6 % hors ligne : même définition — un
+        keypoint sur les 7 attendus, compté détecté ou non.
+        """
+        stats = {}
+        for nom, trames in self._det_trames.items():
+            if trames:
+                stats[nom] = (100.0 * self._det_vus[nom] / (7.0 * trames),
+                              self._det_vus[nom] / trames, trames)
+        if self._det_union_trames:
+            stats['union'] = (
+                100.0 * self._det_union_vus / (7.0 * self._det_union_trames),
+                self._det_union_vus / self._det_union_trames,
+                self._det_union_trames)
+        return stats
+
     def reset_session_stats(self):
         """Remet à zéro les compteurs cumulés depuis le lancement (MAE/RMS
         session, cold-restarts, pose-ruptures). Les courbes et la fenêtre 30s
@@ -718,6 +873,11 @@ class DashboardNode(Node):
         self._angle_err_sum[:] = 0.0
         self._angle_err_sq_sum[:] = 0.0
         self._angle_err_count = 0
+        self._det_vus.clear()
+        self._det_trames.clear()
+        self._det_union_vus = 0
+        self._det_union_trames = 0
+        self._det_dernier.clear()
         self.n_solves = 0
         self.n_cold_restarts = 0
         self.n_pose_ruptures = 0
@@ -875,6 +1035,7 @@ class DashboardNode(Node):
             view.latest_kp_2d, view.latest_kp_valid = self._parse_keypoints(msg.data)
             view.note_kp(time.time())
             view.note_keypoints_for_display(view.latest_kp_2d, view.latest_kp_valid)
+            self._compte_trame(view.name, view.latest_kp_valid)
             if int(np.sum(view.latest_kp_valid)) >= 4:
                 view._last_good_t = time.time()
         return _cb
@@ -914,6 +1075,12 @@ class DashboardNode(Node):
         now = time.time()
         self._kp_recv_times.append(now)
         self._kp_recv_times = [t for t in self._kp_recv_times if t > now - 5.0]
+        # Le miroir ci-dessus recopiait les keypoints dans `primary` mais JAMAIS
+        # l'instant de reception : `primary._kp_recv_times` restait vide, et tout
+        # ce qui juge la fraicheur d'une vue croyait l'arducam muette. Mesure du
+        # 23/09 : taux de detection annonce 0,0 % alors qu'elle voyait 7/7.
+        self.primary.note_kp(now)
+        self._compte_trame(self.primary.name, valid)
 
     def _status_cb(self, msg: String):
         self.latest_status = msg.data
@@ -948,6 +1115,10 @@ class DashboardNode(Node):
             kf.x = None
             kf._last_t = None
         self._ema_state = None
+        for buf in self._ema_median_buffers:
+            buf.clear()
+        for buf in self._kf_median_buffers:
+            buf.clear()
         for buf in self._ma_buffers:
             buf.clear()
 
@@ -957,14 +1128,31 @@ class DashboardNode(Node):
         les chemins (fusion, mono, single-view)."""
         mode = self.filter_mode
         if mode == 'kalman':
+            # Mouvement encodeur par joint : si l'encodeur a bougé de > seuil
+            # depuis la dernière frame, ce joint bouge pour de vrai -> on ouvre
+            # le Kalman (suivi rapide) au lieu de rejeter le grand saut.
+            enc = self.latest_joint_q
+            if enc is not None and self._prev_enc_for_kf is not None:
+                just_moved = np.abs(np.asarray(enc) - self._prev_enc_for_kf) > _KF_MOVE_THRESH_RAD
+                self._kf_move_since = np.where(just_moved, 0, self._kf_move_since + 1)
+            if enc is not None:
+                self._prev_enc_for_kf = np.asarray(enc, dtype=np.float64).copy()
+            # Porte ouverte pendant le mvt ET _KF_MOVE_HOLD_FRAMES après (retard médiane).
+            moving = self._kf_move_since <= _KF_MOVE_HOLD_FRAMES
+            for j in range(6):
+                self._kf_median_buffers[j].append(float(q_raw[j]))
+            q_med = [float(np.median(self._kf_median_buffers[j])) for j in range(6)]
             return np.clip(np.array([
-                kf.step(q_raw[j], t) for j, kf in enumerate(self._kf_joints)
+                kf.step(q_med[j], t, bool(moving[j])) for j, kf in enumerate(self._kf_joints)
             ]), JOINT_LOWER, JOINT_UPPER)
         if mode == 'passe_bas':
+            for j in range(6):
+                self._ema_median_buffers[j].append(float(q_raw[j]))
+            q_med = np.array([float(np.median(self._ema_median_buffers[j])) for j in range(6)])
             if self._ema_state is None:
-                self._ema_state = np.asarray(q_raw, dtype=np.float64).copy()
+                self._ema_state = q_med.copy()
             else:
-                self._ema_state = _EMA_ALPHA * q_raw + (1.0 - _EMA_ALPHA) * self._ema_state
+                self._ema_state = _EMA_ALPHA * q_med + (1.0 - _EMA_ALPHA) * self._ema_state
             return self._ema_state.copy()
         if mode == 'moyenne':
             for j in range(6):
@@ -1092,6 +1280,15 @@ class DashboardNode(Node):
         self.n_solves += 1
         self.last_solver_ms = (t1 - t0) * 1000.0
         self._prev_dream_q = res['q']
+
+        # Peuple per_cam_kp AUSSI en mono, pour que le tableau d'erreurs affiche
+        # la caméra qui voit encore (sinon il reste vide en « MONO via {cam} »).
+        positions, _ = forward_kinematics(res['q'])
+        pts3d = np.array([positions[n] for n in KEYPOINT_NAMES], dtype=np.float64)
+        proj, _ = cv2.projectPoints(pts3d, res['rvec'], res['tvec'], view.K, None)
+        proj = proj.reshape(-1, 2)
+        reproj = np.linalg.norm(proj - np.asarray(view.latest_kp_2d), axis=1)
+        self.per_cam_kp = [(view.name, np.asarray(view.latest_kp_valid, bool), reproj)]
         if self.latest_kp_image_stamp is not None:
             self.last_pipeline_latency_ms = (t1 - self.latest_kp_image_stamp) * 1000.0
 
@@ -1373,6 +1570,22 @@ class DashboardNode(Node):
 
         q_out = self._apply_filter(res['q'], t_solve_end)
 
+        # Le chemin mono PRIMAIRE ne renseignait pas `per_cam_kp` — seuls
+        # `_solve_single_view` (primaire aveugle) et `_fuse_multiview` le
+        # faisaient. Consequence : avec la seule arducam exploitable, cas le plus
+        # courant, le tableau par camera gardait des valeurs perimees et le taux
+        # de detection ne comptait rien du tout.
+        reproj_mono = np.full(len(KEYPOINT_NAMES), np.nan)
+        positions_mono, _ = forward_kinematics(res['q'])
+        pts3d_mono = np.array([positions_mono[n] for n in KEYPOINT_NAMES],
+                              dtype=np.float64)
+        proj_mono, _ = cv2.projectPoints(pts3d_mono, res['rvec'], res['tvec'],
+                                         self.camera_K, None)
+        reproj_mono = np.linalg.norm(
+            proj_mono.reshape(-1, 2) - np.asarray(self.latest_kp_2d), axis=1)
+        self.per_cam_kp = [(self.primary.name,
+                            np.asarray(self.latest_kp_valid, bool), reproj_mono)]
+
         self._dream_q_history.append((t_solve_end, q_out))
         return _finish(q_out)
 
@@ -1569,6 +1782,12 @@ class Tab1LiveValidation(QWidget):
         stats_row.addStretch()
         layout.addLayout(stats_row)
         self.reproj_label = QLabel('RMS reprojection : — px')
+        # Sans retour a la ligne, ce libelle s'allonge avec le cumul par camera
+        # et ELARGIT la fenetre : le 23/09 il a pousse J6 et le bouton SET
+        # Angles hors de l'ecran, rendant le mode manuel inutilisable.
+        self.reproj_label.setWordWrap(True)
+        self.reproj_label.setMinimumWidth(1)
+        self.reproj_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         layout.addWidget(self.reproj_label)
 
         self.kp_grid = QGridLayout()
@@ -1592,7 +1811,31 @@ class Tab1LiveValidation(QWidget):
             val.setFont(cell_font)
             self.kp_grid.addWidget(val, i + 1, 1, alignment=Qt.AlignRight)
             self.err_value_labels.append(val)
-        self.kp_grid.setColumnStretch(2, 1)
+        self._kp_last_good_t = 0.0   # dernier instant où le tableau a eu des valeurs
+
+        # Le taux de detection vit DANS LA COLONNE VIDE A DROITE du tableau des
+        # keypoints, pas sous lui : sous lui il tombait hors de la fenetre, et
+        # dans le bandeau son texte l'ELARGISSAIT au point de pousser les
+        # boutons SET hors de l'ecran. Ici il occupe une place deja perdue.
+        colonne_det = QVBoxLayout()
+        titre_det = QLabel('Détection par trame')
+        titre_det.setStyleSheet('font-weight:bold;')
+        colonne_det.addWidget(titre_det)
+        self.det_grid = QGridLayout()
+        self.det_grid.setVerticalSpacing(4)
+        self.det_grid.setHorizontalSpacing(14)
+        colonne_det.addLayout(self.det_grid)
+        colonne_det.addStretch(1)
+        for col, entete in enumerate(('Vue', 'kp/7', 'Det%', 'trames')):
+            lbl = QLabel(entete)
+            lbl.setStyleSheet('font-weight:bold;')
+            self.det_grid.addWidget(
+                lbl, 0, col, alignment=Qt.AlignRight if col else Qt.AlignLeft)
+        self.det_lignes = {}
+        self.kp_grid.addLayout(colonne_det, 0, 3, len(KEYPOINT_NAMES) + 1, 1)
+        self.kp_grid.setColumnMinimumWidth(2, 24)
+        self.kp_grid.setColumnStretch(3, 1)
+
         layout.addStretch(1)  # pousse tout le vide en bas → labels + tableau tassés
 
     @staticmethod
@@ -1601,6 +1844,38 @@ class Tab1LiveValidation(QWidget):
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
         return line
+
+    _DET_RANG_FUSION = 6          # rangee FIXE, au-dela de toute camera
+
+    def _montre_detection(self, stats):
+        """Remplit le bloc : une ligne par vue, puis la fusion.
+
+        Les rangees sont FIXES — camera par ordre alphabetique, fusion tout en
+        bas. Calculees a la volee, elles se chevauchaient : la fusion occupait
+        la ligne 2 tant que la SVPRO n'avait rien publie, puis la SVPRO arrivait
+        dessus et les deux s'ecrivaient l'une sur l'autre.
+        """
+        cameras = sorted(n for n in stats if n != 'union')
+        lignes = [(nom, rang) for rang, nom in enumerate(cameras, start=1)]
+        if 'union' in stats:
+            lignes.append(('union', self._DET_RANG_FUSION))
+        for nom, rang in lignes:
+            pct, moyen, trames = stats[nom]
+            cellules = self.det_lignes.get(nom)
+            if cellules is None:
+                cellules = [QLabel('—') for _ in range(4)]
+                if nom == 'union':
+                    for c in cellules:
+                        c.setStyleSheet('font-weight:bold;')
+                self.det_lignes[nom] = cellules
+            for col, cellule in enumerate(cellules):
+                self.det_grid.addWidget(
+                    cellule, rang, col,
+                    alignment=Qt.AlignRight if col else Qt.AlignLeft)
+            cellules[0].setText('FUSION' if nom == 'union' else nom)
+            cellules[1].setText(f'{moyen:.2f}')
+            cellules[2].setText(f'{pct:.1f} %')
+            cellules[3].setText(str(trames))
 
     def refresh(self):
         n = self.node
@@ -1627,6 +1902,7 @@ class Tab1LiveValidation(QWidget):
         else:
             self.reproj_label.setText('RMS reprojection : — px (données insuffisantes)')
 
+        table_updated = False
         if overlay is not None:
             # Squelette (base -> link1 -> ... -> link6), comme dessiné en réunion :
             # relier les joints consécutifs, pas seulement des cercles isolés.
@@ -1652,14 +1928,14 @@ class Tab1LiveValidation(QWidget):
                     self.err_value_labels[i].setText(f'{overlay["err_px"][i]:.1f}')
                 else:
                     self.err_value_labels[i].setText('non détecté')
-        else:
-            for lbl in self.err_value_labels:
-                lbl.setText('—')
+            table_updated = True
 
-        # En fusion, le tableau reflète TOUTES les caméras : un keypoint vu par
-        # la SVPRO mais pas l'arducam n'est plus « non détecté » — on affiche la
-        # caméra qui le voit le mieux (erreur px la plus basse) et son nom.
-        if n.last_fusion_active and n.per_cam_kp:
+        # Le tableau reflète les caméras détectées via per_cam_kp — en FUSION
+        # (toutes les vues) comme en MONO (la seule vue qui voit encore). Un
+        # keypoint vu par la SVPRO mais pas l'arducam n'est plus « non détecté ».
+        # Prioritaire sur le bloc overlay ci-dessus (qui, lui, ne connaît que la
+        # caméra primaire) : sans ça, « MONO via svpro » laissait le tableau vide.
+        if n.per_cam_kp:
             global_err = []
             for i in range(len(KEYPOINT_NAMES)):
                 dets = [(name, reproj[i]) for (name, valid, reproj) in n.per_cam_kp if valid[i]]
@@ -1673,6 +1949,8 @@ class Tab1LiveValidation(QWidget):
                     global_err.append(err)
                 else:
                     self.err_value_labels[i].setText('non détecté')
+            if global_err:
+                table_updated = True
             # Détection GLOBALE = union des caméras : un keypoint compte s'il est
             # vu par AU MOINS une caméra. C'est la vraie couverture de la fusion
             # (souvent 7/7) vs chaque caméra seule (ici arducam 4/7 + svpro 7/7).
@@ -1680,9 +1958,25 @@ class Tab1LiveValidation(QWidget):
                 f'{name} {int(np.sum(valid))}/7' for (name, valid, reproj) in n.per_cam_kp)
             if global_err:
                 rms = float(np.sqrt(np.mean(np.square(global_err))))
+                srcmode = 'fusion' if n.last_fusion_active else 'mono'
+                cumul = n.detection_stats()
+                # Le `N/7` est INSTANTANE, le pourcentage est CUMULE depuis le
+                # lancement : deux chiffres de natures differentes sur la meme
+                # ligne, d'ou les mots « sur N trames » qui ferment l'ambiguite.
+                self._montre_detection(cumul)
                 self.reproj_label.setText(
-                    f'Détection globale (fusion) : {len(global_err)}/7 kp · '
+                    f'Détection globale ({srcmode}) : {len(global_err)}/7 kp · '
                     f'RMS {rms:.2f} px   [{per_cam_counts}]')
+
+        # Maintien d'affichage : si cette frame n'a rien pu remplir (bref
+        # mouvement / flou), on garde les dernières valeurs _KP_TABLE_HOLD_S
+        # secondes avant de vraiment vider en « — » — pas de clignotement.
+        now = time.time()
+        if table_updated:
+            self._kp_last_good_t = now
+        elif now - self._kp_last_good_t > _KP_TABLE_HOLD_S:
+            for lbl in self.err_value_labels:
+                lbl.setText('—')
 
         if n.last_pose_rupture_triggered:
             pose_bgr = (32, 0, 176)       # rouge — rupture
@@ -1808,7 +2102,10 @@ class ManualPilotPanel(QWidget):
         # Spinboxes rather than plain line edits: each field can be nudged by a
         # step with the arrows or typed into directly, and the range clamps a
         # typo before it reaches the robot.
-        grid.addWidget(QLabel('Angles (°) — FK'), 0, 0, 1, 6)
+        # Les boutons SET etaient en 7e colonne, a DROITE des six axes : le
+        # panneau depassait la fenetre et « SET Angles » devenait inclicquable
+        # (23/09). Places sur la ligne du titre, ils ne coutent plus de largeur.
+        grid.addWidget(QLabel('Angles (°) — FK'), 0, 0, 1, 4)
         self.angle_edits = []
         for i in range(6):
             grid.addWidget(QLabel(f'J{i+1}'), 1, i)
@@ -1817,11 +2114,11 @@ class ManualPilotPanel(QWidget):
             self.angle_edits.append(sb)
         btn_angles = QPushButton('SET Angles')
         btn_angles.clicked.connect(self._on_set_angles)
-        grid.addWidget(btn_angles, 2, 6)
+        grid.addWidget(btn_angles, 0, 4, 1, 2)
 
-        grid.addWidget(self._hline(), 3, 0, 1, 7)
+        grid.addWidget(self._hline(), 3, 0, 1, 6)
 
-        grid.addWidget(QLabel('Coordonnées — IK'), 4, 0, 1, 6)
+        grid.addWidget(QLabel('Coordonnées — IK'), 4, 0, 1, 4)
         self.coord_edits = []
         for i, label in enumerate(self.COORD_LABELS):
             grid.addWidget(QLabel(label), 5, i)
@@ -1831,7 +2128,7 @@ class ManualPilotPanel(QWidget):
             self.coord_edits.append(sb)
         btn_coords = QPushButton('SET Coords')
         btn_coords.clicked.connect(self._on_set_coords)
-        grid.addWidget(btn_coords, 6, 6)
+        grid.addWidget(btn_coords, 4, 4, 1, 2)
 
         grid.addWidget(QLabel('Position actuelle'), 7, 0, 1, 6)
         self.coord_readback = []
@@ -1848,7 +2145,7 @@ class ManualPilotPanel(QWidget):
         self.speed_edit.setFixedWidth(70)
         grid.addWidget(self.speed_edit, 9, 1)
 
-        grid.addWidget(self._hline(), 10, 0, 1, 7)
+        grid.addWidget(self._hline(), 10, 0, 1, 6)
 
         btn_lock = QPushButton('🔒 Fixer (power_on)')
         btn_lock.setStyleSheet('background:#c8f0c8;')
@@ -1862,16 +2159,16 @@ class ManualPilotPanel(QWidget):
 
         self.servo_state_label = QLabel(
             'État servos : inconnu — cliquer Fixer avant SET Angles/Coords')
-        grid.addWidget(self.servo_state_label, 12, 0, 1, 7)
+        grid.addWidget(self.servo_state_label, 12, 0, 1, 6)
 
         self.acq_checkbox = QCheckBox('Enregistrer les données (CSV) à chaque SET Angles')
         self.acq_checkbox.stateChanged.connect(
             lambda s: setattr(self.node, 'acquisition_enabled', bool(s)))
-        grid.addWidget(self.acq_checkbox, 13, 0, 1, 7)
+        grid.addWidget(self.acq_checkbox, 13, 0, 1, 6)
         acq_path = QLabel(f'→ {ACQUISITION_DIR}')
         acq_path.setStyleSheet('color:#666;')
         acq_path.setWordWrap(True)
-        grid.addWidget(acq_path, 14, 0, 1, 7)
+        grid.addWidget(acq_path, 14, 0, 1, 6)
 
     @staticmethod
     def _spinbox(lo, hi, step):
@@ -2066,6 +2363,28 @@ class KPIPanel(QWidget):
         lines.append('')
         return lines
 
+    def _format_detection_block(self, stats):
+        """Le taux de détection EN MOUVEMENT, par caméra puis en union."""
+        if not stats:
+            return ['— Détection cumulée —', 'Aucune estimation pour le moment.', '']
+        lines = ['— Détection cumulée depuis le lancement —', '',
+                 f'{"Vue":<12}{"kp/7":>8}{"Det%":>12}{"trames":>9}']
+        for nom in sorted(k for k in stats if k != 'union'):
+            pct, moyen, trames = stats[nom]
+            lines.append(f'{nom:<12}{moyen:>8.2f}{pct:>11.1f} %{trames:>9}')
+        if 'union' in stats:
+            pct, moyen, trames = stats['union']
+            lines.append(f'{"FUSION":<12}{moyen:>8.2f}{pct:>11.1f} %{trames:>9}')
+        lines += ['',
+                  "L'UNION est la couverture de la fusion : un keypoint compte",
+                  "s'il est vu par AU MOINS une caméra.", '',
+                  'Référence hors ligne : 91,6 % (9618/10500 keypoints,',
+                  '1500 trames FIGÉES de real_3cam_val_ndds, 3 caméras).',
+                  "Ce tableau-ci est mesuré EN MOUVEMENT : le flou, les poses",
+                  'traversées et l\'enveloppe articulaire y pèsent, pas là-bas.',
+                  '']
+        return lines
+
     def _show_angle_stats_details(self):
         session_stats = self.node.angle_error_stats()
         window_stats = self.node.angle_error_stats_window()
@@ -2073,7 +2392,8 @@ class KPIPanel(QWidget):
             f'— Session (depuis le lancement) —', session_stats)
         lines += self._format_stats_block(
             f'— Fenêtre {CURVE_WINDOW_S:.0f}s (même échantillons que les graphes) —', window_stats)
-        QMessageBox.information(self, 'MAE / RMS par joint (live)', '\n'.join(lines))
+        lines += self._format_detection_block(self.node.detection_stats())
+        QMessageBox.information(self, 'MAE / RMS et détection (live)', '\n'.join(lines))
 
     def _on_filter_mode(self, mode):
         # Changer de filtre réinitialise l'état des filtres pour éviter un

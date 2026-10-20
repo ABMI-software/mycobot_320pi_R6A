@@ -2,7 +2,7 @@
 """Pick-and-place vision-guidé LIVE — glue perception (moitié B).
 
 À lancer avec le .venv (torch + roslibpy) :
-  .venv/bin/python scripts/pick_and_place_vision_live.py --pi-host 10.10.0.221 --dry-run
+  .venv/bin/python scripts/pick_and_place_vision_live.py --pi-host 10.10.0.224 --dry-run
 
 Chaîne (markerless, auto-adaptatif) :
   caméras (cv2) ──► YOLO ──► pixel objet (u,v) par vue          ┐
@@ -10,16 +10,17 @@ Chaîne (markerless, auto-adaptatif) :
   rosbridge /joint_states ──► angles encodeurs ──► FK           ┘        │
                                                      (x,y,z) base ◄──────┘
                                                           │
-                                       pick_and_place_vision.run (send_coords)
+                         IK multi-branches PC + contrôle XYZ (send_angles)
 
 Prérequis EN PARALLÈLE :
   - ros2 launch mycobot_gateway dream_multicam.launch.py     (keypoints + joint_states)
   - ros2 launch rosbridge_server rosbridge_websocket_launch.xml
-  - bridge Pi (send_coords / pince)
+  - bridge Pi (get_angles/get_coords, send_angles, pince)
 """
 import argparse
 import subprocess
 import base64
+import json
 import sys
 import time
 from pathlib import Path
@@ -34,11 +35,15 @@ sys.path.insert(0, str(_REPO / 'training' / 'dream'))
 
 import cv2                                                              # noqa: E402
 import roslibpy                                                        # noqa: E402
+import yaml                                                            # noqa: E402
 
 import multiview_localizer as mv                                       # noqa: E402
 from object_localizer import pixel_to_base, load_extrinsic             # noqa: E402
-from mycobot_gateway.vision.camera_registry import load_intrinsics     # noqa: E402
+from mycobot_gateway.vision.camera_registry import (                   # noqa: E402
+    load_intrinsics, detect_cameras)
 import pick_and_place_vision as ctrl                                   # noqa: E402
+import live_aruco_geometry as aruco_geometry                           # noqa: E402
+from joint_ik_control import JointIKController                         # noqa: E402
 
 # caméra -> topics DREAM/image + stem intrinsèque. On s'abonne aux IMAGES que le
 # launch multicam publie déjà (le device V4L2 est déjà pris par camera_publisher,
@@ -46,11 +51,18 @@ import pick_and_place_vision as ctrl                                   # noqa: E
 # 'extrinsic' : YAML DREAM self-cal figé (caméra FIXE) — plus stable que le live
 # 1-frame. None = pas d'extrinsèque figée (svpro) -> live obligatoire.
 _CAL = _REPO / 'training' / 'calibration'
+_PICK_CAL = _REPO / 'scripts' / 'pick_adaptive_calibration.json'
 CAMERAS = {
-    'arducam': {'kp_topic': '/dream/keypoints',       'img_topic': '/camera/image_raw', 'device': 2,
-                'calib': 'cam_0',
+    'arducam': {'kp_topic': '/dream/keypoints',       'img_topic': '/camera/image_raw', 'device': None,
+                # cam_3, pas cam_0 : c'est l'intrinsèque que camera_registry et le
+                # dashboard utilisent réellement. cam_0 (fx=526 vs 496, cy=226 vs
+                # 248) déplace la cible de 41 mm près du robot à 73 mm au fond de
+                # la planche — une erreur qui VARIE avec la position, donc
+                # incorrigeable par l'offset XY constant.
+                'calib': 'cam_3',
                 'extrinsic': str(_CAL / 'arducam_extrinsic_dream_v4.yaml'),   # DREAM self-cal
-                'extrinsic_markers': str(_CAL / 'arducam_extrinsic_markers.yaml')},  # ArUco table (précis)
+                # Calibration géométrique directe par les quatre ArUco fixes.
+                'extrinsic_markers': str(_CAL / 'arducam_extrinsic_markers.yaml')},
     'svpro':   {'kp_topic': '/dream_svpro/keypoints', 'img_topic': '/camera_svpro/image_raw', 'device': 3,
                 'calib': 'cam_2', 'extrinsic': None, 'extrinsic_markers': None},
 }
@@ -134,7 +146,8 @@ class RosbridgeRobot:
         return int(m.group()) if m else None
 
 
-def detect_color(frame, hsv_lo, hsv_hi, name=None, save=False, min_area=200, border=25):
+def detect_color(frame, hsv_lo, hsv_hi, name=None, save=False, min_area=200,
+                 max_area=2500, min_circularity=0.30, border=25):
     """Détecte le plus gros blob dans la plage HSV -> (u,v du centroïde, score) ou (None,0).
 
     Bien plus robuste que YOLO pour un objet de couleur franche (balle jaune-vert).
@@ -146,12 +159,24 @@ def detect_color(frame, hsv_lo, hsv_hi, name=None, save=False, min_area=200, bor
     h, w = frame.shape[:2]
     hsv = _cv.cvtColor(frame, _cv.COLOR_BGR2HSV)
     mask = _cv.inRange(hsv, np.array(hsv_lo), np.array(hsv_hi))
-    mask = _cv.morphologyEx(mask, _cv.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    # Petit OPEN contre le bruit, puis CLOSE plus large pour réunir les morceaux
+    # d'une balle partiellement masquée par la pince/câbles.
+    # Les noyaux sont mis à l'échelle de la résolution : figés à 3/9 (calibrés en
+    # 640x480), ils laissent en 1600x1200 un masque déchiqueté dont le périmètre
+    # fait chuter la circularité à 0.34 — sous le seuil dès qu'une ombre passe,
+    # d'où des « balle non détectée » aléatoires. Mis à l'échelle : 0.75.
+    _s = max(1.0, w / 640.0)
+    _open, _close = int(3 * _s) | 1, int(9 * _s) | 1
+    mask = _cv.morphologyEx(mask, _cv.MORPH_OPEN, np.ones((_open, _open), np.uint8))
+    mask = _cv.morphologyEx(mask, _cv.MORPH_CLOSE, np.ones((_close, _close), np.uint8))
     cnts, _ = _cv.findContours(mask, _cv.RETR_EXTERNAL, _cv.CHAIN_APPROX_SIMPLE)
     best, best_area = None, 0.0
     for c in cnts:
         a = _cv.contourArea(c)
-        if a > best_area and a >= min_area:
+        perimeter = _cv.arcLength(c, True)
+        circularity = 4.0 * np.pi * a / (perimeter * perimeter) if perimeter > 0 else 0.0
+        if (a > best_area and min_area <= a <= max_area and
+                circularity >= min_circularity):
             M = _cv.moments(c)
             if M['m00'] > 0:
                 cx, cy = M['m10'] / M['m00'], M['m01'] / M['m00']
@@ -203,8 +228,28 @@ def detect_object(model, frame, want, name=None, save=False):
     return best, best_conf
 
 
-def camera_extrinsic(name, state, obs, K, mode):
-    """T_world_cam : ArUco table (précis), DREAM self-cal figé, ou live 1-frame PnP."""
+def camera_extrinsic(name, state, obs, K, mode, live_geometry=None):
+    """T_world_cam : ArUco live/YAML, DREAM figé, ou DREAM live."""
+    if mode == 'markers-live':
+        if live_geometry is None:
+            raise ValueError(f'{name}: calibration ArUco live indisponible')
+        frame = state.frame.get(name)
+        if frame is None:
+            raise ValueError(f'{name}: aucune image pour détecter les ArUco')
+        centres = aruco_geometry.detect_marker_centres(
+            frame,
+            dictionary_name=live_geometry.camera.dictionary_name,
+        )
+        pose = aruco_geometry.estimate_live_extrinsic(
+            centres,
+            live_geometry.workspace,
+            live_geometry.camera,
+        )
+        p = pose.camera_position_world_m
+        print(f'    ✅ {name}: extrinsèque ArUco LIVE — IDs={list(pose.marker_ids)}, '
+              f'RMS={pose.rms_reprojection_px:.2f}px, '
+              f'caméra=({p[0]*1000:.0f},{p[1]*1000:.0f},{p[2]*1000:.0f})mm base')
+        return pose.T_world_cam
     if mode == 'markers' and CAMERAS[name].get('extrinsic_markers'):
         T = load_extrinsic(CAMERAS[name]['extrinsic_markers'])
         print(f'    ℹ️ {name}: extrinsèque ArUco TABLE (précise)')
@@ -221,19 +266,21 @@ def camera_extrinsic(name, state, obs, K, mode):
     return T
 
 
-def localize(state, intr, obj_px, table_z, cameras, mode):
+def localize(state, intr, obj_px, table_z, cameras, mode, live_geometries=None):
     """(x,y,z) base : triangulation si ≥2 vues avec extrinsèque, sinon mono plan-table."""
     extr, rays = {}, []
     for name in cameras:
         if obj_px.get(name) is None:
             continue
-        if mode != 'markers' and state.kp[name] is None:
+        if mode not in ('markers', 'markers-live') and state.kp[name] is None:
             continue                              # extrinsèque DREAM -> keypoints requis
         kp_2d, valid = state.kp[name] if state.kp[name] is not None else (None, None)
         obs = {'kp_2d': kp_2d, 'valid': valid, 'obj_px': obj_px[name]}
         try:
-            T = camera_extrinsic(name, state, obs, intr[name], mode)
-        except ValueError as e:
+            T = camera_extrinsic(
+                name, state, obs, intr[name], mode,
+                None if live_geometries is None else live_geometries.get(name))
+        except (ValueError, aruco_geometry.GeometryError) as e:
             print(f'    ⚠️ {name}: extrinsèque échoue ({e})')
             continue
         extr[name] = (T, obj_px[name])
@@ -245,50 +292,129 @@ def localize(state, intr, obj_px, table_z, cameras, mode):
     # mono : une seule vue exploitable -> intersection plan table
     for name, (T, (u, v)) in extr.items():
         try:
+            if mode == 'markers-live' and live_geometries is not None:
+                bundle = live_geometries[name]
+                return aruco_geometry.deproject_pixel_to_base(
+                    (u, v), bundle.camera, T, table_z), \
+                    f'mono {name} (ArUco live + plan-table)'
             return pixel_to_base(u, v, intr[name], T, table_z), f'mono {name} (plan-table)'
-        except ValueError as e:
+        except (ValueError, aruco_geometry.GeometryError) as e:
             print(f'    ⚠️ {name}: déprojection échoue ({e})')
     raise RuntimeError('aucune vue exploitable')
 
 
+def load_workspace_polygon(path):
+    """Retourne l'enveloppe convexe XY des marqueurs fixes de la table."""
+    data = yaml.safe_load(Path(path).read_text())
+    points = np.asarray([v[:2] for v in data['markers'].values()], dtype=np.float64)
+    if len(points) < 3:
+        raise ValueError('au moins 3 marqueurs sont requis pour définir la zone de table')
+    return cv2.convexHull(points.astype(np.float32)).reshape(-1, 2)
+
+
+def inside_workspace(xyz, polygon, margin_m):
+    """Test zone ArUco, avec marge positive vers l'intérieur de la table."""
+    distance = cv2.pointPolygonTest(
+        polygon.astype(np.float32), (float(xyz[0]), float(xyz[1])), True)
+    return distance >= margin_m, float(distance)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--pi-host', default='10.10.0.221')
+    ap.add_argument('--pi-host', default='10.10.0.224')
     ap.add_argument('--ros-host', default='localhost')
     ap.add_argument('--ros-port', type=int, default=9090)
     ap.add_argument('--weights', default='yolov8n.pt')
     ap.add_argument('--classes', nargs='*', default=None,
                     help='classes COCO à saisir (ex: cup bottle "sports ball")')
-    ap.add_argument('--table-z', type=float, default=0.0, help='plan table (m, base) pour le repli mono')
-    ap.add_argument('--max-xy', type=float, default=0.35,
-                    help='limite de sécurité absolue X/Y en mètres (défaut: 0.35)')
+    ap.add_argument('--table-z', type=float, default=0.0, help='hauteur de la table (m, base)')
+    ap.add_argument('--object-height', type=float, default=0.067,
+                    help='hauteur de l\'objet en m ; balle de tennis = 0.067')
+    ap.add_argument('--max-xy', type=float, default=0.55,
+                    help='limite de sécurité absolue X/Y en mètres (défaut: 0.55)')
+    ap.add_argument('--max-reach', type=float, default=0.44,
+                    help='portée radiale XY maximale du robot, en m (défaut validé: 0.44)')
     ap.add_argument('--place', nargs=3, type=float, default=[0.20, 0.15, 0.05])
-    ap.add_argument('--speed', type=int, default=40)
+    ap.add_argument('--task', choices=['place', 'handover'], default='place',
+                    help='place = dépose sur table ; handover = remise en main à une pose apprise')
+    ap.add_argument('--positions', default=str(_REPO / 'scripts' / 'pick_place_positions.json'),
+                    help='JSON contenant handover_approach et handover pour --task handover')
+    ap.add_argument('--speed', type=int, default=None,
+                    help='vitesse ; défaut chargé depuis la calibration adaptative')
+    ap.add_argument('--grasp-angle', type=int, default=None,
+                    help='fermeture pince 0-100 adaptée à l\'objet')
+    ap.add_argument('--open-angle', type=int, default=100)
     ap.add_argument('--mode', type=int, default=1, choices=[0, 1])
     ap.add_argument('--auto', action='store_true')
     ap.add_argument('--keep-ori', action='store_true',
-                    help='garde l\'orientation actuelle du bras (atteignable) au lieu de forcer '
-                         'TOP_DOWN_ORI — utile si send_coords ne bouge pas (pose top-down injoignable).')
+                    help='option historique ; l’IK PC conserve maintenant l’orientation de la '
+                         'prise manuelle validée')
     ap.add_argument('--approach-ori', nargs=3, type=float, default=None,
                     metavar=('RX', 'RY', 'RZ'), help='orientation d\'approche imposée (deg).')
+    ap.add_argument('--pick-calibration', default=str(_PICK_CAL),
+                    help='calibration vision→commande apprise par démonstration')
+    ap.add_argument('--no-pick-offset', action='store_true',
+                    help='désactive seulement la correction XY apprise')
+    ap.add_argument('--pick-offset-x', type=float, default=None,
+                    help='surcharge correction X en m')
+    ap.add_argument('--pick-offset-y', type=float, default=None,
+                    help='surcharge correction Y en m')
+    ap.add_argument('--flange-above', type=float, default=None,
+                    help='distance bride→centre objet en mm')
+    ap.add_argument('--approach-height', type=float, default=None,
+                    help='hauteur d\'approche au-dessus du pick en mm')
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--save', action='store_true', help='écrit les frames YOLO annotées (diagnostic)')
     ap.add_argument('--samples', type=int, default=6,
                     help='frames échantillonnées par caméra (détection robuste)')
-    ap.add_argument('--detector', choices=['yolo', 'color'], default='yolo',
+    ap.add_argument('--sample-spread-px', type=float, default=18.0,
+                    help='dispersion pixel maximale des détections retenues (défaut: 18)')
+    ap.add_argument('--workspace-markers',
+                    default=str(_CAL / 'workspace_markers.yaml'),
+                    help='positions des 4 ArUco délimitant la table')
+    ap.add_argument('--workspace-margin', type=float, default=0.025,
+                    help='marge intérieure de sécurité par rapport aux ArUco, en m')
+    ap.add_argument('--adaptive', action='store_true',
+                    help='re-détecte et corrige l\'approche tant que l\'objet bouge')
+    ap.add_argument('--alignment-check', action='store_true',
+                    help='descend pince ouverte, capture une image, puis remonte sans saisir')
+    ap.add_argument('--adaptive-tolerance', type=float, default=0.015,
+                    help='déplacement XY toléré avant correction, en m (défaut: 0.015)')
+    ap.add_argument('--max-replans', type=int, default=4,
+                    help='nombre maximal de corrections visuelles avant abandon')
+    ap.add_argument('--servo-loop', action='store_true',
+                    help='enchaîne observation→corrections→pick→place sur plusieurs cycles')
+    ap.add_argument('--cycles', type=int, default=1,
+                    help='nombre de cycles avec --servo-loop (1 à 100)')
+    ap.add_argument('--miss-retries', type=int, default=3,
+                    help='observations sans balle tolérées entre deux cycles')
+    ap.add_argument('--controller-xy-limit', type=float, default=0.350,
+                    help='limite absolue X/Y acceptée par le contrôleur, en m')
+    ap.add_argument('--xyz-tolerance-mm', type=float, default=5.0,
+                    help='erreur XYZ réelle maximale avant arrêt/refus de descente')
+    ap.add_argument('--descent-step-mm', type=float, default=2.0,
+                    help='pas vertical IK pendant une descente (défaut: 2 mm)')
+    ap.add_argument('--observation-pose', default='observation_clear',
+                    help='pose articulaire JSON qui initialise l’IK et dégage la balle')
+    ap.add_argument('--detector', choices=['yolo', 'color'], default='color',
                     help='yolo (COCO) ou color (blob HSV, robuste pour balle jaune-vert)')
-    ap.add_argument('--cameras', nargs='+', default=list(CAMERAS), choices=list(CAMERAS),
+    ap.add_argument('--cameras', nargs='+', default=['arducam'], choices=list(CAMERAS),
                     help='caméras à utiliser. 1 seule -> mono plan-table (utile si une '
                          'extrinsèque DREAM est faible). 2 -> triangulation.')
-    ap.add_argument('--extrinsic', choices=['markers', 'static', 'live'], default='markers',
-                    help='markers = ArUco table (précis, 0.7px) ; static = DREAM self-cal ; '
-                         'live = recalcul PnP chaque frame (si la caméra bouge).')
+    ap.add_argument('--extrinsic',
+                    choices=['markers-live', 'markers', 'static', 'live'],
+                    default='markers-live',
+                    help='markers-live = recalcule caméra→base avec les 4 ArUco visibles avant '
+                         'chaque mesure ; markers = ancien YAML ArUco figé ; static = DREAM '
+                         'figé ; live = PnP DREAM.')
     ap.add_argument('--marker-extrinsic', default=None,
                     help='fichier YAML extrinsèque ArUco à utiliser (défaut: calibration standard)')
-    ap.add_argument('--hsv-lo', nargs=3, type=int, default=[25, 60, 60],
+    ap.add_argument('--hsv-lo', nargs=3, type=int, default=[20, 170, 70],
                     metavar=('H', 'S', 'V'), help='seuil HSV bas (détecteur color)')
-    ap.add_argument('--hsv-hi', nargs=3, type=int, default=[45, 255, 255],
+    ap.add_argument('--hsv-hi', nargs=3, type=int, default=[35, 255, 255],
                     metavar=('H', 'S', 'V'), help='seuil HSV haut (détecteur color)')
+    ap.add_argument('--color-min-circularity', type=float, default=0.12,
+                    help='circularité minimale du blob ; 0.12 tolère une balle partiellement cachée')
     ap.add_argument('--camera-source', choices=['rosbridge', 'v4l2'], default='rosbridge',
                     help='rosbridge = images du launch multicam (défaut) ; v4l2 = caméra en '
                          'direct si le launch est arrêté.')
@@ -301,12 +427,80 @@ def main():
                          'connexion Pi — pas de conflit avec le dashboard) ; socket = TCP direct.')
     args = ap.parse_args()
 
+    pick_cal_path = Path(args.pick_calibration).expanduser().resolve()
+    if not pick_cal_path.is_file():
+        raise SystemExit(f'calibration adaptative introuvable : {pick_cal_path}')
+    pick_cal = json.loads(pick_cal_path.read_text())
+    learned_offset = pick_cal.get('pick_offset_xy_m', [0.0, 0.0])
+    if args.no_pick_offset:
+        learned_offset = [0.0, 0.0]
+    pick_offset = np.array([
+        learned_offset[0] if args.pick_offset_x is None else args.pick_offset_x,
+        learned_offset[1] if args.pick_offset_y is None else args.pick_offset_y,
+    ], dtype=np.float64)
+    args.flange_above = (float(pick_cal.get('flange_above_object_mm', 110.0))
+                         if args.flange_above is None else args.flange_above)
+    args.approach_height = (float(pick_cal.get('approach_height_mm', 80.0))
+                            if args.approach_height is None else args.approach_height)
+    args.approach_ori = (list(pick_cal.get('safe_orientation_deg', [-11.7, -74.7, 141.8]))
+                         if args.approach_ori is None else args.approach_ori)
+    args.speed = int(pick_cal.get('speed', 8)) if args.speed is None else args.speed
+    args.grasp_angle = (int(pick_cal.get('grasp_angle', 20))
+                        if args.grasp_angle is None else args.grasp_angle)
+
+    if not 0.0 <= args.object_height <= 0.25:
+        raise SystemExit('--object-height doit être compris entre 0 et 0.25 m')
+    if not 0 <= args.grasp_angle <= 100 or not 0 <= args.open_angle <= 100:
+        raise SystemExit('--grasp-angle et --open-angle doivent être compris entre 0 et 100')
+    if not 0.05 <= args.color_min_circularity <= 1.0:
+        raise SystemExit('--color-min-circularity doit être dans [0.05, 1]')
+    if not 1 <= args.cycles <= 100 or not 0 <= args.miss_retries <= 20:
+        raise SystemExit('--cycles doit être dans [1,100] et --miss-retries dans [0,20]')
+    if not 1.0 <= args.xyz_tolerance_mm <= 20.0:
+        raise SystemExit('--xyz-tolerance-mm doit être dans [1,20]')
+    if not 0.5 <= args.descent_step_mm <= 10.0:
+        raise SystemExit('--descent-step-mm doit être dans [0.5,10]')
+    if args.servo_loop:
+        # L'asservissement demandé corrige dès 5 mm par défaut. Une surcharge
+        # CLI plus stricte reste possible.
+        if args.adaptive_tolerance == 0.015:
+            args.adaptive_tolerance = 0.005
+        args.adaptive = True
+        args.auto = True
+
     if args.marker_extrinsic:
         marker_path = Path(args.marker_extrinsic).expanduser().resolve()
         if not marker_path.is_file():
             raise SystemExit(f'extrinsèque ArUco introuvable: {marker_path}')
         for camera_name in args.cameras:
             CAMERAS[camera_name]['extrinsic_markers'] = str(marker_path)
+
+    handover_angles = None
+    positions_path = Path(args.positions).expanduser().resolve()
+    positions = json.loads(positions_path.read_text()) if positions_path.is_file() else {}
+    observation_angles = positions.get(args.observation_pose)
+    if args.servo_loop:
+        if (not isinstance(observation_angles, list) or len(observation_angles) != 6 or
+                not all(isinstance(v, (int, float)) and np.isfinite(v)
+                        for v in observation_angles)):
+            raise SystemExit(
+                f'pose d’observation {args.observation_pose!r} absente/invalide dans {positions_path}')
+    if args.task == 'handover':
+        missing = [name for name in ('handover_approach', 'handover') if name not in positions]
+        if missing:
+            raise SystemExit(
+                f'poses de remise manquantes dans {positions_path}: {missing}. '
+                'Apprends-les avec pick_and_place_real.py --capture handover_approach puis handover.')
+        handover_angles = (positions['handover_approach'], positions['handover'])
+        for name, angles in zip(('handover_approach', 'handover'), handover_angles):
+            if not isinstance(angles, list) or len(angles) != 6 or not all(
+                    isinstance(v, (int, float)) and np.isfinite(v) for v in angles):
+                raise SystemExit(f'pose {name} invalide dans {positions_path}')
+
+    if args.detector == 'yolo' and not args.classes:
+        raise SystemExit(
+            '--detector yolo exige --classes (ex: --classes bottle cup "sports ball"). '
+            'Cela empêche YOLO de choisir un objet parasite.')
 
     # intrinsèques par caméra (640x480)
     intr = {}
@@ -331,9 +525,15 @@ def main():
         roslibpy.Topic(ros, '/joint_states', 'sensor_msgs/JointState').subscribe(state.on_joint_states)
         print(f'  ✅ rosbridge {args.ros_host}:{args.ros_port} — DREAM + images + joint_states')
     else:  # v4l2 : caméra en direct, autonome (pas de dashboard/DREAM -> pas de contention)
-        if args.extrinsic != 'markers':
-            raise SystemExit('--camera-source v4l2 exige --extrinsic markers (pas de DREAM live).')
+        if args.extrinsic not in ('markers', 'markers-live'):
+            raise SystemExit('--camera-source v4l2 exige --extrinsic markers-live ou markers.')
+        for spec in detect_cameras(names=list(args.cameras)):
+            CAMERAS[spec.name]['device'] = spec.v4l2_index
         for name in args.cameras:
+            if CAMERAS[name]['device'] is None:
+                raise SystemExit(
+                    f'{name} non détectée par v4l2-ctl — vérifie le branchement '
+                    '(`python3 mycobot_gateway/mycobot_gateway/vision/camera_registry.py`)')
             dev = f'/dev/video{CAMERAS[name]["device"]}'
             if name == 'arducam':
                 subprocess.run(
@@ -347,10 +547,17 @@ def main():
                      '-c', f'focus_absolute={args.svpro_focus},sharpness=0,contrast=1'],
                     check=False,
                 )
-            cap = cv2.VideoCapture(CAMERAS[name]['device'], cv2.CAP_V4L2)
-            if name == 'svpro':
-                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640); cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            # L'Arducam démarre en 1600x1200 MJPEG. Sur certains pilotes UVC,
+            # ouvrir d'abord puis changer le format échoue (OpenCV l'annonce à
+            # tort comme « caméra occupée »). Fournir les paramètres à
+            # VideoCapture négocie MJPEG/640x480 dès VIDIOC_S_FMT.
+            capture_params = [
+                cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'),
+                cv2.CAP_PROP_FRAME_WIDTH, 640,
+                cv2.CAP_PROP_FRAME_HEIGHT, 480,
+            ]
+            cap = cv2.VideoCapture(
+                CAMERAS[name]['device'], cv2.CAP_V4L2, capture_params)
             if not cap.isOpened():
                 raise SystemExit(f'{name}: /dev/video{CAMERAS[name]["device"]} occupé — arrête le '
                                  'launch multicam/dashboard pour libérer la caméra en mode v4l2.')
@@ -366,7 +573,9 @@ def main():
 
     def detect(frame, name=None, save=False):
         if args.detector == 'color':
-            return detect_color(frame, args.hsv_lo, args.hsv_hi, name=name, save=save)
+            return detect_color(
+                frame, args.hsv_lo, args.hsv_hi, name=name, save=save,
+                min_circularity=args.color_min_circularity)
         return detect_object(model, frame, want, name=name, save=save)
 
     def get_frame(name):
@@ -376,7 +585,7 @@ def main():
         return state.frame[name]
 
     if ros is not None:  # attendre les 1ers messages (rosbridge)
-        need_dream = args.extrinsic != 'markers'
+        need_dream = args.extrinsic not in ('markers', 'markers-live')
         print('  ⏳ attente images' + (' + DREAM' if need_dream else '') + '…')
         t0 = time.time()
         while (all(state.frame[n] is None for n in args.cameras)
@@ -386,51 +595,240 @@ def main():
             if time.time() - t0 > 15:
                 raise SystemExit('pas de données — le launch multicam tourne ?')
 
-    # Détection robuste : on échantillonne plusieurs frames par caméra et on garde
-    # la détection la plus confiante (la détection YOLO d'un petit objet varie
-    # frame-à-frame — 1 seule frame rate souvent la cible dans une des vues).
-    obj_px = {}
-    for name in args.cameras:
-        best_px, best_conf, last_frame = None, 0.0, None
-        for _ in range(args.samples):
-            frame = get_frame(name)
-            if frame is not None:
-                last_frame = frame
-                px, conf = detect(frame)
-                if px is not None and conf > best_conf:
-                    best_px, best_conf = px, conf
-            time.sleep(0.2)
-        # 1 log récap + frame annotée sur la dernière image
-        if last_frame is not None:
-            detect(last_frame, name=name, save=args.save)
-        obj_px[name] = best_px
-        print(f'    {name}: objet cible px = {best_px}  (conf max {best_conf:.2f})')
+    workspace = load_workspace_polygon(args.workspace_markers)
+    live_geometries = {}
+    if args.extrinsic == 'markers-live':
+        for name in args.cameras:
+            calib_stem = CAMERAS[name]['calib']
+            npz_path = _CAL / f'{calib_stem}.npz'
+            meta_path = _CAL / f'{calib_stem}.meta.json'
+            try:
+                live_geometries[name] = aruco_geometry.load_geometry(
+                    npz_path, meta_path, args.workspace_markers)
+            except aruco_geometry.GeometryError as exc:
+                raise SystemExit(f'calibration ArUco live {name} invalide: {exc}') from exc
+        print('  ✅ calibration ArUco LIVE armée — les 4 tags devront rester visibles')
 
-    if all(v is None for v in obj_px.values()):
-        raise SystemExit('YOLO n\'a rien détecté sur aucune vue.')
+    def observe_target(required=True):
+        """Mesure robuste multi-frame puis valide la cible dans la zone ArUco."""
+        obj_px = {}
+        for name in args.cameras:
+            detections, confidences, last_frame = [], [], None
+            for _ in range(args.samples):
+                frame = get_frame(name)
+                if frame is not None:
+                    last_frame = frame.copy()
+                    px, conf = detect(frame)
+                    if px is not None:
+                        detections.append(px); confidences.append(conf)
+                time.sleep(0.2)
+            if last_frame is not None:
+                # La pose ArUco et le pixel objet doivent provenir du même flux.
+                # C'est également nécessaire en V4L2, où LiveState n'est pas
+                # alimenté par rosbridge.
+                state.frame[name] = last_frame
+                detect(last_frame, name=name, save=args.save)
+            if detections:
+                pts = np.asarray(detections, dtype=np.float64)
+                centre = np.median(pts, axis=0)
+                spread = float(np.max(np.linalg.norm(pts - centre, axis=1)))
+                obj_px[name] = tuple(centre) if spread <= args.sample_spread_px else None
+                print(f'    {name}: {len(pts)}/{args.samples} détections, '
+                      f'médiane={tuple(np.round(centre, 1))}, dispersion={spread:.1f}px'
+                      + ('' if obj_px[name] else '  ❌ instable'))
+            else:
+                obj_px[name] = None
+                print(f'    {name}: cible absente')
 
-    xyz, method = localize(state, intr, obj_px, args.table_z, args.cameras, args.extrinsic)
-    print(f'\n  🎯 objet localisé ({method}) : base = '
-          f'({xyz[0]*1000:.0f}, {xyz[1]*1000:.0f}, {xyz[2]*1000:.0f}) mm\n')
-    if not np.all(np.isfinite(xyz)) or abs(float(xyz[0])) > args.max_xy or abs(float(xyz[1])) > args.max_xy:
-        raise SystemExit(
-            f'🛑 cible hors espace sécurisé ±{args.max_xy*1000:.0f} mm : '
-            f'({xyz[0]*1000:.0f}, {xyz[1]*1000:.0f}, {xyz[2]*1000:.0f}) mm — aucun mouvement')
+        if all(v is None for v in obj_px.values()):
+            if required:
+                raise RuntimeError('cible absente ou instable sur toutes les vues')
+            return None
+        object_center_z = args.table_z + args.object_height / 2.0
+        xyz_now, method = localize(
+            state, intr, obj_px, object_center_z, args.cameras, args.extrinsic,
+            live_geometries)
+        if (not np.all(np.isfinite(xyz_now)) or
+                abs(float(xyz_now[0])) > args.max_xy or
+                abs(float(xyz_now[1])) > args.max_xy):
+            raise RuntimeError(f'cible hors limite absolue ±{args.max_xy*1000:.0f} mm')
+        reach = float(np.linalg.norm(np.asarray(xyz_now)[:2]))
+        if reach > args.max_reach:
+            raise RuntimeError(
+                f'cible hors portée radiale ({reach*1000:.0f} mm > '
+                f'{args.max_reach*1000:.0f} mm)')
+        valid, edge_distance = inside_workspace(
+            xyz_now, workspace, args.workspace_margin)
+        if not valid:
+            raise RuntimeError(
+                f'cible hors zone ArUco sûre (distance bord={edge_distance*1000:.0f} mm, '
+                f'marge requise={args.workspace_margin*1000:.0f} mm)')
+        print(f'\n  🎯 objet ({method}) : base=({xyz_now[0]*1000:.0f}, '
+              f'{xyz_now[1]*1000:.0f}, {xyz_now[2]*1000:.0f}) mm | '
+              f'bord table={edge_distance*1000:.0f} mm\n')
+        return np.asarray(xyz_now, dtype=np.float64)
+
+    def command_target():
+        """Localisation brute sûre + correction vision→pince apprise."""
+        raw = observe_target()
+        corrected = raw.copy()
+        corrected[:2] += pick_offset
+        reach = float(np.linalg.norm(corrected[:2]))
+        if (abs(float(corrected[0])) > args.max_xy or
+                abs(float(corrected[1])) > args.max_xy or reach > args.max_reach):
+            raise RuntimeError(
+                f'cible corrigée hors portée : ({corrected[0]*1000:.0f}, '
+                f'{corrected[1]*1000:.0f}) mm')
+        if (abs(float(corrected[0])) > args.controller_xy_limit or
+                abs(float(corrected[1])) > args.controller_xy_limit):
+            raise RuntimeError(
+                f'cible refusée par limite contrôleur ±{args.controller_xy_limit*1000:.0f} mm : '
+                f'({corrected[0]*1000:.1f}, {corrected[1]*1000:.1f}) mm')
+        print(f'  🧠 correction démonstration XY = '
+              f'({pick_offset[0]*1000:+.0f}, {pick_offset[1]*1000:+.0f}) mm '
+              f'→ commande ({corrected[0]*1000:.0f}, {corrected[1]*1000:.0f}) mm')
+        return corrected
 
     if args.dry_run:
         bridge = None
     elif args.robot_via == 'rosbridge':
         if ros is None:
-            raise SystemExit('--robot-via rosbridge exige --camera-source rosbridge (rosbridge actif).')
+            ros = roslibpy.Ros(host=args.ros_host, port=args.ros_port)
+            ros.run()
+            if not ros.is_connected:
+                raise SystemExit(
+                    f'rosbridge ws://{args.ros_host}:{args.ros_port} injoignable pour le robot')
         bridge = RosbridgeRobot(ros)
         print('  🤖 robot via /to_robot (bridge_tour) — ferme le dashboard pour éviter le cross-talk')
     else:
         bridge = ctrl.Bridge(args.pi_host)
         print(f'  🤖 robot via socket direct {args.pi_host}:5005')
 
-    ctrl.run(bridge, [float(v) for v in xyz], args.place,
-             args.speed, args.mode, args.dry_run, args.auto,
-             keep_ori=args.keep_ori, ori=args.approach_ori)
+    manual_angles = pick_cal.get('successful_pick_angles_deg')
+    manual_coords = pick_cal.get('successful_pick_coords_mm_deg')
+    if (not isinstance(manual_angles, list) or len(manual_angles) != 6 or
+            not isinstance(manual_coords, list) or len(manual_coords) < 3):
+        raise SystemExit(
+            'calibration incomplète : successful_pick_angles_deg et '
+            'successful_pick_coords_mm_deg sont obligatoires pour l’IK PC')
+    joint_controller = JointIKController(
+        bridge, manual_angles, manual_coords[:3], speed=args.speed,
+        xyz_tolerance_mm=args.xyz_tolerance_mm,
+        descent_step_mm=args.descent_step_mm, dry_run=args.dry_run)
+    print('  🧭 IK PC activée : orientation de la PRISE manuelle validée ; '
+          'observation_clear reste uniquement une pose caméra')
+
+    def acquire_target(retries=0):
+        """Observe la balle, avec attente bornée entre deux cycles."""
+        last_error = None
+        for attempt in range(retries + 1):
+            try:
+                return command_target()
+            except RuntimeError as exc:
+                last_error = exc
+                if attempt < retries:
+                    print(f'  ⏳ cible indisponible ({exc}) — nouvelle observation '
+                          f'{attempt + 2}/{retries + 1}')
+                    time.sleep(1.0)
+        raise RuntimeError(str(last_error))
+
+    try:
+        if args.servo_loop:
+            completed = 0
+            for cycle in range(1, args.cycles + 1):
+                print(f'\n{"=" * 18} CYCLE ASSERVI {cycle}/{args.cycles} {"=" * 18}')
+                # Initialisation articulaire obligatoire : empêche pymycobot de
+                # choisir la branche IK J5≈+90° observée depuis home.
+                ctrl.move_angles(
+                    bridge, observation_angles, args.speed, args.dry_run)
+                try:
+                    xyz = acquire_target(args.miss_retries)
+                except RuntimeError as exc:
+                    print(f'  🛑 aucune cible après {args.miss_retries + 1} observations : {exc}')
+                    break
+                success = ctrl.run(
+                    bridge, [float(v) for v in xyz], args.place,
+                    args.speed, args.mode, args.dry_run, True,
+                    keep_ori=args.keep_ori, ori=args.approach_ori,
+                    relocalize=command_target,
+                    adaptive_tolerance_m=args.adaptive_tolerance,
+                    max_replans=args.max_replans,
+                    grasp_angle=args.grasp_angle, open_angle=args.open_angle,
+                    flange_above=args.flange_above,
+                    approach_h=args.approach_height,
+                    joint_controller=joint_controller)
+                if not success:
+                    print('  🛑 cycle interrompu : prise ou validation non confirmée')
+                    break
+                completed += 1
+            print(f'\n  ✅ boucle terminée : {completed}/{args.cycles} cycle(s) réussi(s)')
+            return
+
+        try:
+            xyz = acquire_target()
+        except RuntimeError as exc:
+            raise SystemExit(f'🛑 {exc} — aucun mouvement') from exc
+
+        if args.alignment_check:
+            orientation = list(args.approach_ori)
+            approach, pick = ctrl.plan(
+                xyz, orientation, args.flange_above, args.approach_height)
+            print('\n  🔎 TEST ALIGNEMENT — aucune fermeture de pince, aucune dépose')
+            ctrl.grip(bridge, args.open_angle, args.dry_run)
+            joint_controller.move_pose(approach[:3], context='approche alignement')
+            try:
+                fresh = command_target()
+            except RuntimeError as exc:
+                # Pendant ce diagnostic uniquement, la pince peut masquer un
+                # tag à l'approche. La pose caméra et la cible ont déjà été
+                # validées juste avant le mouvement ; on conserve donc cette
+                # mesure au lieu de fermer la pince ou de poursuivre un pick.
+                fresh = np.asarray(xyz, dtype=np.float64)
+                print(f'  ⚠️ relecture masquée à l\'approche ({exc})')
+                print('  ↪ position initiale validée conservée pour la capture sans saisie')
+            approach, pick = ctrl.plan(
+                fresh, orientation, args.flange_above, args.approach_height)
+            descended = False
+            try:
+                joint_controller.descend_vertical(pick[:3])
+                descended = True
+                last = None
+                for _ in range(8):
+                    frame = get_frame(args.cameras[0])
+                    if frame is not None:
+                        last = frame.copy()
+                    time.sleep(0.12)
+                if last is None:
+                    raise RuntimeError('aucune image pendant le contrôle descendu')
+                output = _REPO / 'scratch_alignment_descended.jpg'
+                cv2.imwrite(str(output), last)
+                print(f'  📷 capture pince descendue : {output}')
+            finally:
+                if descended:
+                    joint_controller.move_pose(approach[:3], context='retrait alignement')
+            print('  ✅ contrôle terminé — pince remontée, aucune saisie effectuée')
+            return
+
+        def confirm_handover():
+            answer = input(
+                '\n🤲 Place ta main OUVERTE sous l\'objet, sans toucher la pince. '
+                'Tape O puis ENTER pour libérer (autre touche = conserver) : ')
+            return answer.strip().lower() in ('o', 'oui', 'y', 'yes')
+
+        ctrl.run(bridge, [float(v) for v in xyz], args.place,
+                 args.speed, args.mode, args.dry_run, args.auto,
+                 keep_ori=args.keep_ori, ori=args.approach_ori,
+                 relocalize=command_target if args.adaptive else None,
+                 adaptive_tolerance_m=args.adaptive_tolerance,
+                 max_replans=args.max_replans,
+                 handover_angles=handover_angles,
+                 release_ready=confirm_handover if args.task == 'handover' else None,
+                 grasp_angle=args.grasp_angle, open_angle=args.open_angle,
+                 flange_above=args.flange_above,
+                 approach_h=args.approach_height,
+                 joint_controller=joint_controller)
+    except RuntimeError as exc:
+        raise SystemExit(f'🛑 {exc}') from exc
 
     if ros is not None:
         ros.terminate()

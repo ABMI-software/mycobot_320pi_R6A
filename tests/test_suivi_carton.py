@@ -144,6 +144,7 @@ class RobeDesCartons(unittest.TestCase):
 
     def _cartons(self, part_noire_a, part_noire_b):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         candidats = [(20000.0, np.array([300.0, -130.0]), None, part_noire_a,
                       np.array([100.0, 100.0])),
                      (7000.0, np.array([390.0, 210.0]), None, part_noire_b,
@@ -174,6 +175,7 @@ class MarqueursDesCartons(unittest.TestCase):
 
     def _vision(self, part_noire_a=0.02, part_noire_b=0.59):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         vision._creux_candidats = lambda *a, **k: [
             (20000.0, np.array([300.0, -130.0]), None, part_noire_a,
              np.array([100.0, 100.0])),
@@ -186,8 +188,8 @@ class MarqueursDesCartons(unittest.TestCase):
     def test_le_marqueur_renomme_contre_la_robe(self):
         vision = self._vision()
         vision.cartons_marques = lambda *a, **k: {
-            'petit': (np.array([300.0, -130.0]), 83.0),
-            'grand': (np.array([390.0, 210.0]), 71.0)}
+            'petit': (np.array([300.0, -130.0]), 83.0, 0.0),
+            'grand': (np.array([390.0, 210.0]), 71.0, 0.0)}
         vus = {c: (tuple(xy), z) for c, xy, _, z in vision.cartons(None)}
         self.assertEqual(vus['petit'], ((300.0, -130.0), 83.0))
         self.assertEqual(vus['grand'], ((390.0, 210.0), 71.0))
@@ -195,7 +197,7 @@ class MarqueursDesCartons(unittest.TestCase):
     def test_un_seul_marqueur_laisse_l_autre_a_la_geometrie(self):
         vision = self._vision()
         vision.cartons_marques = lambda *a, **k: {
-            'petit': (np.array([300.0, -130.0]), 83.0)}
+            'petit': (np.array([300.0, -130.0]), 83.0, 0.0)}
         vus = {c: (tuple(xy), z) for c, xy, _, z in vision.cartons(None)}
         self.assertEqual(vus['petit'], ((300.0, -130.0), 83.0))
         self.assertEqual(vus['grand'], ((390.0, 210.0), tb.HAUTEUR_CARTON))
@@ -217,7 +219,7 @@ class MarqueursDesCartons(unittest.TestCase):
         vision = self._vision()
         vision.cartons_marques = lambda *a, **k: {
             'petit': (np.array([300.0 + tb.PORTE_MARQUEUR_CARTON + 50.0, -130.0]),
-                      83.0)}
+                      83.0, 0.0)}
         vus = {c: tuple(xy) for c, xy, _, _ in vision.cartons(None)}
         self.assertEqual(vus['grand'], (300.0, -130.0))
         self.assertNotIn('petit', vus)
@@ -234,6 +236,7 @@ class ContinuiteDesCartons(unittest.TestCase):
 
     def _vision(self, aires):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         vision.cartons_marques = lambda *a, **k: {}
         vision._creux_candidats = lambda *a, **k: [
             (aires[0], np.array([350.0, -170.0]), None, 0.02, np.array([100.0, 100.0])),
@@ -282,6 +285,7 @@ class AnneauRompuParLOuverture(unittest.TestCase):
 
     def _vision(self):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         vision.masque_plateau = lambda forme: np.full(forme, 255, np.uint8)
         vision.vers_base = lambda uv, z: np.array([uv[0] * self.ECHELLE,
                                                    uv[1] * self.ECHELLE, z])
@@ -343,6 +347,7 @@ class UnMarqueurTropPetitNeDitQueSonNom(unittest.TestCase):
 
     def _vision(self):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         vision.K = np.array([[600.0, 0.0, 320.0], [0.0, 600.0, 240.0],
                              [0.0, 0.0, 1.0]])
         vision.dist = np.zeros(5)
@@ -357,18 +362,18 @@ class UnMarqueurTropPetitNeDitQueSonNom(unittest.TestCase):
                           600.0 * y / distance_m + 240.0] for x, y in modele])
 
     def test_a_15_px_la_hauteur_est_refusee(self):
-        _, z, cote_px = self._vision().pose_marqueur(self._coins(1.0))
+        _, z, cote_px, _ = self._vision().pose_marqueur(self._coins(1.0))
         self.assertLess(cote_px, tb.COTE_MARQUEUR_PX_MIN)
         self.assertIsNone(z)
 
     def test_a_36_px_la_hauteur_est_rendue(self):
-        _, z, cote_px = self._vision().pose_marqueur(self._coins(0.5))
+        _, z, cote_px, _ = self._vision().pose_marqueur(self._coins(0.5))
         self.assertGreater(cote_px, tb.COTE_MARQUEUR_PX_MIN)
         self.assertIsNotNone(z)
 
     def test_le_nom_passe_meme_sans_hauteur(self):
         vision = self._vision()
-        vision.pose_marqueur = lambda coins: (np.array([300.0, -130.0]), None, 15.0)
+        vision.pose_marqueur = lambda coins: (np.array([300.0, -130.0]), None, 15.0, 0.0)
         rendus = tb.Vision.cartons_marques(vision, None, {10: None})
         self.assertEqual(set(rendus), {'grand'})
         self.assertIsNone(rendus['grand'][1])
@@ -384,11 +389,12 @@ class MarqueurPoseAPlatSurLaTable(unittest.TestCase):
 
     def _vision(self, z_marqueur):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         vision._creux_candidats = lambda *a, **k: [
             (20000.0, np.array([300.0, -130.0]), None, 0.02, np.array([100.0, 100.0]))]
         vision.vers_base = lambda uv, z: np.array([300.0, -130.0, z])
         vision.cartons_marques = tb.Vision.cartons_marques.__get__(vision)
-        vision.pose_marqueur = lambda coins: (np.array([300.0, -130.0]), z_marqueur, 0.0)
+        vision.pose_marqueur = lambda coins: (np.array([300.0, -130.0]), z_marqueur, 0.0, 0.0)
         return vision
 
     def test_un_marqueur_sur_le_rebord_donne_sa_hauteur(self):
@@ -411,6 +417,7 @@ class CoeurSombreDuCreux(unittest.TestCase):
 
     def _vision(self):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         vision._cotes_mm = lambda contour, z=None: tuple(
             sorted(cv2.minAreaRect(contour)[1]))
         return vision
@@ -515,6 +522,7 @@ class PriseParEpaisseur(unittest.TestCase):
 
     def test_le_point_epais_tombe_dans_le_torse(self):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         u, v = vision.point_le_plus_epais(self._silhouette())
         self.assertTrue(40 <= u <= 100, f'u={u} hors du torse')
         self.assertTrue(70 <= v <= 130, f'v={v} hors du torse')
@@ -528,10 +536,17 @@ class PriseParEpaisseur(unittest.TestCase):
 
     def test_une_tache_vide_ne_rend_rien(self):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         self.assertIsNone(vision.point_le_plus_epais(np.zeros((50, 50), np.uint8)))
 
-    def test_le_scotch_n_est_pas_concerne(self):
-        self.assertNotIn('scotch', tb.PRISE_PAR_EPAISSEUR)
+    def test_le_rouleau_se_prend_par_sa_BANDE_pas_par_son_trou(self):
+        """Il gardait le centroïde, « centre de son anneau » — c'est-à-dire le
+        TROU. Mesure du 27/08 : la prise se fait (statut 2, angle 24) puis
+        l'objet glisse à la remontée, et chaque essai raté le POUSSE — 65 mm de
+        dérive en sept tentatives. Six décalages latéraux (16 et 22 mm dans les
+        quatre directions) échouent, et le couple monté à 250 aussi. Ce n'est ni
+        la visée ni la force : les doigts ne prennent qu'un quart de rouleau."""
+        self.assertIn('scotch', tb.PRISE_PAR_EPAISSEUR)
         self.assertIn('robot', tb.PRISE_PAR_EPAISSEUR)
 
 
@@ -635,6 +650,7 @@ class LaContinuitePrimeSurLaTaille(unittest.TestCase):
 
     def _vision(self, aire_grand, aire_petit):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         vision.cartons_marques = lambda *a, **k: {}
         vision._creux_candidats = lambda *a, **k: [
             (aire_grand, self.GRAND, None, 0.02, np.array([130.0, 155.0])),
@@ -677,6 +693,7 @@ class UnCartonVuSeulSeMesure(unittest.TestCase):
 
     def _vision(self, aire, xy):
         vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
         vision.cartons_marques = lambda *a, **k: {}
         vision._creux_candidats = lambda *a, **k: [
             (aire, np.asarray(xy, float), None, 0.02, np.array([130.0, 155.0]))]
@@ -777,14 +794,17 @@ class ApresUnLargageOnPasseAuSuivant(unittest.TestCase):
         self.assertEqual(len(ctx.largages), 1)
 
 
-class UnCartonMarqueSuitSonMarqueurSansDELAI(unittest.TestCase):
+class UnCartonMarqueSuitSonMarqueurEnDeuxImages(unittest.TestCase):
     """Le 26/08 les deux cartons ont été intervertis et les deux étiquettes
     sont restées l'une sur l'autre à leur ancienne place.
 
-    Le lissage et les deux confirmations existent pour une ombre qui tremble ou
-    pour le bras qui passe au-dessus — deux cas où personne ne dit où est la
-    boîte. Un marqueur, lui, PROUVE l'identité : un écart franc n'est plus un
-    doute à lever, c'est un déplacement à suivre.
+    Un marqueur PROUVE l'identité de la boîte : un écart franc n'est pas un
+    doute à lever indéfiniment, c'est un déplacement à suivre. Mais il ne prouve
+    pas que le contour trouvé autour de lui soit le bon — l'appariement accepte
+    une ouverture jusqu'à `PORTE_MARQUEUR_CARTON`, et le bras qui masque la
+    boîte fabrique justement dans ce rayon un contour décalé. Le suivi exige
+    donc deux images CONCORDANTES : ~0,2 s à 10 im/s, immédiat à l'œil, et
+    l'occlusion, elle, ne se répète pas au même endroit.
     """
 
     def _suivi(self):
@@ -796,20 +816,291 @@ class UnCartonMarqueSuitSonMarqueurSansDELAI(unittest.TestCase):
         s = self._suivi()
         loin = np.array([300.0 + 4 * tb.SAUT_CARTON, 130.0])
         s.maj(loin, 12000.0, None, maintenant=0.1)
-        self.assertLess(float(np.linalg.norm(s.centre - loin)), 1e9)
         self.assertGreater(float(np.linalg.norm(s.centre - loin)), tb.SAUT_CARTON,
                            "un saut non marqué ne doit pas être adopté d'emblée")
 
-    def test_avec_marqueur_le_saut_est_adopte_des_la_premiere_image(self):
+    def test_une_seule_image_marquee_ne_deplace_pas_la_boite(self):
         s = self._suivi()
         loin = np.array([300.0 + 4 * tb.SAUT_CARTON, 130.0])
         s.maj(loin, 12000.0, None, maintenant=0.1, marque=True)
+        self.assertTrue(np.allclose(s.centre, [300.0, -130.0]))
+        self.assertEqual(s.deplacements, 0)
+
+    def test_deux_images_marquees_concordantes_deplacent_la_boite(self):
+        s = self._suivi()
+        loin = np.array([300.0 + 4 * tb.SAUT_CARTON, 130.0])
+        for i in range(tb.CONFIRMATIONS_CARTON):
+            s.maj(loin, 12000.0, None, maintenant=0.1 * (i + 1), marque=True)
         self.assertTrue(np.allclose(s.centre, loin))
+        self.assertEqual(s.deplacements, 1)
 
     def test_deux_cartons_intervertis_se_croisent_sans_se_confondre(self):
         grand, petit = self._suivi(), tb.SuiviCarton()
         petit.maj(np.array([300.0, 130.0]), 7700.0, None, maintenant=0.0)
-        grand.maj(np.array([300.0, 130.0]), 12000.0, None, maintenant=0.1, marque=True)
-        petit.maj(np.array([300.0, -130.0]), 7700.0, None, maintenant=0.1, marque=True)
+        for i in range(tb.CONFIRMATIONS_CARTON):
+            t = 0.1 * (i + 1)
+            grand.maj(np.array([300.0, 130.0]), 12000.0, None, maintenant=t, marque=True)
+            petit.maj(np.array([300.0, -130.0]), 7700.0, None, maintenant=t, marque=True)
         self.assertTrue(np.allclose(grand.centre, [300.0, 130.0]))
         self.assertTrue(np.allclose(petit.centre, [300.0, -130.0]))
+
+
+class UneOcclusionNeDeplacePasUneBoiteMarquee(unittest.TestCase):
+    """Le défaut du 26/08, à sa source.
+
+    Le bras se place AU-DESSUS du grand carton pour déposer : la boîte disparaît
+    de la vue pendant plus de `PEREMPTION_CARTON`, puis la détection revient
+    remplie de l'ombre et du bras, décalée de 50 à 170 mm. Ré-adoptée sans
+    discuter, cette position d'occlusion devenait la position du carton : quatre
+    « carton grand déplacé » d'affilée dans le journal, le point de largage
+    périmé en plein transfert, et le petit robot déposé à côté du petit carton.
+    """
+
+    VRAIE = np.array([394.0, 205.0])          # grand carton, capture du 26/08
+
+    def _suivi_marque(self):
+        s = tb.SuiviCarton()
+        s.maj(self.VRAIE, 12600.0, None, maintenant=0.0, marque=True)
+        return s
+
+    def test_un_retour_decale_apres_occlusion_ne_deplace_rien(self):
+        s = self._suivi_marque()
+        # Le bras masque la boîte : plus rien pendant plus que la péremption.
+        # Puis un contour d'occlusion, différent à chaque image.
+        for i, decalage in enumerate(((150.0, -60.0), (90.0, -110.0), (170.0, 20.0))):
+            s.maj(self.VRAIE + np.asarray(decalage), 12600.0, None,
+                  maintenant=tb.PEREMPTION_CARTON + 1.0 + i, marque=True)
+        self.assertEqual(s.deplacements, 0)
+        self.assertTrue(np.allclose(s.centre, self.VRAIE))
+
+    def test_une_boite_SANS_marqueur_se_readopte_comme_avant(self):
+        """Sans marqueur, rien ne prouve l'identité : la dernière vue fait foi."""
+        s = tb.SuiviCarton()
+        s.maj(self.VRAIE, 12600.0, None, maintenant=0.0)
+        ailleurs = self.VRAIE + np.array([150.0, -60.0])
+        s.maj(ailleurs, 12600.0, None, maintenant=tb.PEREMPTION_CARTON + 1.0)
+        self.assertTrue(np.allclose(s.centre, ailleurs))
+
+    def test_la_boite_reste_visible_apres_l_occlusion(self):
+        """Tenir la position ne doit pas rendre la boîte introuvable : dès que
+        la vraie ouverture est revue, le suivi la rend fraîche."""
+        s = self._suivi_marque()
+        s.maj(self.VRAIE + np.array([150.0, -60.0]), 12600.0, None,
+              maintenant=tb.PEREMPTION_CARTON + 1.0, marque=True)
+        t = tb.PEREMPTION_CARTON + 2.0
+        s.maj(self.VRAIE + np.array([2.0, -1.0]), 12600.0, None,
+              maintenant=t, marque=True)
+        vu = s.position(maintenant=t)
+        self.assertIsNotNone(vu)
+        self.assertLess(float(np.linalg.norm(vu[0] - self.VRAIE)), 5.0)
+
+
+class UnCartonMarqueImMOBILE_NeBougePas(unittest.TestCase):
+    """Adopter à chaque image comptait un déplacement par image.
+
+    La machine croyait les cartons perpétuellement en mouvement, réannonçait
+    « point de largage à recalculer » en boucle et ne sortait plus de
+    TRANSFERT, balle en main (26/08).
+    """
+
+    def test_un_marqueur_stable_ne_compte_aucun_deplacement(self):
+        s = tb.SuiviCarton()
+        s.maj(np.array([300.0, -130.0]), 12000.0, None, maintenant=0.0, marque=True)
+        depart = s.deplacements
+        for i in range(1, 40):
+            bruit = np.array([300.0 + 0.4 * (i % 3), -130.0 - 0.3 * (i % 2)])
+            s.maj(bruit, 12000.0, None, maintenant=i * 0.1, marque=True)
+        self.assertEqual(s.deplacements, depart,
+                         "un carton immobile ne doit jamais compter de déplacement")
+
+    def test_un_vrai_deplacement_compte_toujours_pour_un(self):
+        s = tb.SuiviCarton()
+        s.maj(np.array([300.0, -130.0]), 12000.0, None, maintenant=0.0)
+        depart = s.deplacements
+        loin = np.array([300.0, -130.0 + 4 * tb.SAUT_CARTON])
+        for i in range(tb.CONFIRMATIONS_CARTON):
+            s.maj(loin, 12000.0, None, maintenant=0.1 * (i + 1), marque=True)
+        self.assertEqual(s.deplacements, depart + 1)
+        self.assertTrue(np.allclose(s.centre, loin))
+
+
+class UneBoitePerdueDeVuePuisRevueNAPasBouge(unittest.TestCase):
+    """Le bras la masque, le suivi la déclare périmée et la ré-adopte.
+
+    Compter cela comme un déplacement faisait réannoncer « point de largage à
+    recalculer » sans arrêt — journal noyé et quatre échecs d'affilée sur la
+    recherche du carton (26/08).
+    """
+
+    def test_peremption_puis_retour_au_meme_endroit(self):
+        s = tb.SuiviCarton()
+        s.maj(np.array([380.0, -155.0]), 7700.0, None, maintenant=0.0)
+        depart = s.deplacements
+        for i in range(6):
+            t0 = (i + 1) * (tb.PEREMPTION_CARTON + 1.0)
+            s.maj(np.array([380.5, -154.6]), 7700.0, None, maintenant=t0)
+        self.assertEqual(s.deplacements, depart)
+
+    def test_peremption_puis_retour_AILLEURS_compte_bien_un_deplacement(self):
+        s = tb.SuiviCarton()
+        s.maj(np.array([380.0, -155.0]), 7700.0, None, maintenant=0.0)
+        depart = s.deplacements
+        s.maj(np.array([380.0, 155.0]), 7700.0, None,
+              maintenant=tb.PEREMPTION_CARTON + 1.0)
+        self.assertEqual(s.deplacements, depart + 1)
+
+
+class UneBoitePleineSePlaceParSonMarqueur(unittest.TestCase):
+    """Une boîte pleine n'a plus d'ouverture — son marqueur, si.
+
+    Mesure du 25/08 : le grand carton avec la balle et un scotch dedans tombe à
+    59 cm² contre 126 vide. Ce qui disparaît alors n'est pas seulement le nom
+    (la continuité le tient) mais le POLYGONE dont le point de largage a besoin.
+    L'écart marqueur → ouverture, appris quand la boîte était vide, le replace.
+
+    Mesuré sur le vrai banc le 27/08, écart gelé 5 s plus tôt : reconstruction à
+    6,5 mm d'écart médian (13 max) pour le petit, 10,3 (16,1) pour le grand —
+    très en deçà des 28 à 40 mm de marge intérieure du point de largage.
+    """
+
+    CENTRE = np.array([400.0, 150.0])
+    MARQUEUR = np.array([400.0, 275.0])       # collé sur le rabat, 125 mm plus loin
+
+    def _vision(self):
+        vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
+        vision.polygone_base = lambda contour, hauteur: np.asarray(contour, float)
+        vision.vers_pixel = lambda p: np.asarray(p, float)[:2]
+        return vision
+
+    def _ouverture(self, centre):
+        c = np.asarray(centre, float)
+        return np.array([c + [-55, -55], c + [55, -55], c + [55, 55], c + [-55, 55]])
+
+    def _apprend(self, vision, angle=0.0):
+        vision._apprend_forme('grand', self.CENTRE, (self.MARQUEUR, 83.0, angle),
+                              self._ouverture(self.CENTRE), 83.0)
+
+    def test_sans_rien_appris_on_ne_reconstruit_pas(self):
+        vision = self._vision()
+        self.assertIsNone(
+            vision._forme_depuis_marqueur('grand', (self.MARQUEUR, 83.0, 0.0),
+                                          self.CENTRE))
+
+    def test_le_marqueur_immobile_redonne_la_meme_ouverture(self):
+        vision = self._vision()
+        self._apprend(vision)
+        centre, contour, hauteur = vision._forme_depuis_marqueur(
+            'grand', (self.MARQUEUR, 83.0, 0.0), self.CENTRE)
+        self.assertLess(float(np.linalg.norm(centre - self.CENTRE)), 1e-6)
+        self.assertEqual(hauteur, 83.0)
+
+    def test_la_boite_deplacee_suit_son_marqueur(self):
+        vision = self._vision()
+        self._apprend(vision)
+        saut = np.array([-70.0, -95.0])          # reste dans la planche
+        centre, _, _ = vision._forme_depuis_marqueur(
+            'grand', (self.MARQUEUR + saut, 83.0, 0.0), self.CENTRE + saut)
+        self.assertLess(float(np.linalg.norm(centre - (self.CENTRE + saut))), 1e-6)
+
+    def test_la_boite_TOURNEE_suit_aussi(self):
+        """En base, l'écart ne vaudrait que pour l'orientation apprise : tourner
+        la boîte d'un quart de tour le rendrait faux de deux fois sa longueur."""
+        vision = self._vision()
+        self._apprend(vision, angle=0.0)
+        # même marqueur, boîte pivotée d'un quart de tour
+        marqueur = np.array([330.0, 30.0])       # boite pivotee, marqueur ailleurs
+        attendu = marqueur + np.array([[0.0, -1.0], [1.0, 0.0]]) @ (self.CENTRE - self.MARQUEUR)
+        centre, _, _ = vision._forme_depuis_marqueur('grand', (marqueur, 83.0, np.pi / 2),
+                                                     attendu)
+        self.assertLess(float(np.linalg.norm(centre - attendu)), 1e-6)
+        # et pas simplement la position apprise translatee
+        self.assertGreater(float(np.linalg.norm(centre - self.CENTRE)), 100.0)
+
+    def test_une_reconstruction_hors_planche_est_refusee(self):
+        vision = self._vision()
+        self._apprend(vision)
+        self.assertIsNone(vision._forme_depuis_marqueur(
+            'grand', (np.array([5000.0, 5000.0]), 83.0, 0.0), self.CENTRE))
+
+    def test_le_polygone_reconstruit_garde_la_taille_de_l_ouverture(self):
+        vision = self._vision()
+        self._apprend(vision)
+        saut = np.array([-40.0, -60.0])
+        _, contour, _ = vision._forme_depuis_marqueur(
+            'grand', (self.MARQUEUR + saut, 83.0, 0.0), self.CENTRE + saut)
+        points = np.asarray(contour, float).reshape(-1, 2)
+        cotes = points.max(axis=0) - points.min(axis=0)
+        self.assertLess(float(np.abs(cotes - 110.0).max()), 2.0)
+
+
+class LaReconstructionNeTELEPORTEPasUneBoite(unittest.TestCase):
+    """Le 27/08 l'étiquette « petit » s'est posée SUR LE BRAS, à 210 mm, pendant
+    qu'il portait la balle — et le cycle s'est mis à faire l'aller-retour.
+
+    La reconstruction par marqueur sert à garder en vie une boîte qu'on connaît
+    et qui vient de perdre son ouverture parce qu'on l'a remplie. Une boîte qui
+    a vraiment bougé, elle, est VIDE : son ouverture se voit, l'appariement
+    normal la retrouve. La reconstruction n'a donc jamais à placer une boîte
+    loin de là où on la suivait.
+    """
+
+    CENTRE = np.array([400.0, 150.0])
+    MARQUEUR = np.array([400.0, 275.0])
+
+    def _vision(self):
+        vision = tb.Vision.__new__(tb.Vision)
+        vision._forme_carton = {}
+        vision.polygone_base = lambda contour, hauteur: np.asarray(contour, float)
+        vision.vers_pixel = lambda p: np.asarray(p, float)[:2]
+        c = self.CENTRE
+        vision._apprend_forme('petit', c, (self.MARQUEUR, 83.0, 0.0),
+                              np.array([c + [-55, -55], c + [55, -55],
+                                        c + [55, 55], c + [-55, 55]]), 83.0)
+        return vision
+
+    def test_sans_position_connue_on_ne_reconstruit_rien(self):
+        self.assertIsNone(self._vision()._forme_depuis_marqueur(
+            'petit', (self.MARQUEUR, 83.0, 0.0), None))
+
+    def test_un_marqueur_lu_loin_de_la_boite_suivie_est_ignore(self):
+        """Le cas exact du 27/08 : le résultat tomberait sur le bras."""
+        vision = self._vision()
+        sur_le_bras = np.array([210.0, 40.0])
+        self.assertIsNone(vision._forme_depuis_marqueur(
+            'petit', (sur_le_bras, 83.0, 0.0), self.CENTRE))
+
+    def test_pres_de_la_boite_suivie_la_reconstruction_passe(self):
+        vision = self._vision()
+        petit_saut = np.array([25.0, -30.0])
+        rendu = vision._forme_depuis_marqueur(
+            'petit', (self.MARQUEUR + petit_saut, 83.0, 0.0), self.CENTRE)
+        self.assertIsNotNone(rendu)
+        self.assertLess(float(np.linalg.norm(rendu[0] - (self.CENTRE + petit_saut))), 1e-6)
+
+
+class UneTacheTropGRANDENEstPasUnCarton(unittest.TestCase):
+    """Le 27/08, marqueur 11 absent : une tache de 230 x 236 mm — 543 cm², plus
+    de quatre fois le grand carton — a été nommée « petit » à 226 mm, c'est-à-dire
+    SUR LA BALLE. Le cycle est parti en boucle.
+
+    Le gabarit par côtés ne pouvait pas l'arrêter : porté à 260 mm pour laisser
+    passer un carton vu de biais, il accepte du même coup un carré de 236. C'est
+    l'AIRE qui tranche.
+    """
+
+    def test_les_bornes_couvrent_ce_qui_a_ete_MESURE(self):
+        # boîte pleine mesurée à 59 cm², petit vu de biais à 117, grand à 126
+        for aire_cm2 in (59.0, 77.0, 117.0, 126.0):
+            self.assertLessEqual(tb.AIRE_CARTON_MIN, aire_cm2 * 100.0)
+            self.assertLessEqual(aire_cm2 * 100.0, tb.AIRE_CARTON_MAX)
+
+    def test_la_tache_du_27_08_est_hors_bornes(self):
+        self.assertGreater(230.0 * 236.0, tb.AIRE_CARTON_MAX)
+
+    def test_les_vraies_ouvertures_restent_dedans(self):
+        """Mesurées le 27/08 bras dégagé : grand 101x123, petit 69x115 mm —
+        le petit retrouve ses cotes au mètre ruban (115 x 70)."""
+        for petit, grand in ((101.0, 123.0), (69.0, 115.0)):
+            self.assertLessEqual(tb.AIRE_CARTON_MIN, petit * grand)
+            self.assertLessEqual(petit * grand, tb.AIRE_CARTON_MAX)

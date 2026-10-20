@@ -210,7 +210,7 @@ def launch_scene(context):
                 'gui_config': gui_config,
             }.items()),
     ] + (sorting_nodes(seed, run_yaml, csv_path, panel) if sorting else []) + (
-        randomize_nodes(context, seed, run_yaml) if sorting and pieces else []) + [
+        randomize_nodes(context, seed, run_yaml, log_dir) if sorting and pieces else []) + [
         TimerAction(period=12.0, condition=IfCondition(LaunchConfiguration('observe')), actions=[
             LogInfo(msg=f'observation pose {tri_scene.OBSERVATION_Q_DEG} deg'),
             ExecuteProcess(cmd=['ros2', 'topic', 'pub', '--once', '-w', '1',
@@ -220,15 +220,20 @@ def launch_scene(context):
     ]
 
 
-def randomize_nodes(context, seed, run_yaml):
-    """Step 2: redraw pieces and bins without restarting Gazebo, button with the GUI."""
+def randomize_nodes(context, seed, run_yaml, log_dir):
+    """Step 2: redraw pieces and bins without restarting Gazebo; with the GUI, the
+    panel's buttons Randomiser and Démarrer le tri (one bilan_tris.csv row per sort)."""
     nodes = [Node(package='mycobot_gateway', executable='tri_scene_randomizer', output='screen',
                   parameters=[{'use_sim_time': True, 'world_name': WORLD_NAME, 'seed': seed,
                                'piece_reach': float(LaunchConfiguration('piece_reach').perform(context)),
                                'run_yaml': run_yaml}])]
     if (LaunchConfiguration('randomize_panel').perform(context) == 'true'
             and LaunchConfiguration('headless').perform(context) != 'true'):
-        nodes.append(Node(package='mycobot_gateway', executable='tri_scene_panel', output='screen'))
+        nodes.append(Node(package='mycobot_gateway', executable='tri_scene_panel', output='screen',
+                          parameters=[{'use_sim_time': True, 'world_name': WORLD_NAME, 'seed': seed,
+                                       'log_dir': str(log_dir or ''),
+                                       'wall_timeout_scale': float(
+                                           LaunchConfiguration('wall_timeout_scale').perform(context))}]))
     return nodes
 
 
@@ -289,6 +294,9 @@ def generate_launch_description():
         DeclareLaunchArgument('yolo_exact_boxes', default_value='1', choices=['0', '1'],
                               description='1 = yolo26 box corners not truncated to integers '
                                           '(the truncation costs -0.5 px; the real bench keeps it)'),
+        DeclareLaunchArgument('wall_timeout_scale', default_value='1.0',
+                              description='Passed to the sort started by the panel: multiplies its '
+                                          'wall-clock timeouts (20 when a thermal guard freezes the run)'),
         DeclareLaunchArgument('randomize_panel', default_value='true', choices=['true', 'false'],
                               description='Button window for /tri_scene/randomize (step 2), with the GUI'),
         DeclareLaunchArgument('dream', default_value='false', choices=['true', 'false'],

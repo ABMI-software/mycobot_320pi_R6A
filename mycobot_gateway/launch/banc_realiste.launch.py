@@ -8,8 +8,9 @@ Variante realiste de `real_table.launch.py`. Ce qu'elle apporte :
     de fabrication, et plus aucun reste de l'ancien banc ;
   * les deux cameras a LEUR pose calibree, avec LEURS intrinseques, donc les
     memes millimetres robot qu'en reel ;
-  * les masses de la fiche 320 Pi 2022 — bras 3 kg, pince 0,340 kg — et les
-    butees MESUREES en pratique, deja portees par l'URDF
+  * les masses d'origine du modele (bras 1,58 kg, pince 0,22 kg) — celles de la
+    fiche 320 Pi 2022 (3 kg, 0,340 kg) restent accessibles par
+    arm_mass_kg:=3.0 gripper_mass_kg:=0.34 — et les butees MESUREES en pratique, deja portees par l'URDF
     (J1 168, J2 135, J3 150, J4 145, J5 165, J6 180 degres).
 
     ros2 launch mycobot_gateway banc_realiste.launch.py
@@ -52,10 +53,10 @@ def generate_launch_description():
                                '/usr/share/glvnd/egl_vendor.d/10_nvidia.json'),
         SetEnvironmentVariable('__GLX_VENDOR_LIBRARY_NAME', 'nvidia'),
         DeclareLaunchArgument('headless', default_value='false'),
-        DeclareLaunchArgument('arm_mass_kg', default_value='3.0',
-                              description='fiche 320 Pi 2022'),
-        DeclareLaunchArgument('gripper_mass_kg', default_value='0.34',
-                              description='fiche 320 Pi 2022'),
+        DeclareLaunchArgument('arm_mass_kg', default_value='1.58',
+                              description='3.0 = fiche 320 Pi 2022'),
+        DeclareLaunchArgument('gripper_mass_kg', default_value='0.22',
+                              description='0.34 = fiche 320 Pi 2022'),
         DeclareLaunchArgument('robot_appearance', default_value='realistic',
                               choices=['original', 'realistic']),
         IncludeLaunchDescription(
