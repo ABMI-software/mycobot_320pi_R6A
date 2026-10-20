@@ -1,0 +1,47 @@
+# Passed directly as a --params-file path (not loaded as a Python dict and
+# re-serialized by launch_ros) because launch_ros's dict->YAML writer tags
+# Python lists as `!!python/tuple`, which ROS2's own parameter parser can't
+# read -- request_adapters and planner_configs silently came through empty,
+# and move_group aborted with "Planning plugin name is empty or not defined
+# in namespace 'ompl'". Writing the file in its final, already-namespaced
+# form and handing launch_ros the path sidesteps that serialization step.
+/**:
+  ros__parameters:
+    planning_pipelines:
+      - ompl
+    default_planning_pipeline: ompl
+    ompl:
+      planning_plugins:
+        - ompl_interface/OMPLPlanner
+      # Confirmed by reading the actual pluginlib exception on load failure --
+      # this MoveIt2 version renamed the package (default_planner_* ->
+      # default_planning_*) and several classes (Fix* -> Check*/Validate*;
+      # AddTimeOptimalParameterization doesn't exist as a request adapter in
+      # this version at all).
+      request_adapters:
+        - default_planning_request_adapters/ResolveConstraintFrames
+        - default_planning_request_adapters/ValidateWorkspaceBounds
+        - default_planning_request_adapters/CheckStartStateBounds
+        - default_planning_request_adapters/CheckStartStateCollision
+      # Time parameterization is a SEPARATE plugin base class in this MoveIt2
+      # version (planning_interface::PlanningResponseAdapter, package
+      # default_planning_response_adapters) with its own "response_adapters"
+      # parameter -- confirmed via `strings` on libmoveit_planning_pipeline.so
+      # and libmoveit_default_planning_response_adapter_plugins.so. Without
+      # this, OMPL's raw path has no timing on its waypoints and
+      # mycobot_controller flatly rejects the trajectory goal.
+      response_adapters:
+        - default_planning_response_adapters/AddTimeOptimalParameterization
+        - default_planning_response_adapters/ValidateSolution
+      start_state_max_bounds_error: 0.1
+      planner_configs:
+        RRTConnectkConfigDefault:
+          type: geometric::RRTConnect
+          range: 0.0
+          goal_bias: 0.05
+      arm:
+        default_planner_config: RRTConnectkConfigDefault
+        planner_configs:
+          - RRTConnectkConfigDefault
+        projection_evaluator: joints(joint2_to_joint1,joint3_to_joint2)
+        longest_valid_segment_fraction: 0.005

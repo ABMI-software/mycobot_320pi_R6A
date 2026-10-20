@@ -59,8 +59,40 @@ ROT_WEIGHT = 40.0
 # Pour un recalage d'orientation pur, à position tenue : là on veut l'inverse.
 ALIGN_WEIGHT = 400.0
 
-# Domaine pratique du 320 Pi. Il est volontairement plus étroit que l'URDF :
-# le firmware refuse J2 hors de ±137°, donc ±135° conserve une marge réelle.
+# --------------------------------------------------------------------------- #
+#  Butées articulaires — source unique
+# --------------------------------------------------------------------------- #
+# Le dépôt portait onze déclarations de butées pour trois jeux de valeurs
+# différents, jusqu'à 25,3° d'écart sur J2. Les trois sont nommés ici, avec
+# leur provenance, pour que personne n'en retranscrive un douzième à la main.
+# `tests/test_joint_limits_coherence.py` vérifie que les URDF et les copies
+# Python restent d'accord avec eux.
+#
+#   J1      J2      J3      J4      J5      J6
+#   169.6   159.9   159.9   159.9   169.6   174.8   URDF d'origine
+#   167.9   134.6   145.0   145.0   167.9   179.9   URDF Gazebo / benchmark
+#   168.0   135.0   150.0   145.0   165.0   180.0   domaine pratique
+
+# `mycobot_pro_320_pi.urdf` et `new_mycobot_pro_320_pi_moveit.urdf`.
+URDF_JOINT_LIMITS_DEG = np.degrees(np.array([
+    (-2.96, 2.96), (-2.79, 2.79), (-2.79, 2.79),
+    (-2.79, 2.79), (-2.96, 2.96), (-3.05, 3.05),
+], dtype=np.float64))
+
+# `mycobot_pro_320_pi_gazebo.urdf` et `..._benchmark.urdf` — c'est le modèle
+# que chargent le jumeau Gazebo, MoveIt et les collectes synthétiques.
+URDF_GAZEBO_JOINT_LIMITS_DEG = np.degrees(np.array([
+    (-2.93, 2.93), (-2.35, 2.35), (-2.53, 2.53),
+    (-2.53, 2.53), (-2.93, 2.93), (-3.14, 3.14),
+], dtype=np.float64))
+
+# CE QUI FAIT FOI POUR TOUT CE QUI COMMANDE LE ROBOT. C'est le seul des trois
+# jeux adossé à une contrainte mesurée plutôt qu'héritée d'un fichier : le
+# firmware refuse J2 hors de ±137°, donc ±135° conserve une marge réelle.
+# Attention, il n'est pas uniformément plus étroit que les URDF — il est plus
+# LARGE de 5° sur J3 que l'URDF Gazebo. Ne pas l'employer pour échantillonner
+# des poses destinées à la simulation sans vérifier ce que le contrôleur en
+# fait.
 PRACTICAL_JOINT_LIMITS_DEG = np.array([
     (-168.0, 168.0), (-135.0, 135.0), (-150.0, 150.0),
     (-145.0, 145.0), (-165.0, 165.0), (-180.0, 180.0),

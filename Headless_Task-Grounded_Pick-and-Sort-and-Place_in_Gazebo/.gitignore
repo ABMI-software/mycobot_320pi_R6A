@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*Zone.Identifier
+# Recorded bags and converted datasets are regenerable from batch.sh /
+# port_bag.py (see datasets/README.md) -- not tracked, same policy as the
+# team's own mycobot_320pi_R6A repo for training checkpoints and results/.
+datasets/*/data/
+datasets/*/videos/
+datasets/*/meta/
+datasets/*/port_manifest.json
+*.bak*

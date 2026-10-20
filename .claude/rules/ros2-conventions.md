@@ -1,5 +1,9 @@
 # Rule — ROS2 conventions in this repo
 
+> **`CONTRIBUTING.md` (repository root) is the source of truth for this project's
+> conventions.** This file restates them for tooling. If the two disagree, fix
+> this one.
+
 ## Build
 
 - **Always** from `~/ros_jazzy/`, never from inside `src/mycobot_R6A/`. Colcon writes `build/`, `install/`, `log/` at its CWD; we want those at the workspace root.

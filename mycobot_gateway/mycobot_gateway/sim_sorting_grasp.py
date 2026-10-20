@@ -57,7 +57,8 @@ _SCRIPTS = Path(__file__).resolve().parents[2] / 'scripts'
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from diff_ik import fk_pose, solve_pose  # noqa: E402
+from diff_ik import (PRACTICAL_JOINT_LIMITS_DEG, fk_pose,  # noqa: E402
+                     solve_pose)
 
 
 ARM_JOINTS = [
@@ -107,6 +108,7 @@ IK_ITERATIONS = 60       # 150 ne gagnait rien : la tolerance est a 0.05 mm
 JOINT_SPEED_DPS = 75.0   # vitesse articulaire visee, deg/s
 SETTLE_TOL_DEG = 0.35    # arrive quand l'ecart passe sous ca
 
+JOINT_LIMITS_DEG = PRACTICAL_JOINT_LIMITS_DEG   # source : scripts/diff_ik.py
 # Perception : trois messages fusionnes successifs, d'accord a 4 mm pres. La
 # fusion des 4 cameras tient 0,65 mm de mediane, 2,07 mm au pire (01/10).
 PERCEPTION_SAMPLES = 3

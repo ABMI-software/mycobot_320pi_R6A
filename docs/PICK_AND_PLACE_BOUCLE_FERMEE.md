@@ -18,7 +18,7 @@ confirmer une prise — `bridge_pi_simple.py` ne convient pas.
 
 ```bash
 conda deactivate                       # sinon rclpy et OpenCV se marchent dessus
-cd ~/Osama_ws/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 /usr/bin/python3 scripts/pick_dashboard.py
 ```
 

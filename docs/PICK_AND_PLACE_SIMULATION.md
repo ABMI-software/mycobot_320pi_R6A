@@ -12,7 +12,69 @@ Pour le vrai bras, voir [`PICK_AND_PLACE_REAL.md`](PICK_AND_PLACE_REAL.md).
 
 ---
 
-## Résultat mesuré (31/08/2026)
+## Résultat mesuré (22/09/2026) — 3 objets sur 4
+
+Deux cycles complets en `headless`, résultats identiques. **Ceci contredit le
+relevé du 31/08 reproduit plus bas sur le cylindre**, qui est conservé tel quel :
+c'est un historique, pas l'état courant.
+
+| objet | cycle 1 | cycle 2 | écart au centre |
+|---|---|---|---|
+| `red_cube` | ✔ | ✔ | −1/−2 · −0/−2 mm |
+| `blue_cube` | ✔ | ✔ | −11/+10 · −13/+11 mm |
+| **`green_cylinder`** | **✘** | **✘** | **−81/−122 · −35/−102 mm** |
+| `yellow_box` | ✔ | ✔ | +0/+0 · +3/+15 mm |
+
+Le cylindre finit à une dizaine de centimètres du bac, poussé vers −Y, une fois
+au sol (z = 0,025) une fois perché sur un rebord (z = 0,051).
+
+### L'échec est non déterministe — mesuré sur 7 cycles
+
+C'est le fait dominant, et il change la lecture de tout le reste de cette page.
+
+Sept cycles complets ont été joués, dont six instrumentés. **Les six commandent
+une géométrie identique** — poignet à φ = 120° à la saisie comme au-dessus du
+bac, mêmes hauteurs, même serrage — et donnent **trois réussites puis trois
+échecs**. La divergence n'est pas dans la planification : elle est dans le
+solveur de contact.
+
+| | cycles 1-3 | cycles 4-6 |
+|---|---|---|
+| `green_cylinder` | ✔ +19/+7 · ✔ +19/+8 · ✔ +16/−7 | ✘ −424/−299 · ✘ −24/−197 · ✘ −161/−395 |
+
+- Les écarts d'échec vont de **24 mm à 1 132 mm**, l'objet finissant tantôt au
+  sol (z = 0,022) tantôt perché sur un rebord (z = 0,052). Une éjection
+  métrique est une signature de **pénétration de contact**, pas de roulement.
+- **`blue_cube` a échoué une fois** (+142/−89 mm) — sa garde latérale au dépôt
+  n'est que de 1,5 mm. Le cylindre n'est donc pas seul exposé.
+
+⚠ **Une explication a été avancée puis réfutée** : le poignet à φ = 120° aux
+échecs contre 105° à la réussite, d'où une prétendue dépendance à l'ordre de
+tri. Elle reposait sur trois échantillons. Les six cycles ci-dessus, tous à
+φ = 120°, la contredisent. Conservée ici parce que l'erreur est instructive :
+**trois cycles ne suffisent pas à départager deux versions de ce code.**
+
+La marge des doigts est hors de cause. Au dégagement introduit par `aeb39dfc`
+ils passent de 44 à 49,1 mm d'écartement, soit **2,5 mm de jeu par côté** autour
+du cylindre — ils ne le touchent plus.
+
+### Piste testée et rejetée : la remontée verticale
+
+`move_to` interpole en **articulaire** : entre deux poses verticalement alignées
+la pointe décrit un arc. Mesuré sur la remontée du bac vert, 28 → 110 mm en un
+seul segment : **7,3 mm de flèche latérale**. Remplacer ce segment par un
+escalier de paliers de 20 mm ramène la flèche à **0,33 mm** — vérifié hors
+ligne, sans saut de branche. Les sept cycles ci-dessus ont été joués avec cet
+escalier : **il ne corrige pas l'échec**. Le code a été annulé.
+
+La descente `q_over_bin → q_place` porte la même flèche mais ne peut pas être en
+cause : elle culmine à z = 69 mm, au-dessus du rebord à 30 mm, et l'encombrement
+des doigts serrés sur l'objet (40,0 mm) plus la flèche donne 47,3 mm pour une
+paroi à 47,5 mm.
+
+---
+
+## Résultat mesuré (31/08/2026) — historique, contredit sur le cylindre
 
 4 objets sur 4, en **115 s**.
 
@@ -51,7 +113,7 @@ Deux terminaux, `conda deactivate` d'abord dans chacun.
 
 ```bash
 # 1 — le banc (Gazebo + les trois contrôleurs)
-source /opt/ros/jazzy/setup.bash && source ~/Osama_ws/install/setup.bash
+source /opt/ros/jazzy/setup.bash && source <votre_ws>/install/setup.bash
 ros2 launch mycobot_gateway sim_grasp.launch.py          # headless:=true pour sans fenêtre
 
 # 2 — le cycle de tri
@@ -165,8 +227,12 @@ motrice : c'est un parallélogramme, elle tourne du même angle que son servo.
 7. **Descendre poser** l'objet sur le fond (1 mm de garde sous lui).
 8. **Rendre la largeur exacte** de l'objet : il repose déjà, la force de serrage
    tombe à zéro et il est libéré sans que les doigts s'écartent.
-9. **Remonter**, puis seulement **ouvrir en grand**.
-10. **Vérifier** que l'objet est dans l'emprise du bac.
+9. **Écarter les doigts** au maximum que le bac autorise — encombrement sous
+   `BIN_INNER_HALF_MM − CLEAR_MARGIN_MM`, soit 45,5 mm de demi-largeur — toujours
+   au fond du bac. Ajouté par `aeb39dfc` pour supprimer le frottement de la
+   remontée sur la surface courbe du cylindre ; **mesuré insuffisant le 22/09**.
+10. **Remonter**, puis seulement **ouvrir en grand**.
+11. **Vérifier** que l'objet est dans l'emprise du bac.
 
 Les étapes 2, 3 et 5 partagent une **orientation de poignet unique** : résoudre
 l'IK indépendamment à chaque hauteur laissait φ changer d'un point au suivant, et
@@ -218,8 +284,12 @@ Bacs : 100 × 100 mm hors-tout, parois de 5 mm hautes de 30 mm, fond à z = 2 mm
 
 ## Limites
 
-- **Trois passages seulement**, tous dans la même session et sur la même scène.
-  Rien ne dit ce que donne un démarrage à froid ou des objets déplacés.
+- **Le résultat n'est pas reproductible.** À géométrie commandée identique, le
+  cylindre réussit ou échoue selon le tirage du solveur de contact (3 sur 7).
+  Aucun chiffre de cette page ne doit être lu comme un état déterministe, et
+  comparer deux versions du code demande plusieurs cycles de chaque côté.
+- **Trois passages seulement** au 31/08, deux au 22/09, tous dans la même session
+  et sur la même scène. Rien ne dit ce que donne un démarrage à froid.
 - **Le biais de `yellow_box` (−12 mm en X) n'est pas expliqué** — mesuré,
   reproductible, mais la cause n'a pas été cherchée.
 - **Pas de vision.** Les positions viennent de la pose Gazebo des objets, pas du

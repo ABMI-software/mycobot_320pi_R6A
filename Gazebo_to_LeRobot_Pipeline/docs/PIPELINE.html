@@ -1,0 +1,844 @@
+<!doctype html>
+<title>Gazebo→LeRobot Runbook</title>
+<meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --paper: #E9ECEA;
+  --surface: #FFFFFF;
+  --surface-sunk: #DEE3E0;
+  --ink: #172422;
+  --ink-soft: #4B5B57;
+  --ink-faint: #7C8985;
+  --line: #C4CBC7;
+  --accent: #146356;
+  --accent-ink: #0E4A40;
+  --accent-soft: #DBEAE6;
+  --verify: #8A5A12;
+  --verify-soft: #F1E6D3;
+  --bug: #9C3B23;
+  --bug-soft: #F3E1DA;
+  --code-bg: #10201D;
+  --code-text: #D9EDE8;
+  --code-accent: #7FD9C4;
+  --code-comment: #7C978F;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #10181685cc;
+    --paper: #101615;
+    --surface: #171F1D;
+    --surface-sunk: #0C1312;
+    --ink: #E7EDEA;
+    --ink-soft: #9FB0AB;
+    --ink-faint: #6C7C77;
+    --line: #2A3532;
+    --accent: #57C4AE;
+    --accent-ink: #7FD9C4;
+    --accent-soft: #14322C;
+    --verify: #D6A44B;
+    --verify-soft: #33270F;
+    --bug: #E08468;
+    --bug-soft: #3A1D15;
+    --code-bg: #0A1513;
+    --code-text: #CFEAE3;
+    --code-accent: #7FD9C4;
+    --code-comment: #5D766F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #101615;
+  --surface: #171F1D;
+  --surface-sunk: #0C1312;
+  --ink: #E7EDEA;
+  --ink-soft: #9FB0AB;
+  --ink-faint: #6C7C77;
+  --line: #2A3532;
+  --accent: #57C4AE;
+  --accent-ink: #7FD9C4;
+  --accent-soft: #14322C;
+  --verify: #D6A44B;
+  --verify-soft: #33270F;
+  --bug: #E08468;
+  --bug-soft: #3A1D15;
+  --code-bg: #0A1513;
+  --code-text: #CFEAE3;
+  --code-accent: #7FD9C4;
+  --code-comment: #5D766F;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding-inline: 20px;
+}
+
+h1, h2, h3, h4 { font-family: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif; text-wrap: balance; color: var(--ink); }
+
+.shell {
+  max-width: 1180px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 40px;
+  padding-block: 32px 80px;
+}
+
+/* ---------------------------------------------------------------- rail */
+.rail {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.rail-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+}
+.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail a {
+  display: flex;
+  gap: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+  line-height: 1.35;
+}
+.rail a:hover, .rail a:focus-visible { background: var(--surface-sunk); color: var(--ink); outline: none; }
+.rail a .n { color: var(--accent); font-weight: 600; flex-shrink: 0; }
+.rail .rail-group-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 16px 0 4px 8px;
+}
+.rail .rail-group-label:first-child { margin-top: 0; }
+
+/* ------------------------------------------------------------- content */
+main { min-width: 0; }
+
+.cover {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 28px;
+  margin-bottom: 36px;
+}
+.cover .eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+.cover h1 { font-size: 2.55rem; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
+.cover .dek { font-family: "IBM Plex Serif", serif; font-style: italic; font-size: 1.1rem; color: var(--ink-soft); max-width: 62ch; margin: 0 0 20px; }
+.cover .meta {
+  display: flex; flex-wrap: wrap; gap: 22px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+.cover .meta b { color: var(--ink-soft); font-weight: 600; }
+
+section.block { margin-bottom: 44px; }
+section.block > h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  scroll-margin-top: 20px;
+}
+section.block > .block-dek {
+  color: var(--ink-soft);
+  max-width: 68ch;
+  margin: 0 0 20px;
+}
+p { max-width: 70ch; }
+.prose { max-width: 70ch; }
+
+code, .mono { font-family: "IBM Plex Mono", monospace; }
+p code, li code, td code { background: var(--surface-sunk); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.88em; color: var(--accent-ink); }
+
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 14px 0;
+}
+pre .c { color: var(--code-comment); }
+pre .k { color: var(--code-accent); }
+
+/* ------------------------------------------------------------ tables */
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; background: var(--surface); }
+thead th {
+  text-align: left;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--surface-sunk);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody td:first-child { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--accent-ink); white-space: nowrap; }
+
+/* --------------------------------------------------------------- step */
+.step {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 22px 24px 24px;
+  margin-bottom: 18px;
+}
+.step-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.step-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+.step-head h3 { margin: 0; font-size: 1.18rem; font-weight: 600; }
+.step-purpose { color: var(--ink-soft); margin: 2px 0 16px; font-size: 0.95rem; }
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) { .panels { grid-template-columns: 1fr; } }
+.panel { border-radius: var(--radius); padding: 14px 16px 16px; }
+.panel.procedure { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+.panel.verify { background: var(--verify-soft); border: 1px solid color-mix(in srgb, var(--verify) 35%, transparent); }
+.panel-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin: 0 0 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.panel.procedure .panel-tag { color: var(--accent-ink); }
+.panel.verify .panel-tag { color: var(--verify); }
+.panel p, .panel ul, .panel pre { margin-top: 8px; margin-bottom: 8px; }
+.panel p:first-of-type { margin-top: 0; }
+.panel ul { padding-left: 18px; margin: 8px 0; }
+.panel li { margin-bottom: 4px; font-size: 0.94rem; }
+.panel pre { font-size: 12px; }
+
+/* ---------------------------------------------------------- bug cards */
+.bugcard {
+  border: 1px solid color-mix(in srgb, var(--bug) 35%, var(--line));
+  background: var(--bug-soft);
+  border-radius: 12px;
+  padding: 20px 22px 22px;
+  margin-bottom: 18px;
+}
+.bugcard h4 { margin: 0 0 4px; font-size: 1.08rem; color: var(--ink); }
+.bugcard .repo {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--bug);
+  margin: 0 0 14px;
+}
+.bugcard dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.bugcard dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 3px;
+  white-space: nowrap;
+}
+.bugcard dd { margin: 0; max-width: 62ch; }
+.bugcard pre { margin-top: 4px; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 3px 9px; border-radius: 999px;
+  margin-left: 8px;
+}
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+  padding: 12px 18px;
+  margin: 16px 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.callout b { color: var(--ink); }
+.callout.warn { border-left-color: var(--verify); }
+
+.ladder { display: flex; flex-direction: column; gap: 0; margin: 18px 0; }
+.rung {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.rung:first-child { border-top: none; }
+.rung .level {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+.rung.reached .level { color: var(--accent-ink); font-weight: 600; }
+.rung.stopped .level { color: var(--verify); font-weight: 600; }
+.rung h5 { margin: 0 0 4px; font-size: 1rem; }
+.rung p { margin: 0 0 6px; color: var(--ink-soft); font-size: 0.94rem; }
+.rung .tag {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 999px;
+  margin-bottom: 6px;
+}
+.rung.reached .tag { background: var(--accent-soft); color: var(--accent-ink); }
+.rung.stopped .tag { background: var(--verify-soft); color: var(--verify); }
+
+.manifest-tree {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+.manifest-tree .c { color: var(--code-comment); }
+.manifest-tree .k { color: var(--code-accent); }
+
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+  padding-top: 18px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { position: static; max-height: none; }
+  .cover h1 { font-size: 1.9rem; }
+}
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <p class="rail-eyebrow">Contents</p>
+    <nav>
+      <a href="#overview"><span class="n">§</span>Overview &amp; architecture</a>
+      <a href="#tools"><span class="n">§</span>Tool inventory</a>
+      <p class="rail-group-label">Pipeline</p>
+      <a href="#s1"><span class="n">01</span>Build the image</a>
+      <a href="#s2"><span class="n">02</span>Start the container</a>
+      <a href="#s3"><span class="n">03</span>Import the digital twin</a>
+      <a href="#s4"><span class="n">04</span>Build the workspace</a>
+      <a href="#s5"><span class="n">05</span>Bring up sim + control</a>
+      <a href="#s6"><span class="n">06</span>Direct joint command</a>
+      <a href="#s7"><span class="n">07</span>Keyboard teleop</a>
+      <a href="#s8"><span class="n">08</span>MoveIt2 plan &amp; execute</a>
+      <a href="#s9"><span class="n">09</span>Import rosetta bridge</a>
+      <a href="#s10"><span class="n">10</span>Record an episode</a>
+      <a href="#s11"><span class="n">11</span>Convert to LeRobot</a>
+      <a href="#s12"><span class="n">12</span>Verification ladder</a>
+      <p class="rail-group-label">Reference</p>
+      <a href="#bugs-env"><span class="n">§</span>Bugs fixed — environment</a>
+      <a href="#bugs-upstream"><span class="n">§</span>Bugs worth reporting</a>
+      <a href="#git"><span class="n">§</span>Git &amp; reproduction</a>
+      <a href="#manifest"><span class="n">§</span>File manifest</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="cover">
+      <p class="eyebrow">Gazebo_to_LeRobot_Pipeline — internal runbook</p>
+      <h1>ROS2 Jazzy + Gazebo Harmonic, MyCobot 320 Pi digital twin, rosetta → LeRobot bridge</h1>
+      <p class="dek">Every step of the pipeline in the order it must be run, what it produces, and the concrete check that proves it worked — plus every tool installed, every bug hit and fixed, and the two that look like real upstream defects rather than local misconfiguration.</p>
+      <div class="meta">
+        <span><b>Sandbox</b> /home/tomislav_ilic/tomislav/robotics/Gazebo_to_LeRobot_Pipeline</span>
+        <span><b>Host</b> Ubuntu 26.04, WSL2, ~4.8&nbsp;GB usable RAM, CPU-only</span>
+        <span><b>Reproduced via</b> Docker (Ubuntu 24.04)</span>
+        <span><b>Commit</b> 157041d on <code>main</code></span>
+        <span><b>Written</b> 2026-09-12</span>
+      </div>
+    </div>
+
+    <section class="block" id="overview">
+      <h2>Overview &amp; architecture</h2>
+      <p class="block-dek">Why this exists, why it's built the way it is, and the one constraint that shapes every decision below.</p>
+      <p class="prose">The host laptop runs Ubuntu 26.04, which has no official ROS2 Jazzy or Gazebo Harmonic packages. The team's own <code>mycobot_320pi_R6A</code> repo — the digital twin this sandbox reuses — targets exactly Jazzy + Harmonic on Ubuntu 24.04. Rather than fight the host OS, <code>Gazebo_to_LeRobot_Pipeline</code> runs the whole stack inside one Ubuntu 24.04 Docker container, with WSLg's X11/Wayland sockets and <code>/dev/dxg</code> GPU device bind-mounted in, so Gazebo, RViz and <code>rqt_image_view</code> render out to the host desktop like native apps.</p>
+      <p class="prose">One container stays running for the life of a session (<code>docker/run.sh</code>, once), and every terminal after the first attaches to it with <code>docker/shell.sh</code>. ROS2's DDS discovery is unreliable across separate containers/network namespaces — one shared container sidesteps that class of problem entirely rather than working around it per-command.</p>
+      <p class="prose">The digital twin — <code>mycobot_description</code> and <code>mycobot_gateway</code> — is a one-time <em>copy</em> from the team repo, not a live bind-mount: this sandbox is meant to be a decoupled, disposable place to learn Gazebo and prove the pipeline, not a second working copy of the main project. Three files in that copy were hand-modified (lower controller update-rate, smaller/partly-disabled camera sensors, a longer controller-switch timeout); those three are tracked on their own under <code>overrides/</code> rather than duplicating the ~130&nbsp;MB mesh tree — see <a href="#git">Git &amp; reproduction</a>.</p>
+      <div class="callout"><b>The resource ceiling that shaped every call in this document:</b> this VM has roughly 4.8&nbsp;GB of usable RAM and no GPU compute, only WSLg's D3D12-translated rendering. Headless Gazebo, 320×240 cameras, and stopping short of an actual SmolVLA training run are all direct consequences of that ceiling, not oversights.</div>
+    </section>
+
+    <section class="block" id="tools">
+      <h2>Tool inventory</h2>
+      <p class="block-dek">Everything installed to make this pipeline run, and why each piece is there.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tool</th><th>Version / source</th><th>Purpose</th><th>Installed via</th></tr></thead>
+          <tbody>
+            <tr><td>Docker</td><td>host daemon, rootless (user in <code>docker</code> group)</td><td>Ubuntu 24.04 sandbox on an unsupported 26.04 host</td><td>pre-existing on host</td></tr>
+            <tr><td>ros:jazzy-ros-base</td><td>official image, Ubuntu 24.04 + ROS2 Jazzy core</td><td>base OS and ROS2 core</td><td><code>Dockerfile FROM</code></td></tr>
+            <tr><td>ros-jazzy-desktop</td><td>apt</td><td>rviz2, the rqt framework</td><td>Dockerfile</td></tr>
+            <tr><td>ros-gz · gz-ros2-control · ros2-control · ros2-controllers · joint-trajectory-controller · position-controllers · controller-manager</td><td>apt (ros-jazzy-*)</td><td>Gazebo Harmonic + ros2_control stack</td><td>Dockerfile</td></tr>
+            <tr><td>xacro · robot-state-publisher · joint-state-publisher(-gui)</td><td>apt (ros-jazzy-*)</td><td>URDF processing, TF/state publishing</td><td>Dockerfile</td></tr>
+            <tr><td>cv-bridge · image-transport · rqt-image-view</td><td>apt (ros-jazzy-*)</td><td>camera topic viewing — confirmed absent from every package.xml in the source repo</td><td>Dockerfile</td></tr>
+            <tr><td>moveit · moveit-planners-ompl · moveit-ros-visualization · moveit-simple-controller-manager · moveit-visual-tools</td><td>apt (ros-jazzy-*)</td><td>MoveIt2 motion planning — net-new, no upstream config existed for this robot</td><td>Dockerfile</td></tr>
+            <tr><td>colcon-common-extensions · rosdep · build-essential</td><td>apt</td><td>workspace build tooling</td><td>Dockerfile</td></tr>
+            <tr><td>libgl1 · libglx-mesa0 · libegl1 · mesa-utils</td><td>apt</td><td>minimal GL/EGL loader userland; the real WSLg driver is bind-mounted at runtime from <code>/usr/lib/wsl</code></td><td>Dockerfile</td></tr>
+            <tr><td>vcstool</td><td>pip, inside container</td><td>pinned multi-repo import of the rosetta ecosystem from one <code>.repos</code> file</td><td>manual pip install</td></tr>
+            <tr><td>rosetta + rosetta_interfaces + lerobot_rosetta + lerobot_teleoperator_rosetta + lerobot_robot_rosetta</td><td>git, pinned to <code>main</code>, see <code>src/rosetta.repos</code></td><td>ROS2 ↔ LeRobot dataset bridge (recorder, contract schema, bag→dataset converter)</td><td><code>vcs import src &lt; src/rosetta.repos</code></td></tr>
+            <tr><td>venv_lerobot</td><td>python3 -m venv + get-pip.py bootstrap</td><td>isolated Python env for lerobot/torch, sidesteps PEP&nbsp;668</td><td>manual, inside container</td></tr>
+            <tr><td>lerobot</td><td>pip, v0.6.0, into venv_lerobot</td><td>LeRobotDataset format, training scripts</td><td>pip</td></tr>
+            <tr><td>scipy</td><td>pip, into venv_lerobot specifically</td><td>numeric backend — must match the venv's own numpy build, see bug #4 below</td><td>pip</td></tr>
+            <tr><td>accelerate</td><td>pip, into venv_lerobot</td><td>required by <code>lerobot-train</code>'s <code>[training]</code> extra</td><td>pip</td></tr>
+            <tr><td>python-docx</td><td>1.2.0, host-side scratch venv</td><td>generated the Word version of this document</td><td>pip (host)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="callout warn"><b>Not installed, and why the pipeline stops there:</b> <code>transformers</code>, needed for <code>lerobot[smolvla]</code>'s ~500M-parameter SmolVLM2 vision-language backbone. Installing it and pulling that backbone was judged very likely to exceed this VM's ~4.8&nbsp;GB RAM ceiling; per the user's explicit standing instruction not to push through near-impossible resource constraints, this was not attempted. See <a href="#s12">§12 Verification ladder</a>.</p>
+    </section>
+
+    <!-- ============================================================ PIPELINE ============================================================ -->
+    <section class="block" id="pipeline-head">
+      <h2>The pipeline, step by step</h2>
+      <p class="block-dek">Each step is a real dependency of the next — this is the order a fresh reproduction has to follow. Every step pairs how it's done with the concrete check that proves it worked, not just that a command exited zero.</p>
+    </section>
+
+    <article class="step" id="s1">
+      <div class="step-head"><span class="step-num">01</span><h3>Build the Docker image</h3></div>
+      <p class="step-purpose">Produces <code>gazebo_to_lerobot:jazzy-harmonic</code> — Ubuntu 24.04 + every package in the tool inventory above.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>cd Gazebo_to_LeRobot_Pipeline
+docker/run.sh   <span class="c"># builds the image, then starts the container</span></pre>
+          <p>Or build alone: <code>docker build -t gazebo_to_lerobot:jazzy-harmonic -f docker/Dockerfile docker</code>.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li><code>docker images</code> lists <code>gazebo_to_lerobot:jazzy-harmonic</code>.</li>
+            <li>The build log reaches <code>rosdep init</code> / <code>rosdep update</code> with no unresolved apt package names.</li>
+          </ul>
+          <p>If <code>apt-get</code> hangs mid-build without ever failing outright, that's environment bug&nbsp;#1 in <a href="#bugs-env">Bugs fixed — environment</a>, not a Dockerfile defect.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s2">
+      <div class="step-head"><span class="step-num">02</span><h3>Start the persistent container</h3></div>
+      <p class="step-purpose">One long-lived container with WSLg's display/audio sockets and GPU device bind-mounted in, so GUI tools render to the host desktop.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>docker/run.sh     <span class="c"># first time only</span>
+docker/shell.sh   <span class="c"># every subsequent terminal</span></pre>
+          <p><code>run.sh</code> mounts <code>/tmp/.X11-unix</code>, <code>/mnt/wslg</code>, <code>/usr/lib/wsl</code>, passes <code>--device=/dev/dxg</code>, forwards <code>DISPLAY</code>/<code>WAYLAND_DISPLAY</code>/<code>PULSE_SERVER</code>, and bind-mounts <code>src/</code> so host edits are visible without a rebuild.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li><code>docker ps</code> shows <code>gazebo_to_lerobot</code> running.</li>
+            <li>Inside a shell, <code>glxinfo | grep "OpenGL renderer"</code> reports a real renderer (D3D12 translation or software), not an immediate GL context failure.</li>
+          </ul>
+          <p>If the GUI window is black or GL init fails outright, the documented fallback (not needed in practice here) is <code>-e LIBGL_ALWAYS_SOFTWARE=1</code> on the terminal that runs Gazebo's GUI.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s3">
+      <div class="step-head"><span class="step-num">03</span><h3>Import the digital twin</h3></div>
+      <p class="step-purpose">Snapshot-copy the team's <code>mycobot_description</code> and <code>mycobot_gateway</code> packages, then re-apply three sandbox-specific edits.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>Copy (not symlink) both packages from <code>mycobot_320pi_R6A</code> into <code>src/mycobot_R6A/</code>, then apply the three files under <code>overrides/</code> on top:</p>
+          <ul>
+            <li><code>controller.yaml</code> — <code>update_rate</code> 500 → 100 (WSL2 virtualization jitter).</li>
+            <li><code>mycobot_pro_320_pi_gazebo.urdf</code> — the 3 secondary cameras (right/left/top) set <code>&lt;always_on&gt;false&lt;/always_on&gt;</code>; all 4 cameras' resolution 640×480 → 320×240.</li>
+            <li><code>mycobot_teleop.launch.py</code> — adds a <code>headless</code> launch arg, raises controller <code>--switch-timeout</code> to 60s, and pushes the spawner start delays to 8.0/8.5/9.0s.</li>
+          </ul>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li><code>diff overrides/&lt;file&gt; src/mycobot_R6A/&lt;same path&gt;</code> is empty — the override is exactly what's live.</li>
+            <li><code>grep -c always_on src/mycobot_R6A/.../mycobot_pro_320_pi_gazebo.urdf</code> shows 3 occurrences set to <code>false</code>.</li>
+            <li>At launch time (step 5), the controller_manager log reports an update rate of 100&nbsp;Hz, not 500.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s4">
+      <div class="step-head"><span class="step-num">04</span><h3>Build the workspace</h3></div>
+      <p class="step-purpose">colcon-build every package under <code>src/</code> inside the container.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>cd /workspace
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --symlink-install
+source install/setup.bash</pre>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li><code>colcon build</code> exits 0 with all packages reported <code>Finished</code>.</li>
+            <li><code>ros2 pkg list | grep -E "mycobot|Gazebo_to_LeRobot_Pipeline"</code> lists all four: <code>mycobot_description</code>, <code>mycobot_gateway</code>, <code>gazebo_to_lerobot_bringup</code>, <code>mycobot_moveit_config</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s5">
+      <div class="step-head"><span class="step-num">05</span><h3>Bring up sim + control graph</h3></div>
+      <p class="step-purpose">Spawn the robot in Gazebo Harmonic, activate its controllers, and bridge one camera — headless by default.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>ros2 launch gazebo_to_lerobot_bringup sim_full.launch.py
+<span class="c"># add headless:=false for the GUI window, all_cameras:=true for all 4</span></pre>
+          <p><code>sim_full.launch.py</code> wraps <code>mycobot_gateway/mycobot_teleop.launch.py target:=sim</code> — the one reused launch file that actually spawns <code>joint_state_broadcaster</code> + <code>mycobot_controller</code> + <code>gripper_position_controller</code> and bridges <code>/clock</code> — and adds the <code>ros_gz_image image_bridge</code> node(s) it doesn't set up on its own.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li><code>ros2 topic list</code> shows <code>/clock</code>, <code>/joint_states</code>, <code>/gz/joint_states</code>, <code>/synth_camera/image(/compressed)</code>, <code>/mycobot_controller/joint_trajectory</code>.</li>
+            <li><code>ros2 topic hz /joint_states</code> reads ≈150&nbsp;Hz, matching <code>joint_state_broadcaster</code>'s configured <code>publish_rate</code>.</li>
+            <li><code>ros2 control list_controllers</code> shows <code>joint_state_broadcaster</code> and <code>mycobot_controller</code> both <code>active</code>.</li>
+            <li><code>ros2 run rqt_image_view rqt_image_view</code>, select <code>/synth_camera/image</code>, shows a live picture of the arm.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s6">
+      <div class="step-head"><span class="step-num">06</span><h3>Command the arm directly</h3></div>
+      <p class="step-purpose">Prove the controller path works with no MoveIt2 in the loop, by publishing one raw trajectory point.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>ros2 run gazebo_to_lerobot_bringup send_test_trajectory \
+  --positions 0.3 -0.2 0.2 0.0 0.0 0.0 --duration 4.0</pre>
+          <p>Publishes a single <code>trajectory_msgs/JointTrajectory</code> point to <code>/mycobot_controller/joint_trajectory</code> with the 6 arm joints in <code>controller.yaml</code>'s order.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li>The arm visibly moves in Gazebo (GUI mode) or in <code>rqt_image_view</code> (headless).</li>
+            <li><code>ros2 topic echo /joint_states</code> converges to the commanded positions within <code>--duration</code>. Confirmed run: target <code>[0.65, 0.20, 0.15, 0.15, 0.15, 0.15]</code> matched exactly in the echoed joint states.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s7">
+      <div class="step-head"><span class="step-num">07</span><h3>Continuous keyboard teleop</h3></div>
+      <p class="step-purpose">Drive the arm live, one small trajectory point at a time, for recording demonstrations later.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>ros2 run gazebo_to_lerobot_bringup teleop_arm_keyboard</pre>
+          <p>Seeds its start position from the first <code>/joint_states</code> message (no jump on launch), then publishes a fresh short-horizon point every 0.1&nbsp;s: <code>q/a w/s e/d r/f t/g y/h</code> for joints 1–6 ±0.05&nbsp;rad, <code>o/c</code> gripper, <code>z</code> home.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li>Holding a key drives smooth continuous motion (spline interpolation between closely-spaced targets), not discrete jumps.</li>
+            <li><code>/joint_states</code> tracks the displayed running target — confirmed live by the user against on-screen target values.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s8">
+      <div class="step-head"><span class="step-num">08</span><h3>Plan &amp; execute with MoveIt2</h3></div>
+      <p class="step-purpose">Hand-authored MoveIt2 config (no upstream one existed) targeting the same <code>mycobot_controller</code> action interface.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>ros2 launch mycobot_moveit_config move_group.launch.py
+ros2 launch mycobot_moveit_config moveit_rviz.launch.py   <span class="c"># separate terminal</span></pre>
+          <p>Drag the interactive marker in RViz and hit Plan &amp; Execute — or skip RViz and call the action directly: <code>ros2 run gazebo_to_lerobot_bringup send_moveit_goal</code>, which builds joint constraints for all 6 arm joints via <code>moveit_msgs/MoveGroup</code>.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li>Action result <code>error_code.val == 1</code> (SUCCESS).</li>
+            <li><code>/joint_states</code> after execution matches the goal — confirmed on a real planned motion.</li>
+          </ul>
+          <p>Group <code>arm</code> is a 6-joint chain <code>base</code>→<code>link6</code>; self-collision is blanket-disabled (all 171 link pairs) — a deliberate simplification for pipeline verification, not collision-aware planning.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s9">
+      <div class="step-head"><span class="step-num">09</span><h3>Import &amp; configure the rosetta bridge</h3></div>
+      <p class="step-purpose">Pull the 5-repo rosetta/LeRobot ecosystem and declare which ROS2 topics map to which LeRobot dataset keys.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>vcs import src < src/rosetta.repos
+colcon build --symlink-install --packages-up-to rosetta lerobot_rosetta</pre>
+          <p>The contract at <code>src/contracts/mycobot_320_pi.yaml</code> maps <code>observation.images.front</code> to <code>/synth_camera/image/compressed</code>, and <em>both</em> <code>observation.state</code> and <code>action</code> to <code>/joint_states</code> — a deliberate deviation from rosetta's leader/follower examples, since this sandbox has no physical leader arm; <code>action</code> records what the sim arm achieved, not a command issued an instant earlier.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li><code>ros2 pkg list</code> includes <code>rosetta</code>, <code>rosetta_interfaces</code>, <code>lerobot_rosetta</code>, <code>lerobot_teleoperator_rosetta</code>, <code>lerobot_robot_rosetta</code>.</li>
+            <li><code>episode_recorder_node</code> starts against the contract with no schema errors.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s10">
+      <div class="step-head"><span class="step-num">10</span><h3>Record a teleoperated episode</h3></div>
+      <p class="step-purpose">Capture a rosbag2 recording of a teleop session, structured per the contract.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>Run <code>episode_recorder_node</code> (or <code>episode_keyboard_node</code> for start/stop control) against the contract, while driving the arm with <code>teleop_arm_keyboard</code> from step 7.</p>
+          <p>Note the sim's real-time factor is well below 1.0 even headless — a "5-second" episode at the contract's 30&nbsp;fps takes noticeably longer than 5 real seconds to perform.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li><code>ros2 bag info &lt;bag&gt;</code> lists the contract's topics (<code>/joint_states</code>, <code>/synth_camera/image/compressed</code>) with message counts consistent with the episode's duration and rates.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s11">
+      <div class="step-head"><span class="step-num">11</span><h3>Convert the bag to a LeRobot dataset</h3></div>
+      <p class="step-purpose"><code>rosetta_port</code> turns a bag + contract into a LeRobot v3.0 dataset directory.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre><span class="c"># system Python, ROS sourced, venv's site-packages prepended --
+# see upstream bug B below for why the installed console script
+# can't be run directly</span>
+PYTHONPATH="$VENV/lib/python3.12/site-packages:$PYTHONPATH" \
+  python3 -m rosetta.robots.ros2.offline.port \
+  --bag &lt;bag&gt; --contract src/contracts/mycobot_320_pi.yaml \
+  --out datasets/mycobot_320_pi_test</pre>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li>Output directory has the LeRobot v3.0 layout: parquet episode files, AV1 video, <code>info.json</code>, <code>stats.json</code>, <code>tasks.parquet</code>.</li>
+            <li>No conversion errors or dropped frames reported.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s12">
+      <div class="step-head"><span class="step-num">12</span><h3>Verify the dataset — the ladder toward SmolVLA</h3></div>
+      <p class="step-purpose">Four increasingly strict checks that the dataset is genuinely usable, not just present on disk.</p>
+      <div class="ladder">
+        <div class="rung reached">
+          <div class="level">Level&nbsp;0</div>
+          <div>
+            <span class="tag">Passed</span>
+            <h5>Bag is structurally sound</h5>
+            <p><code>ros2 bag info</code> shows the expected topics and message counts for the recorded episode duration.</p>
+          </div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Level&nbsp;1</div>
+          <div>
+            <span class="tag">Passed</span>
+            <h5>Conversion produced a valid v3.0 layout</h5>
+            <p><code>rosetta_port</code> completed cleanly; the output directory matches the LeRobot v3.0 file layout exactly.</p>
+          </div>
+        </div>
+        <div class="rung reached">
+          <div class="level">Level&nbsp;2</div>
+          <div>
+            <span class="tag">Passed</span>
+            <h5>LeRobotDataset actually loads and yields correctly-shaped tensors</h5>
+            <p>Loaded via the <code>LeRobotDataset</code> class and iterated a sample. Confirmed output for the test recording:</p>
+            <pre>num_episodes: 2
+num_frames: 3483
+observation.images.front  torch.Size([3, 224, 224])  float32
+observation.state         torch.Size([6])            float32
+action                    torch.Size([6])             float32
+<span class="c"># plus is_first / is_last / is_terminal / timestamp / frame_index /
+# episode_index / index / task_index / task</span></pre>
+          </div>
+        </div>
+        <div class="rung stopped">
+          <div class="level">Level&nbsp;3</div>
+          <div>
+            <span class="tag">Stopped here</span>
+            <h5>Actually instantiate the SmolVLA policy and run a training smoke test</h5>
+            <p>Fixed on the way: missing <code>accelerate</code> (<code>lerobot-train</code>'s <code>[training]</code> extra); a validation error requiring <code>repo_id</code> for <code>push_to_hub</code> (fixed with <code>--policy.push_to_hub=false</code>). Stopped at a missing <code>transformers</code> package — <code>lerobot[smolvla]</code>'s extra, which would pull in the ~500M-parameter SmolVLM2 vision-language backbone.</p>
+            <p>This dataset was never meant to teach SmolVLA anything useful — 2 episodes of scripted keyboard motion with no real task semantics (no red block, no goal condition) — its purpose was purely to prove the pipeline end to end. Given that, and the VM's ~4.8&nbsp;GB RAM / CPU-only ceiling, pushing into an actual backbone download and forward pass was judged very likely to fail on resources rather than reveal anything new, and was deliberately not attempted, per the user's explicit standing instruction to stop rather than push through near-impossible resource constraints.</p>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- ============================================================ BUGS ============================================================ -->
+    <section class="block" id="bugs-env">
+      <h2>Bugs fixed — environment-specific</h2>
+      <p class="block-dek">Symptoms of this VM/WSL2/Docker combination, not defects in any upstream project. Listed so a teammate hits the same wall for a shorter time than this session did.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Symptom</th><th>Root cause</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td>apt-get hangs indefinitely reaching Ubuntu mirrors</td><td>DNS for <code>archive.ubuntu.com</code>/<code>security.ubuntu.com</code> resolves IPv6-only inside the container's network and is unroutable; some IPv4s in the round-robin pool are also blackholed</td><td><code>Acquire::ForceIPv4 "true"</code> + longer timeout/retries, plus patience — apt makes real cumulative progress across retries. A static <code>/etc/hosts</code> IP pin was tried and reverted (pinned a mirror missing the "noble" suite)</td></tr>
+            <tr><td><code>sed -i</code> on <code>/etc/hosts</code> fails "Device or resource busy"</td><td>Docker bind-mounts <code>/etc/hosts</code>; in-place rename-based edits can't replace a bind-mounted inode</td><td>Overwrite content instead: <code>grep -v ... /etc/hosts > tmp && cat tmp > /etc/hosts</code></td></tr>
+            <tr><td><code>python3-venv</code>/pip unavailable; pip refuses "externally-managed-environment"</td><td>PEP&nbsp;668 restriction on system Python, and installing <code>python3-venv</code> via apt hit the same DNS hang above</td><td><code>python3 -m venv</code> (partial — no ensurepip), then bootstrap pip via <code>get-pip.py</code> run against the venv's own interpreter directly</td></tr>
+            <tr><td><code>ValueError: numpy.dtype size changed</code></td><td>System dist-packages' <code>scipy</code> (built against system numpy) picked up via <code>PYTHONPATH</code> alongside the venv's own, different numpy build</td><td><code>pip install scipy</code> directly into the venv so a matching build resolves first</td></tr>
+            <tr><td>Controller spawners time out / stay in <code>unconfigured</code> on first launch</td><td>The very first <code>switch_controller</code> service call after a cold Gazebo start took ~40s in this environment (subsequent calls ~0.2s) — a one-time cold-start cost under WSL2 virtualization, not a steady-state real-time problem</td><td>Raised <code>--switch-timeout</code> to 60s on all three spawners; pushed their <code>TimerAction</code> start delays from 3.0/3.5/4.0s to 8.0/8.5/9.0s</td></tr>
+            <tr><td>Gazebo GUI crashes (compositor segfault) during interactive Follow/Move-To camera use</td><td>WSLg's weston compositor destabilizes under sustained GPU-accelerated Gazebo GUI use in this environment</td><td>Run headless (<code>gz sim -s</code>) by default for teleop/recording; use the GUI only for occasional visual spot-checks</td></tr>
+            <tr><td>Arm renders tiny in Follow/Move-To camera modes</td><td>Camera auto-framing fits the bounding box of all 4 wide-FOV camera frustums, not just the arm</td><td>Worked around (not fixed) by defaulting to headless + <code>rqt_image_view</code>. A fix attempt — spawning the 3 secondary cameras as a separate <code>scene_cameras.sdf</code> model — caused "Parent not found" sensor-attachment errors and a server crash, and was fully reverted</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block" id="bugs-upstream">
+      <h2>Bugs worth reporting upstream</h2>
+      <p class="block-dek">Two defects that reproduce independent of this VM — real bugs in code other teams depend on. <b>Filing the actual GitHub issues has not been done</b> and needs a separate explicit go-ahead.</p>
+
+      <div class="bugcard">
+        <h4>Silent <code>!!python/tuple</code> serialization corrupts nested-list parameters<span class="status-pill">Not yet filed</span></h4>
+        <p class="repo">Candidate repo: ros2/launch_ros (or wherever its Node parameter-file writer lives — not pinned down to an exact file/line this session)</p>
+        <dl>
+          <dt>Symptom</dt>
+          <dd>Passing a Python dict with nested list values to <code>Node(parameters=[{...}])</code> gets written to a generated temp params file with PyYAML <code>!!python/tuple</code> tags. ROS2's own parameter parser can't read that tag, so the value comes back empty or misread — with no error raised anywhere. In this project it surfaced as <code>move_group</code> aborting with <em>"Planning plugin name is empty or not defined in namespace 'ompl'"</em>, even though the launch file's <code>ompl_planning</code> dict clearly listed <code>planning_plugins</code>.</dd>
+          <dt>Fix used here</dt>
+          <dd>Wrote <code>ompl_planning.yaml</code> and <code>moveit_controllers.yaml</code> as real standalone <code>/**:\n  ros__parameters:</code> files and passed their paths as strings, instead of Python dicts, in <code>parameters=[...]</code>.</dd>
+          <dt>Why it matters</dt>
+          <dd>This is silent data corruption in a widely-used launch API — any <code>Node</code> with a nested list inside a dict parameter is at risk, with no error to point at the cause. A plausible fix is a custom YAML representer that dumps plain lists instead of tuples.</dd>
+        </dl>
+      </div>
+
+      <div class="bugcard">
+        <h4>Installed <code>rosetta_port</code> console script can't honor its own recommended venv<span class="status-pill">Not yet filed</span></h4>
+        <p class="repo">Candidate repo: iblnkn/rosetta</p>
+        <dl>
+          <dt>Symptom</dt>
+          <dd>The installed <code>rosetta_port</code> script's shebang is <code>#!/usr/bin/python3</code> (system Python), and it resolves its entry point via <code>importlib.metadata</code>, which only sees packages installed into system Python. rosetta's own docs recommend installing <code>lerobot[dataset,async]</code> into a <em>separate venv</em> — but the installed script's shebang bypasses whichever venv is active in the shell entirely, so it can never import <code>lerobot</code> as shipped.</dd>
+          <dt>Fix used here</dt>
+          <dd>Located the real entry point (<code>rosetta.robots.ros2.offline.port:main</code>, found via the package's own egg-info <code>entry_points.txt</code>) and invoked it directly with system Python, ROS environment sourced, with the venv's <code>site-packages</code> prepended onto <code>PYTHONPATH</code> — see step&nbsp;11 above.</dd>
+          <dt>Why it matters</dt>
+          <dd>The documented install workflow (separate venv for the lerobot deps) and the packaging (a system-Python console script) actively contradict each other — anyone following the README's own instructions hits this.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="block" id="git">
+      <h2>Git &amp; reproducing this from scratch</h2>
+      <p class="block-dek">This sandbox is a local git repo, not yet pushed anywhere — sharing it with the team on GitHub is a deliberate future step, not done here.</p>
+      <p class="prose">Repo root <code>Gazebo_to_LeRobot_Pipeline/</code>, branch <code>main</code>, initial commit <code>157041d</code> (28 files, ~160&nbsp;KB — no meshes, binaries, venvs, or build artifacts). The <a href="#manifest">file manifest</a> below shows exactly what's tracked.</p>
+      <p class="prose">Two things are intentionally <em>not</em> tracked, because they're either reconstructible or someone else's code to own:</p>
+      <ul class="prose">
+        <li><code>src/mycobot_R6A/</code> — copied from <code>mycobot_320pi_R6A</code> (step 3); ~130&nbsp;MB of mesh assets that belong to that repo, not this one. The 3 hand-modified files live in <code>overrides/</code> instead.</li>
+        <li><code>src/action/</code> — the 5 rosetta-ecosystem repos, cloned via vcstool (step 9); pinned upstream code, re-cloned rather than committed.</li>
+      </ul>
+      <p class="prose">A teammate cloning this repo fresh needs, in order: this repo; read access to <code>mycobot_320pi_R6A</code> for its <code>mycobot_description</code>/<code>mycobot_gateway</code> packages; then:</p>
+      <pre>git clone &lt;Gazebo_to_LeRobot_Pipeline repo&gt; && cd Gazebo_to_LeRobot_Pipeline
+<span class="c"># 1. reconstruct the digital twin (step 3)</span>
+cp -r &lt;mycobot_320pi_R6A&gt;/mycobot_description src/mycobot_R6A/
+cp -r &lt;mycobot_320pi_R6A&gt;/mycobot_gateway     src/mycobot_R6A/
+cp -r overrides/mycobot_description/* src/mycobot_R6A/mycobot_description/
+cp -r overrides/mycobot_gateway/*     src/mycobot_R6A/mycobot_gateway/
+
+<span class="c"># 2. build the container (step 1-2)</span>
+docker/run.sh && docker/shell.sh
+
+<span class="c"># 3. inside the container: rosetta ecosystem (step 9) + build (step 4)</span>
+vcs import src < src/rosetta.repos
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --symlink-install && source install/setup.bash
+
+<span class="c"># then steps 5-12 as documented above</span></pre>
+    </section>
+
+    <section class="block" id="manifest">
+      <h2>File manifest</h2>
+      <p class="block-dek">What's actually tracked in git, and what each piece is for.</p>
+      <div class="manifest-tree">Gazebo_to_LeRobot_Pipeline/<br>
+├── docker/<span class="c">                        # image + container lifecycle</span><br>
+│   ├── Dockerfile<br>
+│   ├── run.sh<span class="c">                       # first-time build + start</span><br>
+│   └── shell.sh<span class="c">                     # every subsequent terminal</span><br>
+├── overrides/<span class="c">                     # the 3 hand-modified files, tracked without the 130MB tree</span><br>
+│   ├── mycobot_description/config/controller.yaml<br>
+│   ├── mycobot_description/urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf<br>
+│   └── mycobot_gateway/launch/mycobot_teleop.launch.py<br>
+├── src/<br>
+│   ├── mycobot_R6A/<span class="c">                 # gitignored — see step 3 / Git &amp; reproduction</span><br>
+│   ├── action/<span class="c">                      # gitignored — vcstool-cloned, see step 9</span><br>
+│   ├── contracts/mycobot_320_pi.yaml<span class="c">  # rosetta contract, step 9</span><br>
+│   ├── rosetta.repos<span class="c">                # pinned 5-repo import list, step 9</span><br>
+│   ├── mycobot_moveit_config/<span class="c">       # hand-authored MoveIt2 config, step 8</span><br>
+│   │   ├── config/{mycobot.srdf, kinematics.yaml, joint_limits.yaml,<br>
+│   │   │            moveit_controllers.yaml, ompl_planning.yaml, moveit.rviz}<br>
+│   │   └── launch/{move_group.launch.py, moveit_rviz.launch.py}<br>
+│   └── gazebo_to_lerobot_bringup/<span class="c">          # sandbox-specific launch + scripts</span><br>
+│       ├── launch/sim_full.launch.py<span class="c">          # step 5</span><br>
+│       └── gazebo_to_lerobot_bringup/<br>
+│           ├── send_test_trajectory.py<span class="c">        # step 6</span><br>
+│           ├── teleop_arm_keyboard.py<span class="c">         # step 7</span><br>
+│           └── send_moveit_goal.py<span class="c">            # step 8</span><br>
+├── docs/PIPELINE.html / PIPELINE.docx<span class="c">   # this document</span><br>
+└── .gitignore</div>
+    </section>
+
+    <footer>Gazebo_to_LeRobot_Pipeline runbook · written 2026-09-12 · commit 157041d on main · Tomislav Ilic</footer>
+  </main>
+</div>

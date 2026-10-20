@@ -1,5 +1,12 @@
 # 🧪 TEST COMPLET DE LA COMMUNICATION
 
+> ⚠ **`bridge_pi_debug.py` a été supprimé du dépôt (22/09/2026).** Son unique
+> commit, en mars 2026, l'avait enregistré **déjà corrompu** — en-tête et corps
+> entrelacés, jamais exécutable. Les instructions ci-dessous qui le nomment
+> n'ont donc jamais pu fonctionner. Le pont de la Pi est
+> [`scripts/gripper_bridge.py`](../scripts/gripper_bridge.py), seul à répondre
+> à `get_pro_gripper_status`.
+
 ## Problème identifié
 Le domaine ROS2 n'était pas exporté dans `send_cmd` !
 
@@ -10,7 +17,7 @@ Ajouté `export ROS_DOMAIN_ID=10` dans `quick_commands.sh`
 
 ### 1️⃣ Rechargez les commandes
 ```bash
-cd /home/genji/ros_jazzy/src/mycobot_R6A
+cd <your_ws>/src/mycobot_320pi_R6A
 source quick_commands.sh
 ```
 

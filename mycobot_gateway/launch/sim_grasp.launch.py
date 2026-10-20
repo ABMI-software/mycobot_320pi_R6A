@@ -50,8 +50,9 @@ def generate_launch_description():
         desc_pkg, 'urdf', '320_pi',
         ['mycobot_pro_320_pi_gazebo', LaunchConfiguration('robot_model_suffix'), '.urdf']])
     world_name = LaunchConfiguration('world_name')
-    default_world_path = PathJoinSubstitution(
-        [desc_pkg, 'worlds', [world_name, '.sdf']])
+    # Concatenation a plat : selon la version de launch, PathJoinSubstitution
+    # rejette la liste imbriquee que '<world_name>.sdf' impose.
+    default_world_path = [os.path.join(desc_pkg, 'worlds') + os.sep, world_name, '.sdf']
     world_path = LaunchConfiguration('world_file')
     controller_cfg = LaunchConfiguration('controller_config')
 

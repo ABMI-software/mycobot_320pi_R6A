@@ -1,5 +1,9 @@
 # Rule — Auto-documentation and auto-commit
 
+> **`CONTRIBUTING.md` (repository root) is the source of truth for this project's
+> conventions.** This file restates them for tooling. If the two disagree, fix
+> this one.
+
 The user does not want to ask Claude to update docs or commit at the end of each session. Claude must **do it proactively**, on the correct branch, with the correct scope — without prompting.
 
 This rule governs when, what, and how.
@@ -105,11 +109,19 @@ If the branch check is ambiguous (e.g. a file that genuinely spans domains like 
 
 - `*.bak`, `*.bak2`, `*.orig`, `*.log`, `*.pyc`, `__pycache__/`
 - `results/`, `build/`, `install/`, `log/` (ROS2 build tree)
-- `*.xlsx` reports (user-local analyses — belong elsewhere)
 - Training checkpoints (`*.pth`) — too heavy, project already avoids tracking them
 - `.env`, `credentials.json`, private keys, SSH keys
 - Files ending in `.session`, `.sessionlock`, `.lock`
 - Anything the user introduced earlier in the session that they didn't mark as done
+
+### Stage only with explicit approval
+
+- **`*.xlsx` analysis workbooks.** These used to be barred outright. They are now
+  committable, but never automatically: ask the user first, in the same breath as
+  the commit, and stage the workbook only on a clear yes. The reason for asking is
+  not size — it is that a workbook is opaque to review and to `git diff`, so
+  whoever commits it has to vouch that its contents are meant to be shared. A
+  refusal, or silence, means leave it out.
 
 If in doubt, **don't stage it** — a missed file gets picked up in the next commit; a wrongly-committed secret does not get un-committed cleanly.
 
@@ -129,14 +141,14 @@ reader needs. Wrap at 72 chars.
 Additional paragraphs for unrelated-but-connected facts, artefacts
 created, or next-step pointers.
 
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 ```
 
 Type vocabulary in use: `feat` · `fix` · `docs` · `refactor` · `test` · `chore` · `perf`.
 
 Scope vocabulary: `teleop` · `dream` · `gazebo` · `sorting` · `bridge` · omit for cross-cutting changes.
 
-**Always** include the `Co-Authored-By` trailer when Claude drafted the commit.
+**Never** add an attribution trailer — no `Co-Authored-By`, no assistant mention.
+A commit here carries the name of its human author and nothing else.
 
 **Never** write commit messages that say "as requested" or "per user's instruction". Future readers don't care who requested it; they care what changed and why.
 
@@ -148,7 +160,6 @@ feat(dream): short summary
 
 Body.
 
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
 )"
 ```

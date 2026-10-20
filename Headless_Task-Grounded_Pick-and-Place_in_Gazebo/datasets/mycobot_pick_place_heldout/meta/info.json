@@ -1,0 +1,49 @@
+{
+  "codebase_version": "v3.0-manual",
+  "robot_type": "mycobot_320_pi",
+  "total_episodes": 5,
+  "total_frames": 927,
+  "total_tasks": 1,
+  "fps": 30,
+  "features": {
+    "observation.state": {
+      "dtype": "float32",
+      "shape": [
+        7
+      ],
+      "names": [
+        "joint2_to_joint1",
+        "joint3_to_joint2",
+        "joint4_to_joint3",
+        "joint5_to_joint4",
+        "joint6_to_joint5",
+        "joint6output_to_joint6",
+        "gripper_controller"
+      ]
+    },
+    "action": {
+      "dtype": "float32",
+      "shape": [
+        7
+      ],
+      "names": [
+        "joint2_to_joint1",
+        "joint3_to_joint2",
+        "joint4_to_joint3",
+        "joint5_to_joint4",
+        "joint6_to_joint5",
+        "joint6output_to_joint6",
+        "gripper_controller"
+      ]
+    },
+    "observation.images.front": {
+      "dtype": "video",
+      "shape": [
+        240,
+        320,
+        3
+      ]
+    }
+  },
+  "note": "Written directly with pyarrow+ffmpeg, NOT via the lerobot package (no torch on this machine). Not yet loaded/validated with the real LeRobotDataset class -- do that on the GPU machine before training."
+}

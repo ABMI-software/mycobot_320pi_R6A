@@ -61,6 +61,22 @@ def _round(c):
     return [round(v, 1) for v in c]
 
 
+def _verifie(reponse, quoi):
+    """Un refus du bridge arrete la sequence au lieu de la laisser continuer.
+
+    La reponse etait imprimee puis ignoree : les etapes suivantes partaient
+    sur une pose que le robot n'a jamais atteinte, et le cycle se deroulait
+    a vide. C'est d'autant plus couteux ici que `send_coords` echoue
+    normalement EN SILENCE en rendant `OK` (247,8 mm d'erreur mesures le
+    20/08) : un `ERROR:` explicite est la seule fois ou il dit la verite, et
+    c'est precisement ce qu'on jetait.
+    """
+    texte = '' if reponse is None else str(reponse).strip()
+    if texte.upper().startswith('ERROR'):
+        raise RuntimeError(f'commande {quoi} refusée par le bridge : {texte}')
+    return reponse
+
+
 def move(b: Bridge, coords, speed, mode, dry, settle=SETTLE):
     print(f'  → send_coords {_round(coords)} v={speed} mode={mode}')
     if dry:

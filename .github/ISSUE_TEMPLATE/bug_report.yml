@@ -1,0 +1,46 @@
+name: Bug
+description: Un comportement observé qui diffère de ce qui est documenté
+labels: [bug]
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Ce qui se passe
+      description: Le comportement observé, et le message d'erreur exact s'il y en a un.
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ce qui était attendu
+      description: Et où c'est documenté, si ça l'est.
+    validations: {required: true}
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Les commandes exactes, dans l'ordre.
+      render: bash
+    validations: {required: true}
+  - type: dropdown
+    id: env
+    attributes:
+      label: Environnement Python actif
+      description: "`conda deactivate` a-t-il été fait ? C'est la première cause de panne du dépôt."
+      options:
+        - ROS2 système (conda désactivé)
+        - conda hand-teleop
+        - venv_dream
+        - je ne sais pas
+    validations: {required: true}
+  - type: dropdown
+    id: target
+    attributes:
+      label: Cible
+      options: [Simulation Gazebo, Robot physique, Les deux, Hors robot (outillage, doc)]
+    validations: {required: true}
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: Sortie de `git rev-parse --short HEAD`.
+    validations: {required: true}

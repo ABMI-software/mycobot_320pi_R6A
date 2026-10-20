@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use this software or its results, please cite it as below."
+title: "R6A — Modular Vision-Guided Robotics"
+abstract: >-
+  Research platform for environment-adaptive robotics. A Gazebo digital twin
+  generates annotated training data at scale; a keypoint model estimates the
+  pose of a 6-DoF arm from plain RGB, with no fiducial marker on the robot, in
+  an eye-to-hand layout; a physical multi-camera bench, characterised against
+  ISO 9283, arbitrates the results.
+type: software
+authors:
+  - family-names: Bernardo
+    given-names: José
+    email: jo.bernardo@abmi-groupe.com
+    affiliation: "ABMI — Direction Recherche & Innovation"
+  - family-names: Bashoaib
+    given-names: Osama
+    email: o.bashoaib@abmi-groupe.com
+    affiliation: "ABMI — Direction Recherche & Innovation"
+  - family-names: Ilic
+    given-names: Tomislav
+repository-code: "https://github.com/ABMI-software/mycobot_320pi_R6A"
+license: Apache-2.0
+version: 1.17.0
+date-released: 2026-09-22
+keywords:
+  - robotics
+  - ros2
+  - digital-twin
+  - pose-estimation
+  - sim-to-real
+  - computer-vision
+  - robot-calibration
+  - metrology

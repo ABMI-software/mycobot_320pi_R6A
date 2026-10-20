@@ -1,0 +1,727 @@
+<!doctype html>
+<title>ROS2→RLDS Runbook</title>
+<meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --paper: #E9ECEA;
+  --surface: #FFFFFF;
+  --surface-sunk: #DEE3E0;
+  --ink: #172422;
+  --ink-soft: #4B5B57;
+  --ink-faint: #7C8985;
+  --line: #C4CBC7;
+  --accent: #146356;
+  --accent-ink: #0E4A40;
+  --accent-soft: #DBEAE6;
+  --verify: #8A5A12;
+  --verify-soft: #F1E6D3;
+  --bug: #9C3B23;
+  --bug-soft: #F3E1DA;
+  --code-bg: #10201D;
+  --code-text: #D9EDE8;
+  --code-accent: #7FD9C4;
+  --code-comment: #7C978F;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101615;
+    --surface: #171F1D;
+    --surface-sunk: #0C1312;
+    --ink: #E7EDEA;
+    --ink-soft: #9FB0AB;
+    --ink-faint: #6C7C77;
+    --line: #2A3532;
+    --accent: #57C4AE;
+    --accent-ink: #7FD9C4;
+    --accent-soft: #14322C;
+    --verify: #D6A44B;
+    --verify-soft: #33270F;
+    --bug: #E08468;
+    --bug-soft: #3A1D15;
+    --code-bg: #0A1513;
+    --code-text: #CFEAE3;
+    --code-accent: #7FD9C4;
+    --code-comment: #5D766F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #101615;
+  --surface: #171F1D;
+  --surface-sunk: #0C1312;
+  --ink: #E7EDEA;
+  --ink-soft: #9FB0AB;
+  --ink-faint: #6C7C77;
+  --line: #2A3532;
+  --accent: #57C4AE;
+  --accent-ink: #7FD9C4;
+  --accent-soft: #14322C;
+  --verify: #D6A44B;
+  --verify-soft: #33270F;
+  --bug: #E08468;
+  --bug-soft: #3A1D15;
+  --code-bg: #0A1513;
+  --code-text: #CFEAE3;
+  --code-accent: #7FD9C4;
+  --code-comment: #5D766F;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding-inline: 20px;
+}
+
+h1, h2, h3, h4 { font-family: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif; text-wrap: balance; color: var(--ink); }
+
+.shell {
+  max-width: 1180px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 40px;
+  padding-block: 32px 80px;
+}
+
+.rail {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.rail-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+}
+.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail a {
+  display: flex;
+  gap: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+  line-height: 1.35;
+}
+.rail a:hover, .rail a:focus-visible { background: var(--surface-sunk); color: var(--ink); outline: none; }
+.rail a .n { color: var(--accent); font-weight: 600; flex-shrink: 0; }
+.rail .rail-group-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 16px 0 4px 8px;
+}
+.rail .rail-group-label:first-child { margin-top: 0; }
+
+main { min-width: 0; }
+
+.cover {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 28px;
+  margin-bottom: 36px;
+}
+.cover .eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+.cover h1 { font-size: 2.4rem; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
+.cover .dek { font-family: "IBM Plex Serif", serif; font-style: italic; font-size: 1.1rem; color: var(--ink-soft); max-width: 62ch; margin: 0 0 20px; }
+.cover .meta {
+  display: flex; flex-wrap: wrap; gap: 22px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+.cover .meta b { color: var(--ink-soft); font-weight: 600; }
+
+section.block { margin-bottom: 44px; }
+section.block > h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  scroll-margin-top: 20px;
+}
+section.block > .block-dek {
+  color: var(--ink-soft);
+  max-width: 68ch;
+  margin: 0 0 20px;
+}
+p { max-width: 70ch; }
+.prose { max-width: 70ch; }
+
+code, .mono { font-family: "IBM Plex Mono", monospace; }
+p code, li code, td code { background: var(--surface-sunk); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.88em; color: var(--accent-ink); }
+
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 14px 0;
+}
+pre .c { color: var(--code-comment); }
+pre .k { color: var(--code-accent); }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; background: var(--surface); }
+thead th {
+  text-align: left;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--surface-sunk);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody td:first-child { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--accent-ink); white-space: nowrap; }
+
+.step {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 22px 24px 24px;
+  margin-bottom: 18px;
+}
+.step-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.step-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+.step-head h3 { margin: 0; font-size: 1.18rem; font-weight: 600; }
+.step-purpose { color: var(--ink-soft); margin: 2px 0 16px; font-size: 0.95rem; }
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) { .panels { grid-template-columns: 1fr; } }
+.panel { border-radius: var(--radius); padding: 14px 16px 16px; }
+.panel.procedure { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+.panel.verify { background: var(--verify-soft); border: 1px solid color-mix(in srgb, var(--verify) 35%, transparent); }
+.panel-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin: 0 0 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.panel.procedure .panel-tag { color: var(--accent-ink); }
+.panel.verify .panel-tag { color: var(--verify); }
+.panel p, .panel ul, .panel pre { margin-top: 8px; margin-bottom: 8px; }
+.panel p:first-of-type { margin-top: 0; }
+.panel ul { padding-left: 18px; margin: 8px 0; }
+.panel li { margin-bottom: 4px; font-size: 0.94rem; }
+.panel pre { font-size: 12px; }
+
+.bugcard {
+  border: 1px solid color-mix(in srgb, var(--bug) 35%, var(--line));
+  background: var(--bug-soft);
+  border-radius: 12px;
+  padding: 20px 22px 22px;
+  margin-bottom: 18px;
+}
+.bugcard h4 { margin: 0 0 4px; font-size: 1.08rem; color: var(--ink); }
+.bugcard .repo {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--bug);
+  margin: 0 0 14px;
+}
+.bugcard dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.bugcard dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 3px;
+  white-space: nowrap;
+}
+.bugcard dd { margin: 0; max-width: 62ch; }
+.bugcard pre { margin-top: 4px; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 3px 9px; border-radius: 999px;
+  margin-left: 8px;
+}
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+  padding: 12px 18px;
+  margin: 16px 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.callout b { color: var(--ink); }
+.callout.warn { border-left-color: var(--verify); }
+
+.ladder { display: flex; flex-direction: column; gap: 0; margin: 18px 0; }
+.rung {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.rung:first-child { border-top: none; }
+.rung .level {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+.rung.reached .level { color: var(--accent-ink); font-weight: 600; }
+.rung h5 { margin: 0 0 4px; font-size: 1rem; }
+.rung p { margin: 0 0 6px; color: var(--ink-soft); font-size: 0.94rem; }
+.rung .tag {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 999px;
+  margin-bottom: 6px;
+}
+.rung.reached .tag { background: var(--accent-soft); color: var(--accent-ink); }
+
+.manifest-tree {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+.manifest-tree .c { color: var(--code-comment); }
+
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+  padding-top: 18px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { position: static; max-height: none; }
+  .cover h1 { font-size: 1.85rem; }
+}
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <p class="rail-eyebrow">Contents</p>
+    <nav>
+      <a href="#overview"><span class="n">§</span>Overview &amp; architecture</a>
+      <a href="#tools"><span class="n">§</span>Tool inventory</a>
+      <p class="rail-group-label">Pipeline</p>
+      <a href="#s1"><span class="n">01</span>Set up the converter env</a>
+      <a href="#s2"><span class="n">02</span>Dummy-data smoke test</a>
+      <a href="#s3"><span class="n">03</span>Inspect the source bags</a>
+      <a href="#s4"><span class="n">04</span>Extract &amp; time-sync topics</a>
+      <a href="#s5"><span class="n">05</span>FK via MoveIt2 RobotState</a>
+      <a href="#s6"><span class="n">06</span>Deltas &amp; gripper channel</a>
+      <a href="#s7"><span class="n">07</span>Image processing</a>
+      <a href="#s8"><span class="n">08</span>Write the builder, real tfds build</a>
+      <a href="#s9"><span class="n">09</span>Validate the dataset</a>
+      <a href="#s10"><span class="n">10</span>Register with OpenVLA</a>
+      <p class="rail-group-label">Reference</p>
+      <a href="#bugs-env"><span class="n">§</span>Bugs fixed — environment</a>
+      <a href="#bugs-upstream"><span class="n">§</span>Issues worth reporting</a>
+      <a href="#git"><span class="n">§</span>Git &amp; reproduction</a>
+      <a href="#manifest"><span class="n">§</span>File manifest</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="cover">
+      <p class="eyebrow">ROS2_to_RLDS_Conversion_OpenVLA — internal runbook</p>
+      <h1>Converting Gazebo_to_LeRobot_Pipeline episodes to an RLDS dataset and registering it with OpenVLA</h1>
+      <p class="dek">Every step from a rosetta-recorded ROS2 bag to an OXE-registered TensorFlow dataset — how it's done, the concrete check that proves it worked, every tool installed, every bug hit and fixed, and the two real friction points worth reporting upstream.</p>
+      <div class="meta">
+        <span><b>Repo</b> /home/tomislav_ilic/tomislav/robotics/ROS2_to_RLDS_Conversion_OpenVLA</span>
+        <span><b>Source data</b> 2 episodes recorded via Gazebo_to_LeRobot_Pipeline (see the Gazebo_to_LeRobot_Pipeline runbook)</span>
+        <span><b>Converter</b> moojink/rlds_dataset_builder (OpenVLA first-author's fork)</span>
+        <span><b>Commit</b> e79e597 on <code>main</code></span>
+        <span><b>Written</b> 2026-09-14</span>
+      </div>
+    </div>
+
+    <section class="block" id="overview">
+      <h2>Overview &amp; architecture</h2>
+      <p class="block-dek">Two Docker containers that never run at the same time, and why.</p>
+      <p class="prose">This pipeline turns the two mcap bags already recorded in the <code>Gazebo_to_LeRobot_Pipeline</code> sandbox into an RLDS/TFDS dataset in OpenVLA's expected Open-X Embodiment (OXE) layout, then registers that dataset with OpenVLA itself. It reuses <a href="https://github.com/moojink/rlds_dataset_builder">moojink/rlds_dataset_builder</a> — a fork of the standard OXE dataset-builder scaffold maintained by Moo Jin Kim, OpenVLA's first author, which makes it a safer bet for staying aligned with what OpenVLA's own dataloader expects than the (functionally identical) upstream <code>kpertsch/rlds_dataset_builder</code>.</p>
+      <p class="prose">The ROS2 side (reading mcap bags, computing forward kinematics) and the RLDS side (TensorFlow, TFDS) have nothing to do with each other technically, and pinning both into one container would mean carrying ROS2 Jazzy, MoveIt2, <em>and</em> TensorFlow 2.13 simultaneously — real memory pressure on this VM. So this pipeline runs across <strong>two containers that are never both running at once</strong>: <code>gazebo_to_lerobot</code> (already existing, ROS2 Jazzy + MoveIt2) does the extraction and FK; <code>rlds_builder</code> (new, Python 3.9 + TensorFlow 2.13.0) does everything from <code>tfds build</code> onward. They talk to each other only through files — the <code>.npy</code> episodes the extraction step writes.</p>
+      <div class="callout"><b>The resource ceiling that shaped this pipeline, same as Gazebo_to_LeRobot_Pipeline's:</b> ~4.8&nbsp;GB RAM, CPU-only. It directly caused the conda→pip pivot in step 1, the container mutual-exclusion rule above, and the decision to skip the Universal Sentence Encoder language embedding entirely in step 8 — each documented at the point it happened below.</p>
+      </div>
+    </section>
+
+    <section class="block" id="tools">
+      <h2>Tool inventory</h2>
+      <p class="block-dek">Everything installed to make this pipeline run, and why each piece is there.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tool</th><th>Version / source</th><th>Purpose</th><th>Installed via</th></tr></thead>
+          <tbody>
+            <tr><td>moojink/rlds_dataset_builder</td><td>git clone, main</td><td>OXE-style RLDS/TFDS dataset builder scaffold</td><td><code>git clone</code></td></tr>
+            <tr><td>python:3.9-slim</td><td>official image</td><td>base for the <code>rlds_builder</code> container — matches the fork's pinned Python 3.9</td><td>Dockerfile FROM</td></tr>
+            <tr><td>tensorflow, tensorflow-datasets, apache-beam, + 94 more</td><td>pip, versions pinned verbatim from the fork's own <code>environment_ubuntu.yml</code> (TF 2.13.0, tfds 4.9.2)</td><td>build and load RLDS/TFDS datasets</td><td>pip, <code>--no-deps</code>, split into cached layers</td></tr>
+            <tr><td>ros-jazzy-moveit-py</td><td>apt (already-available Jazzy package, not installed by default)</td><td>Python bindings for MoveIt2's <code>RobotState</code> — used for per-timestep FK</td><td>apt, inside <code>gazebo_to_lerobot</code></td></tr>
+            <tr><td>rosbag2_py, cv_bridge, scipy</td><td>already present in <code>gazebo_to_lerobot</code></td><td>reading mcap bags, image decode, quaternion/rotation math</td><td>pre-existing</td></tr>
+            <tr><td>git</td><td>apt</td><td><code>python:3.9-slim</code> has none by default; needed for the <code>pip install git+...</code> below</td><td>apt, inside <code>rlds_builder</code></td></tr>
+            <tr><td>huggingface_hub</td><td>pip, latest</td><td>first link in OpenVLA's <code>prismatic</code> import chain (see the upstream issue below)</td><td>pip</td></tr>
+            <tr><td>tensorflow_graphics</td><td>pip, 2021.12.3, <code>--no-deps</code> (4.3&nbsp;MB)</td><td>OpenVLA's <code>transforms.py</code> imports it (for DROID's rotation-matrix helpers) even though our own transform doesn't use it</td><td>pip</td></tr>
+            <tr><td>dlimp</td><td>pip, <code>git+https://github.com/moojink/dlimp_openvla</code></td><td>small data-loading utility OpenVLA's <code>data_utils.py</code> imports</td><td>pip</td></tr>
+            <tr><td>openvla/openvla</td><td>git clone (shallow), main</td><td>the actual repo being edited — <code>configs.py</code>, <code>transforms.py</code>, <code>mixtures.py</code></td><td><code>git clone --depth 1</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="callout warn"><b>Deliberately not installed:</b> <code>torch</code>, <code>torchvision</code>, <code>transformers</code> — OpenVLA's actual model-training dependencies. Registering the dataset (steps below) only needed the OXE data-pipeline modules, which are pure TensorFlow; pulling in the full multi-GB training stack just to test-import 3 config files would have repeated the exact resource mismatch that forced the conda→pip pivot in step 1, for no corresponding benefit. See step 10.</p>
+    </section>
+
+    <section class="block" id="pipeline-head">
+      <h2>The pipeline, step by step</h2>
+      <p class="block-dek">Same convention as the Gazebo_to_LeRobot_Pipeline runbook: every step pairs how it's done with the concrete check that proves it worked.</p>
+    </section>
+
+    <article class="step" id="s1">
+      <div class="step-head"><span class="step-num">01</span><h3>Set up the converter environment</h3></div>
+      <p class="step-purpose">A container with the fork's exact pinned dependencies — Python 3.9, TensorFlow 2.13.0.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>First attempt: <code>conda env create -f environment_ubuntu.yml</code> inside a <code>continuumio/miniconda3</code> image, exactly as the fork's README instructs. <strong>This was killed by the host's low-memory guard</strong> — conda's SAT solver loads full channel repodata into memory before installing anything, expensive even for a small, fully-pinned env.</p>
+          <p>Recovered by dropping conda entirely: extracted the same pinned versions straight from the yml's own <code>pip:</code> section (97 packages, confirmed no stray CUDA deps) into a <code>requirements.txt</code>, and built <code>python:3.9-slim</code> + <code>pip install --no-deps</code> instead, split across several small <code>RUN</code> layers (3 of them isolating the heaviest wheels — tensorflow, tensorflow-datasets, apache-beam — each in its own cached layer) so a build that dies partway doesn't lose everything.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li><code>docker images</code> lists the built image.</li>
+            <li><code>python3 -c "import tensorflow as tf, tensorflow_datasets as tfds; print(tf.__version__, tfds.__version__)"</code> prints <code>2.13.0 4.9.2</code> with no import errors.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s2">
+      <div class="step-head"><span class="step-num">02</span><h3>Dummy-data smoke test</h3></div>
+      <p class="step-purpose">The fork's README says explicitly to run this before touching real data.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>cd rlds_dataset_builder/example_dataset
+python3 create_example_data.py
+tfds build</pre>
+          <p>This step also downloads a Universal Sentence Encoder from TF-Hub (for the example's <code>language_embedding</code> field) — real memory pressure, mitigated by retroactively capping the running container (<code>docker update --memory=2g --memory-swap=3g</code>) mid-build.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li><code>tfds build</code> completes, writes to <code>~/tensorflow_datasets/example_dataset/1.0.0</code>.</li>
+            <li><code>tfds.load("example_dataset", split="train")</code> round-trips: 10 steps/episode, correct <code>(64,64,3)</code> images, <code>(10,)</code> action, readable <code>language_instruction</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s3">
+      <div class="step-head"><span class="step-num">03</span><h3>Inspect the source bags</h3></div>
+      <p class="step-purpose">Two rosetta-recorded mcap bags, still inside the (stopped, not removed) <code>gazebo_to_lerobot</code> container.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>docker start gazebo_to_lerobot</code>, then <code>ros2 bag info</code> on each of <code>/workspace/datasets/bags/{1789171382_864718428, 1789172093_868865993}</code>. Critically, cross-checked each message's own <code>header.stamp</code> (simulation time) against the bag's wall-clock recording duration.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>The mismatch itself was the finding: episode 1 spans <b>66.15&nbsp;s wall-clock</b> but only <b>6.50&nbsp;s of simulation time</b> — roughly a 10× real-time-factor slowdown. Camera frames land at ~10&nbsp;Hz sim-time (not the 30&nbsp;Hz the original contract assumed), joint states at ~100&nbsp;Hz sim-time (matching the controller's configured rate). This directly determined step 4's sync rate and confirmed sim time, never bag-receive time, is the only clock that means anything here.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s4">
+      <div class="step-head"><span class="step-num">04</span><h3>Extract &amp; time-sync topics</h3></div>
+      <p class="step-purpose">One pass per bag: collect <code>/joint_states</code> and the camera topic, interpolate joints onto each camera frame.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>extraction/extract_episodes.py</code>, run inside <code>gazebo_to_lerobot</code>. Reads both topics via <code>rosbag2_py.SequentialReader</code>, sorts by each message's own <code>header.stamp</code>, then for every camera frame's timestamp linearly interpolates every joint angle from the two bracketing <code>/joint_states</code> samples (holding at the ends, never extrapolating). Never the reverse — images are held at their native timestamp, joint angles are the ones interpolated, because you can interpolate numbers but not images.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li>Output step count matches camera frame count exactly: 66 and 52 for the two episodes.</li>
+            <li>No NaNs in any interpolated joint value.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s5">
+      <div class="step-head"><span class="step-num">05</span><h3>Forward kinematics via MoveIt2 RobotState</h3></div>
+      <p class="step-purpose">Per-timestep end-effector pose from the interpolated arm joint angles.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>moveit_py</code>'s <code>RobotState.get_pose("link6")</code>, built once per process from the existing <code>mycobot_moveit_config</code> (<code>arm</code> group, <code>base</code>→<code>link6</code>) — heavier than a raw KDL chain, but the same kinematic model the robot already plans with. <code>MoveItPy</code>'s constructor refuses to start without a loadable planning pipeline even for pure FK (see the upstream issue below), so a full OMPL config had to be assembled just to satisfy that requirement.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>Independently reconstructed the same <code>base</code>→<code>link6</code> pose by chain-multiplying the bag's own per-joint <code>/tf</code> transforms (what Gazebo/<code>robot_state_publisher</code> actually computed live) for the same joint configuration:</p>
+          <pre>MoveItPy FK:      pos (0.009739, -0.178012, 0.487297)  quat (-0.046497, 0.679719, -0.553414, 0.479118)
+/tf chain (bag):  pos [0.009739, -0.178012, 0.487297]   quat [-0.046497, 0.679719, -0.553414, 0.479118]</pre>
+          <p>Matches to 7 decimal places — not a plausibility check, proof the FK path reproduces the exact kinematics the robot used.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s6">
+      <div class="step-head"><span class="step-num">06</span><h3>Position/rotation deltas &amp; gripper channel</h3></div>
+      <p class="step-purpose">Assemble the 8-dim state and 7-dim action vectors from consecutive poses.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><b>State</b> (8-dim): <code>[x, y, z, qx, qy, qz, qw, gripper]</code> — absolute pose + the <code>gripper_controller</code> joint's interpolated position. <b>Action</b> (7-dim): <code>[dx, dy, dz, droll, dpitch, dyaw, gripper]</code> — position delta to the next step, rotation delta as small-angle Euler xyz (<code>R_i⁻¹ R_{i+1}</code>), and gripper as an <em>absolute</em> value on this step, not a delta — matching the same convention OpenVLA's own <code>bridge_oxe_dataset_transform</code> uses. Last step of each episode gets a zero pose-delta (no "next" state exists) rather than extrapolating.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li>No NaNs in 118 total timesteps across both episodes.</li>
+            <li>Position-delta magnitudes: 0 – 0.0042&nbsp;m per step — sane for smooth 10&nbsp;Hz teleop, no outliers.</li>
+            <li><b>Correction made here:</b> an earlier claim this session that "the gripper never moves" (based on a different, constant command topic) turned out wrong once the actual per-frame data was extracted — episode 0's gripper channel swings <code>0 → -0.70</code>, a real, decisive transition. See step 9.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s7">
+      <div class="step-head"><span class="step-num">07</span><h3>Image processing</h3></div>
+      <p class="step-purpose">Decode, correct colour order, resize+center-crop to 224×224.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p>The <code>CompressedImage.format</code> field reads <code>'rgb8; jpeg compressed bgr8'</code> — ROS's <code>compressed_image_transport</code> recording that it converted to BGR8 before handing pixels to OpenCV's BGR-native JPEG encoder. So <code>cv2.imdecode</code>'s output is genuinely BGR, and <code>cv2.cvtColor(..., COLOR_BGR2RGB)</code> is applied unconditionally (asserted on that exact format string, not a soft guess). Resize: scale shortest side to 224, center-crop the other to match, <code>INTER_LINEAR</code>.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>The scene turned out to be nearly grayscale, so a visual before/after check was inconclusive on its own (a B/R swap is invisible with no red or blue in frame) — the format-string reasoning above is what actually settled it, backed by the format field's own literal content, not eyeballing.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s8">
+      <div class="step-head"><span class="step-num">08</span><h3>Write the dataset builder, run the real build</h3></div>
+      <p class="step-purpose"><code>gazebo_to_lerobot_mycobot_dataset_builder.py</code>, modeled on <code>example_dataset</code>.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <pre>cd rlds_dataset_builder/gazebo_to_lerobot_mycobot
+tfds build --overwrite</pre>
+          <p>Same <code>FeaturesDict</code> shape as the example, minus <code>wrist_image</code> (single camera) and minus <code>language_embedding</code> — deliberately dropped: it needs the same Universal Sentence Encoder download that stressed memory in step 2, and OpenVLA's own OXE transform functions only ever consume the raw <code>language_instruction</code> text, never a precomputed embedding, so it isn't load-bearing here.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <ul>
+            <li>Build completed in ~2.4&nbsp;s (no heavy download this time) — 2 examples, <code>dataset_size=1.02&nbsp;MiB</code>.</li>
+            <li><code>tfds.load</code> round-trip matches the extraction output exactly: 66/52 steps, correct state/action shapes, correct <code>is_first</code>/<code>is_last</code> flags, matching instructions.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s9">
+      <div class="step-head"><span class="step-num">09</span><h3>Validate the dataset</h3></div>
+      <p class="step-purpose">The fork's own <code>visualize_dataset.py</code>, plus the four specific checks below.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <p><code>visualize_dataset.py</code> calls <code>plt.show()</code>, which needs a display this headless container doesn't have. Ran the real, unmodified script via a small <code>runpy</code> wrapper that only monkeypatches <code>plt.show()</code> to save each open figure to PNG instead of blocking — the validation logic itself untouched.</p>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify — the four checks</p>
+          <ul>
+            <li><b>Images show the motion:</b> yes — 6 evenly-sampled frames show the arm sweeping, <em>and</em> the gripper fingers visibly open between frame 4 and 5/6.</li>
+            <li><b>Action histograms look sane:</b> yes — all 6 pose-delta dims tightly concentrated near zero, no NaNs, no outlier spikes.</li>
+            <li><b>Gripper dimension actually switching:</b> yes — clearly bimodal (cluster near 0, cluster near -0.70, almost nothing between), matching the visual open/close transition.</li>
+            <li><b>Instructions match episodes:</b> yes, deliberately conservative — both labeled "scripted joint trajectory, no object, mechanics test," and nothing in the images or data contradicts that.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="s10">
+      <div class="step-head"><span class="step-num">10</span><h3>Register with OpenVLA</h3></div>
+      <p class="step-purpose">Three files: <code>configs.py</code>, <code>transforms.py</code>, <code>mixtures.py</code>.</p>
+      <div class="panels">
+        <div class="panel procedure">
+          <p class="panel-tag">Procedure</p>
+          <ul>
+            <li><code>configs.py</code> — <code>OXE_DATASET_CONFIGS["gazebo_to_lerobot_mycobot"]</code>, modeled on <code>berkeley_autolab_ur5</code> (the existing entry whose single <code>state_obs_keys: ["state"]</code> pattern matches ours): <code>StateEncoding.POS_QUAT</code>, <code>ActionEncoding.EEF_POS</code>.</li>
+            <li><code>transforms.py</code> — <code>gazebo_to_lerobot_mycobot_dataset_transform</code>: our data is already in canonical shape, so the only real work is normalizing the gripper (raw URDF joint radians, limits <code>[-1.20, 0.10]</code>) into this file's "+1=open, 0=closed" convention, using the real URDF limits rather than the 2 episodes' own observed range.</li>
+            <li><code>mixtures.py</code> — <code>"gazebo_to_lerobot_mycobot": [("gazebo_to_lerobot_mycobot", 1.0)]</code>, matching the pattern OpenVLA uses for its own LIBERO/<code>droid_wipe</code> fine-tuning datasets.</li>
+          </ul>
+        </div>
+        <div class="panel verify">
+          <p class="panel-tag">Verify</p>
+          <p>Importing normally cascades into OpenVLA's full <code>torch</code>/<code>transformers</code> stack (see the upstream issue below) — avoided that by stubbing the <code>prismatic.*</code> package hierarchy in <code>sys.modules</code> with correct <code>__path__</code>s, so Python resolves the real files without executing the heavy chain. Ran the <em>actual registered function</em> against a real batch from the built dataset:</p>
+          <pre>input  gripper (state) range: -0.700 → 0.000
+output gripper (state) range:  0.077 → 0.615   <span class="c"># normalized per URDF limits</span>
+All assertions passed: gripper normalized into [0,1], all other columns bit-for-bit unchanged.</pre>
+          <p>Also confirmed present and internally consistent across all three registries, and that the registered function is literally the one written (identity-checked).</p>
+        </div>
+      </div>
+    </article>
+
+    <section class="block" id="bugs-env">
+      <h2>Bugs fixed — environment-specific</h2>
+      <p class="block-dek">Symptoms of this VM's resource ceiling and this specific task combination, not defects in any upstream project.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Symptom</th><th>Root cause</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td>Docker build killed by the host's low-memory guard during <code>conda env create</code></td><td>conda's SAT solver loads full channel repodata into memory before installing anything — expensive even for a tiny, fully-pinned env</td><td>Dropped conda; extracted the same pinned versions into <code>requirements.txt</code> and used plain <code>pip install --no-deps</code> in <code>python:3.9-slim</code></td></tr>
+            <tr><td><code>tfds build</code> (dummy dataset) pushed memory close to the edge again</td><td>Downloading + running a Universal Sentence Encoder from TF-Hub for the example's <code>language_embedding</code> field</td><td>Retroactively capped the running container (<code>docker update --memory=2g --memory-swap=3g</code>) mid-build; skipped <code>language_embedding</code> entirely for the real dataset since OpenVLA doesn't need it</td></tr>
+            <tr><td>Background build process silently stopped, container state left inconsistent</td><td>A session/VM-level interruption during the first real-data build attempt (separate from the memory guard above)</td><td>Cleaned up dead containers, stopped <code>gazebo_to_lerobot</code> to free RAM before rebuilding, split the Dockerfile into smaller cached layers so a repeat failure loses less progress</td></tr>
+            <tr><td><code>awk</code>-based extraction of the pip package list from <code>environment_ubuntu.yml</code> silently returned 1 line instead of 97</td><td>Indentation assumption in the awk pattern didn't match the file's actual nesting</td><td>Switched to parsing the YAML properly with PyYAML instead of guessing at whitespace</td></tr>
+            <tr><td><code>pip install git+...</code> (for <code>dlimp</code>) failed: "Cannot find command 'git'"</td><td><code>python:3.9-slim</code> ships no git</td><td><code>apt-get install -y git</code> in the container</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block" id="bugs-upstream">
+      <h2>Issues worth reporting upstream</h2>
+      <p class="block-dek">Unlike the Gazebo_to_LeRobot_Pipeline runbook's two <em>correctness</em> bugs (silent wrong output), this session's findings are real <em>friction/architecture</em> issues — reproducible, but nothing here produced a wrong result once worked around. Filing has not been done and needs a separate explicit go-ahead.</p>
+
+      <div class="bugcard">
+        <h4><code>MoveItPy</code> has no lightweight path for pure FK/RobotState use<span class="status-pill">Not yet filed</span></h4>
+        <p class="repo">Candidate repo: moveit/moveit2 (moveit_py)</p>
+        <dl>
+          <dt>Symptom</dt>
+          <dd>Constructing <code>moveit.planning.MoveItPy</code> with only <code>robot_description</code>/<code>robot_description_semantic</code>/<code>robot_description_kinematics</code> params — everything actually needed for <code>RobotState.get_pose()</code> FK — fails outright: <code>RuntimeError: Failed to load planning pipelines from parameter server</code>. There's no documented way to get a bare <code>RobotModel</code>/<code>RobotState</code> without also supplying a fully loadable OMPL planning pipeline config, a controller manager, and a planning scene monitor — none of which pure FK ever touches.</dd>
+          <dt>Workaround used here</dt>
+          <dd>Assembled a full, working <code>ompl_planning.yaml</code>-equivalent params dict (request/response adapters, planner configs) purely to satisfy the constructor, even though no planning was ever performed.</dd>
+          <dt>Why it matters</dt>
+          <dd>Every project needing standalone FK via the "real" MoveIt2 kinematic model (as opposed to raw KDL) hits this same wall. A lighter constructor path, or a documented minimal-viable planning-pipeline stub, would remove a real barrier to a legitimate, common use case.</dd>
+        </dl>
+      </div>
+
+      <div class="bugcard">
+        <h4>Importing OpenVLA's OXE dataset-registration modules requires the full training stack<span class="status-pill">Not yet filed</span></h4>
+        <p class="repo">Candidate repo: openvla/openvla</p>
+        <dl>
+          <dt>Symptom</dt>
+          <dd><code>prismatic/__init__.py</code> unconditionally imports <code>.models</code>, which cascades into <code>huggingface_hub</code> → <code>draccus</code> → eventually <code>torch</code>/<code>transformers</code> (multi-GB) — as a side effect of importing <em>any</em> submodule of the <code>prismatic</code> package, including <code>prismatic.vla.datasets.rlds.oxe.{configs,transforms,mixtures}</code>, which are themselves pure-TensorFlow and have zero dependency on the model-loading code.</dd>
+          <dt>Workaround used here</dt>
+          <dd>Stubbed the <code>prismatic.*</code> package hierarchy in <code>sys.modules</code> with empty placeholder modules carrying the correct <code>__path__</code>, so Python's import machinery resolves the real OXE files on disk without ever executing <code>prismatic/__init__.py</code>.</dd>
+          <dt>Why it matters</dt>
+          <dd>Anyone wanting to register or test a new OXE dataset — the officially documented first step of adding custom data to OpenVLA — currently has no way to do so without installing the entire multi-GB training dependency stack first. Making the heavy imports lazy (or splitting dataset-registration into a package that doesn't import <code>.models</code>) would let that documented workflow actually be lightweight.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="block" id="git">
+      <h2>Git &amp; reproducing this from scratch</h2>
+      <p class="block-dek">Local git repo, not yet pushed anywhere — sharing it is a deliberate future step.</p>
+      <p class="prose">Repo root <code>ROS2_to_RLDS_Conversion_OpenVLA/</code>, branch <code>main</code>, commit <code>e79e597</code> (18 files, ~152&nbsp;KB). Two cloned upstream repos are gitignored wholesale rather than tracked, since each has its own separate git history and tracking them as regular files/subtrees would create nested-repo ambiguity: <code>rlds_dataset_builder/</code> and <code>openvla/</code>. Our own additions/edits inside each live under <code>overrides/</code> instead of duplicating either tree — the same pattern the Gazebo_to_LeRobot_Pipeline runbook uses for its own vendored code.</p>
+      <p class="prose">A teammate reproducing this from scratch needs, in order:</p>
+      <pre>git clone &lt;this repo&gt; && cd ROS2_to_RLDS_Conversion_OpenVLA
+
+<span class="c"># 1. re-clone the two upstream repos (step 1, step 10)</span>
+git clone https://github.com/moojink/rlds_dataset_builder.git
+git clone --depth 1 https://github.com/openvla/openvla.git
+
+<span class="c"># 2. re-apply our overrides on top</span>
+mkdir -p rlds_dataset_builder/gazebo_to_lerobot_mycobot
+cp overrides/rlds_dataset_builder/gazebo_to_lerobot_mycobot/* rlds_dataset_builder/gazebo_to_lerobot_mycobot/
+cp overrides/openvla/prismatic/vla/datasets/rlds/oxe/* openvla/prismatic/vla/datasets/rlds/oxe/
+
+<span class="c"># 3. build the rlds_builder container (step 1)</span>
+docker/run.sh
+
+<span class="c"># 4. re-extract the 2 episodes (step 4) -- needs the gazebo_to_lerobot container
+#    and its still-existing bags at /workspace/datasets/bags/, or freshly
+#    recorded ones -- then place the resulting .npy under
+#    rlds_dataset_builder/gazebo_to_lerobot_mycobot/data/train/</span>
+docker cp gazebo_to_lerobot:/workspace/... extraction/extract_episodes.py ...
+
+<span class="c"># then steps 8-10 as documented above</span></pre>
+    </section>
+
+    <section class="block" id="manifest">
+      <h2>File manifest</h2>
+      <p class="block-dek">What's actually tracked in git, and what each piece is for.</p>
+      <div class="manifest-tree">ROS2_to_RLDS_Conversion_OpenVLA/<br>
+├── docker/<span class="c">                          # rlds_builder image + container lifecycle</span><br>
+│   ├── Dockerfile<br>
+│   ├── requirements.txt<span class="c">              # full pinned pip freeze, extracted from environment_ubuntu.yml</span><br>
+│   ├── requirements_rest.txt<span class="c">         # same, minus the 3 heaviest wheels (their own RUN layers)</span><br>
+│   ├── run.sh<span class="c">                        # first-time build + start</span><br>
+│   └── shell.sh<span class="c">                      # every subsequent terminal</span><br>
+├── extraction/<span class="c">                     # everything that runs inside gazebo_to_lerobot</span><br>
+│   ├── extract_episodes.py<span class="c">           # steps 4-7: the real extraction pipeline</span><br>
+│   ├── check_color_order.py<span class="c">          # step 7: the colour-order investigation</span><br>
+│   ├── test_fk.py<span class="c">                    # step 5: first moveit_py FK smoke test</span><br>
+│   ├── test_tf_chain.py<span class="c">              # step 5: independent /tf-chain cross-check</span><br>
+│   ├── run_visualize_headless.py<span class="c">     # step 9: plt.show() -> save-to-PNG wrapper</span><br>
+│   ├── verify_build.py<span class="c">               # step 8: tfds.load round-trip check</span><br>
+│   └── test_openvla_transform.py<span class="c">     # step 10: real registered-transform exercise</span><br>
+├── overrides/<span class="c">                      # our files inside the 2 gitignored cloned repos</span><br>
+│   ├── rlds_dataset_builder/gazebo_to_lerobot_mycobot/{__init__.py, gazebo_to_lerobot_mycobot_dataset_builder.py}<br>
+│   └── openvla/prismatic/vla/datasets/rlds/oxe/{configs.py, transforms.py, mixtures.py}<br>
+├── docs/PIPELINE.html / PIPELINE.docx<span class="c">    # this document</span><br>
+└── .gitignore</div>
+    </section>
+
+    <footer>ROS2→RLDS→OpenVLA runbook · written 2026-09-14 · commit e79e597 on main · Tomislav Ilic</footer>
+  </main>
+</div>

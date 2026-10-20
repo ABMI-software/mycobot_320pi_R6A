@@ -1,0 +1,111 @@
+<?xml version="1.0" ?>
+<!-- Extracted verbatim from mycobot_320pi_R6A/mycobot_description/worlds/real_table.sdf
+     (branch feature/pick-and-place-osama, added this session). World pose
+     there: 0.18 0.19 0, repositioned 2026-09-23; see doc/BIN_REPOSITIONING.md. -->
+<sdf version="1.9">
+  <model name="green_bin">
+    <static>true</static>
+    <link name="link">
+      <visual name="floor">
+        <pose>0 0 0.001 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.10 0.10 0.002</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.55 0.10 1</ambient>
+          <diffuse>0.10 0.85 0.15 1</diffuse>
+        </material>
+      </visual>
+      <visual name="wn">
+        <pose>0 0.05 0.015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.10 0.005 0.03</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.55 0.10 1</ambient>
+          <diffuse>0.10 0.85 0.15 1</diffuse>
+        </material>
+      </visual>
+      <visual name="ws">
+        <pose>0 -0.05 0.015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.10 0.005 0.03</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.55 0.10 1</ambient>
+          <diffuse>0.10 0.85 0.15 1</diffuse>
+        </material>
+      </visual>
+      <visual name="we">
+        <pose>0.05 0 0.015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.005 0.10 0.03</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.55 0.10 1</ambient>
+          <diffuse>0.10 0.85 0.15 1</diffuse>
+        </material>
+      </visual>
+      <visual name="ww">
+        <pose>-0.05 0 0.015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.005 0.10 0.03</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.55 0.10 1</ambient>
+          <diffuse>0.10 0.85 0.15 1</diffuse>
+        </material>
+      </visual>
+      <collision name="floor_c">
+        <pose>0 0 0.001 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.10 0.10 0.002</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="wn_c">
+        <pose>0 0.05 0.015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.10 0.005 0.03</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="ws_c">
+        <pose>0 -0.05 0.015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.10 0.005 0.03</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="we_c">
+        <pose>0.05 0 0.015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.005 0.10 0.03</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="ww_c">
+        <pose>-0.05 0 0.015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.005 0.10 0.03</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

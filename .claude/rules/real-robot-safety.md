@@ -1,5 +1,9 @@
 # Rule — Real-robot safety
 
+> **`CONTRIBUTING.md` (repository root) is the source of truth for this project's
+> conventions.** This file restates them for tooling. If the two disagree, fix
+> this one.
+
 The MyCobot 320 Pi can be commanded from the PC Tour over a TCP bridge. Mistakes hurt (hardware, cables, the operator's hand, your ego). Before anything that moves motors:
 
 ## Mandatory checklist

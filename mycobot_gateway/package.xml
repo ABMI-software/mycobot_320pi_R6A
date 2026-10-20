@@ -4,8 +4,8 @@
   <name>mycobot_gateway</name>
   <version>0.1.0</version>
   <description>Bridge réseau et visualisation pour MyCobot - Tour (PC) side</description>
-  <maintainer email="genji@todo.todo">genji</maintainer>
-  <license>Apache License 2.0</license>
+  <maintainer email="jo.bernardo@abmi-groupe.com">Jose Bernardo</maintainer>
+  <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>

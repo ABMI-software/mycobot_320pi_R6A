@@ -21,10 +21,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='genji',
-    maintainer_email='genji@todo.todo',
+    maintainer='Jose Bernardo',
+    maintainer_email='jo.bernardo@abmi-groupe.com',
     description='Bridge réseau et vision pour MyCobot - Tour (PC) side',
-    license='Apache License 2.0',
+    license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

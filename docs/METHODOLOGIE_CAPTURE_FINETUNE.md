@@ -38,12 +38,12 @@ Trois interpréteurs coexistent et **ne se mélangent pas**.
 ```bash
 conda deactivate                                  # TOUJOURS en premier
 source /opt/ros/jazzy/setup.bash                  # ROS2, colcon, rclpy
-source ~/Osama_ws/install/setup.bash
+source <your_ws>/install/setup.bash
 
 source ~/ros_jazzy/venv_dream/bin/activate        # DREAM : capture, conversion, entrainement
 ```
 
-Le workspace actif est **`~/Osama_ws`**, pas `~/ros_jazzy` — ce dernier est une
+Le workspace actif est **`<your_ws>`**, pas `~/ros_jazzy` — ce dernier est une
 copie figée. Vérifier : `which python3`.
 
 ⚠ L'OpenCV du `venv_dream` est **headless**. Aucune fenêtre ne s'y ouvre ; pour

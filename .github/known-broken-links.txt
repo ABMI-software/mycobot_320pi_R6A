@@ -1,0 +1,20 @@
+# Cibles de liens internes absentes du depot, tolerees par la CI.
+#
+# Aucune n'a JAMAIS ete commitee — verifie avec `git log --all -- <chemin>`.
+# Ce sont des documents restes sur une machine de travail, cites par des docs
+# qui, elles, ont ete publiees. La liste est une DETTE, pas une exception
+# permanente : chaque ligne disparait quand le fichier est ajoute, ou quand le
+# renvoi qui le cite est retire.
+#
+# N'y ajouter une entree que pour un fichier reellement manquant. Un lien
+# casse par une faute de frappe ou un deplacement doit etre CORRIGE, pas
+# tolere ici.
+docs/PI_REMOTE_ACCESS.md
+scripts/tool_offset.json
+training/CAPTURE_3CAM.md
+training/FINETUNE_MIX_REAL3CAM_PLAN.md
+training/SYNTHETIC_50K_V3.md
+training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md
+training/dream/J4_OBSERVABILITY_DIAG.md
+training/dream/REAL3CAM_SESSION6_HOLDOUT.md
+training/dream/train_dream_ultimate_v4_mix.py

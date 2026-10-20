@@ -155,7 +155,7 @@ sudo apt install \
 
 ### Environnement `hand-teleop` (conda)
 
-À `/home/genji/miniconda/envs/hand-teleop`. Dépendances :
+À `<miniconda>/envs/hand-teleop`. Dépendances :
 
 ```
 roslibpy            # pour --use-rosbridge (OBLIGATOIRE en mode conda)

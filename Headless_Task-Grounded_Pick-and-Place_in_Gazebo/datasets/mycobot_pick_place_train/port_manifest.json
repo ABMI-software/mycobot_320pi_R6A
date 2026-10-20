@@ -1,0 +1,347 @@
+[
+  {
+    "episode_index": 0,
+    "length": 174,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000000.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000000.mp4",
+    "source_episode": 1
+  },
+  {
+    "episode_index": 1,
+    "length": 188,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000001.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000001.mp4",
+    "source_episode": 2
+  },
+  {
+    "episode_index": 2,
+    "length": 176,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000002.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000002.mp4",
+    "source_episode": 3
+  },
+  {
+    "episode_index": 3,
+    "length": 171,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000003.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000003.mp4",
+    "source_episode": 4
+  },
+  {
+    "episode_index": 4,
+    "length": 173,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000004.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000004.mp4",
+    "source_episode": 5
+  },
+  {
+    "episode_index": 5,
+    "length": 167,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000005.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000005.mp4",
+    "source_episode": 6
+  },
+  {
+    "episode_index": 6,
+    "length": 175,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.265,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000006.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000006.mp4",
+    "source_episode": 7
+  },
+  {
+    "episode_index": 7,
+    "length": 193,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.28,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000007.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000007.mp4",
+    "source_episode": 8
+  },
+  {
+    "episode_index": 8,
+    "length": 186,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.295,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000008.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000008.mp4",
+    "source_episode": 9
+  },
+  {
+    "episode_index": 9,
+    "length": 183,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.31,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000009.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000009.mp4",
+    "source_episode": 10
+  },
+  {
+    "episode_index": 10,
+    "length": 194,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      -0.08
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000010.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000010.mp4",
+    "source_episode": 11
+  },
+  {
+    "episode_index": 11,
+    "length": 163,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      -0.04
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000011.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000011.mp4",
+    "source_episode": 12
+  },
+  {
+    "episode_index": 12,
+    "length": 174,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      0.0
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000012.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000012.mp4",
+    "source_episode": 13
+  },
+  {
+    "episode_index": 13,
+    "length": 174,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      0.04
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000013.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000013.mp4",
+    "source_episode": 14
+  },
+  {
+    "episode_index": 14,
+    "length": 179,
+    "tasks": [
+      "pick up the red block and place it on the plate"
+    ],
+    "camera": "front",
+    "simulated_attachment": true,
+    "placed_on_plate": true,
+    "grasp_held": true,
+    "block_xy_commanded": [
+      0.25,
+      0.08
+    ],
+    "video_shape": [
+      240,
+      320,
+      3
+    ],
+    "parquet_path": "data/chunk-000/episode_000014.parquet",
+    "video_path": "videos/chunk-000/observation.images.front/episode_000014.mp4",
+    "source_episode": 15
+  }
+]

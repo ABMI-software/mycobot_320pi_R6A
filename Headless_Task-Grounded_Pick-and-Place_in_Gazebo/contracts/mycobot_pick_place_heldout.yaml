@@ -1,0 +1,50 @@
+# HELD-OUT CAMERA variant: observation.images.front is fed by /synth_camera_right
+# instead of /synth_camera, so these episodes test a viewpoint never seen in training.
+# Contract for the task-grounded pick-and-place episodes.
+# Derived from Gazebo_to_LeRobot_Pipeline/src/contracts/mycobot_320_pi.yaml, with
+# ONE change: the gripper joint (gripper_controller, 0 = open, -0.4 = closed) is
+# added to observation.state and action (6 arm joints + 1 gripper = 7 dims),
+# because a pick-and-place policy cannot be trained without it.
+#
+# action := the follower's own achieved state (no leader arm), same
+# simplification as the source contract: it records what the arm DID.
+#
+# SIMULATED ATTACHMENT: episodes recorded with this contract carry the block
+# with a Gazebo DetachableJoint weld, NOT a physical grasp. The gripper joint
+# closes on the block but the carrying is done by the weld.
+
+robot_type: mycobot_320_pi
+robot_interface: ros2
+fps: 30
+
+observations:
+  observation.images.front:
+    # rosetta's per-camera auto-recording prefers a compressed stream over
+    # raw when one is advertised (confirmed empirically: a test recording
+    # captured /synth_camera_right/image/compressed but never /synth_camera/image
+    # itself, even though the contract at the time named the raw topic).
+    # Pointing the contract at the stream that's actually in the bag.
+    channel: {topic: /synth_camera_right/image/compressed,
+              type: sensor_msgs/msg/CompressedImage,
+              qos: {reliability: best_effort, history: keep_last, depth: 10}}
+    align: {strategy: hold, timeline: header}
+    apply: [resize: [224, 224]]
+
+  observation.state:
+    channel: {topic: /joint_states, type: sensor_msgs/msg/JointState,
+              qos: {reliability: best_effort, history: keep_last, depth: 50}}
+    align: {strategy: hold, timeline: header}
+    select: [position.joint2_to_joint1, position.joint3_to_joint2,
+             position.joint4_to_joint3, position.joint5_to_joint4,
+             position.joint6_to_joint5, position.joint6output_to_joint6,
+             position.gripper_controller]
+
+actions:
+  action:
+    channel: {topic: /joint_states, type: sensor_msgs/msg/JointState,
+              qos: {reliability: best_effort, history: keep_last, depth: 50}}
+    align: {strategy: hold, timeline: header}
+    select: [position.joint2_to_joint1, position.joint3_to_joint2,
+             position.joint4_to_joint3, position.joint5_to_joint4,
+             position.joint6_to_joint5, position.joint6output_to_joint6,
+             position.gripper_controller]

@@ -1,0 +1,123 @@
+# config/objects.yaml — single source of truth (Part 4).
+#
+# Every geometric field below was read from mycobot_description/worlds/real_table.sdf
+# via the Part 4.2 extraction script (see doc/OBJECTS_MANIFEST.md for the raw
+# command output). Nothing here is invented.
+#
+# grasp_dz sign convention, reconciled against the reference implementation:
+# the specification defines grasp_dz as a small POSITIVE offset above the
+# object's geometric centre. The reference grasp node
+# (mycobot_gateway/mycobot_gateway/sim_sorting_grasp.py) instead targets
+# `grasp_z = max(0.018, height * 0.45)`, which for every object here sits
+# 2.0-2.5 mm BELOW the geometric centre (object rests on the table, so
+# centre_z = height/2; e.g. red_cube: centre 0.020, reference target 0.018).
+# grasp_dz here is kept signed (negative = below centre) and set to
+# REPRODUCE the reference formula exactly, not to a new guessed value —
+# deviating risks reintroducing exactly the grasp failures Part 3 already
+# measured. grip_mm/squeeze_mm are carried over unchanged from the same
+# reference TARGETS list, since they are measured off the physical gripper
+# mesh (see that file's own module docstring), not invented either.
+world_path_file: config/WORLD_PATH
+table_top_z: 0.000        # read: table pose z (-0.00425) + half-thickness (0.00425)
+
+objects:
+  red_cube:
+    shape: box
+    size: [0.040, 0.040, 0.040]
+    mass: 0.050
+    mu: 1.0
+    grasp_dz: -0.002        # reference grasp_z=0.018, centre=0.020
+    grasp_yaw: 0.0          # reference: phi_deg=None (free) — see note below
+    grasp_yaw_fixed: false
+    grip_mm: 40.0
+    squeeze_mm: 4.0
+    bin: red_bin
+    instruction: "pick up the red cube and place it in the red bin"
+  blue_cube:
+    shape: box
+    size: [0.050, 0.050, 0.050]
+    mass: 0.060
+    mu: 1.0
+    grasp_dz: -0.0025       # reference grasp_z=0.0225, centre=0.025
+    grasp_yaw: 0.0
+    grasp_yaw_fixed: false
+    grip_mm: 50.0
+    squeeze_mm: 4.0
+    bin: blue_bin
+    instruction: "pick up the blue cube and place it in the blue bin"
+  green_cylinder:
+    shape: cylinder
+    radius: 0.022
+    length: 0.050
+    mass: 0.050
+    mu: 1.0
+    grasp_dz: -0.0025       # reference grasp_z=0.0225, centre=0.025
+    grasp_yaw: 0.0          # symmetric about its own axis
+    grasp_yaw_fixed: false
+    grip_mm: 44.0
+    squeeze_mm: 6.0         # firmer than the cubes: line contact, not face contact
+    bin: green_bin
+    instruction: "pick up the green cylinder and place it in the green bin"
+  yellow_box:
+    shape: box
+    size: [0.050, 0.030, 0.040]     # NOT symmetric: 50x30mm footprint, 40mm tall
+    mass: 0.050
+    mu: 1.0
+    grasp_dz: -0.002        # reference grasp_z=0.018, centre=0.020
+    grasp_yaw: 1.5708       # 90 deg — FIXED in the reference (phi_deg=90.0):
+    grasp_yaw_fixed: true   # must close across the 30mm short axis, not the 50mm long one
+    grip_mm: 30.0
+    squeeze_mm: 4.0
+    bin: yellow_bin
+    instruction: "pick up the yellow box and place it in the yellow bin"
+
+bins:
+  # All four are identical geometry (100x100mm floor, four 5mm walls 30mm
+  # tall) placed at different world poses. inner_radius is the INSCRIBED
+  # circle of the square clear opening (wall inner faces at +-47.5mm from
+  # centre — matches sim_sorting_grasp.py's own BIN_INNER_HALF_MM=47.5
+  # constant exactly), used conservatively for the Part 9.2 radial
+  # placement check; the true usable footprint is square, so this slightly
+  # under-counts area near the corners rather than over-counting it.
+  # rim_z = wall top = pose_z (0, world frame) + wall centre z (0.015) +
+  # half wall height (0.015) = 0.030 for all four.
+  red_bin:
+    pose: [0.220, 0.100, 0.0]
+    inner_radius: 0.0475
+    rim_z: 0.030
+    static: true
+  blue_bin:
+    # Repositioned 2026-09-23 from [0.340, 0.130] (r=0.363m): confirmed
+    # UNREACHABLE by offline IK on any branch, any height -- see
+    # doc/BIN_REPOSITIONING.md. New pose verified reachable at r=0.241m.
+    pose: [0.240, 0.020, 0.0]
+    inner_radius: 0.0475
+    rim_z: 0.030
+    static: true
+  green_bin:
+    # Repositioned 2026-09-23 from [0.340, -0.040] (r=0.343m), same reason.
+    pose: [0.180, 0.190, 0.0]
+    inner_radius: 0.0475
+    rim_z: 0.030
+    static: true
+  yellow_bin:
+    # Repositioned 2026-09-23 from [0.330, -0.170] (r=0.371m), same reason.
+    pose: [0.0, 0.120, 0.0]
+    inner_radius: 0.0475
+    rim_z: 0.030
+    static: true
+
+release:
+  height_above_bin_rim: 0.030    # see Part 8.3 for why 3 cm and not 0
+
+spawn:
+  settle_seconds_sim: 3.0        # SIMULATION seconds, not wall clock
+  min_object_separation: 0.080   # centre-to-centre
+  # 0.070 m, not the specification's illustrative 0.090: after the Part 6/7
+  # bin repositioning (doc/BIN_REPOSITIONING.md), some legitimate pick
+  # position variants sit within 0.09m of a (now much closer) bin, causing
+  # sample_distractors() to fail deterministically for those rows regardless
+  # of distractor placement. 0.070 = bin half-width (0.05) + largest object
+  # half-size (~0.02, blue_cube) -- the actual physical no-overlap distance,
+  # not an arbitrary relaxation.
+  bin_keepout_radius: 0.070      # object centre to bin centre
