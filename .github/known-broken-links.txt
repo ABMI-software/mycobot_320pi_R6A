@@ -9,12 +9,9 @@
 # N'y ajouter une entree que pour un fichier reellement manquant. Un lien
 # casse par une faute de frappe ou un deplacement doit etre CORRIGE, pas
 # tolere ici.
-docs/PI_REMOTE_ACCESS.md
+#
+# 22/10/2026 : CAPTURE_3CAM, SYNTHETIC_50K_V3, FINETUNE_MIX_REAL3CAM_PLAN,
+# REAL3CAM_SESSION6_HOLDOUT et J4_OBSERVABILITY_DIAG ont été commités ; le lien
+# vers PI_REMOTE_ACCESS.md a été retiré (le fichier contient un mot de passe).
+# tool_offset.json reste local par choix : il décrit le montage de la pince du banc.
 scripts/tool_offset.json
-training/CAPTURE_3CAM.md
-training/FINETUNE_MIX_REAL3CAM_PLAN.md
-training/SYNTHETIC_50K_V3.md
-training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md
-training/dream/J4_OBSERVABILITY_DIAG.md
-training/dream/REAL3CAM_SESSION6_HOLDOUT.md
-training/dream/train_dream_ultimate_v4_mix.py

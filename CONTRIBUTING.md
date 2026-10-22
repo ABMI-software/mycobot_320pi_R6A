@@ -150,9 +150,48 @@ already published a wrong conclusion by confusing them:
 
 State the protocol with the number, or do not state the number.
 
+## Automatic safeguards
+
+Run once per clone:
+
+```bash
+bash scripts/installer_hooks.sh      # git config core.hooksPath .githooks
+```
+
+From then on every commit goes through `scripts/verifier_depot.py`, the same
+script the CI runs:
+
+| Blocks the commit | Only warns |
+|---|---|
+| a secret (password, key, token) | code changed without `CHANGELOG.md` |
+| a forbidden file (`*.bak*`, `results/`, `*.pth` outside the listed checkpoints, `.env`, `docs/PI_REMOTE_ACCESS.md`) | a new `docs/` document missing from `INDEX.md` |
+| a file over 5 MB outside Git LFS | |
+| a **new** line of code with a bench IP (`10.10.0.x`) or a `/home/<user>/` path | |
+| a broken internal Markdown link | |
+| a commit subject outside `type(scope): summary`, or an attribution trailer | |
+
+Only *added* lines are judged for IPs and paths: the existing debt does not
+block anyone, it simply cannot grow. Read the bench address from
+`MYCOBOT_PI`, build paths from the repository root. A literal that must stay
+carries `# verifier: ok` and its reason. `git commit --no-verify` exists for
+emergencies; say why in the message.
+
+`bash scripts/etat_session.sh` prints where the clone stands — branch, lag
+behind `origin/main`, stashes, missing bench files, reachability of
+`$MYCOBOT_PI`. Claude Code runs it at the start of every session.
+
+Measurement results never go into Git (`results/` is blocked): archive each
+run's folder — raw CSVs plus a `run.yaml` recording commit, models,
+extrinsics, tool offset and conditions — outside the repository, and cite it
+from the document that reports the number.
+
 ## For contributors using an AI assistant
 
 `.claude/` holds machine-readable versions of these same rules, plus commands
-and skills specific to this project. **This file is the source of truth**;
+and skills specific to this project. Two reviewer agents never edit anything:
+`metrologue` challenges a measured claim (reference, statistic, sample size,
+circularity) and `gardien-doc` checks that the documentation says the same
+thing everywhere. The skills `campagne-mesure` and `precision-iso9283` carry
+the measurement method. **This file is the source of truth**;
 `.claude/` restates it for tooling. If the two disagree, this file wins and
 `.claude/` needs fixing.

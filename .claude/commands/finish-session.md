@@ -14,6 +14,8 @@ Run the full auto-commit workflow described in [`.claude/rules/auto-commit.md`](
    - Update `CHANGELOG.md` if any user-visible code changed.
    - Update `README.md` and/or relevant `docs/*.md` only if their domain changed.
    - Stage the right files (skip `*.bak*`, `*.log`, `*.pth`, runtime locks — see the auto-commit rule's "Never stage" list; an `*.xlsx` workbook needs the user's explicit go-ahead).
+   - Run `python3 scripts/verifier_depot.py --indexe` on the staged set and fix every blocking finding (the pre-commit hook runs the same check; never bypass it with `--no-verify` on Claude's initiative).
+   - If the session published or changed a measured result, have the `metrologue` agent review the claim before committing; if it changed a status line in README/INDEX/CLAUDE.md, have `gardien-doc` check consistency.
    - Draft and make a single commit with a conventional message, and no attribution trailer.
 5. Report: commit hash + branch + 1-line-per-file summary. No giant diff.
 6. **Do not push.** Pushing is a separate action that requires an explicit user instruction.

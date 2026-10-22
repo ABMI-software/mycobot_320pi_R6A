@@ -1,0 +1,5 @@
+#!/bin/sh
+# Garde-fous du dépôt sur les fichiers indexés : secrets, fichiers interdits,
+# gros fichiers hors LFS, nouvelles IP et chemins codés, liens cassés.
+# Installé par scripts/installer_hooks.sh (git config core.hooksPath .githooks).
+exec /usr/bin/env python3 "$(git rev-parse --show-toplevel)/scripts/verifier_depot.py" --indexe

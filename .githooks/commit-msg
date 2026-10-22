@@ -1,0 +1,3 @@
+#!/bin/sh
+# Message de commit : « type(portée): résumé », 72 caractères, aucune ligne d'attribution.
+exec /usr/bin/env python3 "$(git rev-parse --show-toplevel)/scripts/verifier_depot.py" --message "$1"

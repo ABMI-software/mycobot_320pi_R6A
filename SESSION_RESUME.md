@@ -17,6 +17,17 @@
   commités ajoutés), `INDEX.md` organisé selon la démarche du projet,
   README et CLAUDE.md mis à l'état d'octobre, mot de passe VNC retiré de
   `docs/DEPLOYMENT.md`. Détail dans le CHANGELOG.
+- **Garde-fous automatiques** : `scripts/verifier_depot.py` partagé par les
+  hooks Git (`.githooks/`, `bash scripts/installer_hooks.sh` une fois par
+  clone), la CI et Claude ; état de reprise `scripts/etat_session.sh` à chaque
+  session ; agents `metrologue` et `gardien-doc`, skills `campagne-mesure` et
+  `precision-iso9283`. Voir `CONTRIBUTING.md` § Automatic safeguards.
+- **Plan ISO 9283 du bras** (V1.0 du 01/10) relu : numérotation E1/E2/E3
+  incohérente, formules incomplètes, 11 points de méthode à trancher. Les
+  scripts de la campagne de septembre sont perdus (bac à sable de session).
+- **Tests** : 395 réussis, 24 en échec sur `main` (tests périmés après le
+  remontage de la pince, un fichier local manquant, et une vraie incohérence de
+  limites articulaires dans `mycobot_pro_320_pi_benchmark.urdf`).
 
 ### Décisions prises
 

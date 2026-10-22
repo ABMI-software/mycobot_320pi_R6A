@@ -8,9 +8,9 @@ The MyCobot 320 Pi can be commanded from the PC Tour over a TCP bridge. Mistakes
 
 ## Mandatory checklist
 
-1. Pi is on `10.10.0.224`. `ping -c 1 10.10.0.224` first.
-2. Run [`scripts/real_robot_preflight.sh`](../../scripts/real_robot_preflight.sh) — five checks (ping, TCP port 5005, bridge TCP handshake, ROS graph, round-trip `get_angles`). Exit codes tell you which step failed.
-3. On the Pi, `python3 bridge_pi_simple.py` must be running.
+1. **The Pi's address moves** (`.218`, `.219`, `.223`, `.224` seen between August and October 2026). A `ping` proves nothing: confirm with a TCP round-trip on port 5005 (`timeout 3 bash -c 'echo > /dev/tcp/$MYCOBOT_PI/5005'`), and export `MYCOBOT_PI` for every launcher.
+2. Run [`scripts/real_robot_preflight.sh`](../../scripts/real_robot_preflight.sh) `$MYCOBOT_PI` — five checks (ping, TCP port 5005, bridge TCP handshake, ROS graph, round-trip `get_angles`). Exit codes tell you which step failed. Afterwards, stop any `bridge_tour` it left running (`pgrep -af bridge_tour`, kill by PID): the bridge is single-client.
+3. On the Pi, `scripts/gripper_bridge.py` must be running (not `bridge_pi_simple.py`, which lacks `get_pro_gripper_status`).
 4. Servos at rest? `send_angles` commands return within 300 ms? If not — stop.
 5. **Physically hold or secure the arm** before issuing commands that release the servos (`stop`, power cycle).
 

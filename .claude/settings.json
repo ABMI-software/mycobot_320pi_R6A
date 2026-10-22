@@ -24,13 +24,31 @@
       "Bash(nc -zv 10.10.0.223 5005)",
       "Bash(ls*)",
       "Bash(cat*)",
+      "Bash(python3 scripts/verifier_depot.py*)",
+      "Bash(bash scripts/etat_session.sh)",
       "Read(//home/genji/ros_jazzy/src/mycobot_R6A/**)"
+    ],
+    "ask": [
+      "Bash(git push*)"
     ],
     "deny": [
       "Bash(rm -rf /*)",
       "Bash(git push --force*)",
       "Bash(git reset --hard*)",
       "Bash(sudo rm*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/etat_session.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

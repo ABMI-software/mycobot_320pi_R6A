@@ -1,0 +1,4 @@
+#!/bin/sh
+# Relais Git LFS : core.hooksPath remplace .git/hooks, il faut donc le reprendre ici.
+command -v git-lfs >/dev/null 2>&1 || { echo >&2 "git-lfs introuvable : ce dépôt en a besoin (datasets/**/*.png)."; exit 2; }
+git lfs post-checkout "$@"

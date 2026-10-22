@@ -38,40 +38,14 @@ jobs:
           sys.exit(f'CITATION.cff: champs manquants {missing}' if missing else 0)
           PY
 
-      - name: Internal Markdown links resolve
-        run: |
-          python - <<'PY'
-          import re, sys, subprocess
-          from pathlib import Path
+      # Un seul script pour la CI, les hooks Git et Claude : secrets, liens
+      # internes (tolérances dans .github/known-broken-links.txt), dette d'IP
+      # et de chemins codés (signalée, non bloquante).
+      - name: Garde-fous du dépôt (secrets, liens, dette)
+        run: python scripts/verifier_depot.py --complet
 
-          tolerees = {l.strip() for l in
-                      Path('.github/known-broken-links.txt').read_text().splitlines()
-                      if l.strip() and not l.startswith('#')}
-          suivis = set(subprocess.run(['git', 'ls-files'], capture_output=True,
-                                      text=True).stdout.split())
-          casses = set()
-          for f in subprocess.run(['git', 'ls-files', '*.md'], capture_output=True,
-                                  text=True).stdout.split():
-              p = Path(f)
-              for m in re.finditer(r'\[[^\]]*\]\(([^)#]+)\)', p.read_text(errors='ignore')):
-                  t = m.group(1)
-                  if t.startswith(('http', 'mailto', '#')):
-                      continue
-                  try:
-                      cible = str((p.parent / t).resolve().relative_to(Path.cwd()))
-                  except ValueError:                 # sort de l'arborescence
-                      cible = t.lstrip('./').replace('../', '')
-                  if cible in tolerees:
-                      continue
-                  if cible not in suivis and not Path(cible).exists():
-                      casses.add(f'{f} -> {t}')
-          if casses:
-              print('\n'.join(sorted(casses)))
-              sys.exit(f'{len(casses)} lien(s) interne(s) casse(s). Corriger le lien ; '
-                       f'n ajouter a .github/known-broken-links.txt que si le fichier '
-                       f'manque reellement.')
-          print(f'liens internes : tous resolvent ({len(tolerees)} absences connues tolerees)')
-          PY
+      - name: Tests du vérificateur
+        run: python -m unittest -v tests.test_verifier_depot
 
   build:
     name: colcon build + launch files load

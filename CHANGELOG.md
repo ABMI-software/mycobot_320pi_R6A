@@ -9,6 +9,37 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajoute — Garde-fous automatiques du dépôt (22/10)
+
+- **`scripts/verifier_depot.py`** (bibliothèque standard seule) : un seul
+  vérificateur pour les hooks Git, la CI et Claude. Bloque un secret, un
+  fichier interdit (`*.bak*`, `results/`, `*.pth` hors checkpoints listés,
+  `docs/PI_REMOTE_ACCESS.md`…), un fichier de plus de 5 Mo hors LFS, une
+  **nouvelle** IP du banc ou un **nouveau** chemin `/home/...` dans le code,
+  un lien Markdown cassé, un message de commit hors convention ou portant une
+  ligne d'attribution. Avertit si du code change sans `CHANGELOG.md` ou si un
+  nouveau document manque à `INDEX.md`. `--complet` chiffre la dette existante
+  (51 fichiers avec une IP, 20 avec un chemin) sans la bloquer. Tests :
+  `tests/test_verifier_depot.py` (13 cas, dont les deux formes du mot de passe
+  VNC publié).
+- **`.githooks/`** (`pre-commit`, `commit-msg`, relais Git LFS) et
+  **`scripts/installer_hooks.sh`** à lancer une fois par clone.
+- **`scripts/etat_session.sh`** : état de reprise en dix lignes (branche,
+  retard sur `origin/main`, remises, hooks inactifs, `tool_offset.json`
+  manquant, Pi joignable sur `$MYCOBOT_PI`), lancé à chaque démarrage de
+  session Claude Code (hook `SessionStart` dans `.claude/settings.json`) ;
+  `git push` y demande désormais une confirmation.
+- **CI** : le contrôle de liens écrit en dur dans `ci.yml` est remplacé par
+  le vérificateur et ses tests. `.github/known-broken-links.txt` réduit à
+  `scripts/tool_offset.json`.
+- **`.claude/`** : règle `configuration.md` (ni IP ni chemin de poste dans le
+  code), skills `campagne-mesure` (méthode de mesure du dépôt) et
+  `precision-iso9283` (plan ISO 9283 du bras, essais E0-E2), agents relecteurs
+  `metrologue` et `gardien-doc` (lecture seule), `/finish-session` les
+  appelle. `real-robot-safety.md` corrigé : l'IP de la Pi se vérifie par TCP
+  et non par `ping`, et le bridge est `gripper_bridge.py`.
+- **`CONTRIBUTING.md`** § Automatic safeguards.
+
 ### Documentation — remise en ordre (22/10)
 
 - **Cinq documents DREAM jamais commités** ajoutés depuis le poste de travail
