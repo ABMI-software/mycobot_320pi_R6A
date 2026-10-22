@@ -9,10 +9,17 @@
   `backup/main-local-cam2-2026-06-17` (fichiers `cam_2.*` absents de `main`).
 - **Tri des 4 objets dans Gazebo** (`sim_grasp` + `sim_sorting_grasp`) : 4/4,
   1 à 3 mm du centre des bacs.
-- **Banc réel** : Pi en `10.10.0.218`, preflight passé. Tri non lancé :
-  l'arducam ne livre aucune image (erreurs USB `-71`, déconnexions en boucle,
-  port `1-3`) — câble ou port à changer. `tool_offset.json` copié depuis
-  `~/Osama_ws` ; `ultralytics` ajouté au `.venv`.
+- **Banc réel** : Pi en `10.10.0.218`, preflight passé (angles, pince,
+  `get_angles` 30 ms). Arducam rebranchée en fin de journée : 543/543 images
+  en une minute, SVPRO comprise, sans erreur USB. `tool_offset.json` et
+  `cam_2.*` (intrinsèques SVPRO) copiés depuis `~/Osama_ws` ; `ultralytics`
+  ajouté au `.venv`.
+- **Tri réel, premier essai non conclusif** : sans `cam_2.*`, le dashboard
+  levait une erreur `projectPoints` à chaque image SVPRO. Cube bleu : 2
+  tentatives, « prise à vide » ; cylindre vert ignoré, vu à (270 ; −601) mm,
+  hors portée. Bouton « détecter le carton » : `ValueError` au déballage
+  (`pick_dashboard.py:3000`, fichier à ne pas modifier). Au second lancement,
+  calibration arducam **refusée** (motif non relevé) : tri non relancé.
 - **Documentation** : 19 liens cassés réparés (5 documents DREAM jamais
   commités ajoutés), `INDEX.md` organisé selon la démarche du projet,
   README et CLAUDE.md mis à l'état d'octobre, mot de passe VNC retiré de
@@ -37,8 +44,9 @@
 
 ### Prochaines actions
 
-1. [ROUGE] Arducam : autre port USB (arrière, sans hub) ou autre câble, puis
-   relancer `lancer_pick_dashboard_final.py --svpro-dream`.
+1. [ROUGE] Calibration arducam refusée : dégager les 4 ArUco, sinon
+   `calibration_extrinseque_auto.py --controle` (n'écrit rien) pour juger
+   l'ancienne extrinsèque, puis relancer le tri et rejouer le cube bleu.
 2. [ROUGE] Changer le mot de passe VNC de la Pi (il est dans l'historique Git).
 3. [JAUNE] Fusionner `feature/gazebo-collisions-legeres` (simulation ~4×
    plus rapide, 40/40) et `fix/tri-yolo-launch` avant les campagnes simulées.
@@ -52,6 +60,8 @@
 ```bash
 cd ~/ros_jazzy/src/mycobot_R6A && git switch chore/audit-nettoyage
 timeout 3 bash -c 'echo > /dev/tcp/10.10.0.218/5005' && echo "Pi OK"
+/usr/bin/python3 scripts/calibration_extrinseque_auto.py --controle
+# depuis un terminal hors VS Code (le snap casse le Python système)
 MYCOBOT_PI=10.10.0.218 /usr/bin/python3 scripts/lancer_pick_dashboard_final.py --svpro-dream
 ```
 
