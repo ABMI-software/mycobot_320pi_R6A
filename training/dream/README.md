@@ -202,7 +202,7 @@ fine-tune (pas from-scratch) depuis `vgg_ultimate_v4_e50/best_network.pth`.
 Méthodologie complète, y compris le recalage manuel des extrinsèques caméra
 réelles (2026-07-03, préalable indispensable — les anciens placeholders
 plaçaient la vérité-terrain 2D à côté du bras) :
-[`../FINETUNE_MIX_REAL3CAM_PLAN.md`](../FINETUNE_MIX_REAL3CAM_PLAN.md).
+[`FINETUNE_MIX_REAL3CAM_PLAN.md`](FINETUNE_MIX_REAL3CAM_PLAN.md).
 
 **Évaluation réelle — méthodologie et correction d'un biais d'échantillonnage**
 

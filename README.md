@@ -195,13 +195,14 @@ Topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (FR) (FR).
 | **Validated** | Hand teleoperation — Orbbec Astra → Wilor → rosbridge → joint trajectory → robot, validated on the physical arm on 2026-04-22 — see [`docs/TELEOPERATION.md`](docs/TELEOPERATION.md) (FR) |
 | **In progress** | Teleoperation is currently **blocked on the system side**: a `fastcdr` ABI mismatch in the installed ROS 2 prevents rosbridge from starting |
 | **In progress** | Extrinsic recalibration exists as a node and a script ([`scripts/calibration_extrinseque_auto.py`](scripts/calibration_extrinseque_auto.py)) with leave-one-out self-check, but is not yet wired as an automatic startup step in any launch file |
-| **In progress** | Learned object detection: a YOLOv8 detector ([`scripts/yolo_object_detect.py`](scripts/yolo_object_detect.py)) is used by the live pick pipeline, but the ROS 2 node in the graph is still HSV-based |
+| **Validated** | Learned object detection (yolo26) driving the sort: in the ROS 2 graph on 4 simulated cameras (`tri_yolo.launch.py`, 40/40 objects sorted over 10 seeds), and on the physical bench from the sorting dashboard (4/4 per run, 13-15/10/2026) — see [`docs/PROTOCOLE_YOLO_GAZEBO.md`](docs/PROTOCOLE_YOLO_GAZEBO.md) (FR) and [`docs/PROTOCOLE_REEL.md`](docs/PROTOCOLE_REEL.md) (FR). On the bench yolo26 runs inside the dashboard process, not as a ROS 2 node |
+| **Validated** | DREAM measured alongside the sort, in simulation then on the bench: after a 600-pose real fine-tune, 1.69 px / 96.0 % on an out-of-sample real test; DREAM-derived camera extrinsics replace the ArUco markers with the sort still at 4/4 — see [`docs/PROTOCOLE_REEL.md`](docs/PROTOCOLE_REEL.md) (FR) |
 | **In progress** | Physical-grasp sorting in simulation: outcome is **not deterministic** at identical commanded geometry — see [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) |
 | **Validated** | Episode export to LeRobot v3.0 and to RLDS/TFDS, the Open X-Embodiment format, registered in OpenVLA's own configs, transforms and mixtures — and tested, not asserted. **Two scripted episodes: this proves the plumbing, it trains nothing** ([`Gazebo_to_LeRobot_Pipeline/`](Gazebo_to_LeRobot_Pipeline/), [`ROS2_to_RLDS_Conversion_OpenVLA/`](ROS2_to_RLDS_Conversion_OpenVLA/)) |
 | **In progress** | Task-grounded pick-and-place in headless Gazebo: **20 episodes**, 2670 training frames and 927 from a camera mount never seen in training — a held-out *viewpoint*, not just held-out images ([`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/)) |
 | **In progress** | That dataset's grasp is a **simulated attachment, not a physical grasp** — the grasp itself is unsolved there, and the sim runs at a 0.082 real-time factor |
 | **To come** | An actual VLA fine-tune. It needs far more episodes on a real task than any of the above provides |
-| **To come** | Replace HSV thresholding with a learned detector *inside the ROS 2 graph* |
+| **To come** | Run the bench's yolo26 detector as a ROS 2 node, as it already is in simulation |
 | **To come** | Higher simulation realism for vision-guided pick-and-place |
 | **To come** | Extended multi-view fusion and an additional keypoint, to lift the last-joint limitation |
 | **To come** | Automation of the collect / replay / analysis chain |
@@ -366,6 +367,9 @@ worthless detached from it.
 | Validation dashboard and its reading | [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md) (FR) |
 | Sorting simulation: measured state and rejected hypotheses | [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) |
 | Closed-loop pick-and-place on hardware | [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) |
+| Sorting driven by yolo26, DREAM alongside — simulation (steps 0-11) | [`docs/PROTOCOLE_YOLO_GAZEBO.md`](docs/PROTOCOLE_YOLO_GAZEBO.md) (FR) |
+| The same on the physical bench, two cameras (steps 0-9, per-run CSV) | [`docs/PROTOCOLE_REEL.md`](docs/PROTOCOLE_REEL.md) (FR) |
+| Proposed acceptance criteria | [`docs/protocole_yolo_gazebo/CRITERES.md`](docs/protocole_yolo_gazebo/CRITERES.md) (FR) |
 | Version history | [`CHANGELOG.md`](CHANGELOG.md) (FR) |
 
 Two cautions when reading any of it. An extrinsic's fit residual is **not** an
@@ -375,7 +379,7 @@ questions and are routinely confused.
 
 ## Documentation
 
-The repository carries 42 documents. The entry points, by domain — the full map
+The repository carries some sixty documents. The entry points, by domain — the full map
 is [`INDEX.md`](INDEX.md) (FR).
 
 | Domain | Start here |
@@ -386,7 +390,7 @@ is [`INDEX.md`](INDEX.md) (FR).
 | Pose estimation | [`training/dream/README.md`](training/dream/README.md) — training and evaluation · [`docs/DREAM_VALIDATION_DASHBOARD.md`](docs/DREAM_VALIDATION_DASHBOARD.md) (FR) · [`docs/DREAM_VALIDATION_LAUNCH.md`](docs/DREAM_VALIDATION_LAUNCH.md) (FR) · [`docs/DREAM_DIAGNOSTIC_BIAIS.md`](docs/DREAM_DIAGNOSTIC_BIAIS.md) (FR) |
 | Calibration and metrology | [`training/calibration/PROTOCOLE_ESSAIS_PRECISION.md`](training/calibration/PROTOCOLE_ESSAIS_PRECISION.md) (FR) · [`training/calibration/METHODOLOGIE_PRECISION.md`](training/calibration/METHODOLOGIE_PRECISION.md) (FR) · [`docs/CAMERA_CALIBRATION.md`](docs/CAMERA_CALIBRATION.md) (FR) |
 | Simulation and data | [`docs/SYNTHETIC_DATA.md`](docs/SYNTHETIC_DATA.md) (FR) · [`docs/GAZEBO_REAL_TABLE.md`](docs/GAZEBO_REAL_TABLE.md) (FR) · [`mycobot_description/README.md`](mycobot_description/README.md) (FR) |
-| Pick-and-place | [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) · [`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md) (FR) · [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) · [`docs/PROTOCOLE_YOLO_GAZEBO.md`](docs/PROTOCOLE_YOLO_GAZEBO.md) (FR) |
+| Pick-and-place | [`docs/PICK_AND_PLACE_SIMULATION.md`](docs/PICK_AND_PLACE_SIMULATION.md) (FR) · [`docs/PICK_AND_PLACE_REAL.md`](docs/PICK_AND_PLACE_REAL.md) (FR) · [`docs/PICK_AND_PLACE_BOUCLE_FERMEE.md`](docs/PICK_AND_PLACE_BOUCLE_FERMEE.md) (FR) · [`docs/PROTOCOLE_YOLO_GAZEBO.md`](docs/PROTOCOLE_YOLO_GAZEBO.md) (FR) · [`docs/PROTOCOLE_REEL.md`](docs/PROTOCOLE_REEL.md) (FR) |
 | Deployment and diagnosis | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (FR) · [`docs/DEBUG_CONNECTION_GUIDE.md`](docs/DEBUG_CONNECTION_GUIDE.md) (FR) · [`docs/BRIDGE_PI_UPGRADE_GUIDE.md`](docs/BRIDGE_PI_UPGRADE_GUIDE.md) (FR) |
 | VLA data pipelines | [`Headless_Task-Grounded_Pick-and-Place_in_Gazebo/MEASUREMENTS.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/MEASUREMENTS.md) — what was measured, with per-item confidence · [`.../doc/headless_pick_and_place_specification.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/doc/headless_pick_and_place_specification.md) · [`.../datasets/README.md`](Headless_Task-Grounded_Pick-and-Place_in_Gazebo/datasets/README.md) — the two LeRobot datasets and why the split holds out a camera. Each of `Gazebo_to_LeRobot_Pipeline/` and `ROS2_to_RLDS_Conversion_OpenVLA/` carries its own `docs/PIPELINE.html` |
 | Evaluating a candidate technology | [`docs/SPEC_VALIDATION_BRIQUES.md`](docs/SPEC_VALIDATION_BRIQUES.md) (FR) — how two interchangeable components are compared: the pluggable pose port, the four use cases, the error budget the bench can resolve, and the anti-circularity test that already invalidated one demonstration |
@@ -394,7 +398,8 @@ is [`INDEX.md`](INDEX.md) (FR).
 
 ## Roadmap
 
-1. Learned object detection inside the ROS 2 graph, replacing HSV thresholding.
+1. The bench's yolo26 detector as a ROS 2 node (done in simulation), and a
+   measured object ground truth on the bench to evaluate it.
 2. Higher simulation realism for vision-guided pick-and-place, and a contact
    model that makes the sorting bench reproducible.
 3. Extended multi-view fusion plus an additional keypoint downstream of the last
@@ -402,8 +407,9 @@ is [`INDEX.md`](INDEX.md) (FR).
 4. Automated collection, replay and analysis of test campaigns, so that
    cross-site campaigns stay comparable.
 5. External metrological reference, independent of encoders and vision.
-6. Marker-free pose estimation on the pick path itself — today the pick uses
-   the ArUco extrinsic, and only the dashboard consumes the model. The
+6. Marker-free pose estimation on the pick path itself — DREAM-derived camera
+   extrinsics already replace the ArUco markers (sort at 4/4, 14-15/10/2026),
+   but the grasp target still comes from the encoders and YOLO, not DREAM. The
    comparison protocol is specified in
    [`docs/SPEC_VALIDATION_BRIQUES.md`](docs/SPEC_VALIDATION_BRIQUES.md) (FR).
 7. Migration of the simulation path to NVIDIA Isaac Sim, on its own branch until

@@ -1,11 +1,12 @@
 # 🚀 Deployment Guide - Distributed MyCobot System
 
-> **Mis à jour le 20 août 2026.** L'IP de la Pi est `10.10.0.224` (ce document
-> indiquait `10.10.0.218`, corrigé) et l'utilisateur est `er`, pas `pi`.
+> **Mis à jour le 22 octobre 2026.** L'IP de la Pi **change** (`.218`, `.219`, `.223`, `.224`
+> relevées entre août et octobre) : l'identifier par un aller-retour TCP sur le port 5005,
+> jamais par `ping`. L'utilisateur est `er`, pas `pi`.
 >
 > ⚠️ **SSH est inutilisable** — mot de passe système oublié. Le Pi se pilote par
-> **VNC** (mot de passe `Elephant`), clavier/souris USB en panne matérielle.
-> Procédure complète : [`PI_REMOTE_ACCESS.md`](PI_REMOTE_ACCESS.md).
+> **VNC** (mot de passe : demander à l'équipe, il n'est pas versionné), clavier/souris USB en panne matérielle.
+> Procédure complète : `docs/PI_REMOTE_ACCESS.md`, **non versionné** (contient le mot de passe VNC) — copie locale sur le PC Tour.
 >
 > ⚠️ **Bridge à lancer sur la Pi : `scripts/gripper_bridge.py`**, pas
 > `bridge_pi_simple.py` — seul le premier implémente `get_pro_gripper_status`,

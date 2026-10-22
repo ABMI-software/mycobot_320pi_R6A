@@ -20,6 +20,27 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 
 ---
 
+## 🧭 La démarche du projet — par où lire
+
+Le projet valide la vision (DREAM pour la pose du bras, YOLO pour les objets) **d'abord en
+simulation, puis sur le banc réel**, chaque fois **en statique puis en dynamique**, avant de les
+réunir sur un cas d'usage : le **tri** de quatre pièces dans quatre bacs. Un document par étape :
+
+| Étape | Gazebo | Banc réel |
+|---|---|---|
+| 1 · DREAM, images statiques | [training/dream/README.md](training/dream/README.md) · [VGG_ULTIMATE_V4_50K.md](training/dream/VGG_ULTIMATE_V4_50K.md) · [SYNTHETIC_50K_V3.md](training/SYNTHETIC_50K_V3.md) | [PROTOCOLE_REEL.md § étape 8](docs/PROTOCOLE_REEL.md) · [DREAM_DIAGNOSTIC_BIAIS.md](docs/DREAM_DIAGNOSTIC_BIAIS.md) · [REAL3CAM_SESSION6_HOLDOUT.md](training/dream/REAL3CAM_SESSION6_HOLDOUT.md) |
+| 2 · DREAM en dynamique | [PROTOCOLE_YOLO_GAZEBO.md § étape 10](docs/PROTOCOLE_YOLO_GAZEBO.md) | [PROTOCOLE_REEL.md § étapes 4-6](docs/PROTOCOLE_REEL.md) · [DREAM_VALIDATION_DASHBOARD.md](docs/DREAM_VALIDATION_DASHBOARD.md) |
+| 3 · Tri YOLO, puis YOLO + DREAM | [PROTOCOLE_YOLO_GAZEBO.md](docs/PROTOCOLE_YOLO_GAZEBO.md) · [PICK_AND_PLACE_SIMULATION.md](docs/PICK_AND_PLACE_SIMULATION.md) | [PROTOCOLE_REEL.md § étapes 1 et 9](docs/PROTOCOLE_REEL.md) · [PICK_AND_PLACE_REAL.md](docs/PICK_AND_PLACE_REAL.md) |
+| Critères et seuils | [protocole_yolo_gazebo/CRITERES.md](docs/protocole_yolo_gazebo/CRITERES.md) | idem (proposés, pas encore validés pour le réel) |
+| Référence du bras (précision) | [GAZEBO_REAL_TABLE.md](docs/GAZEBO_REAL_TABLE.md) | [PROTOCOLE_ESSAIS_PRECISION.md](training/calibration/PROTOCOLE_ESSAIS_PRECISION.md) · [PINCE_SUPPORT_AXE_J6.md](docs/PINCE_SUPPORT_AXE_J6.md) |
+
+**Modèles DREAM en service (octobre 2026)** : `vgg_tri_mix_ft_e10` dans Gazebo,
+`vgg_tri_reel_ft_e10` sur le banc réel (test réel hors échantillon : 96,0 %, 1,69 px).
+`vgg_montage0901_ft_e30` (1,81 px annoncés le 01/09) est **invalidé** : il mémorisait la
+position du socle (test de décalage : 0 %). Voir [CLAUDE.md § DREAM — September 2026 state](CLAUDE.md).
+
+---
+
 ## 📋 Documentation par catégorie
 
 ### 🚀 Démarrage
@@ -72,7 +93,13 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | Document | Description |
 |----------|-------------|
 | [training/README.md](training/README.md) | Pipeline ML (régression directe legacy + DREAM actif) |
-| [training/dream/README.md](training/dream/README.md) | Module DREAM keypoint detection — VGG-19, checkpoint courant `vgg_montage0901_ft_e30` (médiane 1,81 px, détection 100 % sur 800 images tenues à l'écart) ; le précédent `vgg_ultimate_v4_mix_ft_e30` reste la base du fine-tune |
+| [training/dream/README.md](training/dream/README.md) | Module DREAM keypoint detection — VGG-19. Modèles en service : `vgg_tri_mix_ft_e10` (Gazebo) et `vgg_tri_reel_ft_e10` (banc réel, 1,69 px sur le test réel). `vgg_montage0901_ft_e30` est invalidé (socle mémorisé) |
+| [training/SYNTHETIC_50K_V3.md](training/SYNTHETIC_50K_V3.md) | Génération du dataset synthétique 50K : distribution des angles, filtre d'auto-collision, rendu |
+| [training/CAPTURE_3CAM.md](training/CAPTURE_3CAM.md) | Fiche de capture réelle à 3 caméras (ArduCam, SVPRO, Astra) pour DREAM : lancement, nœuds vidéo stables |
+| [training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md](training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md) | Plan et méthode du fine-tuning mixte synthétique + réel (`vgg_ultimate_v4_mix_ft_e30`) |
+| [training/dream/REAL3CAM_SESSION6_HOLDOUT.md](training/dream/REAL3CAM_SESSION6_HOLDOUT.md) | Test hors échantillon sur la session 6 : pourquoi le chiffre réel venait de la distribution d'entraînement |
+| [training/dream/J4_OBSERVABILITY_DIAG.md](training/dream/J4_OBSERVABILITY_DIAG.md) | J4 faiblement observable en mono-caméra : erreur de signe variable, pas un biais corrigeable |
+| [training/dream/SYNTHETIC_TRAINING_REPORT.md](training/dream/SYNTHETIC_TRAINING_REPORT.md) | Rapport d'entraînement sur données synthétiques |
 | [docs/DREAM_VALIDATION_DASHBOARD.md](docs/DREAM_VALIDATION_DASHBOARD.md) | Dashboard PyQt de validation live **multi-caméras** (Arducam + SVPRO, fusion *solve-then-fuse* par joint) : ce qu'il affiche (vues empilées, courbes enc vs DREAM, tableau keypoint fusionné + détection globale), 3 filtres temporels au choix (aucun défaut), poids solveur, mode cohérence, acquisition CSV. Inclut le graphe ROS2 ![png](training/dream/rqt_dream_multicam.png) |
 | [docs/DREAM_VALIDATION_LAUNCH.md](docs/DREAM_VALIDATION_LAUNCH.md) | Lancement : **launch unique `dream_multicam.launch.py`** (auto-détecte 1 ou 2 caméras) ou les 5 nœuds à la main, graphe nœuds/topics + rqt, **table de diagnostic** (quel symptôme → quel nœud manquant) + piège `.venv` |
 | [docs/SYNTHETIC_DATA.md](docs/SYNTHETIC_DATA.md) | Pipeline données synthétiques Gazebo + domain randomization v2 |
@@ -124,6 +151,10 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 | [docs/TEST_COMPLET.md](docs/TEST_COMPLET.md) | Procédure de test complète (legacy) |
 | [docs/TEST_ROBOT_PROCEDURE.md](docs/TEST_ROBOT_PROCEDURE.md) | Procédure détaillée robot (legacy) |
 | [docs/SESSION_TEST.md](docs/SESSION_TEST.md) | Session de test du bridge, configuration réseau |
+| [docs/PROTOCOLE_REEL.md](docs/PROTOCOLE_REEL.md) | **Protocole réel YOLO + DREAM, deux caméras, étapes 0 à 9** : tri YOLO 4/4, DREAM avant/après fine-tuning réel (18,7 → 1,69 px), extrinsèque sans marqueur, essais CSV du 15/10, limites de la référence |
+| [docs/protocole_yolo_gazebo/CRITERES.md](docs/protocole_yolo_gazebo/CRITERES.md) | Critères et plages attendues (DREAM, YOLO, thermique) — proposés, pas encore validés |
+| [docs/PINCE_SUPPORT_AXE_J6.md](docs/PINCE_SUPPORT_AXE_J6.md) | Pince remontée sur support dans l'axe de J6 : conséquences sur le déport d'outil et les hauteurs |
+| [RAPPORT_PICK_AND_PLACE_LIVE.md](RAPPORT_PICK_AND_PLACE_LIVE.md) | Premier pick-and-place vision-guidé réussi en direct (balle de tennis, arducam seule, 31/07/2026) |
 | [docs/PICK_AND_PLACE_REAL.md](docs/PICK_AND_PLACE_REAL.md) | Pick-and-place sur le robot physique |
 | [docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md](docs/PICK_AND_PLACE_HANDOFF_2026-06-03.md) · [04](docs/PICK_AND_PLACE_HANDOFF_2026-06-04.md) | Comptes rendus datés, conservés tels quels |
 | [scripts/real_robot_preflight.sh](scripts/real_robot_preflight.sh) | Preflight 5 étapes avant toute session physique |
@@ -156,7 +187,16 @@ Bienvenue dans la documentation du projet MyCobot ! Ce fichier sert de carte cen
 
 ---
 
+### 🗂️ Projet et contribution
+| Document | Description |
+|----------|-------------|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | **Source de vérité des conventions** : environnements Python, build, branches, commits, documentation, robot physique, mesures |
+| [SECURITY.md](SECURITY.md) | Signaler une vulnérabilité |
+| [ABOUT_proposals.md](ABOUT_proposals.md) | Description et mots-clés du dépôt sur GitHub (encart « About ») : texte en service et propositions |
+
+---
+
 **Version :** `v1.17.0` (premier tag du dépôt, 22/09/2026)
-**Mise à jour :** 22 septembre 2026 — section métrologie ajoutée, 17 documents
-qui manquaient à cet index recensés, et deux affirmations périmées corrigées
-(le tri 4/4 et le checkpoint DREAM).
+**Mise à jour :** 22 octobre 2026 — parcours de lecture selon la démarche du projet,
+les documents d'octobre (protocole réel, critères, pince) et cinq documents DREAM qui
+n'avaient jamais été commités ajoutés ; checkpoint DREAM en service corrigé.

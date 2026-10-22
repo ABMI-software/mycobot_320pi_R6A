@@ -37,7 +37,7 @@ This repo is not just a control-software project — it's the starting substrate
 1. **Physics-accurate digital twin** → migrate the simulation path from Gazebo/DART to **NVIDIA Isaac Sim + Isaac Lab**, unlocking photorealistic rendering, soft-body gripper physics, and GPU-parallel training envs. See [`.claude/skills/isaac-sim-integration/SKILL.md`](.claude/skills/isaac-sim-integration/).
 2. **AI physics** → use Isaac Sim's differentiable physics and learned world models to train policies that transfer to the real robot without hand-tuned dynamics.
 3. **Vision-Language-Action models** → fine-tune a VLA (OpenVLA / Octo / π0 class) on episodic teleop data, deploy a VLA inference node behind the same ROS2 topics the teleop dashboard already uses. See [`.claude/agents/vla-integrator.md`](.claude/agents/vla-integrator.md).
-4. **Pose estimation at production accuracy** → detection on the pick bench is solved (`vgg_montage0901_ft_e30`, median 1.81 px, 100% detection). The open gaps are **angle reconstruction** and **viewpoint generalisation** — read "DREAM — September 2026 state" below *before* the July sections, which it supersedes on the model. See [`.claude/skills/dream-workflow/SKILL.md`](.claude/skills/dream-workflow/).
+4. **Pose estimation at production accuracy** → keypoint detection on the real sorting bench is at simulation level (`vgg_tri_reel_ft_e10`, 1.69 px / 96.0% on an out-of-sample real test, 14/10/2026 — see "DREAM sur le banc réel" below). The open gaps are **angle reconstruction** (J6 unobservable, J4 weak), **depth (Z) of the gripper tip** and **viewpoint generalisation** — read "DREAM — September 2026 state" below *before* the July sections, which it supersedes on the model. See [`.claude/skills/dream-workflow/SKILL.md`](.claude/skills/dream-workflow/).
 5. **Robot training + standardized benchmarks** → a reproducible loop of (teleop demos → LeRobot dataset → VLA fine-tune → sim eval → real-robot eval). See [`.claude/skills/lerobot-dataset/SKILL.md`](.claude/skills/lerobot-dataset/).
 6. **POC-ready demonstrator** → a single-command launch that shows the full stack (digital twin + VLA policy + real robot + dashboard) running coherently.
 
@@ -51,7 +51,9 @@ The two July sections that follow are still accurate about the **dashboard**. On
 the **model** — what DREAM can be trusted to do — they are superseded by these
 measurements.
 
-- **Current checkpoint: `vgg_montage0901_ft_e30`** (fine-tuned from
+- **Checkpoint of September: `vgg_montage0901_ft_e30`** — superseded in October
+  by `vgg_tri_mix_ft_e10` (Gazebo) and `vgg_tri_reel_ft_e10` (real bench); its own
+  result is invalidated by the next bullet (it memorised the base). (Fine-tuned from
   `vgg_ultimate_v4_mix_ft_e30`, which is untouched). The 52 px systematic bias on
   the pick bench is gone: median **53.82 → 1.81 px**, detection **54.8% → 100%**
   on 800 held-out frames, no regression on `real_3cam`. Cause:
@@ -381,8 +383,11 @@ Do not cross-pollinate teleop commits into `feature/pose-training` (or vice vers
 ```bash
 # Build everything (run from ~/ros_jazzy, not from inside src/)
 conda deactivate
-cd ~/ros_jazzy && colcon build --packages-select mycobot_gateway mycobot_description --symlink-install
+cd ~/ros_jazzy && colcon build --base-paths src --packages-select mycobot_gateway mycobot_description --symlink-install
 source install/setup.bash
+# Without --base-paths src, colcon also scans ~/ros_jazzy/venv_dream (Isaac Sim's
+# pip tree) and aborts on "Duplicate package names". A COLCON_IGNORE file in
+# venv_dream/ has the same effect.
 
 # Control a live robot (bridge must run on the Pi)
 ssh er@10.10.0.224        # adresse non fixe : voir l'avertissement en tête de fichier
@@ -459,7 +464,10 @@ la connexion TCP est acceptée mais plus rien ne répond.
 
 ## Safety — real robot
 
-- Config files say `10.10.0.224`, but **the Pi's address moves** (`.218` on 07/09, `.219` on 10/09). A successful `ping` proves nothing — `.224` answers it without serving the bridge. Confirm with a **TCP round-trip on port 5005** before launching anything that commands motion.
+- Config files say `10.10.0.224`, but **the Pi's address moves** (`.218` on 07/09 and 22/10, `.219` on 10/09, `.223` on 14/10). A successful `ping` proves nothing — `.224` answers it without serving the bridge. Confirm with a **TCP round-trip on port 5005** before launching anything that commands motion.
+- **Local files the real sort needs, never committed** — copy them from the bench PC's other clone if missing: `scripts/tool_offset.json` (gripper offset; without it `pick_fsm` refuses every move with "deport d'outil inconnu") and the session extrinsics `training/calibration/*_extrinsic_*.yaml`. YOLO runs in the repo's `.venv` and needs `ultralytics` there.
+- `real_robot_preflight.sh` can leave a `bridge_tour` running after it exits: check `pgrep -af bridge_tour` and stop it by PID before starting the sort (the bridge is single-client). Its "No pong" warning is a false alarm: `gripper_bridge.py` answers `PONG`.
+- Camera that opens but never delivers a frame + kernel `usb …: -71` errors / disconnect loops = a cable or port fault, not software. Move it to a rear port, no hub.
 - Run [`scripts/real_robot_preflight.sh`](scripts/real_robot_preflight.sh) before each physical session.
 - On `feature/teleoperation`: start every session with the `🐢 Safe start` preset (gains 0.6/0.6/0.6, tfs 0.3). Only go to `⚙️ Nominal` (1.2/1.2/1.6/0.25 — the validated default) once calibration is clean.
 - **Le robot a désormais une pince Pro adaptative** (`gripper_id=14`, ~1,6 s entre

@@ -9,6 +9,33 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Documentation — remise en ordre (22/10)
+
+- **Cinq documents DREAM jamais commités** ajoutés depuis le poste de travail
+  d'origine : `training/SYNTHETIC_50K_V3.md`, `training/CAPTURE_3CAM.md`,
+  `training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`,
+  `training/dream/REAL3CAM_SESSION6_HOLDOUT.md`,
+  `training/dream/J4_OBSERVABILITY_DIAG.md`. Dix-neuf liens pointaient vers
+  eux ou vers de mauvais chemins ; il n'en reste aucun de cassé.
+- **`INDEX.md`** : parcours de lecture selon la démarche du projet (DREAM puis
+  YOLO, simulation puis banc, statique puis dynamique, puis le tri) ; ajout de
+  `PROTOCOLE_REEL.md`, `CRITERES.md`, `PINCE_SUPPORT_AXE_J6.md` et des
+  documents ci-dessus ; checkpoint DREAM en service corrigé
+  (`vgg_tri_reel_ft_e10` au banc, `vgg_montage0901_ft_e30` invalidé).
+- **`README.md`** : statut d'octobre (tri yolo26 en simulation et au banc,
+  DREAM après fine-tuning réel, extrinsèque sans marqueur), protocoles YOLO /
+  réel dans les résultats et la feuille de route.
+- **`CLAUDE.md`** : checkpoint en service corrigé ; `colcon build --base-paths
+  src` (sinon colcon parcourt `venv_dream` et s'arrête) ; fichiers locaux
+  requis par le tri réel (`scripts/tool_offset.json`, extrinsèques) ;
+  `bridge_tour` orphelin du preflight ; panne USB `-71` d'une caméra.
+- **`docs/DEPLOYMENT.md`** : le mot de passe VNC de la Pi n'est plus écrit en
+  clair ; l'IP de la Pi est décrite comme variable. Le mot de passe reste dans
+  l'historique Git : il faut le changer sur la Pi.
+- **`.gitignore`** : `*.bak[0-9]`, `*.code-workspace`,
+  `docs/PI_REMOTE_ACCESS.md` (contient le mot de passe VNC),
+  `scripts/calibration_duree.json`.
+
 ### Ajoute — Lanceur a boutons pour le tri (15-19/10)
 
 - **`scripts/lanceur_tri.py`** (`/usr/bin/python3 scripts/lanceur_tri.py`) :
@@ -2405,7 +2432,7 @@ détection réelle de **≈27% (v4 synth-only) à 91,6%** sur `real_3cam_val_ndd
   tombait à 100% sur arducam (step=3,0 en phase avec l'ordre des caméras) ;
   `--max-samples 1500` rétablit les 3 caméras et améliore les distaux.
 
-Plan et méthodo : [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](../training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md).
+Plan et méthodo : [`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md).
 
 ### 🔭 Prochaine direction — pose estimation eye-to-hand + visual servoing
 
@@ -2464,7 +2491,7 @@ Le transfert sim-to-real reste bloqué à ≈27% sur `real_3cam_ndds` malgré ce
 gain. Un fine-tune depuis `best_network.pth` sur un mix synthétique 50K + réel
 3 caméras ×5 (`train_dream_ultimate_v4_mix.py`, `scale_limit=0.3`, 30 epochs)
 est en cours pour combler l'écart — voir
-[`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](../training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md).
+[`training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md`](training/dream/FINETUNE_MIX_REAL3CAM_PLAN.md).
 
 ### Modifié — Documentation
 

@@ -1,5 +1,49 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (22 octobre 2026 — soir, audit et remise en ordre de la documentation)
+
+### Ce qui a été accompli aujourd'hui
+
+- **Poste `~/ros_jazzy`** remis sur `origin/main` (v1.17.0 + 97 commits) ;
+  commits locaux de calibration cam_2 du 17/06 conservés sur
+  `backup/main-local-cam2-2026-06-17` (fichiers `cam_2.*` absents de `main`).
+- **Tri des 4 objets dans Gazebo** (`sim_grasp` + `sim_sorting_grasp`) : 4/4,
+  1 à 3 mm du centre des bacs.
+- **Banc réel** : Pi en `10.10.0.218`, preflight passé. Tri non lancé :
+  l'arducam ne livre aucune image (erreurs USB `-71`, déconnexions en boucle,
+  port `1-3`) — câble ou port à changer. `tool_offset.json` copié depuis
+  `~/Osama_ws` ; `ultralytics` ajouté au `.venv`.
+- **Documentation** : 19 liens cassés réparés (5 documents DREAM jamais
+  commités ajoutés), `INDEX.md` organisé selon la démarche du projet,
+  README et CLAUDE.md mis à l'état d'octobre, mot de passe VNC retiré de
+  `docs/DEPLOYMENT.md`. Détail dans le CHANGELOG.
+
+### Décisions prises
+
+- Le nettoyage du code (archivage, configuration de l'IP, chemins absolus)
+  attend une validation : seules la documentation et le `.gitignore` ont
+  changé, sur la branche locale `chore/audit-nettoyage`, non poussée.
+
+### Prochaines actions
+
+1. [ROUGE] Arducam : autre port USB (arrière, sans hub) ou autre câble, puis
+   relancer `lancer_pick_dashboard_final.py --svpro-dream`.
+2. [ROUGE] Changer le mot de passe VNC de la Pi (il est dans l'historique Git).
+3. [JAUNE] Fusionner `feature/gazebo-collisions-legeres` (simulation ~4×
+   plus rapide, 40/40) et `fix/tri-yolo-launch` avant les campagnes simulées.
+4. [JAUNE] Une seule source pour l'IP de la Pi (`MYCOBOT_PI`) au lieu de
+   5 adresses codées dans 51 fichiers.
+5. [VERT] Réconcilier le plan de validation de la chaîne (modules M1-M9,
+   implémentations I1-I15) avec le plan « référence du bras + 2e caméra ».
+
+### Commande rapide de reprise
+
+```bash
+cd ~/ros_jazzy/src/mycobot_R6A && git switch chore/audit-nettoyage
+timeout 3 bash -c 'echo > /dev/tcp/10.10.0.218/5005' && echo "Pi OK"
+MYCOBOT_PI=10.10.0.218 /usr/bin/python3 scripts/lancer_pick_dashboard_final.py --svpro-dream
+```
+
 ## État actuel (14 octobre 2026 — soir, DREAM sur le banc réel)
 
 ### Ce qui a été accompli aujourd'hui

@@ -61,3 +61,9 @@ scripts/affaissement.json
 
 # Captures reelles et jeux NDDS : 885 Mo + 430 Mo, jamais dans git.
 training/dream/captures/
+
+# Fichiers locaux à ne jamais versionner (22/10/2026)
+*.bak[0-9]
+*.code-workspace
+docs/PI_REMOTE_ACCESS.md
+scripts/calibration_duree.json
