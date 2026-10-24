@@ -561,6 +561,11 @@ def stage_dataset(cfg):
     info = json.loads((dst / 'meta' / 'info.json').read_text())
     log(f'dataset {src} -> {dst}: {info["total_episodes"]} episodes, {info["total_frames"]} frames, '
         f'fps {info["fps"]}')
+    expected = {k: cfg[f'expect_{k}'] for k in ('episodes', 'frames') if cfg.get(f'expect_{k}')}
+    found = {'episodes': info['total_episodes'], 'frames': info['total_frames']}
+    if any(found[k] != v for k, v in expected.items()):
+        sys.exit(f'Wrong dataset: {src} holds {found}, this run expects {expected}. Attach only the run\'s '
+                 f'dataset; delete {dst} if it was staged from another one in this session.')
     return dst
 
 

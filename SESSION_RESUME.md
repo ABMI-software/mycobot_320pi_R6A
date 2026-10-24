@@ -1,5 +1,40 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (24 octobre 2026 — matin, lot B converti, carnet Run B prêt)
+
+### Ce qui a été accompli
+- **Lot 1051-1400 terminé** le 21/10 à 05:25 (Paris) : 348 / 350 du premier coup ; seuls 1098
+  et 1099 (incident mémoire du 19/10) en échec.
+- **1098 et 1099 réenregistrées** le 23/10 (14:19-14:35), OK ; les tentatives ratées sont de côté
+  en `seed_NNNN.incomplete_<heure>`.
+- **Graine 1234 écartée** : `verify_preplaced_batch` y trouvait 2 épisodes (première prise ratée,
+  reprise réussie). Réenregistrée : même échec, même reprise, même écart +6/+3 mm — la scène est
+  déterministe. Dossier renommé `seed_1234.excluded_retry_both_runs` ; **graine 1401** enregistrée
+  à sa place, OK.
+- Le portable s'est mis en veille ~10 h le 23/10 (14:46 → ~01:20) : la graine 1234 a repris à
+  la sortie de veille, sans dommage.
+- `verify_preplaced_batch` 1001-1401, enregistrements puis jeu converti : **400 OK** ; seul
+  signalement, 1234 « non enregistrée » (voulu). Pièces pré-triées 0/1/2/3 : 114/98/99/89 ;
+  cibles 101/99/100/100.
+- Conteneur redémarré (0 zombie), conversion `local/mycobot_tri_sort_B_s1001_1401` :
+  **400 épisodes, 71 059 trames**, 154-214 par épisode (médiane 176), 1,2 Go.
+- Zip `mycobot_tri_sort_B_s1001_1401.zip` (sha256 `1428ed00…46ae1`, 14 fichiers, CRC bon), rechargé
+  par LeRobot depuis le zip : 400 / 71 059, images des trois caméras décodées au début, au milieu
+  et à la fin. Copié dans `C:\Users\tomis\Downloads` avec le carnet.
+- **Carnet Run B** : mêmes arguments `lerobot-train` que Run A (comparés par programme), pilote du
+  dépôt avec garde sur le nombre d'épisodes et de trames.
+
+### Prochaines actions
+1. [ROUGE] Feu vert de l'utilisateur, puis : téléverser le zip comme `mycobot-tri-sort-b-400`,
+   lancer le carnet (session 1 ≈ 10,5 h jusqu'au pas ~13 000, session 2 ≈ 6,5 h).
+2. [JAUNE] Pendant Run B : préparation de Run C sur le jeu complet (étiquettes, démarrage à
+   chaud, λ, tests CPU restants) ; erreur du démarrage (mm) et λ dans le protocole.
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot /workspace/venv_lerobot/bin/python /workspace/src/scripts/verify_preplaced_batch.py /workspace/tri_sort_B 1001 1401 --dataset /workspace/tri_datasets/local/mycobot_tri_sort_B_s1001_1401
+```
+
 ## État actuel (19 octobre 2026 — nuit, code de la tête auxiliaire de Run C ; tests en partie reportés)
 
 ### Ce qui a été accompli

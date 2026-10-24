@@ -9,6 +9,18 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — Run B : jeu de 400 dispositions et carnet Kaggle (24/10)
+
+- **`training/smolvla_kaggle/smolvla_tri_sort_runB_frozen_20k.ipynb`** : Run A à l'identique
+  (mêmes arguments de `lerobot-train`, vérifié), sur le jeu `local/mycobot_tri_sort_B_s1001_1401`
+  (400 épisodes, une disposition chacun, 71 059 trames). Le pilote embarqué est celui du dépôt,
+  octet pour octet.
+- **Pilote** : `expect_episodes` / `expect_frames` ; il s'arrête avant l'entraînement si le jeu
+  joint sur Kaggle n'a pas exactement ce nombre d'épisodes et de trames (testé sur CPU).
+- **Lot B** : graine 1234 écartée (sa première prise rate de la même façon à chaque
+  enregistrement, la scène étant déterministe ; deux épisodes là où le contrôle n'en admet
+  qu'un), remplacée par la graine 1401 ; dossier renommé, non supprimé.
+
 ### Ajouté — Run C : tête auxiliaire de position, démarrage à chaud, calibration de λ (19/10, soir)
 
 - **`scripts/build_aux_labels.py`** : positions x, y des quatre pièces par trame (par `index` du
