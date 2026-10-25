@@ -1,5 +1,44 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (25 octobre 2026 — matin, Run B terminé, préparation du Run C sur Kaggle)
+
+### Ce qui a été accompli
+- **Run B terminé** sur Kaggle : 20 000 pas, perte finale 0,036 (0,055 à la fin de la première
+  session), pic 12,4 Go ; deuxième session 24/10 19:33 → 25/10 02:04 (Paris). Sortie téléchargée
+  dans `C:\Users\tomis\Downloads\results (3)\` (`run/checkpoints/020000`, `kept/005000`,
+  `010000`, `015000`).
+- **Run C, démarrage à chaud** (CPU) : extraction des traits 06:29 → 07:41, ajustement ridge :
+  **65,7 mm** médiane (p90 122,5) contre **133,8 mm** pour la position moyenne ; pave_jaune
+  le plus faible (83,5 mm, p90 158,9 au-dessus de son plancher).
+- **Calibration de λ sur CPU interrompue** : lancée à 07:58 au lot de 6 sans limites, WSL a
+  redémarré à 08:13 (Paris) avant le premier lot. Aucun résultat ; les fichiers du conteneur ont
+  survécu. Nouvelle règle : tout calcul SmolVLA sur CPU sous `docker update --cpus 4 --memory 8g
+  --memory-swap 8g`, `OMP_NUM_THREADS=4`, lot ≤ 2, avec accord et durée annoncée ; de préférence
+  sur Kaggle. Limites posées sur `gazebo_to_lerobot` le 25/10.
+- **Carnet `smolvla_runC_prep_t4.ipynb`** et **zip `mycobot_tri_sort_C_s1001_1401.zip`**
+  (1 224 228 796 octets, sha256 `0032e46f…a17c05c`) dans `C:\Users\tomis\Downloads`.
+
+### Décisions prises
+- λ, le recouvrement, la reprise avec la tête et le chargement se vérifient sur un T4 (environ
+  50 min), pas en local.
+- Nouveau jeu Kaggle **`mycobot-tri-sort-c-400`** ; `mycobot-tri-sort-b-400` reste inchangé.
+- Seuil de recouvrement fixé avant l'exécution : ≤ 0,05 (≈ 1 trame sur 60 attendue par hasard).
+
+### Prochaines actions
+1. [ROUGE] Téléverser le zip comme `mycobot-tri-sort-c-400`, lancer le carnet de préparation
+   (l'utilisateur), rapporter `runc_prep_results.json`.
+2. [ROUGE] Inscrire λ, les 65,7 mm et le choix du lot de 6 dans `config/probe_protocol.yaml`
+   avant tout lancement du Run C ; construire le carnet du Run C.
+3. [JAUNE] Évaluation Gazebo du Run B (15000 contre 020000, graines 11-15) : SmolVLA sur CPU,
+   donc accord et durée annoncée d'abord.
+
+### Commande rapide de reprise
+```bash
+# Docker Desktop ouvert sous Windows
+docker start gazebo_to_lerobot
+docker update --cpus 4 --memory 8g --memory-swap 8g gazebo_to_lerobot
+```
+
 ## État actuel (24 octobre 2026 — matin, lot B converti, carnet Run B prêt)
 
 ### Ce qui a été accompli

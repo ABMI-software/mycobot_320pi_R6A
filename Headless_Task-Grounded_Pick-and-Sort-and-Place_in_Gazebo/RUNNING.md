@@ -18,8 +18,11 @@ Every command below runs in a **shell inside the container**, unless it starts
 with `docker` or `sudo` (those run on the WSL2 host, your Ubuntu prompt). From
 the host:
 
-    sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'   # WSL has no systemd: start Docker by hand
+    # Docker Desktop (this PC since 16/10/2026): open Docker Desktop on Windows; `docker` appears in
+    # Ubuntu once it runs (Settings -> Resources -> WSL Integration). Native dockerd in WSL instead:
+    #   sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'
     docker start gazebo_to_lerobot                          # starts the container in the background, gives no shell
+    docker update --cpus 4 --memory 8g --memory-swap 8g gazebo_to_lerobot   # before any SmolVLA job on CPU
     docker exec -it gazebo_to_lerobot bash                  # a shell inside it; the prompt becomes root@<container id>
 
 That shell's `~/.bashrc` loads ROS 2 and the workspace, so nothing needs
@@ -179,8 +182,8 @@ The container runs the copies placed in the workspace (`/workspace/src/scripts`,
 `scripts/rlds`, `contracts`); the repository copies are under this project's
 `scripts/`, `contracts/`, `docker/`, and `ROS2_to_RLDS_Conversion_OpenVLA/extraction/`.
 
-    # WSL2 host, every new session (WSL2 has no systemd; Docker stops with WSL2)
-    sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'; sleep 5
+    # WSL2 host, every new session: open Docker Desktop on Windows (this PC since 16/10/2026),
+    # or with a native dockerd: sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'; sleep 5
     # every new session, Linux or WSL2
     docker start gazebo_to_lerobot rlds_builder
 

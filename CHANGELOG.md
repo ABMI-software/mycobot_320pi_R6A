@@ -9,6 +9,25 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — Run C : carnet de préparation Kaggle et jeu `mycobot-tri-sort-c-400` (25/10)
+
+- **Démarrage à chaud de la tête auxiliaire** (CPU, conteneur) : 1 200 trames du lot B,
+  381 épisodes ; erreur par épisode tenu à l'écart **65,7 mm** en médiane (p90 122,5 mm), contre
+  **133,8 mm** pour la position moyenne de chaque pièce. Par pièce : cube_rouge 62,7,
+  pave_jaune 83,5 (p90 158,9, au-dessus de son plancher), cylindre_vert 56,9, cube_bleu 63,7 mm.
+  Pour pave_jaune et cylindre_vert, la régularisation retenue est la plus faible de la grille (0,01).
+- **`training/smolvla_kaggle/smolvla_runC_prep_t4.ipynb`** : sur un T4, contrôle
+  `meta/SHA256SUMS`, calibration de λ (10 lots de 6, graine 1001), recouvrement avec les trames du
+  démarrage à chaud (seuil 0,05, fixé avant), contrôle de reprise avec la tête au λ calibré,
+  chargement du point de reprise comme en évaluation Gazebo. PASS/FAIL par étape, tout dans
+  `/kaggle/working/runc_prep_results.json`.
+- **Jeu `mycobot_tri_sort_C_s1001_1401.zip`** (1 224 228 796 octets) : le zip du Run B
+  octet pour octet, plus `aux_labels.npz`, `aux_head_init.safetensors`, `aux_warm_start.json`,
+  `aux_warm_start_index.npz` (indices des 1 200 trames, 10 Ko) et `SHA256SUMS`. Nouveau jeu
+  Kaggle, le jeu du Run B reste tel quel. `aux_features.npz` (442 Mo) n'est pas envoyé.
+- **`RUNNING.md`** : démarrage par Docker Desktop (le `dockerd` lancé à la main n'existe plus sur
+  ce PC depuis le 16/10) et limites du conteneur avant tout calcul SmolVLA sur CPU.
+
 ### Ajouté — Run B : jeu de 400 dispositions et carnet Kaggle (24/10)
 
 - **`training/smolvla_kaggle/smolvla_tri_sort_runB_frozen_20k.ipynb`** : Run A à l'identique
