@@ -55,6 +55,10 @@ CAMERA_RENAME = {
 # encoder in its own group too. Two preparation modes run the same data path without training:
 # SMOLVLA_AUX_FEATURES (frozen connector features of training frames, for the warm start) and
 # SMOLVLA_AUX_CALIBRATE (gradient norms of both losses on the vision encoder, for lambda).
+# SMOLVLA_AUX_HEAD_FROZEN keeps the head at its warm start (no gradient, no optimizer group): with
+# 184 320 inputs averaging 3.5, Adam's first step at lr 1e-3 moved the head's output by ~100
+# normalised units and threw the fp16 scaler down to 2 (Kaggle T4, 25/10). The auxiliary loss still
+# trains the encoder and connector through it; every checkpoint's head is checked against the start.
 FP32_LAUNCHER = '''import copy
 import json
 import os
@@ -87,6 +91,7 @@ AUX_FEATURES_FRAMES = int(os.environ.get("SMOLVLA_AUX_FEATURES_FRAMES") or 0)
 AUX_CALIBRATE = os.environ.get("SMOLVLA_AUX_CALIBRATE") or None
 LR_VISION = float(os.environ.get("SMOLVLA_LR_VISION") or 0)
 LR_HEAD = float(os.environ.get("SMOLVLA_LR_HEAD") or 1e-3)
+AUX_HEAD_FROZEN = bool(os.environ.get("SMOLVLA_AUX_HEAD_FROZEN"))
 AUX_HEAD_FILE = "aux_head.safetensors"
 AUX_INIT_FILE = "aux_head_init.safetensors"
 AUX = None
@@ -123,12 +128,15 @@ class AuxHead:
         device = next(policy.parameters()).device
         self.head = torch.nn.Linear(state["weight"].shape[1], state["weight"].shape[0]).to(device)
         self.head.load_state_dict(state)
+        self.init = load_file(str(Path(AUX_DIR) / AUX_INIT_FILE))
+        if AUX_HEAD_FROZEN:
+            self.head.requires_grad_(False)
         self.features = []
         policy.model.vlm_with_expert.get_vlm_model().connector.register_forward_hook(
             lambda _m, _i, out: self.features.append(out))
         print(f"[fp32 launcher] aux head {tuple(state['weight'].shape)} from {source}, weight sum "
               f"{float(state['weight'].double().sum()):.6g}; labels for {int(self.mask.any(1).sum())} frames, "
-              f"lambda {AUX_LAMBDA}", flush=True)
+              f"lambda {AUX_LAMBDA}{', head frozen' if AUX_HEAD_FROZEN else ''}", flush=True)
 
     def count(self, batch):
         return 2.0 * float(self.mask[batch["index"].long().view(-1).cpu()].sum())
@@ -147,13 +155,17 @@ class AuxHead:
     def save(self, pretrained_dir):
         from safetensors.torch import save_file
         Path(pretrained_dir).mkdir(parents=True, exist_ok=True)
-        save_file({k: v.detach().contiguous().cpu() for k, v in self.head.state_dict().items()},
-                  str(Path(pretrained_dir) / AUX_HEAD_FILE))
+        state = {k: v.detach().contiguous().cpu() for k, v in self.head.state_dict().items()}
+        save_file(state, str(Path(pretrained_dir) / AUX_HEAD_FILE))
+        if AUX_HEAD_FROZEN:
+            same = state.keys() == self.init.keys() and all(torch.equal(state[k], self.init[k]) for k in state)
+            print(f"[fp32 launcher] aux head frozen: identical to {AUX_INIT_FILE} {same}, weight sum "
+                  f"{float(state['weight'].double().sum()):.6g}", flush=True)
 
 
 def trained_params(policy):
     params = [p for p in policy.parameters() if p.requires_grad]
-    return params + (list(AUX.head.parameters()) if AUX else [])
+    return params + (list(AUX.head.parameters()) if AUX and not AUX_HEAD_FROZEN else [])
 
 
 def make_policy_fp32(*args, **kwargs):
@@ -172,7 +184,7 @@ def make_policy_fp32(*args, **kwargs):
         groups = [{"params": [p for n, p in named if group(n) != "vision"], "name": "connector, expert"},
                   {"params": [p for n, p in named if group(n) == "vision"], "name": "vision",
                    **({"lr": LR_VISION} if LR_VISION else {})}]
-        if AUX:
+        if AUX and not AUX_HEAD_FROZEN:
             groups.append({"params": list(AUX.head.parameters()), "name": "aux head", "lr": LR_HEAD})
         policy.get_optim_params = lambda: groups
         print("[fp32 launcher] optimizer groups: " + "; ".join(
@@ -518,6 +530,8 @@ if __name__ == "__main__":
 STEP_RE = re.compile(r'step:([\d.]+)([KMB]?)\s.*?loss:([\d.eE+-]+).*?updt_s:([\d.]+).*?data_s:([\d.]+)')
 TQDM_RE = re.compile(r'(\d+)/\d+ \[')
 MEM_RE = re.compile(r'mem_gb:([\d.]+)')
+AUX_RE = re.compile(r'aux_loss:([\d.eE+-]+)')
+SCALE_RE = re.compile(r'(?:scale now|loss scaler restored: scale) ([\d.eE+-]+)')
 SUFFIX = {'': 1, 'K': 1_000, 'M': 1_000_000, 'B': 1_000_000_000}
 OOM_MARKERS = ('OutOfMemoryError', 'CUDA out of memory')
 
@@ -645,9 +659,45 @@ class GpuMemSampler(threading.Thread):
                 pass
 
 
-def run_lerobot(cfg, args, log_path, deadline=None, prune_dir=None, stop_after_step=None):
-    """Stream lerobot-train output; stop it cleanly at the deadline, or once a step past stop_after_step
-    is logged (resume check). Returns (rc, steps, oom, peak_mb, stopped)."""
+class Guards:
+    """Run C stop conditions (cfg['guards'], fixed in probe_protocol.yaml before the run): the
+    auxiliary loss above aux_loss_max on a step up to aux_loss_steps; more than skip_max updates
+    skipped by the fp16 loss scaler among steps 1..skip_steps; the scaler below scale_min on a step
+    after scale_after; a frozen head that differs from its warm start at a checkpoint."""
+
+    def __init__(self, g, use_amp):
+        self.g, self.reason = g, None
+        self.scale = 65536.0 if use_amp else None  # GradScaler's initial scale; a resume restores its own
+        self.pending, self.skipped = 0, 0
+
+    def line(self, line, step):
+        if 'update skipped by the fp16 loss scaler' in line:
+            self.pending += 1
+        s = SCALE_RE.search(line)
+        if s:
+            self.scale = float(s[1])
+        if 'aux head frozen: identical' in line and ' False,' in line:
+            self.reason = 'frozen aux head differs from aux_head_init.safetensors at a checkpoint'
+        if step is None:
+            return self.reason
+        g = self.g
+        if step <= g['skip_steps']:
+            self.skipped += self.pending
+        self.pending = 0
+        a = AUX_RE.search(line)
+        if a and step <= g['aux_loss_steps'] and float(a[1]) > g['aux_loss_max']:
+            self.reason = f"aux_loss {float(a[1]):.4g} > {g['aux_loss_max']} at step {step}"
+        elif self.skipped > g['skip_max']:
+            self.reason = f"{self.skipped} updates skipped by the fp16 loss scaler in steps 1-{g['skip_steps']}"
+        elif step > g['scale_after'] and self.scale is not None and self.scale < g['scale_min']:
+            self.reason = f"fp16 loss scaler at {self.scale:g} < {g['scale_min']} at step {step}"
+        return self.reason
+
+
+def run_lerobot(cfg, args, log_path, deadline=None, prune_dir=None, stop_after_step=None, guards=None):
+    """Stream lerobot-train output; stop it cleanly at the deadline, once a step past stop_after_step
+    is logged (resume check), or on a guard (Guards). Returns (rc, steps, oom, peak_mb, stopped);
+    a guard stop is in guards.reason."""
     keep = dict(keep_every=cfg.get('keep_every', 0), kept_root=Path(cfg['working']) / 'kept')
     if cfg.get('fp32_weights', True):
         launcher = Path(cfg['scratch']) / 'lerobot_train_fp32.py'
@@ -662,7 +712,8 @@ def run_lerobot(cfg, args, log_path, deadline=None, prune_dir=None, stop_after_s
                SMOLVLA_LR_VISION=str(cfg.get('lr_vision') or ''), SMOLVLA_LR_HEAD=str(cfg.get('lr_head') or ''),
                SMOLVLA_AUX_FEATURES=cfg.get('aux_features') or '',
                SMOLVLA_AUX_FEATURES_FRAMES=str(cfg.get('aux_features_frames') or ''),
-               SMOLVLA_AUX_CALIBRATE=cfg.get('aux_calibrate') or '')
+               SMOLVLA_AUX_CALIBRATE=cfg.get('aux_calibrate') or '',
+               SMOLVLA_AUX_HEAD_FROZEN='1' if cfg.get('aux_head_frozen') else '')
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log('run: ' + ' '.join(cmd))
     sampler = GpuMemSampler()
@@ -695,8 +746,8 @@ def run_lerobot(cfg, args, log_path, deadline=None, prune_dir=None, stop_after_s
             if any(m in line for m in OOM_MARKERS):
                 oom = True
             m = STEP_RE.search(line)
+            step = parse_step(line, m) if m else None
             if m:
-                step = parse_step(line, m)
                 mem = MEM_RE.search(line)
                 steps.append({'step': step, 'loss': float(m[3]), 'updt_s': float(m[4]), 'data_s': float(m[5]),
                               'mem_gb': float(mem[1]) if mem else None})
@@ -704,6 +755,10 @@ def run_lerobot(cfg, args, log_path, deadline=None, prune_dir=None, stop_after_s
                     stopped = True
                     log(f'step {step} logged: stopping training as a session cut would (resume check)')
                     os.killpg(proc.pid, signal.SIGINT)
+            if guards and guards.reason is None and guards.line(line, step):
+                stopped = True
+                log(f'GUARD STOP: {guards.reason}; stopping training')
+                os.killpg(proc.pid, signal.SIGINT)
             if prune_dir and (m or 'Checkpoint policy after step' in line):
                 prune_checkpoints(prune_dir, **keep)
             if m or 'Checkpoint' in line or '[fp32 launcher]' in line or '[accum check]' in line or (
@@ -819,18 +874,25 @@ def train(cfg, data_dir):
         args = common_args(cfg, data_dir, cfg['train_batch_size'], cfg['train_steps'], cfg['train_amp']) + [
             f'--save_freq={cfg["save_freq"]}', f'--log_freq={cfg["log_freq"]}', f'--output_dir={run_dir}']
     deadline = time.time() + cfg['session_hours'] * 3600
+    guards = Guards(cfg['guards'], cfg['train_amp']) if cfg.get('guards') else None
     rc, steps, oom, peak, stopped = run_lerobot(cfg, args, work / 'logs' / f'train_{time.strftime("%Y%m%d_%H%M%S")}.log',
                                                 deadline=deadline, prune_dir=run_dir,
-                                                stop_after_step=cfg.get('stop_after_step'))
+                                                stop_after_step=cfg.get('stop_after_step'), guards=guards)
     drop_incomplete_checkpoints(run_dir)
     done = complete_checkpoints(run_dir)
-    summary = {'rc': rc, 'oom': oom, 'stopped_at_time_limit': stopped, 'peak_gpu_mb': peak,
+    guard_stop = guards.reason if guards else None
+    summary = {'rc': rc, 'oom': oom, 'stopped_at_time_limit': stopped and not guard_stop, 'guard_stop': guard_stop,
+               'updates_skipped_steps_1_100': guards.skipped if guards else None,
+               'fp16_scale_last': guards.scale if guards else None, 'peak_gpu_mb': peak,
                'last_logged_step': steps[-1]['step'] if steps else None,
                'last_logged_loss': steps[-1]['loss'] if steps else None,
                'checkpoint': str(done[-1][1]) if done else None,
                'target_steps': cfg['train_steps']}
     (work / 'train_summary.json').write_text(json.dumps(summary, indent=2))
     log(f'summary {summary}')
+    if guard_stop:
+        sys.exit(f'GUARD STOP: {guard_stop}. Do not resume this run: the stop condition in probe_protocol.yaml '
+                 'applies.')
     if not done:
         sys.exit('No complete checkpoint was written in this session.')
     if done[-1][0] >= cfg['train_steps']:

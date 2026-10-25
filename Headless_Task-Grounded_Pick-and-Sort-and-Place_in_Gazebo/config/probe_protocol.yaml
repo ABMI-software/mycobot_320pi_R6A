@@ -253,3 +253,44 @@ accumulation_check:
     1.38e-2 / 3.81e-4 = 36, accumulated 5.97e-2 / 2.62e-3 = 23 (0.63 x); vision floor
     2.09e-2 / 6.21e-4 = 34, accumulated 7.99e-2 / 4.14e-3 = 19 (0.57 x); connector and expert
     without a floor factor.
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 25/10/2026, committed before any Run C training run.
+run_c_settings:
+  warm_start: >
+    ridge fit of the auxiliary head (Linear 184 320 -> 8) on frozen smolvla_base connector
+    features of 1 200 Run B training frames from 381 episodes (scripts/aux_warm_start.py, CPU,
+    25/10): median error by held-out episode 65.7 mm (p90 122.5), against 133.8 mm for each
+    piece's training mean position. Per piece: cube_rouge 62.7, pave_jaune 83.5 (p90 158.9, above
+    its mean-position floor of 134.4), cylindre_vert 56.9, cube_bleu 63.7 mm. Ridge alpha at the
+    bottom of its grid (0.01) for pave_jaune and cylindre_vert.
+  lambda: >
+    0.3 (exact 0.272), design note D4 rule: at the starting weights with the warm-started head,
+    10 batches of 6 drawn with seed 1001, lambda = 0.5 x median vision-encoder gradient norm of
+    the action loss / that of the auxiliary loss, rounded to {1, 3} x 10^n. 2 of the 60
+    calibration frames were in the warm-start sample (0.033, limit 0.05 set before the run).
+    Kaggle T4, smolvla_runC_prep_t4.ipynb, 25/10/2026 09:49-10:15 (Paris), all checks PASS.
+  batch: 30 = 6 x 5 accumulated (accumulation_check above, batch 6 on the T4)
+  dataset: mycobot-tri-sort-c-400 = Run B's 400 episodes / 71 059 frames byte for byte, plus
+    the Run C files in meta/ (SHA256SUMS)
+  learning_rates: vision encoder 1e-5, connector and action expert 1e-4 (LeRobot's), language
+    layers frozen
+  aux_head: >
+    FROZEN at its warm start (no gradient, no optimizer group); the auxiliary loss trains the
+    vision encoder and connector through it. Decided by the project owner on 25/10/2026 after the
+    prep run: at the head's learning rate of 1e-3, Adam's first step moved its output by ~100
+    normalised units (inputs sum to ~640 000 in absolute value: 1 200 saved frames, mean 3.5 per
+    feature), the auxiliary loss went from 0.13 to 10 216 at step 3, 15 of the first 17 updates were
+    skipped and the fp16 loss scaler fell from 65 536 to 2 and stayed there.
+    Not chosen: a head learning rate of about 1e-8 (keeps one Adam step under ~0.01 normalised
+    unit), because it is derived from that estimate and untested. Candidate for Run D: normalised
+    features before the head (needs a new ridge fit and a new lambda calibration).
+  stop_conditions: >
+    the driver stops training (as a session time limit does) and the run is not resumed, if
+    ANY of: (1) the auxiliary loss logged on a step up to 50 is above 1 (0.13 at the warm start;
+    10 216 in the prep run); (2) more than 5 of the first 100 updates are skipped by the fp16 loss
+    scaler; (3) after step 100, the fp16 loss scaler is below 1024; (4) at any checkpoint, the
+    saved head is not identical to aux_head_init.safetensors. Steps are logged every 10.
+  final_head_check: >
+    the head in the final checkpoint must be identical, tensor for tensor, to
+    aux_head_init.safetensors, weight sum -0.0800367; otherwise the run is reported as failed.

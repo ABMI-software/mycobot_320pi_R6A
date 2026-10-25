@@ -9,6 +9,25 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — Run C : tête figée, conditions d'arrêt, carnet d'entraînement (25/10)
+
+- **Préparation sur T4** (25/10, 09:49-10:15 Paris) : les cinq contrôles passent. **λ = 0,3**
+  (exact 0,272), recouvrement 2/60, reprise correcte, tête rechargée depuis le point de reprise,
+  chargement comme en évaluation.
+- **Défaut trouvé** : au taux de 1e-3, le premier pas d'Adam déplace la sortie de la tête
+  d'environ 100 unités normalisées (184 320 entrées, |x| moyen 3,5) ; perte auxiliaire de 0,13 à
+  10 216, 15 mises à jour sur 17 sautées, échelle fp16 tombée à 2.
+- **Pilote** : `aux_head_frozen` garde la tête à son démarrage à chaud (ni gradient, ni groupe
+  d'optimiseur) et vérifie à chaque point de reprise qu'elle est identique à
+  `aux_head_init.safetensors`. `guards` arrête l'entraînement si : perte auxiliaire > 1 avant le
+  pas 50 ; plus de 5 mises à jour sautées sur les 100 premières ; échelle fp16 < 1024 après le
+  pas 100 ; tête modifiée. Testé : cinq scénarios sur un faux entraîneur, tête figée sur une
+  politique factice (aucun gradient sur la tête, gradients vers l'encodeur, écart de 1e-6 détecté).
+- **`training/smolvla_kaggle/smolvla_tri_sort_runC_aux_10k.ipynb`** : Run C, lot 30 = 6 x 5,
+  10 000 pas, λ 0,3, tête figée, poids gardés tous les 2 500 pas, contrôle final de la tête.
+- **`config/probe_protocol.yaml`** : `run_c_settings` (démarrage à chaud, λ, tête figée, options
+  écartées : taux ~1e-8 non testé ; traits normalisés, candidat Run D ; conditions d'arrêt).
+
 ### Ajouté — Run C : carnet de préparation Kaggle et jeu `mycobot-tri-sort-c-400` (25/10)
 
 - **Démarrage à chaud de la tête auxiliaire** (CPU, conteneur) : 1 200 trames du lot B,

@@ -1,5 +1,22 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (25 octobre 2026 — midi, carnet Run C prêt)
+
+### Ce qui a été accompli
+- **Préparation Run C sur T4** : tout PASS, **λ = 0,3**. Mais la tête auxiliaire au taux 1e-3
+  explose au premier pas (perte 0,13 → 10 216, échelle fp16 → 2).
+- **Décision** : tête figée à son démarrage à chaud (65,7 mm). Taux ~1e-8 écarté (non testé) ;
+  traits normalisés = candidat Run D. Inscrit dans `probe_protocol.yaml` (`run_c_settings`).
+- **Conditions d'arrêt** dans le pilote et le protocole, plus contrôle final de la tête
+  (identique, somme −0,0800367). Testées hors GPU.
+- **Carnet `smolvla_tri_sort_runC_aux_10k.ipynb`** copié dans `C:\Users\tomis\Downloads`.
+
+### Prochaines actions
+1. [ROUGE] Lancer le Run C (l'utilisateur), jeu `mycobot-tri-sort-c-400` seul ; ~18,5 h de GPU
+   en deux sessions.
+2. [ROUGE] Entre les sessions : sonde et échange d'images sur `kept/005000` (`run_c_midway_stop`).
+3. [JAUNE] Évaluation Gazebo du Run B (15000 contre 020000) : accord et durée annoncée d'abord.
+
 ## État actuel (25 octobre 2026 — matin, Run B terminé, préparation du Run C sur Kaggle)
 
 ### Ce qui a été accompli
