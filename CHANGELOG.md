@@ -9,6 +9,18 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — Run C : session 1 de 10,25 h, pas comptés après reprise, passation (25/10, soir)
+
+- **`SESSION_HOURS = 10.25`** : la session 1 tient dans le quota restant (11 h 29) avec ~1 h de
+  marge ; ~5 600 pas à 6,5 s. Session 2 après la remise à zéro du 31/10.
+- **Pilote, correction** : après une reprise, la barre de progression de LeRobot repart de 1 et,
+  à partir du pas 1 000, le pilote y lisait le numéro de pas (1, 2, 3… au lieu de 5 501…). Il
+  ajoute désormais le pas de reprise ; sans cela, les conditions d'arrêt des pas 1-100 se
+  seraient appliquées au début de la session 2. Testé sur trois lignes de journal.
+- **`probe_protocol.yaml`** : `run_c_midway_checkpoint` (session 1 arrêtée avant 5 000 : le
+  contrôle de mi-parcours porte sur le point de reprise le plus récent, pas sur `kept/002500`).
+- **`SESSION_RESUME.md`** : passation de la session 2 (autre compte Kaggle possible).
+
 ### Ajouté — Run C : tête figée, conditions d'arrêt, carnet d'entraînement (25/10)
 
 - **Préparation sur T4** (25/10, 09:49-10:15 Paris) : les cinq contrôles passent. **λ = 0,3**

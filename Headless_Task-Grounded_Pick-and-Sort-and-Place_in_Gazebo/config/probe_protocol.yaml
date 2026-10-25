@@ -294,3 +294,19 @@ run_c_settings:
   final_head_check: >
     the head in the final checkpoint must be identical, tensor for tensor, to
     aux_head_init.safetensors, weight sum -0.0800367; otherwise the run is reported as failed.
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 25/10/2026, committed before Run C session 1 is launched.
+run_c_midway_checkpoint:
+  context: >
+    Session 1 runs SESSION_HOURS = 10.25 (the Kaggle quota left on 25/10 was 11 h 29; the next
+    reset is 31/10). At ~6.5 s per update it ends near step 5 600; on a T4 16 % slower, near 4 900.
+  rule: >
+    The run_c_midway_stop tests use kept/005000 if session 1 wrote it. If session 1 ended before
+    step 5 000, they use the newest complete checkpoint in session 1's output
+    (run/checkpoints/<step>/pretrained_model, e.g. 004500), NOT kept/002500. The tests, metrics and
+    stop_if criteria of run_c_midway_stop are unchanged.
+  session_2: >
+    starts only after the midway result is recorded below and committed, with the verdict
+    "continue" (neither stop_if criterion met).
+  result: not yet run

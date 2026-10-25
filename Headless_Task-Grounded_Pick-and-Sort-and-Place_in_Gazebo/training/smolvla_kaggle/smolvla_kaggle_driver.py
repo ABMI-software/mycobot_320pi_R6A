@@ -536,11 +536,12 @@ SUFFIX = {'': 1, 'K': 1_000, 'M': 1_000_000, 'B': 1_000_000_000}
 OOM_MARKERS = ('OutOfMemoryError', 'CUDA out of memory')
 
 
-def parse_step(line, m):
+def parse_step(line, m, offset=0):
+    """offset: the step a resumed run started from, since the tqdm prefix counts from the resume."""
     if not m[2]:
         return int(m[1])
     t = TQDM_RE.search(line[:m.start()])
-    return int(t[1]) if t else int(float(m[1]) * SUFFIX[m[2]])
+    return int(t[1]) + offset if t else int(float(m[1]) * SUFFIX[m[2]])
 
 
 def log(msg):
@@ -694,7 +695,8 @@ class Guards:
         return self.reason
 
 
-def run_lerobot(cfg, args, log_path, deadline=None, prune_dir=None, stop_after_step=None, guards=None):
+def run_lerobot(cfg, args, log_path, deadline=None, prune_dir=None, stop_after_step=None, guards=None,
+                step_offset=0):
     """Stream lerobot-train output; stop it cleanly at the deadline, once a step past stop_after_step
     is logged (resume check), or on a guard (Guards). Returns (rc, steps, oom, peak_mb, stopped);
     a guard stop is in guards.reason."""
@@ -746,7 +748,7 @@ def run_lerobot(cfg, args, log_path, deadline=None, prune_dir=None, stop_after_s
             if any(m in line for m in OOM_MARKERS):
                 oom = True
             m = STEP_RE.search(line)
-            step = parse_step(line, m) if m else None
+            step = parse_step(line, m, step_offset) if m else None
             if m:
                 mem = MEM_RE.search(line)
                 steps.append({'step': step, 'loss': float(m[3]), 'updt_s': float(m[4]), 'data_s': float(m[5]),
@@ -865,19 +867,22 @@ def train(cfg, data_dir):
             shutil.copytree(ckpt / 'pretrained_model', dst)
             log(f'kept weights of step {ckpt.name} (resumed from) in {dst}')
         args = [f'--config_path={ckpt / "pretrained_model" / "train_config.json"}', '--resume=true']
+        step_offset = step
     else:
         if run_dir.exists() and complete_checkpoints(run_dir):
             sys.exit(f'{run_dir} already holds checkpoints from this session; attach it as input to resume, '
                      'or delete it to start over.')
         shutil.rmtree(run_dir, ignore_errors=True)
         log('no previous checkpoint attached: fresh run from lerobot/smolvla_base')
+        step_offset = 0
         args = common_args(cfg, data_dir, cfg['train_batch_size'], cfg['train_steps'], cfg['train_amp']) + [
             f'--save_freq={cfg["save_freq"]}', f'--log_freq={cfg["log_freq"]}', f'--output_dir={run_dir}']
     deadline = time.time() + cfg['session_hours'] * 3600
     guards = Guards(cfg['guards'], cfg['train_amp']) if cfg.get('guards') else None
     rc, steps, oom, peak, stopped = run_lerobot(cfg, args, work / 'logs' / f'train_{time.strftime("%Y%m%d_%H%M%S")}.log',
                                                 deadline=deadline, prune_dir=run_dir,
-                                                stop_after_step=cfg.get('stop_after_step'), guards=guards)
+                                                stop_after_step=cfg.get('stop_after_step'), guards=guards,
+                                                step_offset=step_offset)
     drop_incomplete_checkpoints(run_dir)
     done = complete_checkpoints(run_dir)
     guard_stop = guards.reason if guards else None

@@ -1,5 +1,77 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Passation : Run C session 2 (rédigée le 25 octobre 2026, soir)
+
+Session 2 reprend le Run C là où la session 1 s'est arrêtée et le mène au pas 10 000. Elle se
+lance **après la remise à zéro du quota Kaggle du 31/10** (minuit, heure de Kaggle), éventuellement
+par un collègue sur un **autre compte Kaggle**. Elle demande environ **8,5 h** de quota GPU.
+
+### Condition de départ (obligatoire)
+
+Ne lancer que si le résultat du contrôle de mi-parcours est écrit et commité dans
+`Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/config/probe_protocol.yaml`, section
+`run_c_midway_checkpoint`, champ `result`, avec le verdict **« continue »**. Ce verdict veut dire
+qu'aucun critère `stop_if` de `run_c_midway_stop` n'est atteint :
+- sonde linéaire sur le connecteur : l'erreur médiane n'est **pas** au-dessus de smolvla_base avec
+  l'intervalle à 95 % de la différence entièrement au-dessus de 0 sur au moins 2 des 3 caméras ;
+- échange d'images (graines 91-100) : la borne basse de l'intervalle à 95 % du décalage du point
+  de prise **et** celle de la variation de la part « donneur » sont **au-dessus de 0**.
+
+Le contrôle porte sur `kept/005000`, ou, si la session 1 s'est arrêtée avant 5 000, sur le point
+de reprise le plus récent de sa sortie (pas sur `kept/002500`). Champ `result` à « not yet run »
+ou verdict « stop » : **ne pas lancer**.
+
+### Ce qu'il faut
+
+1. **Le carnet** : `Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/training/smolvla_kaggle/smolvla_tri_sort_runC_aux_10k.ipynb`,
+   branche `feature/sort-episodes`, la version du commit qui contient cette passation (celle
+   qu'a utilisée la session 1). Dans la cellule 1 : `SESSION_HOURS = 10.25`, `AUX_LAMBDA = 0.3`,
+   `AUX_HEAD_FROZEN = True`, `TRAIN_STEPS = 10000`. Ne rien modifier.
+2. **Le jeu de données Run C** :
+   - même compte : `mycobot-tri-sort-c-400` (déjà sur Kaggle) ;
+   - autre compte : soit le propriétaire le partage (page du jeu → *Settings* → *Sharing* →
+     ajouter le nom d'utilisateur du collègue), soit le collègue téléverse
+     `mycobot_tri_sort_C_s1001_1401.zip` (1 224 228 796 octets, sha256
+     `0032e46fbf6f447bef62139c1e0bb2fd1b0b96976ec7dc026139b1e05a17c05c`) sous le nom de son
+     choix. Le carnet vérifie `meta/SHA256SUMS` et le pilote exige 400 épisodes / 71 059 trames.
+3. **La sortie de la session 1** (version « Complete » du carnet de la session 1) :
+   - même compte : *Add Input* → *Your Work* → *Notebooks* → le carnet de la session 1 (sa
+     dernière version) ;
+   - autre compte : le propriétaire télécharge **toute la sortie** de la session 1 (onglet
+     *Output*, téléchargement complet en zip, 7-10 Go) et la donne au collègue, qui la téléverse
+     telle quelle comme nouveau jeu privé (ex. `runc-session1-output`). Il faut que s'y trouvent
+     `run/checkpoints/<pas>/pretrained_model/` **et** `run/checkpoints/<pas>/training_state/`
+     (les 5 fichiers de LeRobot, dont `optimizer_state.safetensors` et `scheduler_state.json`, plus
+     `grad_scaler.json`), plus
+     `kept/002500/` et `kept/005000/`. Sans `training_state` complet, le pilote repart de zéro.
+4. **Réglages de session** : *GPU T4 x2*, *Internet On*, **exactement deux entrées** : le jeu
+   Run C et la sortie de la session 1. Puis *Save Version* → **Save & Run All (Commit)**.
+
+### À vérifier dans le journal
+
+| Moment | Ligne attendue |
+|---|---|
+| ~15 s | `DATASET PASS` (sinon : mauvais jeu ou deux jeux Run C attachés) |
+| ~2 min | `400 episodes, 71059 frames` |
+| ~2 min | `carried kept weights of step 2500 forward` (et 5000 s'il existe) |
+| ~2 min | **`resuming from step N`**, N = dernier point de reprise de la session 1 (pas `fresh run`) |
+| ~3 min | `aux head (8, 184320) from …/checkpoints/00N/pretrained_model/aux_head.safetensors, weight sum -0.0800367; … lambda 0.3, head frozen` |
+| ~3 min | deux groupes d'optimiseur (`connector, expert` et `vision … lr 1e-05`), **aucun** `aux head` ; `freeze=runC … total 198.1 M` |
+| ~3 min | `fp16 loss scaler restored: scale X`, avec X ≥ 1024 |
+| premiers pas | `step:N+10`, `N+20`… (pas `step:10`) ; `aux_loss` autour de 0,1-0,5 |
+| tous les 500 pas | `aux head frozen: identical to aux_head_init.safetensors True, weight sum -0.0800367` |
+| pas 7 500 | poids gardés `kept/007500` |
+| fin (~8 h) | `TRAINING COMPLETE`, puis `HEAD CHECK PASS` |
+
+`GUARD STOP` à un moment quelconque : ne pas relancer, envoyer la ligne et les 20 précédentes.
+Les traces `libtorchcodec` sont sans conséquence.
+
+### À récupérer à la fin
+
+`run/checkpoints/010000/pretrained_model/`, `kept/002500/`, `kept/005000/`, `kept/007500/`
+(`pretrained_model/` de chacun), `train_summary.json`, `runc_final_head.json`, `logs/`. Ensuite :
+`run_c_gate` (sonde et échange d'images) sur ces points, avant tout passage dans Gazebo.
+
 ## État actuel (25 octobre 2026 — midi, carnet Run C prêt)
 
 ### Ce qui a été accompli
