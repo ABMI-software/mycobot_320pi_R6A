@@ -310,3 +310,42 @@ run_c_midway_checkpoint:
     starts only after the midway result is recorded below and committed, with the verdict
     "continue" (neither stop_if criterion met).
   result: not yet run
+
+# ---------------------------------------------------------------------------------------------
+# Record, 25/10/2026 evening, during Run C session 1 (after its step 120; nothing changed in the run).
+run_c_warm_start_overlap:
+  observation: >
+    The auxiliary loss logged by Run C session 1 was 0.000 / 0.001 / 0.002 / 0.004 over steps
+    1-10 / 11-20 / 21-30 / 31-40, then 0.138 over steps 41-50 and 0.097-0.138 after (the warm
+    start's level: 0.08-0.22 in the lambda calibration).
+  cause: >
+    Real, not a logging artifact: the first 40 updates trained on exactly the frames the ridge
+    warm start was fitted on. LeRobot 0.6.1 draws training frames with EpisodeAwareSampler, whose
+    order is a pure function of (seed, epoch): it does not depend on the batch size or on any other
+    random draw. The warm-start features (auxfeatures mode) were extracted with seed 1000, Run C
+    trains with seed 1000, so the first 1 200 frames of Run C's epoch 0 are the 1 200 warm-start
+    frames, in the same order: 1 200 / 30 = updates 1-40. On those frames the ridge head is
+    nearly exact (alpha at the bottom of its grid for two pieces), so the auxiliary loss and its
+    gradient into the encoder were close to 0; the slow rise 0.000 -> 0.004 is the encoder moving
+    away from the features the head was fitted on. Same bug class as the lambda calibration
+    overlap, which was avoided there with seed + 1.
+  evidence: >
+    EpisodeAwareSampler rebuilt from the dataset's episode boundaries with LeRobot's own class
+    (no model loaded), scripts/sampler_order.py: seed 1000, first 1 200 frames ==
+    aux_features.npz index, same order (1 200 / 1 200); updates 1 and 40: 30 / 30 warm-start frames;
+    update 41: 0 / 30; frames 1 201-2 400: 0 shared. Check of the reconstruction: seed 1001, first
+    60 frames, 2 shared, as the Kaggle calibration reported (0.033).
+  impact: >
+    (1) The position term was almost absent for updates 1-40 of 10 000 (0.4 %), all inside the
+    500-step warmup (learning rate at most 7.3e-6, vision 7.3e-7): negligible for the run. In
+    later epochs the 1 200 frames come back scattered (1.7 % of the 71 059), where the term is again
+    near 0 for them: a 1.7 % dilution of the position term, also negligible. (2) Stop condition 1
+    (auxiliary loss above 1 up to step 50) watched those fitted frames for steps 1-40; a damaged
+    head (10 216 in the prep run) would still have shown on them, so it kept its purpose. (3) Not
+    affected: lambda (calibrated on seed 1001, 2 / 60 shared), the 65.7 mm warm-start error
+    (cross-validated by held-out episode), the run_c_gate and midway probes and the head report
+    (layouts 5001-5800, never trained on).
+  decision: >
+    Run C continues unchanged. For any later warm start (Run D): draw the warm-start sample with a
+    seed different from the training seed and check its share of the first training updates
+    (target ~0), as for the calibration.

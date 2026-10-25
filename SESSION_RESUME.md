@@ -1,5 +1,14 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Note (25 octobre 2026, soir) : perte auxiliaire ~0 aux pas 1-40 du Run C
+
+Réelle, pas un artefact : l'échantillonneur de LeRobot ne dépend que de (graine, époque), et le
+démarrage à chaud a été ajusté avec la graine 1000, celle de l'entraînement. Les 40 premières mises
+à jour (40 x 30 = 1 200 trames) sont exactement les trames de l'ajustement (vérifié :
+`scripts/sampler_order.py`). Effet négligeable (0,4 % des mises à jour, en montée du taux), Run C
+continue. Run D : tirer l'échantillon du démarrage à chaud avec une autre graine.
+`probe_protocol.yaml`, `run_c_warm_start_overlap`.
+
 ## Passation : Run C session 2 (rédigée le 25 octobre 2026, soir)
 
 Session 2 reprend le Run C là où la session 1 s'est arrêtée et le mène au pas 10 000. Elle se
