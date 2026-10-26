@@ -1,5 +1,14 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Run C session 1 terminée (26 octobre 2026, matin)
+
+37 042 s, arrêt à la limite de temps au pas 5 249 ; point de reprise `run/checkpoints/005000`.
+Aucune condition d'arrêt (0 mise à jour sautée sur les pas 1-100, 4 sur la session, échelle fp16
+finale 16 384) ; tête identique au démarrage à chaud aux 10 points de reprise, HEAD CHECK PASS.
+Perte d'action 2,29 → 0,057, perte auxiliaire 0,138 → 0,002 (trames d'entraînement). 7,0 s/pas,
+13,5 Go. Prochaine étape : contrôle de mi-parcours sur `run/checkpoints/005000/pretrained_model`.
+Run B dans Gazebo, graine 11 seulement (PC en veille la nuit) : 15k 0/4, 20k 1/4.
+
 ## Note (25 octobre 2026, soir) : perte auxiliaire ~0 aux pas 1-40 du Run C
 
 Réelle, pas un artefact : l'échantillonneur de LeRobot ne dépend que de (graine, époque), et le
@@ -13,7 +22,8 @@ continue. Run D : tirer l'échantillon du démarrage à chaud avec une autre gra
 
 Session 2 reprend le Run C là où la session 1 s'est arrêtée et le mène au pas 10 000. Elle se
 lance **après la remise à zéro du quota Kaggle du 31/10** (minuit, heure de Kaggle), éventuellement
-par un collègue sur un **autre compte Kaggle**. Elle demande environ **8,5 h** de quota GPU.
+par un collègue sur un **autre compte Kaggle**. Elle demande environ **10 h** de quota GPU (4 750 pas à
+7,0 s, mesuré en session 1, plus l'installation ; `SESSION_HOURS = 10.25` suffit).
 
 ### Condition de départ (obligatoire)
 
@@ -52,7 +62,9 @@ ou verdict « stop » : **ne pas lancer**.
      `run/checkpoints/<pas>/pretrained_model/` **et** `run/checkpoints/<pas>/training_state/`
      (les 5 fichiers de LeRobot, dont `optimizer_state.safetensors` et `scheduler_state.json`, plus
      `grad_scaler.json`), plus
-     `kept/002500/` et `kept/005000/`. Sans `training_state` complet, le pilote repart de zéro.
+     `kept/002500/`. La session 1 s'est arrêtée au pas 5 249 : le point de reprise est
+     `run/checkpoints/005000/` et il n'y a pas de `kept/005000/` (le pilote le crée à la reprise).
+     Sans `training_state` complet, le pilote repart de zéro.
 4. **Réglages de session** : *GPU T4 x2*, *Internet On*, **exactement deux entrées** : le jeu
    Run C et la sortie de la session 1. Puis *Save Version* → **Save & Run All (Commit)**.
 
@@ -62,7 +74,7 @@ ou verdict « stop » : **ne pas lancer**.
 |---|---|
 | ~15 s | `DATASET PASS` (sinon : mauvais jeu ou deux jeux Run C attachés) |
 | ~2 min | `400 episodes, 71059 frames` |
-| ~2 min | `carried kept weights of step 2500 forward` (et 5000 s'il existe) |
+| ~2 min | `carried kept weights of step 2500 forward`, puis `kept weights of step 005000 (resumed from)` |
 | ~2 min | **`resuming from step N`**, N = dernier point de reprise de la session 1 (pas `fresh run`) |
 | ~3 min | `aux head (8, 184320) from …/checkpoints/00N/pretrained_model/aux_head.safetensors, weight sum -0.0800367; … lambda 0.3, head frozen` |
 | ~3 min | deux groupes d'optimiseur (`connector, expert` et `vision … lr 1e-05`), **aucun** `aux head` ; `freeze=runC … total 198.1 M` |
@@ -70,7 +82,7 @@ ou verdict « stop » : **ne pas lancer**.
 | premiers pas | `step:N+10`, `N+20`… (pas `step:10`) ; `aux_loss` autour de 0,1-0,5 |
 | tous les 500 pas | `aux head frozen: identical to aux_head_init.safetensors True, weight sum -0.0800367` |
 | pas 7 500 | poids gardés `kept/007500` |
-| fin (~8 h) | `TRAINING COMPLETE`, puis `HEAD CHECK PASS` |
+| fin (~10 h) | `TRAINING COMPLETE`, puis `HEAD CHECK PASS` |
 
 `GUARD STOP` à un moment quelconque : ne pas relancer, envoyer la ligne et les 20 précédentes.
 Les traces `libtorchcodec` sont sans conséquence.
