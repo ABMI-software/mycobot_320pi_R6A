@@ -309,7 +309,32 @@ run_c_midway_checkpoint:
   session_2: >
     starts only after the midway result is recorded below and committed, with the verdict
     "continue" (neither stop_if criterion met).
-  result: not yet run
+  result:
+    run: 27/10/2026, 10:06-14:17 Paris, laptop CPU (container limited to 4 CPUs / 8 GB, OMP 4, offline)
+    checkpoint: >
+      run/checkpoints/005000/pretrained_model (session 1 stopped at step 5 249 and wrote no
+      kept/005000; its output holds kept/002500 and this checkpoint only). model.safetensors
+      sha256 342e4803..., size checked against Kaggle's listing; aux head identical to its init.
+    probe: >
+      linear probe on the connector, median error (mm), Run C 5 000 minus smolvla_base, 95 %
+      bootstrap interval: top 20.67 vs 32.01, -11.34 [-12.47, -10.26]; left 20.68 vs 38.79,
+      -18.11 [-19.14, -16.63]; right 19.39 vs 38.59, -19.20 [-20.39, -18.12]. smolvla_base
+      reproduced to the 0.01 mm (32.0 / 38.8 / 38.6). Worse on 0 cameras: stop_if not met.
+      (Features at batch 2 instead of 8, for the CPU limit; batch size changes only float rounding, far below the
+      float16 storage.) Reported, not judged here: better than smolvla_base by the "improved" rule on
+      all 3 cameras, and under run_c_gate part 1's limits (25.6 / 31.0 / 30.9); the protocol's
+      validity check still fails because smolvla_base beats floor_pixels by 20 % on the top
+      camera only, as on 18/10.
+    image_swap: >
+      seeds 91-100, 120 chunks, 40 episodes, open_loop_compare.py own vs swapped images:
+      grasp-point shift +68.3 mm [+25.2, +109.0] (122.8 vs 54.5, 19 chunks); donor share
+      42 % -> 68 %, change +26 % [+3, +49]. Both lower ends above 0: stop_if not met. Also:
+      tip error +18.3 mm [+6.6, +33.4], joint error +2.94 deg [+1.17, +4.62]. Next to 19/10:
+      Run A 15k +81.6 mm, +46 %; 36k@36k +2.3 mm, +6 % (failed).
+    verdict: continue (neither stop_if criterion met); session 2 may run.
+    note: >
+      probe_fit.py's verdict loop listed the 18/10 encoders instead of --encoders and crashed on
+      KeyError after the fits; fixed and rerun, same fits.
 
 # ---------------------------------------------------------------------------------------------
 # Record, 25/10/2026 evening, during Run C session 1 (after its step 120; nothing changed in the run).

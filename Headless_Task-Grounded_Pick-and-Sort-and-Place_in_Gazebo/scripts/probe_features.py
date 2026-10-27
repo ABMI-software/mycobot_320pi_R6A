@@ -2,7 +2,7 @@
 """Encoder features of the probe renders (config/probe_protocol.yaml), one encoder at a time.
 
   probe_features.py <render dir> <out .npz> --encoder <checkpoint dir | smolvla_base> \
-                    [--policy <checkpoint dir>] [--crop '{"top": [u0, v0, u1, v1], ...}'] [--layers 4 8]
+                    [--policy <checkpoint dir>] [--batch 8] [--crop '{"top": [u0, v0, u1, v1], ...}'] [--layers 4 8]
 
 The images go through a SmolVLA checkpoint's own path (--policy, default the 13/10 one):
 its preprocessor (camera renaming), prepare_images (resize with padding to 512x512, [-1, 1]),
@@ -58,6 +58,7 @@ def main():
     ap.add_argument('--policy', default=POLICY)
     ap.add_argument('--crop', type=json.loads, default={}, help='{camera: [u0, v0, u1, v1]}')
     ap.add_argument('--layers', type=int, nargs='*', default=[])
+    ap.add_argument('--batch', type=int, default=BATCH, help='renders per forward pass')
     args = ap.parse_args()
     torch.set_num_threads(max(1, torch.get_num_threads()))
     model = SmolVLA(args.policy)
@@ -74,8 +75,8 @@ def main():
     for k in args.layers:
         vlm.vision_model.encoder.layers[k - 1].register_forward_hook(
             lambda _m, _i, out, k=k: hooked.__setitem__(k, out[0] if isinstance(out, tuple) else out))
-    for i in range(0, len(seeds), BATCH):
-        renders = [np.load(args.render / f'{s}.npz') for s in seeds[i:i + BATCH]]
+    for i in range(0, len(seeds), args.batch):
+        renders = [np.load(args.render / f'{s}.npz') for s in seeds[i:i + args.batch]]
         obs = {f'observation.images.{c}': torch.stack([
             torch.from_numpy(np.ascontiguousarray(crop(r[c], args.crop.get(c)))).permute(2, 0, 1).float() / 255.0
             for r in renders]) for c in CAMERAS}
@@ -91,7 +92,7 @@ def main():
             feats[f'{cam}_vision'].append(pool(hidden))
             for k in args.layers:
                 feats[f'{cam}_layer{k}'].append(pool(hooked[k]))
-        print(f'{min(i + BATCH, len(seeds))}/{len(seeds)}', flush=True)
+        print(f'{min(i + args.batch, len(seeds))}/{len(seeds)}', flush=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     np.savez(args.out, seeds=np.array(seeds), encoder=args.encoder, policy=args.policy,
              crop=json.dumps(args.crop),

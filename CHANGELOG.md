@@ -9,6 +9,18 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — Run C : contrôle de mi-parcours, verdict « continuer » (27/10)
+
+- **`probe_protocol.yaml`**, `run_c_midway_checkpoint.result` : sonde du connecteur meilleure que
+  smolvla_base sur les trois caméras (20,7 / 20,7 / 19,4 mm contre 32,0 / 38,8 / 38,6) ; échange
+  d'images +68,3 mm [+25,2 ; +109,0] et part donneur +26 % [+3 ; +49]. Aucun critère d'arrêt.
+- **`probe_features.py --batch`** : taille de lot réglable (défaut 8 inchangé).
+
+### Corrigé
+
+- **`probe_fit.py`** : le verdict parcourait la liste d'encodeurs du 18/10 au lieu de
+  `--encoders` et plantait (KeyError) avec tout autre encodeur.
+
 ### Modifié — Run C : session 1 de 10,25 h, pas comptés après reprise, passation (25/10, soir)
 
 - **`SESSION_HOURS = 10.25`** : la session 1 tient dans le quota restant (11 h 29) avec ~1 h de

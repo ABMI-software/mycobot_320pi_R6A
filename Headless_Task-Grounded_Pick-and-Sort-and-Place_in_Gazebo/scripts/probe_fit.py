@@ -269,7 +269,7 @@ def main():
                <= 0.8 * result['cells'][f'floor_pixels/{cam}/linear']['median_mm']]
     verdict['valid'] = len(base_ok) >= 2
     verdict['base_beats_pixels_by_20pct_on'] = base_ok
-    for enc in ENCODERS[1:]:
+    for enc in [e for e in encoders if e != 'smolvla_base']:
         worse, better = [], []
         for cam in CAMERAS:
             b = result['cells'][f'smolvla_base/{cam}/connector/linear']['median_mm']

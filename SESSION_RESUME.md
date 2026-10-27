@@ -1,5 +1,26 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Run C : contrôle de mi-parcours, verdict « continuer » (27 octobre 2026, après-midi)
+
+Point de reprise `run/checkpoints/005000/pretrained_model` (pas de `kept/005000` dans la sortie),
+téléchargé par l'API Kaggle avec reprise par fichier et tailles vérifiées, dans
+`Downloads\runC_s1\`. Contrôle sur le CPU du portable, hors ligne, conteneur à 4 CPU / 8 Go,
+10:06-14:17 (heure de Paris).
+
+- **Sonde linéaire sur le connecteur** (médiane, mm, Run C 5 000 contre smolvla_base) : haut 20,7
+  contre 32,0, gauche 20,7 contre 38,8, droite 19,4 contre 38,6 ; intervalles à 95 % entièrement
+  sous 0 sur les trois caméras. Pire nulle part : premier critère d'arrêt non atteint.
+- **Échange d'images** (graines 91-100) : décalage du point de saisie +68,3 mm [+25,2 ; +109,0],
+  part « donneur » 42 % → 68 %, écart +26 % [+3 ; +49]. Les deux bornes basses sont au-dessus de
+  0 : second critère non atteint.
+- **Verdict : continuer.** La session 2 peut tourner après la remise à zéro du quota du 31/10.
+  Résultat : `probe_protocol.yaml`, `run_c_midway_checkpoint.result`.
+- `probe_fit.py` plantait après les ajustements (liste d'encodeurs du 18/10 en dur) : corrigé.
+  `probe_features.py --batch` (2 ici, pour la limite CPU).
+
+Prochaine étape locale : évaluation Gazebo du Run B 20k pour le tableau façon article (19 graines,
+~12-19 h), en attente du feu vert.
+
 ## Run C session 1 terminée (26 octobre 2026, matin)
 
 37 042 s, arrêt à la limite de temps au pas 5 249 ; point de reprise `run/checkpoints/005000`.
