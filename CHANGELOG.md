@@ -9,6 +9,23 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — pilote Kaggle : points gardés dès leur enregistrement (27/10)
+
+- **`smolvla_kaggle_driver.py`, `prune_checkpoints`** : les poids d'un pas multiple de
+  `KEEP_EVERY` sont copiés dans `kept/<pas>` dès que ce pas devient `last`, et non plus seulement
+  à l'élagage. Avant, une session coupée avant l'enregistrement suivant (Run C session 1, 5 000)
+  ou le dernier pas d'un entraînement (10 000) n'arrivaient jamais dans `kept/`. Copie par nom
+  temporaire. Testé hors GPU sur des dossiers factices (ancien pilote : `kept/002500` seul ;
+  nouveau : 2 500, 5 000, 7 500, 10 000).
+- **`smolvla_tri_sort_runC_aux_10k.ipynb`** : cellule du pilote mise à jour, consignes de la
+  session 2 et liste des fichiers à récupérer.
+
+### Ajouté — Run C 5000 contre Run B 5k, rapport final fixé d'avance (27/10)
+
+- **`probe_protocol.yaml`** : `follow_up_27_10.matched_samples_run_b_5k` (échantillons égaux :
+  Run C plus proche sur bout, articulations et pince ; point de saisie non tranché) et
+  `run_c_final_report` (contenu obligatoire et règle de la phrase « meilleures saisies »).
+
 ### Ajouté — Run C : contrôle de mi-parcours, verdict « continuer » (27/10)
 
 - **`probe_protocol.yaml`**, `run_c_midway_checkpoint.result` : sonde du connecteur meilleure que

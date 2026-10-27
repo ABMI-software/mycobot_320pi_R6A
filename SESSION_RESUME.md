@@ -1,5 +1,23 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Run C : échantillons égaux, correctif des points gardés, rapport final (27 octobre 2026, fin d'après-midi)
+
+- **Run C 5000 contre Run B 5k** (mêmes données, 150 000 contre 160 000 échantillons ; boucle
+  ouverte, images propres, graines 91-100) : Run C plus proche des enregistrements sur le bout
+  (−14,0 mm [−22,8 ; −3,0]), les articulations (−1,57° [−3,59 ; −0,72]) et la pince (−0,008
+  [−0,016 ; −0,003]) ; point de saisie −27,9 mm [−97,8 ; +3,6], l'intervalle contient encore 0.
+  Run A 5k en référence : pince 0,022 (Run C 0,021, Run B 5k 0,029).
+  `run_c_midway_checkpoint.follow_up_27_10.matched_samples_run_b_5k`.
+- **Pas de `kept/005000` en session 1 : expliqué et corrigé** dans le pilote et le carnet (le 10 000
+  aurait manqué aussi). Détail, effacements du pilote et sommes SHA-256 de
+  `run/checkpoints/005000` : passation ci-dessous, « Correctif du 27/10 ». **La session 2 doit
+  utiliser le carnet du 27/10** (`Downloads\smolvla_tri_sort_runC_aux_10k_27-10.ipynb`).
+- **Rapport final du Run C fixé d'avance** (`probe_protocol.yaml`, `run_c_final_report`) : Run C
+  10 000 contre Run B 20k en boucle ouverte (point de saisie, fermetures à moins de 20 mm) à côté
+  de la sonde et de la tête, avec une phrase unique sur « meilleure localisation → meilleures
+  saisies ».
+- Évaluation Gazebo du Run B 20k (tableau façon article) : **toujours en attente de ton accord**.
+
 ## Run C : contrôle de mi-parcours, verdict « continuer » (27 octobre 2026, après-midi)
 
 Point de reprise `run/checkpoints/005000/pretrained_model` (pas de `kept/005000` dans la sortie),
@@ -79,9 +97,13 @@ ou verdict « stop » : **ne pas lancer**.
 ### Ce qu'il faut
 
 1. **Le carnet** : `Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/training/smolvla_kaggle/smolvla_tri_sort_runC_aux_10k.ipynb`,
-   branche `feature/sort-episodes`, la version du commit qui contient cette passation (celle
-   qu'a utilisée la session 1). Dans la cellule 1 : `SESSION_HOURS = 10.25`, `AUX_LAMBDA = 0.3`,
-   `AUX_HEAD_FROZEN = True`, `TRAIN_STEPS = 10000`. Ne rien modifier.
+   branche `feature/sort-episodes`, **la version du 27/10** (correctif des points gardés,
+   ci-dessous ; copie : `C:\Users\tomis\Downloads\smolvla_tri_sort_runC_aux_10k_27-10.ipynb`).
+   Sur Kaggle : ouvrir le carnet de la session 1 → *File* → *Import Notebook* → ce fichier, puis
+   vérifier que les deux entrées du point 4 sont toujours attachées. Seule la cellule du pilote
+   et le texte d'introduction changent par rapport à la session 1 ; dans la cellule 1 :
+   `SESSION_HOURS = 10.25`, `AUX_LAMBDA = 0.3`, `AUX_HEAD_FROZEN = True`, `TRAIN_STEPS = 10000`.
+   Ne rien modifier d'autre.
 2. **Le jeu de données Run C** :
    - même compte : `mycobot-tri-sort-c-400` (déjà sur Kaggle) ;
    - autre compte : soit le propriétaire le partage (page du jeu → *Settings* → *Sharing* →
@@ -100,6 +122,50 @@ ou verdict « stop » : **ne pas lancer**.
      `grad_scaler.json`), plus
      `kept/002500/`. La session 1 s'est arrêtée au pas 5 249 : le point de reprise est
      `run/checkpoints/005000/` et il n'y a pas de `kept/005000/` (le pilote le crée à la reprise).
+
+### Correctif du 27/10 : points gardés (`kept/`)
+
+**Pourquoi la session 1 n'a pas de `kept/005000`.** Le pilote ne gardait les poids d'un pas
+multiple de 2 500 qu'au moment où il élaguait ce point de reprise, c'est-à-dire une fois le
+suivant enregistré (`prune_checkpoints`). Le 5 000 a été enregistré à 04:50 (Paris) le 26/10, la
+session s'est arrêtée au pas 5 249, avant l'enregistrement du 5 500 : le 5 000 est resté `last`,
+jamais élagué, donc jamais gardé. Il est intact dans `run/checkpoints/005000/`. À la reprise, le
+pilote l'aurait de toute façon copié dans `kept/005000` (cas « resumed from », déjà prévu). Le
+7 500 aurait été gardé à l'élagage, mais le **10 000**, dernier point du Run C, ne l'aurait
+jamais été : il serait resté seulement dans `run/checkpoints/010000/`.
+
+**Correctif** (`smolvla_kaggle_driver.py`, `prune_checkpoints`) : les poids d'un pas multiple de
+`KEEP_EVERY` sont **copiés** dans `kept/<pas>/pretrained_model` dès que ce pas devient `last`
+(enregistrement complet), en passant par un nom temporaire (`pretrained_model.partial`), si bien
+qu'une session tuée en pleine copie ne laisse pas de `kept/` partiel. Testé hors GPU sur des
+dossiers factices passés par les fonctions du pilote : la session 1 telle qu'elle s'est déroulée
+donne désormais `kept/002500` et `kept/005000` (l'ancien pilote : `kept/002500` seul) ; la session 2
+donne `kept/002500, 005000, 007500, 010000`, chacun avec les poids de son pas, et l'entrée reste
+intacte. Disque Kaggle au pire ~14 Go (4 × 1,8 Go gardés + 2 points de reprise de 3,4 Go).
+
+**Ce que le pilote efface, et rien d'autre** : `run/checkpoints/<pas>` plus anciens que `last`
+(après la copie ci-dessus) ; `run/checkpoints/<pas>` plus récents que `last` après l'arrêt (écrits
+à moitié) ; `run/` entier seulement pour un départ à zéro sans point de reprise attaché (d'où la
+ligne `resuming from step 5000` à vérifier) ; les dossiers temporaires des modes de contrôle. Jamais
+`kept/`, jamais l'entrée attachée (en lecture seule sur Kaggle de toute façon).
+
+**Sommes SHA-256 de `run/checkpoints/005000/pretrained_model`** (sortie de la session 1, copie
+`Downloads\runC_s1\` et copie du conteneur identiques fichier par fichier ; tailles vérifiées
+contre la liste de Kaggle) :
+
+| Fichier | SHA-256 |
+|---|---|
+| `model.safetensors` (1 800 257 992 o) | `342e480332bdeccecefc55dffb5f138e420ea4ebbc274380ed8eecc23bfb807a` |
+| `aux_head.safetensors` | `f788d7f6c764ce31f0702ad004582a9007a96772eff43769c961f0b8f4ea66c8` |
+| `config.json` | `647a1bbe2e54c72726a01a91aa9d09911f4688ee987e8eda43c66e0bc2ab961a` |
+| `train_config.json` | `e7ecd27b575112957b078ebbfcc0b4174bd168e82069d1edd1eba51e25d4dd83` |
+| `policy_preprocessor.json` | `7b404a7d24a5e7a040cd3634dcc553e936c2b6a8fae14fbf95cb5d1ee1c83494` |
+| `policy_postprocessor.json` | `3b51f092c70c710ce0213ee1b63bf51b4878ec67828dd2d67daf9ef51081a41a` |
+| `policy_preprocessor_step_5_normalizer_processor.safetensors` | `60751665be1537afcfa04120747864280f53898a85bd41e0269b564476c66aea` |
+| `policy_postprocessor_step_0_unnormalizer_processor.safetensors` | `60751665be1537afcfa04120747864280f53898a85bd41e0269b564476c66aea` |
+
+Le `kept/005000/pretrained_model` que la session 2 créera à la reprise est une copie de ce dossier :
+mêmes sommes attendues.
      Sans `training_state` complet, le pilote repart de zéro.
 4. **Réglages de session** : *GPU T4 x2*, *Internet On*, **exactement deux entrées** : le jeu
    Run C et la sortie de la session 1. Puis *Save Version* → **Save & Run All (Commit)**.
@@ -110,14 +176,15 @@ ou verdict « stop » : **ne pas lancer**.
 |---|---|
 | ~15 s | `DATASET PASS` (sinon : mauvais jeu ou deux jeux Run C attachés) |
 | ~2 min | `400 episodes, 71059 frames` |
-| ~2 min | `carried kept weights of step 2500 forward`, puis `kept weights of step 005000 (resumed from)` |
+| ~2 min | `carried kept weights of step 002500 forward`, puis `kept weights of step 005000 (resumed from)` |
 | ~2 min | **`resuming from step N`**, N = dernier point de reprise de la session 1 (pas `fresh run`) |
 | ~3 min | `aux head (8, 184320) from …/checkpoints/00N/pretrained_model/aux_head.safetensors, weight sum -0.0800367; … lambda 0.3, head frozen` |
 | ~3 min | deux groupes d'optimiseur (`connector, expert` et `vision … lr 1e-05`), **aucun** `aux head` ; `freeze=runC … total 198.1 M` |
 | ~3 min | `fp16 loss scaler restored: scale X`, avec X ≥ 1024 |
 | premiers pas | `step:N+10`, `N+20`… (pas `step:10`) ; `aux_loss` autour de 0,1-0,5 |
 | tous les 500 pas | `aux head frozen: identical to aux_head_init.safetensors True, weight sum -0.0800367` |
-| pas 7 500 | poids gardés `kept/007500` |
+| pas 7 500 | `kept weights of step 007500` (dès l'enregistrement du 7 500) |
+| pas 10 000 | `kept weights of step 010000` |
 | fin (~10 h) | `TRAINING COMPLETE`, puis `HEAD CHECK PASS` |
 
 `GUARD STOP` à un moment quelconque : ne pas relancer, envoyer la ligne et les 20 précédentes.
@@ -125,9 +192,11 @@ Les traces `libtorchcodec` sont sans conséquence.
 
 ### À récupérer à la fin
 
-`run/checkpoints/010000/pretrained_model/`, `kept/002500/`, `kept/005000/`, `kept/007500/`
-(`pretrained_model/` de chacun), `train_summary.json`, `runc_final_head.json`, `logs/`. Ensuite :
-`run_c_gate` (sonde et échange d'images) sur ces points, avant tout passage dans Gazebo.
+`kept/002500/`, `kept/005000/`, `kept/007500/`, `kept/010000/` (`pretrained_model/` de chacun ;
+le 10 000 est aussi dans `run/checkpoints/010000/`, inutile de le prendre deux fois),
+`train_summary.json`, `runc_final_head.json`, `logs/`. Vérifier `kept/005000` contre les sommes
+ci-dessus. Ensuite : `run_c_gate` (sonde et échange d'images) sur ces points, avant tout passage
+dans Gazebo, et le rapport final (`probe_protocol.yaml`, `run_c_final_report`).
 
 ## État actuel (25 octobre 2026 — midi, carnet Run C prêt)
 

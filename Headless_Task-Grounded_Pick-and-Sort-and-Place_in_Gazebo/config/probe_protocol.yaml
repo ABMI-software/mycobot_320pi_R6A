@@ -379,6 +379,23 @@ run_c_midway_checkpoint:
       the decision.validity rule applied to Run C 5000's connector (linear) against floor_pixels:
       top 20.67 vs 48.39 (57 % lower), left 20.68 vs 42.84 (52 %), right 19.39 vs 43.98 (56 %);
       the rule needs 20 % on 2 cameras: met on 3. smolvla_base meets it on the top camera only.
+    matched_samples_run_b_5k: >
+      Run B 5 000 (batch 32: 160 000 samples, Run B session 1's kept/005000, model.safetensors
+      sha256 69b1cecde5863536bf2ed7053bc78817d3b84e6cdbab9be644f10dcb62a1fad2; train_config equal to
+      Run B 20k's but for the resume fields) against Run C 5 000 (batch 30: 150 000 samples): same
+      training data, so the differences are mainly the encoder training and the position loss
+      (also batch 30 vs 32 and Run C's 500-step warmup against Run B's 1 000). Own-image open loop,
+      the same 120 chunks, 27/10 15:26-15:51 Paris, CPU limits. Run C 5000 minus Run B 5k: tip
+      -14.0 mm [-22.8, -3.0] (52.0 vs 65.9), joint -1.57 deg [-3.59, -0.72] (9.15 vs 10.72),
+      gripper -0.008 [-0.016, -0.003] (0.021 vs 0.029), grasp point -27.9 mm [-97.8, +3.6] (56.8 vs
+      84.7, 18 chunks), within 20 mm 1 vs 1 of 120; closes from an open gripper 24 vs 35; own-image
+      donor share 42 % vs 60 %, change -18 % [-38, +2]. Run A 5k (also batch 32) for reference, Run C
+      minus Run A 5k: tip -12.8 [-22.3, -2.0] (64.8), joint -0.92 [-3.79, 0.00] (10.07), gripper
+      -0.001 [-0.005, +0.002] (0.022), grasp point -36.2 [-58.2, +11.2] (93.0, 18 chunks), within
+      20 mm 1 vs 2. Reading: at matched samples Run C is closer to the recordings on tip, joint and
+      gripper (intervals exclude 0); its grasp point is lower too but the interval still contains
+      0. Its gripper error 0.021 is Run A 5k's 0.022 and below Run B 5k's 0.029; the frozen-encoder
+      runs reach 0.013 only at 20 000 steps (640 000 samples).
 
 # ---------------------------------------------------------------------------------------------
 # Record, 25/10/2026 evening, during Run C session 1 (after its step 120; nothing changed in the run).
@@ -418,3 +435,33 @@ run_c_warm_start_overlap:
     Run C continues unchanged. For any later warm start (Run D): draw the warm-start sample with a
     seed different from the training seed and check its share of the first training updates
     (target ~0), as for the calibration.
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 27/10/2026, committed before session 2 runs (no Run C checkpoint past 5 000 exists).
+run_c_final_report:
+  question: >
+    Run C 5 000 localises the pieces far better than smolvla_base (connector probe ~20 mm against
+    32-39; frozen head 19.8 mm on the probe layouts) but its open-loop grasps are not measurably
+    better than the frozen-encoder runs (run_c_midway_checkpoint.follow_up_27_10). At 10 000, did
+    the better localisation become better grasps?
+  must_contain: >
+    side by side, for Run C 10 000 (and 5 000, 7 500 for the trend): (a) the connector linear probe
+    per camera against smolvla_base, with its 95 % paired bootstrap interval (run_c_gate part 1);
+    (b) the frozen head's median and p90 on the 799 probe layouts (scripts/aux_head_probe.py);
+    (c) the image-swap test (run_c_gate part 2); (d) the own-image open loop on seeds 91-100, the
+    same 120 chunks, Run C minus Run B 20k (same training data, encoder frozen): grasp-point error
+    (open_loop_compare.py, difference of medians on the chunks where both close, 95 % interval from
+    2000 episode resamples, with the number of chunks) and the share of chunks closing within
+    20 mm of the recorded close (scripts/open_loop_within20.py, same bootstrap), plus tip, joint,
+    gripper error and the number of chunks that close from an open gripper; also Run C 5 000 minus
+    Run B 5 000 (matched samples seen: 150 000 against 160 000).
+  grasp_statement: >
+    "better localisation became better grasps" only if, for Run C 10 000 minus Run B 20k, the
+    upper end of the grasp-point interval is below 0 AND the within-20 mm share is not lower (its
+    interval's lower end at or above 0). "Not shown" if the grasp-point interval contains 0;
+    "worse grasps" if its lower end is above 0. The within-20 mm share alone decides nothing (1-2
+    of 120 chunks at 5 000). The statement goes in the report and in SESSION_RESUME.md's handover,
+    word for word, with its numbers.
+  not_judged_here: >
+    Gazebo success; this report says only whether the open-loop grasps moved with the encoder.
+    run_c_gate still decides which checkpoint goes to Gazebo.

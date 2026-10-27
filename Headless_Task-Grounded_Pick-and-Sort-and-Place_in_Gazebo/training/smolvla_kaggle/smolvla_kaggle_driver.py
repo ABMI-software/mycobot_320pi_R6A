@@ -621,14 +621,27 @@ def prune_checkpoints(run_dir, keep_every=0, kept_root=None):
 
     lerobot moves `last` only after a save completes, and a checkpoint newer than `last` may be
     one still being written, so both are kept. Safe to call at any moment. With keep_every, the
-    weights of every keep_every-th step move to kept_root/<step>/pretrained_model first (no
-    optimizer state: 1.8 GB instead of ~3.5), so earlier checkpoints can be scored in Gazebo.
+    weights of every keep_every-th step go to kept_root/<step>/pretrained_model (no optimizer
+    state: 1.8 GB instead of ~3.5), so earlier checkpoints can be scored in Gazebo. They are
+    copied as soon as that step is `last`, not when it is pruned: a session cut before the next
+    save (Run C session 1 stopped at 5 249 with 5 000 as `last`) or the run's final step would
+    otherwise never reach kept_root. The copy goes through a temporary name, so a session killed
+    mid-copy leaves no partial kept_root/<step>.
     """
     ckpt_root = Path(run_dir) / 'checkpoints'
     last = ckpt_root / 'last'
     if not last.is_symlink():
         return
     keep = int(last.resolve().name)
+    src = last.resolve() / 'pretrained_model'
+    if keep_every and keep % keep_every == 0 and src.is_dir():
+        dst = Path(kept_root) / last.resolve().name / 'pretrained_model'
+        if not dst.exists():
+            tmp = dst.with_name('pretrained_model.partial')
+            shutil.rmtree(tmp, ignore_errors=True)
+            shutil.copytree(src, tmp)
+            tmp.rename(dst)
+            log(f'kept weights of step {last.resolve().name} in {dst}')
     for d in ckpt_root.iterdir():
         if d.is_dir() and not d.is_symlink() and d.name.isdigit() and int(d.name) < keep:
             if keep_every and int(d.name) % keep_every == 0 and (d / 'pretrained_model').is_dir():
