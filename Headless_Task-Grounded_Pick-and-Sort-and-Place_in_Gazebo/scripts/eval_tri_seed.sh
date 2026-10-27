@@ -2,6 +2,7 @@
 # Evaluate a SmolVLA checkpoint on one tri_yolo seed, inside the gazebo_to_lerobot container.
 #
 #   eval_tri_seed.sh <checkpoint/pretrained_model> <seed> <out dir> [eval_smolvla_tri_sort.py args...]
+#   PREPLACE=1 eval_tri_seed.sh ... <seed 1001-1400> ...   # the recorded target only, as recorded
 #
 # Same scene as record_tri_seed.sh (tri_yolo.launch.py, piece_reach 0.28, headless, no YOLO),
 # without the recorder. <out dir>/ gets result.json, trace_*.jsonl and the logs. Everything is
@@ -32,7 +33,29 @@ until ros2 control list_controllers 2>/dev/null \
 done
 stage "controllers active"
 
+# PREPLACE=1: replay a one-episode-per-layout recording (record_tri_seed.sh PREPLACE=1 RANDOM_START=1).
+# preplace_pieces.py is deterministic in the seed, so it puts the same 0-3 pieces in their bins and
+# names the same target; the placement is checked against the recording's preplaced.json
+# (PREPLACE_REF, <dir>/seed_<seed>/preplaced.json), and only the target is evaluated, from the
+# random start the recording drew first (draw 0 of default_rng(seed), --start-pose random).
+EXTRA=()
+if [ "${PREPLACE:-0}" = 1 ]; then
+    TARGET=$(python3 "$HERE/preplace_pieces.py" --seed "$SEED" --out "$OUT" 2>> "$OUT/preplace.log" | tail -1) \
+        || { stage "FATAL: preplace failed: $(tail -1 "$OUT/preplace.log")"; exit 1; }
+    python3 - "$OUT/preplaced.json" "${PREPLACE_REF:-/workspace/tri_sort_B}/seed_$SEED/preplaced.json" \
+            >> "$OUT/stages.log" <<'EOF' || { stage "FATAL: preplacement differs from the recording"; exit 1; }
+import json, sys
+a, b = (json.load(open(p)) for p in sys.argv[1:3])
+d = max(max(abs(x - y) for x, y in zip(a['pieces_after'][k], b['pieces_after'][k])) for k in b['pieces_after'])
+ok = a['target'] == b['target'] and sorted(a['presorted']) == sorted(b['presorted']) and d < 0.002
+print(f"preplacement vs recording: target {a['target']}, presorted {sorted(a['presorted'])}, max diff {d * 1000:.1f} mm, {'OK' if ok else 'DIFFERENT'}")
+sys.exit(0 if ok else 1)
+EOF
+    stage "preplaced like the recording; target $TARGET"
+    EXTRA=(--only "$TARGET" --start-pose random)
+fi
+
 /workspace/venv_lerobot/bin/python -W ignore "$HERE/eval_smolvla_tri_sort.py" \
-    --checkpoint "$CKPT" --seed "$SEED" --out "$OUT" "$@" > "$OUT/eval.log" 2>&1 || true
+    --checkpoint "$CKPT" --seed "$SEED" --out "$OUT" "${EXTRA[@]}" "$@" > "$OUT/eval.log" 2>&1 || true
 stage "done: $(python3 -c "import json,sys; r=json.load(open(sys.argv[1]))['pieces']; \
 print(sum(p.get('placed_after_pick', False) for p in r), '/', len(r), 'sorted')" "$OUT/result.json" 2>/dev/null)"

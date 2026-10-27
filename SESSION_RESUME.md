@@ -1,5 +1,24 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Run B 20k dans Gazebo contre l'article, lancé ; rapport final du Run C amendé (27 octobre 2026, soir)
+
+- **Évaluation Gazebo du Run B 20k lancée à 16:20 (Paris)**, accord donné. Conteneur 4 CPU / 8 Go,
+  OMP 4, lot 1, hors ligne, sous `reap_children.py` : `/workspace/eval/runB_paper/run.sh`, suivi
+  dans `/workspace/eval/runB_paper/progress.log`. Ordre : graine 1001 d'abord (essai en direct du
+  nouveau mode), puis **hors distribution 11-20** (quatre pièces, pose d'observation, ≤ 120 min par
+  graine), puis **en distribution 1002-1040** (la cible enregistrée seule, mêmes pièces
+  pré-placées, même départ aléatoire, ≤ 45 min). Estimation : ~10 h + ~11 h, fin vers le
+  28/10 en début d'après-midi. `failure_modes.py` après chaque graine ; « never closed » compté à
+  part. Ne pas lancer d'autre calcul lourd sur le PC pendant ce temps.
+- **`eval_tri_seed.sh PREPLACE=1`** : rejoue l'enregistrement (cible, 0-3 pièces dans leur bac,
+  vérifiées contre `preplaced.json`, départ = tirage 0 de `default_rng(graine)`, identique aux
+  `start_poses.jsonl` de 1001-1040). Graine 1001 : même placement à 0,0 mm.
+- **`open_loop_check.py --before-close`** et amendement de `run_c_final_report` : jeu centré sur
+  la saisie (5 départs, 30 à 10 images avant la fermeture enregistrée, 200 segments), décisif
+  pour le point de saisie ; Run C 10000 contre Run B 20k et contre Run B 10k (échantillons égaux) ;
+  note sur les points différents des calendriers de taux (Run C 5000 à 50 %, Run B 5k à 25 %).
+  Run B 10k copié dans le conteneur (`kept/010000`, sha256 `e417e00e…44a30272`).
+
 ## Run C : échantillons égaux, correctif des points gardés, rapport final (27 octobre 2026, fin d'après-midi)
 
 - **Run C 5000 contre Run B 5k** (mêmes données, 150 000 contre 160 000 échantillons ; boucle

@@ -395,7 +395,9 @@ run_c_midway_checkpoint:
       20 mm 1 vs 2. Reading: at matched samples Run C is closer to the recordings on tip, joint and
       gripper (intervals exclude 0); its grasp point is lower too but the interval still contains
       0. Its gripper error 0.021 is Run A 5k's 0.022 and below Run B 5k's 0.029; the frozen-encoder
-      runs reach 0.013 only at 20 000 steps (640 000 samples).
+      runs reach 0.013 only at 20 000 steps (640 000 samples). Not equal annealing: Run C 5 000 is at
+      50 % of its cosine schedule (lr 5.1e-5), Run B 5k at 25 % of its (8.6e-5); see
+      run_c_final_report.amendment_27_10.schedule_note.
 
 # ---------------------------------------------------------------------------------------------
 # Record, 25/10/2026 evening, during Run C session 1 (after its step 120; nothing changed in the run).
@@ -456,12 +458,55 @@ run_c_final_report:
     gripper error and the number of chunks that close from an open gripper; also Run C 5 000 minus
     Run B 5 000 (matched samples seen: 150 000 against 160 000).
   grasp_statement: >
-    "better localisation became better grasps" only if, for Run C 10 000 minus Run B 20k, the
-    upper end of the grasp-point interval is below 0 AND the within-20 mm share is not lower (its
-    interval's lower end at or above 0). "Not shown" if the grasp-point interval contains 0;
-    "worse grasps" if its lower end is above 0. The within-20 mm share alone decides nothing (1-2
-    of 120 chunks at 5 000). The statement goes in the report and in SESSION_RESUME.md's handover,
-    word for word, with its numbers.
+    superseded on 27/10 by amendment_27_10 below (decided on the grasp-focused set, not on the
+    ~18 paired chunks of the 120-chunk set).
+  amendment_27_10:
+    # Committed 27/10/2026, before session 2: no Run C checkpoint past 5 000 exists.
+    why: >
+      on the 120-chunk set (starts at frames 0, 60, 120) the recorded close falls inside a chunk
+      only near the episode start, and both models close in it on only 17-19 chunks: too few to
+      decide a grasp-point difference (Run C 5000 minus Run B 5k: -27.9 mm [-97.8, +3.6]).
+    grasp_set: >
+      open_loop_check.py --per-piece 10 --before-close 30 25 20 15 10 on the same seeds 91-100
+      (mycobot_tri_sort_heldout_s091_100, 40 episodes): in each episode, 5 chunks starting 30, 25,
+      20, 15 and 10 frames (3.0 to 1.0 s at 10 fps) before the recorded close, i.e. the first frame
+      whose recorded gripper action is within 0.05 of the episode's most closed value. 200 chunks;
+      the recorded close is inside every chunk (step 10-30 of 50), so a model that closes within
+      20 steps of the recording is paired. The recorded closes lie at frames 33-60 (median 47), so
+      every start exists. Fixed now: number of starts 5, window 30 to 10 frames before the close,
+      step 5. Checked 27/10 with a stand-in that returns the recorded actions: 200 chunks, all
+      with a close, 0 mm, lag 0.
+    decisive_comparison: >
+      grasp-point error on the grasp set (open_loop_compare.py: difference of medians on the chunks
+      where both models close, 95 % interval from 2000 resamples of whole episodes), Run C 10 000
+      minus Run B 20k (same data, both at the end of their cosine schedules, lr 2.5e-6) AND Run C
+      10 000 minus Run B 10k (equal samples: 300 000 against 320 000; Run B 10k is half-way through
+      its schedule, lr 5.1e-5). Also reported on the grasp set, same bootstrap: the within-20 mm
+      share (scripts/open_loop_within20.py), the number of chunks each model closes in (a chunk
+      with no predicted close is "never closed in the chunk", counted per model), tip, joint and
+      gripper error; and the same for Run C 5 000 and 7 500 against Run B 5k and 20k for the trend.
+    statement_rule: >
+      against Run B 20k, the decisive pairing: "better localisation became better grasps" only if
+      the upper end of the grasp-point interval is below 0 AND Run C closes in at least as many
+      chunks as Run B 20k minus 10 (a model that stops closing must not win on fewer, easier
+      pairs) AND at least 100 of the 200 chunks are paired; "not shown" if the interval contains 0
+      or fewer than 100 chunks are paired; "worse grasps" if its lower end is above 0. The Run B
+      10k pairing is reported with the same three words and the same rule, as the equal-samples
+      reading; when the two disagree, the report says so and gives both. The statement, its
+      numbers and the chunk counts go in the report and in SESSION_RESUME.md's handover.
+    schedule_note: >
+      every Run C / Run B pairing compares different points of their learning-rate schedules,
+      both cosine with warmup in LeRobot 0.6.1 (lr = peak x ((1 - 0.025) x 0.5 (1 + cos(pi step /
+      decay_steps)) + 0.025), peak 1e-4, Run C's vision group 1e-5 on the same factor): Run C 5 000
+      is at 50 % of its 10 000-step schedule (factor 0.51, lr 5.1e-5), Run B 5k at 25 % of its
+      20 000 (factor 0.86, lr 8.6e-5); Run C 10 000 and Run B 20k are both at the end (2.5e-6);
+      Run B 10k at 50 % (5.1e-5). Equal samples therefore do not mean equal annealing; the report
+      states this next to the 5 000 and 10k pairings.
+    checkpoints: >
+      Run B 5k: Run B session 1's kept/005000, model.safetensors sha256 69b1cecd...a1fad2; Run B
+      10k: Run B's kept/010000, sha256 e417e00e8abf393e774eb5356ddab77767dc2b1f90d62ec55e9881ab44a30272
+      (Downloads/results (3), copied to /workspace/checkpoints/run_B_frozen_20k/010000, hash
+      checked).
   not_judged_here: >
     Gazebo success; this report says only whether the open-loop grasps moved with the encoder.
     run_c_gate still decides which checkpoint goes to Gazebo.

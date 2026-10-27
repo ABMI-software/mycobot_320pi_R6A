@@ -2,6 +2,7 @@
 """Open-loop check of a SmolVLA checkpoint on recorded episodes, without the simulator.
 
   open_loop_check.py <checkpoint/pretrained_model> <dataset root> [--per-piece 2] [--starts 0 60 120]
+                     [--before-close 30 25 20 15 10]
 
 Feeds recorded frames (the three images, the state, the instruction) through the checkpoint
 and compares each predicted 50-action chunk with the actions recorded over the same steps:
@@ -13,6 +14,10 @@ camera order, RGB order, image size, normalisation, action units.
 (cyclic, same frame index, clamped), with its own state and instruction: whether the policy uses
 the images at all. Every chunk that closes the gripper also reports how far that close is from
 the episode's own recorded grasp and from the image donor's.
+
+--before-close starts each episode's chunks that many frames before its recorded close (the first
+frame whose recorded gripper action is within 0.05 of the episode's most closed value) instead of
+at fixed frames: a grasp-focused set where the recorded close falls inside every chunk.
 
 Run inside gazebo_to_lerobot with ROS sourced (tool_tip) and /workspace/venv_lerobot's python.
 """
@@ -39,6 +44,7 @@ def main():
     ap.add_argument('dataset_root', type=Path)
     ap.add_argument('--per-piece', type=int, default=2, help='episodes per piece, spread over seeds')
     ap.add_argument('--starts', type=int, nargs='+', default=[0, 60, 120], help='frame of each chunk start')
+    ap.add_argument('--before-close', type=int, nargs='+', help='frames before the recorded close, instead of --starts')
     ap.add_argument('--out', type=Path)
     ap.add_argument('--swap-images', action='store_true')
     args = ap.parse_args()
@@ -54,9 +60,12 @@ def main():
     def frames(src):
         return np.flatnonzero(episode_of == src['episode_index'])
 
+    def close_frame(recorded):
+        return int(np.argmax(recorded[:, 6] <= recorded[:, 6].min() + 0.05))
+
     def grasp_tip(src):
         recorded = np.stack([ds.hf_dataset[int(i)]['action'] for i in frames(src)])
-        k = int(np.argmax(recorded[:, 6] <= recorded[:, 6].min() + 0.05))
+        k = close_frame(recorded)
         return tips(recorded[k:k + 1])[0]
 
     seeds = sorted({s['seed'] for s in sources})
@@ -72,7 +81,10 @@ def main():
         donor = donor_of[src['episode_index']]
         donor_idx = frames(donor)
         own_grasp, donor_grasp = grasp_tip(src), grasp_tip(donor)
-        for t in args.starts:
+        k_close = close_frame(recorded)
+        starts = ([(k_close - b, b) for b in args.before_close if k_close - b >= 0] if args.before_close
+                  else [(t, None) for t in args.starts])
+        for t, before in starts:
             if t >= len(idx):
                 continue
             frame = ds[int(idx[t])]
@@ -95,6 +107,8 @@ def main():
                    'joint_mean_deg': round(float(np.degrees(np.abs(pred[:n, :6] - ref[:, :6])).mean()), 2),
                    'gripper_mean_abs': round(float(np.abs(pred[:n, 6] - ref[:, 6]).mean()), 3),
                    'images_from': donor['source'] if args.swap_images else src['source']}
+            if before is not None:
+                row['before_close'] = before
             # Where the gripper closes on the piece: the step its action first reaches the
             # episode's most closed value, recorded vs predicted (within this chunk).
             close = recorded[:, 6].min() + 0.05
@@ -112,7 +126,8 @@ def main():
     tip = np.array([r['tip_mean_mm'] for r in rows])
     closes = [r for r in rows if 'close_to_own_grasp_mm' in r]
     summary = {'checkpoint': str(args.checkpoint), 'dataset': str(args.dataset_root), 'chunks': len(rows),
-               'swap_images': args.swap_images,
+               'swap_images': args.swap_images, 'before_close': args.before_close,
+               'chunks_with_predicted_close': sum('grasp_point_mm' in r for r in rows),
                'closes': len(closes),
                'close_to_own_grasp_mm_median': round(float(np.median([r['close_to_own_grasp_mm'] for r in closes])), 1) if closes else None,
                'close_to_donor_grasp_mm_median': round(float(np.median([r['close_to_donor_grasp_mm'] for r in closes])), 1) if closes else None,

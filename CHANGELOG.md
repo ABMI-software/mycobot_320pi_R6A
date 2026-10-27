@@ -9,6 +9,19 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — évaluation en distribution rejouant l'enregistrement, jeu centré sur la saisie (27/10)
+
+- **`eval_tri_seed.sh`, `PREPLACE=1`** : pour une graine 1001-1400, remet les mêmes pièces
+  pré-placées (`preplace_pieces.py`, déterministe), vérifie le placement contre le `preplaced.json`
+  de l'enregistrement (`PREPLACE_REF`, défaut `/workspace/tri_sort_B`) et n'évalue que la cible,
+  depuis le départ aléatoire de l'enregistrement.
+- **`open_loop_check.py --before-close 30 25 20 15 10`** : segments qui partent ces nombres
+  d'images avant la fermeture enregistrée de chaque épisode (200 segments sur 91-100, fermeture
+  dans chacun). Résumé : `chunks_with_predicted_close`.
+- **`probe_protocol.yaml`**, `run_c_final_report.amendment_27_10` : ce jeu devient la comparaison
+  décisive du point de saisie (Run C 10000 contre Run B 20k et Run B 10k), règle de la phrase,
+  note sur les calendriers de taux.
+
 ### Corrigé — pilote Kaggle : points gardés dès leur enregistrement (27/10)
 
 - **`smolvla_kaggle_driver.py`, `prune_checkpoints`** : les poids d'un pas multiple de
