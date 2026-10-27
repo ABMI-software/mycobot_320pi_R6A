@@ -18,8 +18,23 @@ téléchargé par l'API Kaggle avec reprise par fichier et tailles vérifiées, 
 - `probe_fit.py` plantait après les ajustements (liste d'encodeurs du 18/10 en dur) : corrigé.
   `probe_features.py --batch` (2 ici, pour la limite CPU).
 
+**Trois contrôles rapides** (après-midi ; `run_c_midway_checkpoint.follow_up_27_10`) :
+
+- **Saisies, images propres, graines 91-100** : pas encore d'amélioration mesurable. Point de
+  saisie, Run C 5000 contre Run A 15k −17 mm [−75 ; +26], contre Run A 20k −11 mm [−78 ; +35],
+  contre Run B 20k (mêmes données, encodeur figé) −27 mm [−55 ; +12] : tous les intervalles
+  contiennent 0. Erreur de pince plus grande sur les trois, et Run C ferme moins souvent (24
+  segments contre 29-31). Fermetures à moins de 20 mm : 1 à 2 sur 120 partout. Part « donneur »
+  avec ses propres images : 42 % contre 36 % (Run A 15k) et 41 % (Run B 20k), écarts non
+  significatifs.
+- **Tête figée sur les 799 dispositions de sonde** : médiane 19,8 mm (p90 43,0) avec l'encodeur du
+  Run C, 62,6 mm avec smolvla_base (≈ les 65,7 mm du démarrage à chaud).
+- **Règle de validité de la sonde** : l'encodeur du Run C bat le plancher pixels de 52 à 57 % sur
+  les trois caméras (il en faut 20 % sur 2) ; smolvla_base ne la passait que sur une.
+- Sommes SHA-256 des 8 fichiers du point de reprise consignées (il n'y a pas de `kept/005000`).
+
 Prochaine étape locale : évaluation Gazebo du Run B 20k pour le tableau façon article (19 graines,
-~12-19 h), en attente du feu vert.
+~12-19 h), **pas avant ton accord**.
 
 ## Run C session 1 terminée (26 octobre 2026, matin)
 

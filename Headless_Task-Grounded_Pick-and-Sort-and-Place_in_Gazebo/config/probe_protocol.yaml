@@ -314,7 +314,8 @@ run_c_midway_checkpoint:
     checkpoint: >
       run/checkpoints/005000/pretrained_model (session 1 stopped at step 5 249 and wrote no
       kept/005000; its output holds kept/002500 and this checkpoint only). model.safetensors
-      sha256 342e4803..., size checked against Kaggle's listing; aux head identical to its init.
+      size checked against Kaggle's listing; aux head identical to its init. sha256 (the
+      Downloads copy and the container copy agree file for file):
     probe: >
       linear probe on the connector, median error (mm), Run C 5 000 minus smolvla_base, 95 %
       bootstrap interval: top 20.67 vs 32.01, -11.34 [-12.47, -10.26]; left 20.68 vs 38.79,
@@ -335,6 +336,49 @@ run_c_midway_checkpoint:
     note: >
       probe_fit.py's verdict loop listed the 18/10 encoders instead of --encoders and crashed on
       KeyError after the fits; fixed and rerun, same fits.
+    sha256:
+      model.safetensors: 342e480332bdeccecefc55dffb5f138e420ea4ebbc274380ed8eecc23bfb807a
+      aux_head.safetensors: f788d7f6c764ce31f0702ad004582a9007a96772eff43769c961f0b8f4ea66c8
+      config.json: 647a1bbe2e54c72726a01a91aa9d09911f4688ee987e8eda43c66e0bc2ab961a
+      train_config.json: e7ecd27b575112957b078ebbfcc0b4174bd168e82069d1edd1eba51e25d4dd83
+      policy_preprocessor.json: 7b404a7d24a5e7a040cd3634dcc553e936c2b6a8fae14fbf95cb5d1ee1c83494
+      policy_postprocessor.json: 3b51f092c70c710ce0213ee1b63bf51b4878ec67828dd2d67daf9ef51081a41a
+      policy_preprocessor_step_5_normalizer_processor.safetensors: 60751665be1537afcfa04120747864280f53898a85bd41e0269b564476c66aea
+      policy_postprocessor_step_0_unnormalizer_processor.safetensors: 60751665be1537afcfa04120747864280f53898a85bd41e0269b564476c66aea
+  follow_up_27_10:
+    # Reported, not judged: none of these is a stop or gate criterion.
+    open_loop_own_images: >
+      seeds 91-100, the same 120 chunks / 40 episodes, own images; open_loop_compare.py (difference
+      of medians, Run C 5000 minus the other, 95 % interval from 2000 episode resamples) and
+      scripts/open_loop_within20.py (share of the 120 chunks whose predicted close is within 20 mm
+      of the recorded close). Medians, Run C 5000 / Run A 15k / Run A 20k / Run B 20k: tip 52.0 /
+      50.2 / 53.4 / 48.4 mm; joint 9.15 / 8.03 / 8.75 / 8.43 deg; gripper 0.021 / 0.016 / 0.013 /
+      0.013. Run C minus Run A 15k: tip +1.7 [-12.1, +13.5], joint +1.13 [-1.76, +2.31], gripper
+      +0.005 [+0.002, +0.009], grasp point -17.3 mm [-74.6, +25.7] (52.6 vs 69.8, 18 chunks),
+      within 20 mm 1 vs 2 of 120, -0.008 [-0.025, 0]. Minus Run A 20k: tip -1.5 [-13.2, +10.4],
+      joint +0.41 [-1.70, +2.14], gripper +0.008 [+0.005, +0.011], grasp point -11.3 [-78.4,
+      +35.3] (17 chunks), within 20 mm 1 vs 1. Minus Run B 20k (same training data, encoder frozen):
+      tip +3.6 [-6.9, +13.6], joint +0.73 [-0.98, +2.40], gripper +0.008 [+0.004, +0.012], grasp
+      point -26.7 [-54.8, +12.0] (54.5 vs 81.2, 19 chunks), within 20 mm 1 vs 2. Own-image donor
+      share (closes from an open gripper nearer the next seed's grasp than the episode's own):
+      Run C 10/24 = 42 %, Run A 15k 11/31 = 36 % (change +6 % [-14, +28]), Run B 20k 12/29 = 41 %
+      (change 0 % [-14, +16]). Reading: no measurable improvement in the grasps yet; every
+      grasp-point interval contains 0, the gripper error is larger on all three pairings, and
+      Run C closes from an open gripper less often (24 chunks vs 29-31). Run B 20k own-image run
+      27/10 14:39-15:04 Paris, same CPU limits; Run A 15k's 18/10 own-image runs in two folders are
+      identical chunk for chunk (open_loop_check is deterministic).
+    aux_head_on_probe_layouts: >
+      scripts/aux_head_probe.py: the frozen head (identical to aux_head_init.safetensors) on the
+      799 x 4 pieces of layouts 5001-5800, input as in training (the three cameras' connector
+      output, camera1-3 = top, right, left). Run C 5000 encoder: median 19.8 mm, p90 43.0 (cube
+      rouge 18.0, pave jaune 29.1, cylindre vert 18.6, cube bleu 16.7). smolvla_base encoder: 62.6 /
+      127.8 (the warm start's cross-validated 65.7 mm, so the input path matches training). The
+      labels' mean with no image: 121.7 / 201.2. Run C's linear probes per camera on the same
+      layouts: 20.7 / 20.7 / 19.4 mm.
+    probe_validity_run_c: >
+      the decision.validity rule applied to Run C 5000's connector (linear) against floor_pixels:
+      top 20.67 vs 48.39 (57 % lower), left 20.68 vs 42.84 (52 %), right 19.39 vs 43.98 (56 %);
+      the rule needs 20 % on 2 cameras: met on 3. smolvla_base meets it on the top camera only.
 
 # ---------------------------------------------------------------------------------------------
 # Record, 25/10/2026 evening, during Run C session 1 (after its step 120; nothing changed in the run).

@@ -15,6 +15,13 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   smolvla_base sur les trois caméras (20,7 / 20,7 / 19,4 mm contre 32,0 / 38,8 / 38,6) ; échange
   d'images +68,3 mm [+25,2 ; +109,0] et part donneur +26 % [+3 ; +49]. Aucun critère d'arrêt.
 - **`probe_features.py --batch`** : taille de lot réglable (défaut 8 inchangé).
+- **`scripts/aux_head_probe.py`** : la tête auxiliaire figée sur les dispositions de sonde, entrée
+  comme à l'entraînement (caméras haut, droite, gauche). Run C 5000 : 19,8 mm de médiane.
+- **`scripts/open_loop_within20.py`** : part des segments dont la fermeture prédite tombe à moins
+  de 20 mm de la fermeture enregistrée, écart apparié par rééchantillonnage d'épisodes.
+- **`probe_protocol.yaml`**, `run_c_midway_checkpoint.follow_up_27_10` : Run C 5000 contre Run A
+  15k / 20k et Run B 20k en boucle ouverte (aucune amélioration mesurable des saisies), validité
+  de la sonde (passée sur 3 caméras), sommes SHA-256 du point de reprise.
 
 ### Corrigé
 
