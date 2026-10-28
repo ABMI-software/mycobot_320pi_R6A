@@ -9,6 +9,13 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — `scripts/repeat_eval_gui.sh` (28/10)
+
+- Rejoue une graine d'un lot d'évaluation comme le lot l'a fait (mêmes point de reprise, graine,
+  pièces dans le même ordre, réglages), fenêtre Gazebo ouverte, puis `failure_modes.py` et la
+  comparaison pièce par pièce avec l'original, fenêtre toujours ouverte. Ex. : la seule réussite
+  hors distribution du Run B 20k, graine 17, pavé jaune (2e pièce).
+
 ### Modifié — `eval_tri_seed.sh` : fenêtre Gazebo laissée ouverte (28/10)
 
 - Avec `HEADLESS=false`, la scène reste ouverte après l'évaluation, simulation en marche, jusqu'à
