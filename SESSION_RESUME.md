@@ -1,5 +1,37 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Run B 20k dans Gazebo, format de l'article ROS2SmolVLA (28 octobre 2026, matin)
+
+50 graines, 27/10 16:20 → 28/10 05:16 (Paris), toutes rc 0, aucune erreur, aucun OOM. Résultats :
+`/workspace/eval/runB_paper/` (`paper_table.json`), tableau par `scripts/paper_table.py`.
+« Placé après saisie » = placés / saisis, comme la colonne de l'article. Intervalles de Wilson à 95 %.
+
+| | Article | Modèle du 13/10 | Run B 20k |
+|---|---|---|---|
+| En distribution : saisie | 78,3 % | 28/40 = 70,0 % [54,6 ; 81,9] | 23/40 = 57,5 % [42,2 ; 71,5] |
+| En distribution : dépose | 72,5 % | 28/40 = 70,0 % [54,6 ; 81,9] | 22/40 = 55,0 % [39,8 ; 69,3] |
+| En distribution : dépose après saisie | 92,5 % | 28/28 = 100 % [87,9 ; 100] | 22/23 = 95,7 % [79,0 ; 99,2] |
+| Hors distribution : saisie | 76,6 % | 1/40 = 2,5 % [0,4 ; 12,9] | 2/40 = 5,0 % [1,4 ; 16,5] |
+| Hors distribution : dépose | 46,9 % | 0/40 = 0 % [0 ; 8,8] | 1/40 = 2,5 % [0,4 ; 12,9] |
+| Hors distribution : dépose après saisie | 61,2 % | 0/1 | 1/2 |
+| Ensemble : saisie | 77,7 % | 29/80 = 36,2 % [26,6 ; 47,2] | 25/80 = 31,2 % [22,2 ; 42,1] |
+| Ensemble : dépose | 63,6 % | 28/80 = 35,0 % [25,5 ; 45,9] | 23/80 = 28,8 % [20,0 ; 39,5] |
+| Ensemble : dépose après saisie | 81,7 % | 28/29 = 96,6 % [82,8 ; 99,4] | 23/25 = 92,0 % [75,0 ; 97,8] |
+
+- **Protocoles différents en distribution** : le 13/10 = tri complet des 4 pièces des graines 1-10
+  depuis la pose d'observation (ses fichiers par graine perdus le 16/10, chiffres du tableau de
+  l'époque) ; Run B = la cible enregistrée seule des graines 1001-1040, mêmes pièces pré-placées,
+  même départ aléatoire. Hors distribution : même protocole (graines 11-20, 4 pièces, pose
+  d'observation). L'article a son propre banc : comparaison d'ordre de grandeur seulement.
+- **Modes d'échec** : hors distribution 34/40 « memorised spot » (fermeture à moins de 20 mm d'une
+  saisie d'entraînement, loin de la pièce), 3 near miss, 1 wrong place, 1 saisi non posé, 1 trié ;
+  en distribution 22 triés, 12 near miss, 4 memorised spot, 1 wrong place, 1 saisi non posé.
+  **« never closed » : 0 sur 80.**
+- En distribution par pièce (triés / 10) : cube rouge 10, cube bleu 5, pavé jaune 4, cylindre
+  vert 3. Par nombre de pièces déjà dans les bacs (0/1/2/3) : 6/9, 4/8, 4/9, 8/14.
+- Le Run B 20k reproduit ce qu'il a vu et ne localise pas les pièces nouvelles : c'est la
+  motivation du Run C (encodeur entraîné, perte de position).
+
 ## Run B 20k dans Gazebo contre l'article, lancé ; rapport final du Run C amendé (27 octobre 2026, soir)
 
 - **Évaluation Gazebo du Run B 20k lancée à 16:20 (Paris)**, accord donné. Conteneur 4 CPU / 8 Go,

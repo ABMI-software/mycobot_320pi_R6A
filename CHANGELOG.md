@@ -9,6 +9,15 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — Run B 20k dans Gazebo au format de l'article (28/10)
+
+- **`scripts/paper_table.py`** : tableau saisie / dépose / dépose après saisie (conditionnelle,
+  comme l'article), en / hors distribution et ensemble, intervalles de Wilson, modes d'échec dont
+  « never closed ».
+- Run B 20k, 80 pièces : en distribution 57,5 / 55,0 / 95,7 %, hors distribution 5,0 / 2,5 / 1 sur 2,
+  ensemble 31,2 / 28,8 / 92,0 % ; 34 des 40 échecs hors distribution sont des « memorised spot »,
+  aucun « never closed ». Détail dans `SESSION_RESUME.md`.
+
 ### Ajouté — évaluation en distribution rejouant l'enregistrement, jeu centré sur la saisie (27/10)
 
 - **`eval_tri_seed.sh`, `PREPLACE=1`** : pour une graine 1001-1400, remet les mêmes pièces
