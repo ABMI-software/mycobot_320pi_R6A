@@ -9,6 +9,12 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — `eval_tri_seed.sh` : fenêtre Gazebo laissée ouverte (28/10)
+
+- Avec `HEADLESS=false`, la scène reste ouverte après l'évaluation, simulation en marche, jusqu'à
+  la fermeture de la fenêtre Gazebo (ou Ctrl+C) ; `KEEP_GUI=0` la ferme tout de suite. Sans fenêtre,
+  rien ne change.
+
 ### Ajouté — Run B 20k dans Gazebo au format de l'article (28/10)
 
 - **`scripts/paper_table.py`** : tableau saisie / dépose / dépose après saisie (conditionnelle,

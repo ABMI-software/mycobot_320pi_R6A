@@ -3,6 +3,7 @@
 #
 #   eval_tri_seed.sh <checkpoint/pretrained_model> <seed> <out dir> [eval_smolvla_tri_sort.py args...]
 #   PREPLACE=1 eval_tri_seed.sh ... <seed 1001-1400> ...   # the recorded target only, as recorded
+#   HEADLESS=false eval_tri_seed.sh ...                     # Gazebo window, left open after the run
 #
 # Same scene as record_tri_seed.sh (tri_yolo.launch.py, piece_reach 0.28, headless, no YOLO),
 # without the recorder. <out dir>/ gets result.json, trace_*.jsonl and the logs. Everything is
@@ -59,3 +60,13 @@ fi
     --checkpoint "$CKPT" --seed "$SEED" --out "$OUT" "${EXTRA[@]}" "$@" > "$OUT/eval.log" 2>&1 || true
 stage "done: $(python3 -c "import json,sys; r=json.load(open(sys.argv[1]))['pieces']; \
 print(sum(p.get('placed_after_pick', False) for p in r), '/', len(r), 'sorted')" "$OUT/result.json" 2>/dev/null)"
+
+# With the GUI (HEADLESS=false), the scene stays up after the evaluation, simulation running, until
+# the Gazebo window is closed or Ctrl+C: any Gazebo process ending (the window) or the launch
+# ending stops everything (tri_cleanup). KEEP_GUI=0 closes it at once, as headless runs do.
+if [ "${HEADLESS:-true}" = false ] && [ "${KEEP_GUI:-1}" = 1 ]; then
+    stage "Gazebo window left open: close it (or Ctrl+C here) to stop the scene"
+    n=$(pgrep -fc "gz sim" || true)
+    while kill -0 %1 2>/dev/null && [ "$(pgrep -fc "gz sim" || true)" -ge "$n" ]; do sleep 2; done
+    stage "Gazebo window closed: stopping the scene"
+fi
