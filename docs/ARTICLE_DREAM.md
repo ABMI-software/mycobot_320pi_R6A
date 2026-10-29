@@ -91,9 +91,13 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
   le maximum de 3,8 px de la quantification.
 - Elle n'explique pas le PCK@2,5 réel du papier (0,24, loin de 0,79) : là,
   l'écart vient du transfert sim-réel.
-- Pour E3 : encoder la gaussienne à la position réelle (sous-pixel) et
-  décoder sans décalage, dans notre script d'entraînement, sans toucher à
-  `~/DREAM`. L'écart avec l'encodage d'origine devient un facteur de E4.
+- Pour E3 : `train_dream_ultimate_v5_geo.py --encodage sous-pixel` dessine la
+  gaussienne à la position exacte moins le décalage du décodeur, qui reste
+  celui de DREAM (rien ne change à l'inférence ni dans `~/DREAM`). Cibles
+  décodées contre labels, sur `real_tri_test` : entier 2,10 px médiane /
+  3,63 max ; sous-pixel σ 2 : 1,23 / 2,02 (la fenêtre 5×5 du décodeur tronque
+  la gaussienne) ; sous-pixel σ 1 (`--sigma-carte 1`) : 0,18 / 0,28. Un σ plus
+  étroit est plus dur à apprendre : encodage et σ sont des facteurs de E4.
 
 ### Point de départ de E3
 

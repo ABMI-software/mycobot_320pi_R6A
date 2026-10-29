@@ -36,6 +36,11 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   est touché comme link1. En Q (100×100), la quantification seule donne un
   PCK@2,5 de 0,79 (médiane 1,92 px, max 3,80 px) — référence, pas plafond
   strict ; en H, 1,90 px max ; en F, sans décalage, 1,70 px max.
+- **`train_dream_ultimate_v5_geo.py --encodage sous-pixel [--sigma-carte S]`** :
+  cartes de croyance à la position exacte, compensée du décalage du décodeur
+  de DREAM ; défaut inchangé (`entier`, celui de DREAM). Cibles décodées sur
+  `real_tri_test` : 2,10 → 0,18 px médiane (σ 1), 3,63 → 0,28 px max. Essai
+  d'une époque passé.
 - **E1 clos** : IC 95 % bootstrap par blocs (100 poses pour E, blocs de 2 s
   pour E'), aucune image commune entre tests et fine-tuning (md5).
 

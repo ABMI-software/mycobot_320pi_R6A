@@ -17,7 +17,7 @@
 
 ### Prochaines actions
 1. [VERT] E1 clos le 29/10 (IC par blocs, md5 train/test). Biais du PCK@2,5 expliqué : quantification des cartes de croyance de DREAM (`int(x)` + 0,4395), référence 0,79 en Q (`docs/ARTICLE_DREAM.md`).
-2. [ROUGE] E3 : encodage sous-pixel des cartes dans le script d'entraînement, sans toucher `~/DREAM`.
+2. [ROUGE] E3 : `--encodage sous-pixel` prêt dans `train_dream_ultimate_v5_geo.py` (cibles 0,18 px médiane à σ 1). Reste le générateur : randomisation d'apparence du papier sur le collecteur caméra libre.
 3. [JAUNE] Test de décalage 10/20/40 px et jeu de test à point de vue réservé.
 4. [VERT] Compléter la bibliographie avec `veilleur-biblio` (références de mémoire, non vérifiées).
 

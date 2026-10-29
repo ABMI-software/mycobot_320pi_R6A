@@ -53,6 +53,18 @@ ne fait que rapprocher des bords.
 pipeline de DREAM, et son gain (p=0,3) ne vaut pas le risque d'un second
 decalage image/cible.
 
+ENCODAGE DES CARTES (option `--encodage`, ajoutee le 29/10/2026). Par defaut,
+celui de DREAM : `create_belief_map` centre la gaussienne sur `int(x)` en
+sortie reseau et l'inference decode a +0,4395. Erreur uniforme sur
+[-0,56 ; +0,44] px reseau, x4,8 en pixels image en Q : mediane 1,90 px, max
+3,69 px apres aller-retour, avant toute erreur du reseau
+(docs/ARTICLE_DREAM.md, « Quantification des cartes de croyance »).
+`--encodage sous-pixel` dessine la gaussienne a la position exacte moins le
+decalage du decodeur, qui reste celui de DREAM : aller-retour sans biais,
+mediane 1,13 px a sigma 2 (la fenetre 5x5 du decodeur tronque la gaussienne),
+0,16 px a sigma 1 (`--sigma-carte`). Les cartes nulles (point a moins de 4 px
+du bord) restent les memes que DREAM, pour n'isoler que l'encodage.
+
 Variante de `train_dream_ultimate_v4_mix.py` (synthetique + reel suréchantillonné).
 
 Same recipe as train_dream_ultimate_v4.py (weighted per-keypoint loss, strong
@@ -121,6 +133,12 @@ VAL_FRAC = 0.10
 TEST_FRAC = 0.10
 
 SEED = 42
+
+# Regle de dream/network.py pour le decalage du decodeur : 0 a partir de
+# 400x400 en sortie (variante F), 0,4395 en dessous.
+DECALAGE_DECODEUR = 0.4395
+SORTIE_SANS_DECALAGE = 400
+DEMI_FENETRE_DREAM = 4
 
 
 def _load_pretrained(dream_network, path):
@@ -191,7 +209,23 @@ class WeightedBeliefMapLoss(torch.nn.Module):
         return weighted.mean()
 
 
-def _patch_augmentation():
+def cartes_sous_pixel(kp_netout, resolution_sortie, sigma):
+    """Gaussiennes centrees a la position exacte, compensee du decalage du
+    decodeur, la ou `create_belief_map` dessinerait les siennes."""
+    largeur, hauteur = resolution_sortie
+    decalage = 0.0 if min(largeur, hauteur) >= SORTIE_SANS_DECALAGE else DECALAGE_DECODEUR
+    colonnes, lignes = np.meshgrid(np.arange(largeur), np.arange(hauteur))
+    cartes = np.zeros((len(kp_netout), hauteur, largeur))
+    for i, (u, v) in enumerate(np.asarray(kp_netout, dtype=float)):
+        iu, iv = int(u), int(v)
+        if (iu - DEMI_FENETRE_DREAM >= 0 and iu + DEMI_FENETRE_DREAM + 1 < largeur
+                and iv - DEMI_FENETRE_DREAM >= 0 and iv + DEMI_FENETRE_DREAM + 1 < hauteur):
+            cartes[i] = np.exp(-((colonnes - (u - decalage)) ** 2 + (lignes - (v - decalage)) ** 2)
+                               / (2 * sigma ** 2))
+    return cartes
+
+
+def _patch_augmentation(encodage="entier", sigma_carte=2.0):
     """Geometrie a DREAM (keypoints suivis), photometrie par-dessus.
 
     Une seule greffe : `__getitem__` laisse `augment_data` a True — donc DREAM
@@ -206,8 +240,12 @@ def _patch_augmentation():
     original_getitem = dream_datasets.ManipulatorNDDSDataset.__getitem__
 
     def patched_getitem(self, idx):
+        sample = original_getitem(self, idx)
+        if encodage == "sous-pixel":
+            sample["belief_maps"] = torch.from_numpy(cartes_sous_pixel(
+                sample["keypoint_projections_output"].numpy(),
+                self.network_output_resolution, sigma_carte)).float()
         if self.augment_data:
-            sample = original_getitem(self, idx)
 
             img_tensor = sample["image_rgb_input"]
             img_np = img_tensor.permute(1, 2, 0).numpy() * 0.5 + 0.5
@@ -255,13 +293,13 @@ def _patch_augmentation():
                 img_aug_f.transpose(2, 0, 1)
             ).float()
 
-            return sample
-        else:
-            return original_getitem(self, idx)
+        return sample
 
     dream_datasets.ManipulatorNDDSDataset.__getitem__ = patched_getitem
     print("[PATCH] Geometrie a DREAM avec keypoints (ses reglages inchanges), "
           "photometrie image-seule par-dessus")
+    print(f"[PATCH] Encodage des cartes : {encodage}"
+          + (f", sigma {sigma_carte}" if encodage == "sous-pixel" else " (DREAM, sigma 2)"))
 
 
 def _save_learning_curve(output_dir, epochs, val_losses, test_losses):
@@ -297,7 +335,7 @@ def train_weighted(args):
     torch.backends.cudnn.benchmark = False
     print(f"🌱 Seed fixe : {SEED}")
 
-    _patch_augmentation()
+    _patch_augmentation(args.encodage, args.sigma_carte)
 
     MANIP_CONFIG = os.path.join(SCRIPT_DIR, "manip_configs", "mycobot320.yaml")
     arch_map = {
@@ -485,6 +523,8 @@ def train_weighted(args):
         "seed": SEED,
         "split": {"train": n_train, "val": n_val, "test": n_test},
         "pretrained": args.pretrained,
+        "encodage": args.encodage,
+        "sigma_carte": args.sigma_carte,
     }
 
     best_valid_loss = float("inf")
@@ -667,6 +707,12 @@ def main():
                               f"Default: {','.join(str(w) for w in DEFAULT_KP_WEIGHTS)}")
     parser.add_argument("--patience", type=int, default=5,
                          help="Early stopping patience (default: 5)")
+    parser.add_argument("--encodage", choices=["entier", "sous-pixel"], default="entier",
+                         help="cartes de croyance : entier = DREAM (int(x)), sous-pixel = position "
+                              "exacte compensee du decalage du decodeur (voir l'en-tete)")
+    parser.add_argument("--sigma-carte", type=float, default=2.0,
+                         help="sigma de la gaussienne en px reseau, avec --encodage sous-pixel "
+                              "(DREAM : 2)")
 
     args = parser.parse_args()
 
