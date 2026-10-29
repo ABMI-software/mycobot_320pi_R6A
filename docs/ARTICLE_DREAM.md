@@ -59,7 +59,7 @@ Chaque expérience suit `.claude/skills/campagne-mesure` (protocole écrit avant
 
 | Id | Expérience | Dépend de | Critère de sortie | Priorité | État |
 |---|---|---|---|---|---|
-| E1 | Métriques du papier (PCK + AUC, ADD, seuils 0,01 et 0,03) recalculées pour les modèles existants | — | Tableau au format du tableau I du papier pour les jeux A, E, E', G du registre | rouge | en cours : PCK de E faite (0,760 / 0,941 / 0,959, AUC 0,867) ; ADD à écrire ; données brutes réelles dans `~/Osama_ws` à centraliser |
+| E1 | Métriques du papier (PCK + AUC, ADD, seuils 0,01 et 0,03) recalculées pour les modèles existants | — | Tableau au format du tableau I du papier pour les jeux A, E, E', G du registre | rouge | en cours : tableau calculé le 29/10 pour A, E, E', G (registre, `~/dream_article/E1/`), tout `a_preciser` ; reste à expliquer le biais d'étiquette synthétique dv ≈ −1,9 px, passer au PCK 6 points, bootstrap par blocs et md5 train/test |
 | E2 | Jeu réel multi-vues : 6 à 10 positions de caméra jamais vues, référence indépendante de DREAM | — | Jeu figé, md5, positions relevées, leave-one-out de l'extrinsèque publié | rouge | à faire |
 | E3 | Synthétique seul multi-vues : caméra libre + randomisation du papier + augmentation v5, aucune image réelle | E1 | PCK@5 ≥ 0,83 et PCK@10 ≥ 0,90 sur E2 ; test de décalage ≥ 95 % ; ADD ≥ 0,80 à 20 mm | rouge | à faire |
 | E4 | Ablations : résolution Q/H/F, volume 25k/50k/100k, perte L2 contre pondérée, recette du papier, randomisation par bloc | E3 | Un tableau par facteur, 3 graines minimum | jaune | à faire |

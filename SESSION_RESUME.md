@@ -13,8 +13,10 @@
 - DREAM n'a jamais fermé la boucle de commande d'un tri (il a mesuré) ; seule l'extrinsèque figée DREAM a orienté le bras. La vraie boucle fermée est E7.
 - Seuil de pic : 0,01 (code NVlabs) déclaré à côté de 0,03 (texte du papier).
 
+- E1 lancé dans l'après-midi : PCK, AUC, ADD et deux seuils pour A, E, E', G (`~/dream_article/E1/`, `run.yaml`) ; revue métrologique, tout `a_preciser`. Les données restent dans `~/Osama_ws` (216 Go), lues sur place.
+
 ### Prochaines actions
-1. [ROUGE] E1 : centraliser les données brutes réelles depuis `~/Osama_ws`, puis PCK de A, G, E' et ADD avec échecs comptés.
+1. [ROUGE] E1, fin : erreur signée (du, dv) dans `eval_papier.py`, expliquer le biais synthétique dv ≈ −1,9 px (centre de pixel ou cy du collecteur), PCK 6 points en chiffre principal, bootstrap par blocs pour E', md5 train/test pour E et E'.
 2. [JAUNE] Test de décalage 10/20/40 px et jeu de test à point de vue réservé.
 3. [VERT] Compléter la bibliographie avec `veilleur-biblio` (références de mémoire, non vérifiées).
 

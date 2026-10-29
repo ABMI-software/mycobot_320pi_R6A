@@ -17,7 +17,7 @@ resultats:
     verdict: a_preciser
     reserve: "médiane sur détectés ; même monde et mêmes 4 caméras fixes ; moyenne 2,61 < médiane 2,78 avec max 127 px, colonnes à revérifier"
     comparable_papier: apres_recalcul
-    recalcul: "PCK@2,5/5/10 sur tous les keypoints dans l'image (E1)"
+    recalcul: "E1, 29/10 (~/dream_article/E1/A_synth50k_val, 2000 images) : détection 0,995 ; PCK 7 points 0,468/0,982/0,990, 6 points 0,546/0,980/0,988 ; AUC 0,870 ; ADD médiane 8,9 mm, p90 18,4 mm, AUC 0-100 mm 0,893, < 20 mm 0,926. Metrologue : a_preciser — PCK@2,5 borné par un biais d'étiquette mesuré dv ≈ −1,9 px (u centré) ; seuls PCK@5/10 comparables au papier"
 
   - id: B
     affirmation: "Synthétique seul vers réel : 13 à 27 % de détection"
@@ -57,7 +57,7 @@ resultats:
     verdict: a_preciser
     reserve: "2 positions de caméra vues à l'entraînement, même jour ; accord avec des labels ArUco"
     comparable_papier: apres_recalcul
-    recalcul: "fait le 29/10 (metrologue) : PCK@2,5/5/10 = 0,760 / 0,941 / 0,959 sur 1 400 keypoints"
+    recalcul: "E1, 29/10 (~/dream_article/E1/E_real_tri_test) : PCK 7 points 0,760/0,941/0,959, 6 points 0,723/0,932/0,952 ; AUC 0,867 ; ADD (K et distorsion par caméra) médiane 8,5 mm, p90 25,4 mm, AUC 0-100 mm 0,849, < 20 mm 0,840. Metrologue : a_preciser — l'ADD mesure l'accord avec la référence FK + ArUco (Z = 0, flexion ignorée), pas une exactitude ; indépendance train/test à prouver par md5"
 
   - id: F
     affirmation: "Test de décalage vgg_tri_reel_ft_e10 : les keypoints suivent à 96-98 % (20 px)"
@@ -77,7 +77,7 @@ resultats:
     verdict: a_preciser
     reserve: "n différents avant/après ; même décor ; le 98,7 → 99,2 % (pince) est à resourcer"
     comparable_papier: apres_recalcul
-    recalcul: "PCK"
+    recalcul: "E1, 29/10, 1 200 images pour les deux modèles (n identiques) : avant (v4_mix) détection 0,526, PCK 0,013/0,064/0,163, ADD médiane 76,6 mm ; après (tri_mix) détection 0,998, PCK 7 points 0,403/0,962/0,985, 6 points 0,470/0,956/0,982, ADD médiane 9,8 mm, p90 21,7 mm. Metrologue : a_preciser — même biais v au PCK@2,5 ; IC par graine à donner"
 
   - id: H
     affirmation: "Campagne Gazebo 10 graines : T_DREAM 8,3 / 12,9 mm, 1,8 / 2,6° (front / right)"
@@ -137,4 +137,4 @@ resultats:
     verdict: a_preciser
     reserve: "pose d'observation hors domaine (J5 ≈ 2°) ; cas courant à citer à côté de E"
     comparable_papier: apres_recalcul
-    recalcul: "PCK au sens du papier, avec et sans la pose d'observation"
+    recalcul: "E1, 29/10, depuis les CSV de la session : tout n = 994, PCK 0,627/0,772/0,819 ; J5 dans [45, 93]° n = 679, 0,733/0,891/0,937 ; statique (= pose d'observation) n = 401, 0,578/0,736/0,776 ; dynamique n = 571, 0,671/0,808/0,860. Pas d'ADD (pas de 3D). Metrologue : a_preciser — images à ~0,2 s, n efficace de quelques dizaines de poses (bootstrap par blocs à faire) ; offsets signés 1-4 px par caméra ; « tri jamais vu » à prouver par md5"

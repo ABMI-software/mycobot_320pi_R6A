@@ -9,6 +9,22 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — E1 : métriques du papier sur les modèles existants (29/10)
+
+- **`eval_papier.py`** rend aussi l'**ADD** du papier (PnP DREAM sans link2,
+  échecs comptés, AUC 0-100 mm), les deux **seuils de pic** (0,01 du code,
+  0,03 du texte, appliqué après coup sans toucher `~/DREAM`) et lit les CSV du
+  dashboard réel (`--csv`, `--j5`). Options `--split-val`, `--max-images`.
+- Jeux réels : K et distorsion **par caméra** (cam_3 / cam_2). `real_tri_test`
+  mélange arducam et SVPRO alors que son `_camera_settings.json` ne porte que
+  l'arducam : un ADD lu sur ce fichier serait faux pour la moitié des images.
+- Résultats (registre, tous `a_preciser`) : A 0,468/0,982/0,990, ADD 8,9 mm ;
+  G 0,526 → 0,998 de détection, ADD 76,6 → 9,8 mm ; E ADD 8,5 mm ; E' 0,627/
+  0,772/0,819, 0,733/0,891/0,937 hors pose d'observation. Le seuil 0,03 ne
+  change rien au-delà de 0,001 hors G avant.
+- **Constaté** : biais d'étiquette synthétique dv ≈ −1,9 px (u centré, mesuré
+  par le metrologue sur 1 045 keypoints) qui borne le PCK@2,5 synthétique.
+
 ### Ajouté — Projet d'article DREAM (29/10)
 
 - **`docs/ARTICLE_DREAM.md`** : thèse visée (DREAM entraîné sur du synthétique
