@@ -7,8 +7,8 @@ Step-locked runs (eval_smolvla_tri_sort.py --step-locked) carry a fingerprint pe
 fingerprints mean the same start state to the bit, the same state and action at every step, the
 same camera frames and the same piece poses. Otherwise, and for free-running runs, the traces are
 compared: the first step where the state or the action differs (and by how much, in degrees), the
-first camera frame that differs, and the outcome of each run. Exit 0 when every piece is
-identical. Plain python3 with numpy.
+first camera frame that differs, and the outcome of each run. Pieces B did not run (a one-piece
+recompute) are listed and left out. Exit 0 when every piece B ran is identical. Plain python3 with numpy.
 """
 import argparse
 import json
@@ -76,8 +76,7 @@ def main():
     for piece in pa:
         a, b = pa[piece], pb.get(piece)
         if b is None:
-            rows.append({'piece': piece, 'identical': False, 'a': outcome(a['result']), 'b': 'not run'})
-            all_same = False
+            rows.append({'piece': piece, 'identical': None, 'a': outcome(a['result']), 'b': 'not run'})
             continue
         fa, fb = a['result'].get('fingerprint'), b['result'].get('fingerprint')
         same = fa is not None and fa == fb
@@ -87,10 +86,13 @@ def main():
                      'detail': 'identical fingerprints' if same else first_difference(a, b)})
     print(f"{'piece':15s}{args.a.name:>32s}{args.b.name:>32s}   identical")
     for r in rows:
-        print(f"{r['piece']:15s}{r['a']:>32s}{r['b']:>32s}   {'YES' if r['identical'] else 'no'}")
+        print(f"{r['piece']:15s}{r['a']:>32s}{r['b']:>32s}   "
+              f"{'-' if r['identical'] is None else 'YES' if r['identical'] else 'no'}")
         if r.get('detail'):
             print(f"{'':15s}{r['detail']}")
-    print('ALL PIECES IDENTICAL' if all_same else 'NOT IDENTICAL (see above)')
+    ran = [r for r in rows if r['identical'] is not None]
+    all_same = all_same and bool(ran)
+    print(f'ALL {len(ran)} PIECES RUN IDENTICAL' if all_same else 'NOT IDENTICAL (see above)')
     if args.json:
         args.json.write_text(json.dumps(rows, indent=1) + '\n')
     sys.exit(0 if all_same else 1)

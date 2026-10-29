@@ -9,6 +9,15 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — remise à zéro exacte par pièce en mode verrouillé (29/10, test A en cours)
+
+- **`scripts/gz_systems/state_reset.py`**, **`StepLock.snapshot` / `start_from`**,
+  **`eval_smolvla_tri_sort.py --reset-from`**, **`eval_tri_seed.sh RESET_FROM=`**,
+  **`repeat_eval_gui.sh <run> [pièce]`** (recalcul d'une pièce seule depuis l'instantané du lot) ;
+  `tri_yolo.launch.py state_reset:=true` (moteur DART nommé, système chargé avant la physique).
+- Démarrage verrouillé (pause, robot au temps 0, blocs de 100 pas sans file d'attente), renvois
+  des requêtes perdues, commandes envoyées 3 fois (abonnements BEST_EFFORT des contrôleurs).
+
 ### Ajouté — évaluation Gazebo reproductible au bit près (29/10)
 
 - **`scripts/step_lock.py`** et **`eval_smolvla_tri_sort.py --step-locked`** : Gazebo n'avance

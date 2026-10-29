@@ -1,5 +1,31 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Mode verrouillé : remise à zéro exacte par pièce, test A en cours (29 octobre 2026, après-midi)
+
+Objectif fixé par l'utilisateur : **recalculer** (politique + physique) dans la fenêtre Gazebo une
+pièce d'un lot avec le résultat identique, sans repli sur la relecture.
+
+- **Ajouté** : `scripts/gz_systems/state_reset.py` (système Gazebo en Python : remet les 12
+  articulations et les 4 pièces à un instantané, vitesses à 0, consigne de vitesse à 0 dans
+  l'`Update` avant la physique, répété sur les 10 pas jusqu'à la mise à jour des contrôleurs) ;
+  `StepLock.snapshot/start_from` (instantané en début de pièce, remise « loin » pour forcer le
+  redessin, consigne de maintien qui finit sur l'instantané, remise exacte) ;
+  `--reset-from` / `RESET_FROM` (recalcul depuis les instantanés d'un lot, une pièce seule possible) ;
+  démarrage en pause, robot au temps 0, pas-à-pas par blocs de 100 sans file d'attente.
+- **Contrôle sans politique, réussi** : second passage à l'historique volontairement différent,
+  remis à l'instantané du premier : états, poses des pièces et images des 3 caméras **identiques
+  au bit** sur 1 s de trajectoire.
+- **Sources trouvées et corrigées en route** : file d'attente de `multi_step` (le simulateur
+  avançait pendant les pauses) ; commande de vitesse périmée de gz_ros2_control au pas de la
+  remise ; freinage limité en effort (une remise ne suffit pas) ; requête de remise perdue
+  (renvoi jusqu'à accusé) ; requête de pas perdue (renvoi si l'horloge de Gazebo n'a pas bougé) ;
+  **commandes bras et pince en BEST_EFFORT** : une commande perdue sous charge donnait 1e-5 rad
+  au pas 14 / 5 alors que départ, images et actions du 1er segment étaient identiques ; désormais
+  envoyées 3 fois en pause.
+- **PC** : Windows en « Modern Standby » de 11:21 à 13:09 (écran éteint après 60 min) : WSL figé.
+  `powercfg /change monitor-timeout-ac 0` pour les longues séries ; batterie à 8 % sur secteur.
+- Test A relancé à 13:48 (Paris) : A1 puis A2 depuis les instantanés d'A1.
+
 ## Test A du mode verrouillé : échec, cause trouvée, correctif partiel (29 octobre 2026, matin)
 
 - **Test A** (Run B 20k, graine 17, deux passages verrouillés et enregistrés, 04:24-06:10 Paris) :

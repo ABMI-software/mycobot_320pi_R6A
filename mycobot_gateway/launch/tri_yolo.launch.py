@@ -137,11 +137,14 @@ def launch_scene(context):
             tri_scene.load_board(source, models), top,
             piece_reach=float(LaunchConfiguration('piece_reach').perform(context)) or None)
         fd, world_file = tempfile.mkstemp(prefix='mycobot_tri_yolo_', suffix='.sdf')
+        world = tri_scene.build_world(
+            source, layout if pieces else {}, WORLD_NAME,
+            drop=() if LaunchConfiguration('aruco').perform(context) == 'true'
+            else tri_scene.NEAR_MARKERS + tri_scene.FAR_MARKERS)
+        if LaunchConfiguration('state_reset').perform(context) == 'true':
+            world = with_state_reset(world)
         with os.fdopen(fd, 'w') as f:
-            f.write(tri_scene.build_world(
-                source, layout if pieces else {}, WORLD_NAME,
-                drop=() if LaunchConfiguration('aruco').perform(context) == 'true'
-                else tri_scene.NEAR_MARKERS + tri_scene.FAR_MARKERS))
+            f.write(world)
     else:
         # The world that rendered the 50K DREAM dataset, used as is: no pieces,
         # so no YOLO and no ground truth, DREAM only.
@@ -223,6 +226,22 @@ def launch_scene(context):
     ]
 
 
+PHYSICS_PLUGIN = '<plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics" />'
+
+
+def with_state_reset(world):
+    """Step-locked evaluations (step_lock.py): the physics engine named (DART, the default, which
+    steps on one thread) and the state_reset system, whose Update runs before Physics's."""
+    if world.count(PHYSICS_PLUGIN) != 1 or world.count('<sdf version="1.9">') != 1:
+        raise RuntimeError('state_reset: unexpected world header')
+    return world.replace('<sdf version="1.9">', '<sdf version="1.9" xmlns:gz="http://gazebosim.org/schema">').replace(
+        PHYSICS_PLUGIN,
+        '<plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics">'
+        '<engine><filename>gz-physics-dartsim-plugin</filename></engine></plugin>\n'
+        '    <plugin filename="gz-sim-python-system-loader-system" name="gz::sim::systems::PythonSystemLoader">'
+        '<module_name>state_reset</module_name><gz:system_priority>-100</gz:system_priority></plugin>')
+
+
 def randomize_nodes(context, seed, run_yaml):
     """Step 2: redraw pieces and bins without restarting Gazebo, button with the GUI."""
     nodes = [Node(package='mycobot_gateway', executable='tri_scene_randomizer', output='screen',
@@ -276,6 +295,9 @@ def generate_launch_description():
                               description='appended to the headless server arguments'),
         DeclareLaunchArgument('run_on_start', default_value='true', choices=['true', 'false'],
                               description='false: the headless server starts paused (sim_grasp.launch.py)'),
+        DeclareLaunchArgument('state_reset', default_value='false', choices=['true', 'false'],
+                              description='load the state_reset system (step-locked evaluations); '
+                                          'GZ_SIM_SYSTEM_PLUGIN_PATH must hold scripts/gz_systems'),
         DeclareLaunchArgument('seed', default_value='-1',
                               description='Scene seed; -1 draws one and logs it'),
         DeclareLaunchArgument('piece_reach', default_value='0.0',

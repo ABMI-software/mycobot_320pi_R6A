@@ -5,6 +5,7 @@
 #   PREPLACE=1 eval_tri_seed.sh ... <seed 1001-1400> ...   # the recorded target only, as recorded
 #   HEADLESS=false eval_tri_seed.sh ...                     # Gazebo window, left open after the run
 #   STEP_LOCKED=1 eval_tri_seed.sh ...                      # step_lock.py: reproducible to the bit
+#   STEP_LOCKED=1 RESET_FROM=<run dir> eval_tri_seed.sh ...  # each piece from that run's snapshot
 #   VIEWER=1 eval_tri_seed.sh ...                           # headless server + a view-only window
 #   RECORD=1 eval_tri_seed.sh ...                           # Gazebo state log in <out>/gzlog
 #
@@ -35,17 +36,38 @@ stage() { echo "[$(TZ=Europe/Paris date +%H:%M:%S)] $*" | tee -a "$OUT/stages.lo
 SCENE=(headless:="${HEADLESS:-true}")
 [ "${VIEWER:-0}" = 1 ] && SCENE=(headless:=true gui_client:=true)
 [ "${RECORD:-0}" = 1 ] && SCENE+=("gz_extra_args:=--record-path $OUT/gzlog --record-period 0.02")
-[ "${STEP_LOCKED:-0}" = 1 ] && SCENE+=(run_on_start:=false)
+# Step-locked: the server starts paused with the state_reset system, no wall-timed observation
+# move; the same thread count for the policy in every run (batch or window).
+if [ "${STEP_LOCKED:-0}" = 1 ]; then
+    SCENE+=(run_on_start:=false state_reset:=true observe:=false)
+    export GZ_SIM_SYSTEM_PLUGIN_PATH="$HERE/gz_systems${GZ_SIM_SYSTEM_PLUGIN_PATH:+:$GZ_SIM_SYSTEM_PLUGIN_PATH}"
+    export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 STEP_LOCK_DIR="$OUT"
+fi
 ros2 launch mycobot_gateway tri_yolo.launch.py seed:="$SEED" piece_reach:=0.28 \
     "${SCENE[@]}" yolo:=false > "$OUT/scene.log" 2>&1 &
 stage "seed $SEED: scene starting ($CKPT)"
-# Step-locked: the server starts paused; the robot is spawned at simulation time 0 (controller loop
-# and cameras on one time grid, step_lock.py), then the simulation runs until lock.
+# Step-locked: the robot is spawned at simulation time 0 (controller loop and cameras on one time
+# grid, step_lock.py); then the simulation only advances in 100-step blocks until the evaluator
+# locks it (it touches lock_requested, this stepper answers stepper_stopped).
 if [ "${STEP_LOCKED:-0}" = 1 ]; then
     until gz model --list 2>/dev/null | grep -q mycobot_320; do sleep 1; done
-    gz service -s /world/tri_yolo/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \
-        --timeout 5000 --req 'pause: false' > /dev/null
-    stage "robot spawned at sim time 0; simulation started"
+    stage "robot spawned at sim time 0; stepping in 100-step blocks until lock"
+    # multi_step requests add up: the next block is sent only once /stats shows the previous one
+    # done, so nothing is left queued when the evaluator locks. A request can time out unanswered
+    # while the policy loads (29/10): if the iterations have not moved after 60 s, the block was
+    # not queued and is sent again; the last block always finishes before stepper_stopped.
+    iterations() { gz topic -e -n 1 -t /world/tri_yolo/stats 2>/dev/null | awk '/^iterations:/ {print $2}'; }
+    ( while [ ! -e "$OUT/lock_requested" ]; do
+          start=$(iterations); start=${start:-0}
+          gz service -s /world/tri_yolo/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \
+              --timeout 5000 --req 'multi_step: 100, pause: true' > /dev/null || true
+          waited=0
+          until now=$(iterations); [ "${now:-0}" -ge $((start + 100)) ]; do
+              sleep 0.2; waited=$((waited + 1))
+              if [ $waited -ge 300 ] && [ "${now:-0}" = "$start" ]; then break; fi
+          done
+      done
+      touch "$OUT/stepper_stopped" ) &
 fi
 # "inactive" contains "active": match the state as a whole word.
 until ros2 control list_controllers 2>/dev/null \
@@ -61,6 +83,7 @@ stage "controllers active"
 # random start the recording drew first (draw 0 of default_rng(seed), --start-pose random).
 EXTRA=()
 [ "${STEP_LOCKED:-0}" = 1 ] && EXTRA+=(--step-locked)
+[ -n "${RESET_FROM:-}" ] && EXTRA+=(--reset-from "$RESET_FROM")
 if [ "${PREPLACE:-0}" = 1 ]; then
     TARGET=$(python3 "$HERE/preplace_pieces.py" --seed "$SEED" --out "$OUT" 2>> "$OUT/preplace.log" | tail -1) \
         || { stage "FATAL: preplace failed: $(tail -1 "$OUT/preplace.log")"; exit 1; }

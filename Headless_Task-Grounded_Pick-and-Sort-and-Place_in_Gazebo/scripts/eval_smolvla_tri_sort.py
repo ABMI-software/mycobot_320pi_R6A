@@ -3,7 +3,7 @@
 
   eval_smolvla_tri_sort.py --checkpoint <pretrained_model> --seed 11 --out <dir>
                            [--start-pose observation|random] [--n-action-steps 50] [--max-steps 300]
-                           [--step-locked]
+                           [--step-locked [--reset-from <step-locked run dir>]]
 
 For each piece, in the sorter's order: the arm goes where a recorded episode starts (the
 observation pose, or a random pose drawn as for the random-start recordings), the gripper to
@@ -27,7 +27,10 @@ command is sent while it is paused, observations are taken on camera ticks, move
 number of steps, and the policy runs with PyTorch's deterministic algorithms. Each piece then gets
 a fingerprint (sha256 of its start state at full precision, of every step's state, action and
 piece poses, and of every camera frame the policy saw), so two runs can be shown identical, or
-where they part. Without it, the evaluator behaves exactly as it did for the 27/10 batch.
+where they part. Each piece starts from an exact state reset (step_lock.start_from) to a snapshot
+the run takes there, or, with --reset-from, to the snapshot the given run took for that piece: a
+piece of a batch can then be recomputed alone (--only) from the bit-identical state. Without
+--step-locked, the evaluator behaves exactly as it did for the 27/10 batch.
 
 Inside gazebo_to_lerobot, ROS sourced, /workspace/venv_lerobot's python (it sees rclpy).
 """
@@ -207,7 +210,7 @@ def run_piece(node, model, target, start_q, args, out):
             'steps': len(trace), 'chunks': chunks, 'infer_s_median': round(float(np.median(infer_s)), 1)}
 
 
-def run_piece_locked(node, model, target, start_q, args, out):
+def run_piece_locked(node, model, target, start_q, args, out, snapshots):
     """run_piece, step-locked (step_lock.py): same sequence, same scoring, plus a fingerprint."""
     name = target.model
     bin_name = tri_scene.PAIRS[name]
@@ -219,6 +222,9 @@ def run_piece_locked(node, model, target, start_q, args, out):
         return {'piece': name, 'error': 'random start pose unreachable without scraping'}
     node.locked_gripper(START_GRIPPER)
     node.align_to_tick()
+    snap = snapshots[name] if snapshots is not None else node.snapshot()
+    node.start_from(snap)
+    piece0 = np.asarray(snap['poses'][name][:3])
     start_state = list(node.joint_full)
     start_t = node.now_ns()
     trace, poses, chunks, infer_s, frames = [], [], 0, [], []
@@ -235,7 +241,7 @@ def run_piece_locked(node, model, target, start_q, args, out):
         for k, a in enumerate(chunk[:n]):
             if grip is None or abs(a[6] - grip) > 1e-4:
                 grip = float(a[6])
-                node.set_gripper_value(grip)
+                node.send_gripper(grip)
             node.deliver()
             node.step(int(round(DT * 1000)))
             trace.append({'t_ns': node.now_ns() - start_t, 'chunk': chunks, 'state': list(node.joint_full),
@@ -255,12 +261,13 @@ def run_piece_locked(node, model, target, start_q, args, out):
     end = node.object_poses().get(name)
     placed = bool(end is not None and abs(end[0] - bin_xy[0]) < BIN_HALF
                   and abs(end[1] - bin_xy[1]) < BIN_HALF and end[2] < PICKED_Z)
-    fingerprint = {'start_state': sha(start_state), 'trace': sha(trace), 'piece_poses': sha(poses),
+    fingerprint = {'snapshot': sha(snap), 'start_state': sha(start_state), 'trace': sha(trace), 'piece_poses': sha(poses),
                    'frames': sha(frames), 'end': sha(None if end is None else end.tolist())}
     fingerprint['all'] = sha(fingerprint)
     with open(out / f'trace_{name}.jsonl', 'w') as f:
         f.write(json.dumps({'piece': name, 'bin': bin_name, 'step_locked': True, 'piece0': piece0.tolist(),
-                            'bin_xy': list(bin_xy), 'start_state': start_state, 'start_q_deg': None if start_q is None
+                            'bin_xy': list(bin_xy), 'snapshot': snap, 'reset_from': args.reset_from and str(args.reset_from),
+                            'start_state': start_state, 'start_q_deg': None if start_q is None
                             else np.round(start_q, 2).tolist(), 'fingerprint': fingerprint}) + '\n')
         for s in trace:
             f.write(json.dumps(s) + '\n')
@@ -286,6 +293,7 @@ def main():
     ap.add_argument('--max-steps', type=int, default=300, help='per piece; recorded episodes are 161-208')
     ap.add_argument('--only', default='', help='comma-separated pieces')
     ap.add_argument('--step-locked', action='store_true', help='step_lock.py: reproducible to the bit')
+    ap.add_argument('--reset-from', type=Path, help='step-locked run whose per-piece snapshots to start from')
     args, ros_args = ap.parse_known_args()
     args.out.mkdir(parents=True, exist_ok=True)
     rclpy.init(args=['--ros-args', '-p', 'use_sim_time:=true', '-p', 'world_name:=tri_yolo',
@@ -298,6 +306,10 @@ def main():
         torch.set_num_threads(4)
     model = SmolVLA(args.checkpoint)
     node.wait_until_ready()
+    snapshots = None
+    if args.reset_from:
+        snapshots = {json.loads(f.read_text().splitlines()[0])['piece']: json.loads(f.read_text().splitlines()[0])['snapshot']
+                     for f in sorted(args.reset_from.glob('trace_*.jsonl'))}
     if args.step_locked:
         bins = sorted(set(tri_scene.PAIRS.values()))
         node.bins = {k: np.asarray(v) for k, v in model_poses(node.world, bins).items()}
@@ -311,14 +323,15 @@ def main():
             continue
         start_q = random_start.sample(rng) if args.start_pose == 'random' else None
         try:
-            r = (run_piece_locked if args.step_locked else run_piece)(node, model, target, start_q, args, args.out)
+            r = (run_piece_locked(node, model, target, start_q, args, args.out, snapshots) if args.step_locked
+                 else run_piece(node, model, target, start_q, args, args.out))
         except Exception as exc:                                # noqa: BLE001
             r = {'piece': target.model, 'error': str(exc)}
         results.append(r)
         node.status(f'[eval] {json.dumps(r)}')
         (args.out / 'result.json').write_text(json.dumps({
             'checkpoint': args.checkpoint, 'seed': args.seed, 'start_pose': args.start_pose,
-            'step_locked': args.step_locked,
+            'step_locked': args.step_locked, 'reset_from': args.reset_from and str(args.reset_from),
             'n_action_steps': args.n_action_steps, 'max_steps': args.max_steps, 'pieces': results},
             indent=1) + '\n')
     node.destroy_node()
