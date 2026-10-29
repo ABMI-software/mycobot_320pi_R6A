@@ -30,7 +30,8 @@ Usage (venv_dream) :
         [--j5 MIN MAX]   # détections déjà calculées (dashboard réel) : PCK seule
 
 Sorties : resume.json, erreurs.npy (px, NaN = non détecté), dans_image.npy,
-score_lisse.npy, add_m.npy (NaN = PnP impossible), pour recalcul.
+score_lisse.npy, add_m.npy (NaN = PnP impossible), signees.npy (détecté moins
+référence, px, par axe) et points_3d.npy (repère caméra, m), pour recalcul.
 """
 import argparse
 import csv
@@ -134,6 +135,7 @@ def evaluer_jeu(reseau, dream, fichiers, dossier):
     import torch
     from PIL import Image
     erreurs, dans_image, scores, add, pnp_possible = [], [], [], {s: [] for s in SEUILS_PIC}, []
+    signees, positions = [], []
     cache_K = {}
     for chemin in fichiers:
         label = json.load(open(chemin))
@@ -162,8 +164,11 @@ def evaluer_jeu(reseau, dream, fichiers, dossier):
         erreurs.append(ligne)
         dans_image.append(visible)
         scores.append(score)
+        signees.append(np.where(detecte[:, None], detections - references, np.nan))
+        positions.append(points_3d)
     return (np.array(erreurs), np.array(dans_image, bool), np.array(scores),
-            {s: np.array(v, float) for s, v in add.items()}, np.array(pnp_possible, bool))
+            {s: np.array(v, float) for s, v in add.items()}, np.array(pnp_possible, bool),
+            np.array(signees), np.array(positions))
 
 
 def lire_csv(chemin, j5):
@@ -223,7 +228,10 @@ def main():
             pas = len(fichiers) / args.max_images
             fichiers = [fichiers[int(i * pas)] for i in range(args.max_images)]
 
-        erreurs, dans_image, scores, add, pnp_possible = evaluer_jeu(reseau, dream, fichiers, args.data)
+        erreurs, dans_image, scores, add, pnp_possible, signees, positions = evaluer_jeu(
+            reseau, dream, fichiers, args.data)
+        np.save(sortie / "signees.npy", signees)
+        np.save(sortie / "points_3d.npy", positions)
         np.save(sortie / "score_lisse.npy", scores)
         np.save(sortie / "add_m.npy", np.stack([add[s] for s in SEUILS_PIC], axis=1))
         np.save(sortie / "pnp_possible.npy", pnp_possible)

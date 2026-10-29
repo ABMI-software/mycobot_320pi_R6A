@@ -16,9 +16,10 @@
 - E1 lancé dans l'après-midi : PCK, AUC, ADD et deux seuils pour A, E, E', G (`~/dream_article/E1/`, `run.yaml`) ; revue métrologique, tout `a_preciser`. Les données restent dans `~/Osama_ws` (216 Go), lues sur place.
 
 ### Prochaines actions
-1. [ROUGE] E1, fin : erreur signée (du, dv) dans `eval_papier.py`, expliquer le biais synthétique dv ≈ −1,9 px (centre de pixel ou cy du collecteur), PCK 6 points en chiffre principal, bootstrap par blocs pour E', md5 train/test pour E et E'.
-2. [JAUNE] Test de décalage 10/20/40 px et jeu de test à point de vue réservé.
-3. [VERT] Compléter la bibliographie avec `veilleur-biblio` (références de mémoire, non vérifiées).
+1. [ROUGE] E1, fin : bootstrap par blocs pour E', md5 train/test pour E et E'. Le biais du PCK@2,5 est expliqué : quantification des cartes de croyance de DREAM (`int(x)` + 0,4395), plafond 0,79 en Q (`docs/ARTICLE_DREAM.md`).
+2. [ROUGE] E3 : encodage sous-pixel des cartes dans le script d'entraînement, sans toucher `~/DREAM`.
+3. [JAUNE] Test de décalage 10/20/40 px et jeu de test à point de vue réservé.
+4. [VERT] Compléter la bibliographie avec `veilleur-biblio` (références de mémoire, non vérifiées).
 
 ### Commande rapide de reprise
 ```bash

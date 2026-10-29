@@ -21,9 +21,20 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Résultats (registre, tous `a_preciser`) : A 0,468/0,982/0,990, ADD 8,9 mm ;
   G 0,526 → 0,998 de détection, ADD 76,6 → 9,8 mm ; E ADD 8,5 mm ; E' 0,627/
   0,772/0,819, 0,733/0,891/0,937 hors pose d'observation. Le seuil 0,03 ne
-  change rien au-delà de 0,001 hors G avant.
-- **Constaté** : biais d'étiquette synthétique dv ≈ −1,9 px (u centré, mesuré
-  par le metrologue sur 1 045 keypoints) qui borne le PCK@2,5 synthétique.
+  change rien au-delà de 0,001 hors G avant. PCK sans link2 (6 points)
+  inscrit à côté.
+- `eval_papier.py` sauve aussi l'erreur signée par axe (`signees.npy`) et les
+  points 3D (`points_3d.npy`).
+- **Constaté — quantification des cartes de croyance de DREAM.** Le biais
+  vertical d'environ 1,9 px que le metrologue avait lu sur le synthétique n'est
+  pas un biais d'étiquette : il ne touche que base et link1, les points fixes
+  dans l'image, à (+2,1 ; −2,6) px, et il est identique sur trois modèles
+  (σ = 0,05 px). `create_belief_map` (`~/DREAM/dream/image_proc.py:866`)
+  centre la gaussienne d'entraînement sur `int(x)` en sortie réseau, puis le
+  décodage ajoute 0,4395. Un point dont la sortie vaut 49,9999… est appris à
+  49 et décodé à 49,44, soit −0,56 px réseau, ×4,8 = −2,7 px image. En Q
+  (100×100), cette quantification plafonne à elle seule le PCK@2,5 à 0,79
+  (erreur médiane 1,92 px, max 3,80 px) ; en H, 1,90 px max ; en F, 0,95 px.
 
 ### Ajouté — Projet d'article DREAM (29/10)
 

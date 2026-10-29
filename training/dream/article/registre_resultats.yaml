@@ -17,7 +17,7 @@ resultats:
     verdict: a_preciser
     reserve: "médiane sur détectés ; même monde et mêmes 4 caméras fixes ; moyenne 2,61 < médiane 2,78 avec max 127 px, colonnes à revérifier"
     comparable_papier: apres_recalcul
-    recalcul: "E1, 29/10 (~/dream_article/E1/A_synth50k_val, 2000 images) : détection 0,995 ; PCK 7 points 0,468/0,982/0,990, 6 points 0,546/0,980/0,988 ; AUC 0,870 ; ADD médiane 8,9 mm, p90 18,4 mm, AUC 0-100 mm 0,893, < 20 mm 0,926. Metrologue : a_preciser — PCK@2,5 borné par un biais d'étiquette mesuré dv ≈ −1,9 px (u centré) ; seuls PCK@5/10 comparables au papier"
+    recalcul: "E1, 29/10 (~/dream_article/E1/A_synth50k_val, 2000 images) : détection 0,995 ; PCK 7 points 0,468/0,982/0,990, 6 points 0,546/0,980/0,988 ; AUC 0,870 ; ADD médiane 8,9 mm, p90 18,4 mm, AUC 0-100 mm 0,893, < 20 mm 0,926. Metrologue : a_preciser — PCK@2,5 borné par la quantification des cartes de croyance de DREAM en Q (plafond 0,79 ; base et link1 à (+2,1 ; −2,6) px constants, docs/ARTICLE_DREAM.md) ; seuls PCK@5/10 comparables au papier hors variante Q"
 
   - id: B
     affirmation: "Synthétique seul vers réel : 13 à 27 % de détection"
@@ -77,7 +77,7 @@ resultats:
     verdict: a_preciser
     reserve: "n différents avant/après ; même décor ; le 98,7 → 99,2 % (pince) est à resourcer"
     comparable_papier: apres_recalcul
-    recalcul: "E1, 29/10, 1 200 images pour les deux modèles (n identiques) : avant (v4_mix) détection 0,526, PCK 0,013/0,064/0,163, ADD médiane 76,6 mm ; après (tri_mix) détection 0,998, PCK 7 points 0,403/0,962/0,985, 6 points 0,470/0,956/0,982, ADD médiane 9,8 mm, p90 21,7 mm. Metrologue : a_preciser — même biais v au PCK@2,5 ; IC par graine à donner"
+    recalcul: "E1, 29/10, 1 200 images pour les deux modèles (n identiques) : avant (v4_mix) détection 0,526, PCK 0,013/0,064/0,163, ADD médiane 76,6 mm ; après (tri_mix) détection 0,998, PCK 7 points 0,403/0,962/0,985, 6 points 0,470/0,956/0,982, ADD médiane 9,8 mm, p90 21,7 mm. Metrologue : a_preciser — même quantification au PCK@2,5 (base et link1 à (+2,1 ; −2,6) px) ; IC par graine à donner"
 
   - id: H
     affirmation: "Campagne Gazebo 10 graines : T_DREAM 8,3 / 12,9 mm, 1,8 / 2,6° (front / right)"
