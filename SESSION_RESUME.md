@@ -1,5 +1,30 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (29 octobre 2026 — soir, E3 démarré)
+
+### Ce qui a été accompli aujourd'hui
+- Suivi du chantier : feuille de route E3.0-E3.10 et « Ce qu'on a appris » dans `docs/ARTICLE_DREAM.md` ; le bandeau de démarrage affiche l'expérience en cours et sa prochaine étape.
+- E3.1 fait : labels du jeu caméra libre de septembre contrôlés à l'œil (planche de 24, vue tenue comprise). Constat : apparence pauvre (même table, même sol, trois objets).
+- E3.2 fait : masque du robot par caméra de segmentation, aligné au pixel ; 31 masques sur 40 synchrones après resynchronisation sur l'horodatage.
+- E3.0 lancé à 16:55 : synthétique seul sur 17 702 images caméra libre, encodage DREAM, ≤ 50 époques (~6 min chacune), détaché, garde thermique.
+
+### Décisions prises
+- E3.0 sert de référence « diversité de caméra seule », avant toute randomisation d'apparence.
+- La pince est déjà montée dans la collecte caméra libre (E3.6 fait).
+- Collecte et entraînement ne tournent jamais en même temps (GPU).
+
+### Prochaines actions
+1. [ROUGE] E3.3 : choisir la source des fonds (décision utilisateur), puis écrire la composition hors ligne derrière le masque.
+2. [ROUGE] Évaluer E3.0 quand il a fini : `eval_papier.py` sur `synth_cam_libre_vue_tenue` et `real_tri_test`, puis test de décalage.
+3. [JAUNE] E3.4-E3.5 : distracteurs, recoloration du robot, lumières libres.
+4. [JAUNE] Préparer la session au banc pour E2 (jeu réel multi-vues).
+
+### Commande rapide de reprise
+```bash
+bash scripts/etat_session.sh
+tail -c 2000 ~/dream_article/E3/E3_0/journal_b.txt | tr '\r' '\n' | grep -E "Epoch +[0-9]+/50 \|" | tail -3
+```
+
 ## État actuel (29 octobre 2026 — après-midi, projet d'article DREAM)
 
 ### Ce qui a été accompli aujourd'hui

@@ -40,6 +40,7 @@ import os
 import random
 import signal
 import time
+import zlib
 
 from pathlib import Path
 
@@ -47,6 +48,8 @@ import numpy as np
 import rclpy
 
 from rclpy.executors import SingleThreadedExecutor
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from sensor_msgs.msg import Image
 from ros_gz_interfaces.msg import Entity
 from ros_gz_interfaces.srv import SetEntityPose
 
@@ -59,6 +62,19 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
     CAMERA_TOPICS = {'libre': '/cam_libre/image'}
 
     NOM_MODELE = 'cam_libre'
+
+    # Masque du robot rendu par le second capteur de worlds/camera_libre.sdf
+    # (label 1 pose par l'URDF `_masque`, 0 ailleurs).
+    TOPIC_MASQUE = '/cam_libre/masque/labels_map'
+    LABEL_ROBOT = 1
+    # Demi-periode des deux capteurs (10 Hz) : au-dela, masque et image ne
+    # viennent pas du meme rendu.
+    ECART_MASQUE_MAX_S = 0.05
+    # Mesure du 29/10 : le masque suit l'image de 0,1 a 0,7 s, 9 paires
+    # synchrones sur 40. La scene est immobile a la capture : on reessaie donc
+    # la meme capture toutes les 0,1 s jusqu'a 1,5 s, sans bouger le bras.
+    ATTENTE_MASQUE_PAS_S = 0.1
+    ATTENTE_MASQUE_ESSAIS = 15
 
     # Coquille de tirage autour du poste de travail. Les deux cameras reelles y
     # sont : l'arducam a 1,077 m et 80 deg d'elevation, la svpro a 0,98 m et
@@ -117,6 +133,17 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
         self._n_appels_moissonnes = 0
         self._poses_pick = self._charge_poses_pick()
         self._settle_plein = self.settle_time
+        self._masque = None
+        self._crc_masque = None
+        self._essais_masque = 0
+        os.makedirs(os.path.join(self.output_dir, 'images', 'masque'), exist_ok=True)
+        self.chemin_masques = os.path.join(self.output_dir, 'masques.csv')
+        with open(self.chemin_masques, 'w', newline='') as f:
+            csv.writer(f).writerow(['index', 'frais', 'part_robot', 'ecart_s'])
+        self.create_subscription(
+            Image, self.TOPIC_MASQUE, self._on_masque,
+            QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
+                       history=HistoryPolicy.KEEP_LAST, depth=1))
         self._ouvre_client_pose()
         self.get_logger().warn(
             f'camera LIBRE : pose retiree a chaque trame '
@@ -579,7 +606,74 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
                 f'(total {self._n_collisions_mesurees})')
             self._collect_next()
             return
-        return super()._capture_and_save(target_angles)
+        if self._ecart_masque() > self.ECART_MASQUE_MAX_S \
+                and self._essais_masque < self.ATTENTE_MASQUE_ESSAIS:
+            self._essais_masque += 1
+            minuteur = self.create_timer(
+                self.ATTENTE_MASQUE_PAS_S,
+                lambda: (minuteur.cancel(), self._capture_and_save(target_angles)))
+            return
+        self._essais_masque = 0
+        index, enregistres = self.sample_idx, self.n_recorded
+        super()._capture_and_save(target_angles)
+        if self.n_recorded > enregistres:
+            self._enregistre_masque(index)
+
+    def _start_collection_once(self):
+        """Attend `/joint_states` et un premier masque avant la premiere pose.
+
+        Le minuteur du v3 demarre a 5 s quoi qu'il arrive ; or
+        `joint_state_broadcaster` peut s'activer plus tard (le launch lui laisse
+        60 s), et `_capture_and_save` arrete alors la collecte au premier
+        echantillon. Le minuteur rappelle cette methode tant qu'il n'est pas
+        annule : on rend la main sans demarrer.
+        """
+        if not self.current_joints or self._masque is None:
+            self.get_logger().info(
+                'attente : /joint_states ' + ('ok' if self.current_joints else 'muet')
+                + ', masque ' + ('ok' if self._masque is not None else 'absent'),
+                throttle_duration_sec=5.0)
+            return
+        super()._start_collection_once()
+
+    def _ecart_masque(self):
+        image = self.current_images.get('libre')
+        if self._masque is None or image is None:
+            return float('inf')
+        return abs((self._masque.header.stamp.sec - image.header.stamp.sec)
+                   + (self._masque.header.stamp.nanosec - image.header.stamp.nanosec) * 1e-9)
+
+    def _on_masque(self, msg):
+        self._masque = msg
+
+    def _enregistre_masque(self, index):
+        """Masque de la trame `index`, 255 sur le robot.
+
+        Deux gardes. Le CRC, comme pour l'image : la camera bouge a chaque
+        trame, un masque identique au precedent est perime. Et l'horodatage :
+        mesure du 29/10, sur 12 trames, 2 ou 3 masques suivaient une autre
+        pose du bras — rendus avant l'arret, ils avaient pourtant change. Un
+        masque perime est ecrit quand meme, marque `frais = 0`, et la
+        composition des fonds le saute : l'image garde alors son decor
+        Gazebo, elle reste utilisable.
+        """
+        ecart = self._ecart_masque()
+        if ecart == float('inf'):
+            with open(self.chemin_masques, 'a', newline='') as f:
+                csv.writer(f).writerow([index, 0, '', ''])
+            return
+        from PIL import Image as PILImage
+        m = self._masque
+        canaux = len(m.data) // (m.height * m.width)
+        labels = np.frombuffer(bytes(m.data), np.uint8).reshape(m.height, m.width, canaux)[:, :, 0]
+        robot = labels == self.LABEL_ROBOT
+        crc = zlib.crc32(bytes(m.data))
+        frais = int(crc != self._crc_masque and ecart <= self.ECART_MASQUE_MAX_S)
+        self._crc_masque = crc
+        PILImage.fromarray((robot * 255).astype(np.uint8)).save(
+            os.path.join(self.output_dir, 'images', 'masque', f'{index:06d}.png'))
+        with open(self.chemin_masques, 'a', newline='') as f:
+            csv.writer(f).writerow([index, frais, round(float(robot.mean()), 4), round(ecart, 3)])
 
     def _randomize_scene(self):
         """Point d'accroche : appele en tete de chaque echantillon, AVANT la

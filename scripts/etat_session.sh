@@ -26,8 +26,11 @@ for f in scripts/tool_offset.json; do
 done
 
 if [ -f docs/ARTICLE_DREAM.md ]; then
-  prochaine=$(grep -m1 -E '^\| E[0-9] \|.*\| (à faire|en cours[^|]*) \|$' docs/ARTICLE_DREAM.md | cut -d'|' -f2,3 | sed 's/ *| */ — /; s/^ *//')
-  [ -n "$prochaine" ] && echo "Article DREAM : prochaine expérience ${prochaine} (/article)"
+  experience() { grep -m1 -E "^\\| E[0-9] \\|.*\\| $1[^|]* \\|\$" docs/ARTICLE_DREAM.md | cut -d'|' -f2,3 | sed 's/ *| */ — /; s/^ *//'; }
+  prochaine=$(experience "en cours"); [ -n "$prochaine" ] || prochaine=$(experience "à faire")
+  [ -n "$prochaine" ] && echo "Article DREAM : expérience ${prochaine} (/article)"
+  etape=$(grep -m1 -E '^\| E[0-9]+\.[0-9]+ \|.*\| (à faire|en cours[^|]*) \|$' docs/ARTICLE_DREAM.md | cut -d'|' -f2,3 | sed 's/ *| */ — /; s/^ *//')
+  [ -n "$etape" ] && echo "  étape suivante : ${etape} (feuille de route, docs/ARTICLE_DREAM.md)"
 fi
 
 derniere=$(grep -m1 -oE '^## État actuel \([^)]*\)' SESSION_RESUME.md 2>/dev/null | sed 's/^## //')

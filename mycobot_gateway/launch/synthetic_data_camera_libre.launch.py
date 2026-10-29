@@ -50,8 +50,10 @@ def generate_launch_description():
     # TOUJOURS occultee par la pince reellement montee : entrainer sur une bride
     # nue apprend une situation qui n'existe jamais. `pro_adaptive_gripper` est
     # bien le modele monte sur le robot.
+    # Enveloppe qui ajoute l'etiquette de segmentation au modele (masque du
+    # robot, docs/ARTICLE_DREAM.md E3.2) ; l'URDF inclus est inchange.
     urdf_path = os.path.join(
-        desc_pkg, 'urdf', '320_pi', 'mycobot_pro_320_pi_gazebo.urdf')
+        desc_pkg, 'urdf', '320_pi', 'mycobot_pro_320_pi_gazebo_masque.urdf.xacro')
     world_path = os.path.join(desc_pkg, 'worlds', f'{WORLD_NAME}.sdf')
     camera_sdf = os.path.join(desc_pkg, 'worlds', 'camera_libre.sdf')
 
@@ -134,14 +136,19 @@ def generate_launch_description():
     # reste MUET. Le collecteur retombe alors sur les angles COMMANDES au lieu
     # des mesures — or la pince fait flechir le bras, donc les deux different :
     # 40 relances pour 10 poses et des etiquettes fausses.
+    # L'echelonnement ne suffit plus depuis le capteur de masque (29/10) : a 4 s
+    # le monde charge encore, la simulation n'avance pas, et l'activation rate
+    # ses 5 s par defaut (« Switch controller timed out »). On attend donc la
+    # bascule jusqu'a 60 s au lieu de deviner un delai de lancement.
     joint_state_broadcaster = TimerAction(period=4.0, actions=[Node(
         package='controller_manager', executable='spawner',
-        arguments=['joint_state_broadcaster', '--controller-manager', '/controller_manager'],
+        arguments=['joint_state_broadcaster', '--controller-manager', '/controller_manager',
+                   '--switch-timeout', '60', '--service-call-timeout', '60'],
         output='screen')])
     mycobot_controller_spawner = TimerAction(period=5.0, actions=[Node(
         package='controller_manager', executable='spawner',
         arguments=['mycobot_controller', '--controller-manager', '/controller_manager',
-                   '--param-file', controller_cfg],
+                   '--param-file', controller_cfg, '--switch-timeout', '60', '--service-call-timeout', '60'],
         output='screen')])
 
     # La pince a SIX articulations pilotees, jamais `mimic` : DART ignore les
@@ -154,12 +161,12 @@ def generate_launch_description():
         package='controller_manager', executable='spawner',
         arguments=['gripper_position_controller',
                    '--controller-manager', '/controller_manager',
-                   '--param-file', controller_cfg],
+                   '--param-file', controller_cfg, '--switch-timeout', '60', '--service-call-timeout', '60'],
         output='screen')])
 
     gz_image_bridge = Node(
         package='ros_gz_image', executable='image_bridge', name='gz_image_bridge',
-        output='screen', arguments=['/cam_libre/image'])
+        output='screen', arguments=['/cam_libre/image', '/cam_libre/masque/labels_map'])
 
     collector = TimerAction(
         period=14.0,

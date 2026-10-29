@@ -9,6 +9,27 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — E3 : feuille de route et masque du robot (29/10)
+
+- **Feuille de route E3.0-E3.10** et section **« Ce qu'on a appris »** dans
+  `docs/ARTICLE_DREAM.md` ; `scripts/etat_session.sh` affiche au démarrage
+  l'expérience en cours et sa prochaine étape ; la skill `article-dream`
+  oblige à consigner chaque constat et à le corriger en place.
+- **Masque du robot dans la collecte caméra libre** : capteur de segmentation
+  `cam_libre_masque` dans `worlds/camera_libre.sdf`, label sur le modèle par
+  `urdf/320_pi/mycobot_pro_320_pi_gazebo_masque.urdf.xacro` (l'URDF partagé
+  n'est pas modifié), `images/masque/` et `masques.csv` écrits par le
+  collecteur. Capture resynchronisée sur l'horodatage : 31 masques sur 40 du
+  même rendu que l'image, tous alignés au pixel.
+- Collecteur caméra libre : attend `/joint_states` et un premier masque avant
+  de démarrer ; spawners du launch avec `--switch-timeout 60
+  --service-call-timeout 60`.
+- **`scripts/garde_thermique.sh <pid> <journal>`** : pause d'un entraînement
+  au-delà de 90 °C, reprise sous 80 °C. À n'utiliser que sur un entraînement
+  lancé détaché (`setsid nohup`).
+- E3.0 lancé : DREAM synthétique seul sur le jeu caméra libre de septembre
+  (17 702 images), référence sans randomisation d'apparence.
+
 ### Ajouté — E1 : métriques du papier sur les modèles existants (29/10)
 
 - **`eval_papier.py`** rend aussi l'**ADD** du papier (PnP DREAM sans link2,

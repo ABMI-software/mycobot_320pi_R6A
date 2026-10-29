@@ -36,8 +36,9 @@ détections YOLO en coordonnées robot. La boucle fermée est l'expérience E7.
    AUC de 0 à 100 mm.
 3. **Seuil de pic déclaré** : le code officiel NVlabs utilise 0,01 après
    lissage σ = 3 (`~/DREAM/dream/image_proc.py:925`), alors que le texte du
-   papier annonce 0,03. Rapporter le seuil utilisé ; tester 0,03 demande une
-   copie modifiée de `peaks_from_belief_maps`, la valeur y étant en dur.
+   papier annonce 0,03. Rapporter 0,01 en chiffre principal et 0,03 en
+   sensibilité ; `eval_papier.py` rend les deux (0,03 appliqué après coup sur
+   la carte lissée).
 4. **Résolution déclarée** : variante Q, H ou F, et taille d'entrée.
 5. **Ce qui est tenu à l'écart** : poses, jour, scène, **point de vue**. Un
    test qui ne retient pas un point de vue ne mesure pas la généralisation
@@ -61,7 +62,7 @@ Chaque expérience suit `.claude/skills/campagne-mesure` (protocole écrit avant
 |---|---|---|---|---|---|
 | E1 | Métriques du papier (PCK + AUC, ADD, seuils 0,01 et 0,03) recalculées pour les modèles existants | — | Tableau au format du tableau I du papier pour les jeux A, E, E', G du registre | rouge | fait le 29/10 : tableau pour A, E, E', G avec PCK 7 et 6 points, ADD, deux seuils, IC bootstrap par blocs, md5 train/test (registre, `~/dream_article/E1/`). Tout reste `a_preciser` : référence ArUco et point de vue unique, que seul E2 lève |
 | E2 | Jeu réel multi-vues : 6 à 10 positions de caméra jamais vues, référence indépendante de DREAM | — | Jeu figé, md5, positions relevées, leave-one-out de l'extrinsèque publié | rouge | à faire |
-| E3 | Synthétique seul multi-vues : caméra libre + randomisation du papier + augmentation v5, aucune image réelle | E1 | PCK@5 ≥ 0,83 et PCK@10 ≥ 0,90 sur E2 ; test de décalage ≥ 95 % ; ADD ≥ 0,80 à 20 mm | rouge | à faire |
+| E3 | Synthétique seul multi-vues : caméra libre + randomisation du papier + augmentation v5, aucune image réelle | E1 | PCK@5 ≥ 0,83 et PCK@10 ≥ 0,90 sur E2 ; test de décalage ≥ 95 % ; ADD ≥ 0,80 à 20 mm | rouge | en cours : feuille de route E3.1-E3.10 ci-dessous |
 | E4 | Ablations : résolution Q/H/F, encodage des cartes (entier contre sous-pixel), volume 25k/50k/100k, perte L2 contre pondérée, recette du papier, randomisation par bloc | E3 | Un tableau par facteur, 3 graines minimum | jaune | à faire |
 | E5 | Plusieurs images contre hand-eye (marqueur sur la bride) : erreur en fonction du nombre d'images | E2 | Courbe équivalente à la Fig. 6 du papier | jaune | à faire |
 | E6 | Erreur atteinte : 10 cibles (5 marqueurs × 2 hauteurs), une série par extrinsèque (ArUco, hand-eye, DREAM), ISO 9283 | E5 | Tableau équivalent au tableau II du papier | jaune | à faire |
@@ -99,6 +100,29 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
   la gaussienne) ; sous-pixel σ 1 (`--sigma-carte 1`) : 0,18 / 0,28. Un σ plus
   étroit est plus dur à apprendre : encodage et σ sont des facteurs de E4.
 
+### Feuille de route de E3 (tenue à jour à chaque session)
+
+`scripts/etat_session.sh` affiche au démarrage la première étape qui n'est pas
+« fait ». Une étape ne passe à « fait » qu'avec son critère atteint ; ce qui a
+été appris en route va dans « Ce qu'on a appris », plus bas.
+
+| Étape | Contenu | Critère de sortie | État |
+|---|---|---|---|
+| E3.0 | Référence : synthétique seul sur le jeu caméra libre de septembre (17 702 images, pince montée, sans randomisation d'apparence), encodage DREAM | Checkpoint `vgg_e3_0_camlibre_synth_e50`, évalué sur la vue tenue et `real_tri_test` | en cours : relancé le 29/10 à 16:55, détaché, sur les cœurs 20-27, garde thermique `scripts/garde_thermique.sh` (`~/dream_article/E3/E3_0/journal_b.txt`) ; le premier essai a été tué à l'époque 7 |
+| E3.1 | Collecteur caméra libre : contrôle visuel des labels reprojetés | 24 images, keypoints superposés au robot à l'œil sur toutes | fait le 29/10 : jeu de septembre (23 272 images collectées, 17 702 + 2 145 vue tenue en NDDS), labels sur le robot partout, vue tenue comprise |
+| E3.2 | Masque du robot : caméra de segmentation au même endroit que la caméra libre | Masque par image, aligné au pixel sur le rendu | fait le 29/10 : capteur `cam_libre_masque` (label 1 via `mycobot_pro_320_pi_gazebo_masque.urdf.xacro`), `images/masque/` + `masques.csv` ; capture resynchronisée sur l'horodatage : 31/40 masques du même rendu que l'image, tous alignés au pixel (planche de 24), les 9 autres marqués `frais = 0` |
+| E3.3 | Fonds aléatoires : composition hors ligne derrière le masque, sur une part des images | Source d'images choisie (décision utilisateur), part fixée, 50 images contrôlées | à faire |
+| E3.4 | Distracteurs : primitives aux couleurs tirées, apparues et retirées à chaque lot, occultations comprises | Labels inchangés, collecte stable sur 1 000 images | à faire |
+| E3.5 | Recoloration du robot et lumières libres (couleur, nombre) | Diversité visible sur une planche de 50 images | à faire |
+| E3.6 | Pince montée | Pince visible, keypoints identiques au schéma à 7 points | fait : le launch caméra libre monte déjà la pince Pro (`mycobot_pro_320_pi_gazebo.urdf`), visible sur la planche de E3.1 |
+| E3.7 | Collecte : volume visé ~100k (papier), un secteur d'azimut tenu à l'écart, `run.yaml`, md5 | Jeu NDDS figé, md5, secteur tenu à l'écart documenté | à faire |
+| E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | à faire |
+| E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | à faire |
+| E3.10 | Évaluation : E2, `real_tri_test`, test de décalage, revue du metrologue | Critère de E3 (tableau des expériences) | à faire |
+
+E3.10 dépend de E2 (jeu réel multi-vues), qui demande une session au banc : la
+préparer pendant que la collecte et l'entraînement tournent.
+
 ### Point de départ de E3
 
 - Générateur : `mycobot_gateway/synthetic_data_collector_v3_camera_libre.py`
@@ -110,6 +134,86 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
   sur du réel, qui porterait le montage mémorisé.
 - Garde thermique : cœurs E (`taskset -c 16-27`), voir
   [`DONNEES_ET_CONSOMMATION.md`](DONNEES_ET_CONSOMMATION.md).
+
+## Ce qu'on a appris (tenu à jour)
+
+Chaque constat porte sa date. Quand un constat change, on le **corrige ici
+même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoire.
+
+- **29/10 — PCK** : `evaluate_dream.py` ne compte que les détectés ; au sens du
+  papier, 98,1 % « < 5 px » devient 0,941 sur `real_tri_test`.
+- **29/10 — Seuil de pic** : 0,01 (code) ou 0,03 (texte) ne change rien au-delà
+  de 0,001 sur nos modèles, sauf hors domaine. Un pic net vaut ~0,30 après
+  lissage.
+- **29/10 — Intrinsèques** : `real_tri_test` mélange arducam et SVPRO, son
+  `_camera_settings.json` ne décrit que l'arducam, et les labels incluent la
+  distorsion. Tout PnP sur un jeu réel prend K et distorsion par caméra
+  (`source.camera`).
+- **29/10 — Quantification des cartes** : voir la section dédiée. Le biais de
+  (+2,1 ; −2,6) px sur base, link1, link2 n'est pas un biais d'étiquette
+  (hypothèse du metrologue, réfutée le jour même) mais l'arrondi `int(x)` de
+  DREAM sur des points fixes dans l'image.
+- **29/10 — Encodage sous-pixel** : compenser seulement l'arrondi ne suffit
+  pas ; à σ 2, la fenêtre 5×5 du décodeur garde 1,1-1,2 px d'erreur. Le gain
+  vient de σ 1 (0,18 px médiane sur les cibles). Reste à savoir si le réseau
+  l'apprend (E3.8).
+- **29/10 — E' et pose d'observation** : sur un tri réel, la pose
+  d'observation (J5 ≈ 2,6°) coûte ~12 points de PCK@5 ; le régime
+  « statique » d'une session de tri est surtout cette pose.
+- **29/10 — Effectif** : les images d'une session à ~0,2 s d'intervalle sont
+  corrélées ; un IC se calcule par blocs (2 s ou par pose), jamais sur n images.
+- **29/10 — Jeu caméra libre existant** : 17 702 images NDDS + 2 145 d'un
+  secteur d'azimut tenu à l'écart (60-100°, `convert_to_ndds_camera_libre.py
+  --azimut-tenu`), pince montée, collectées en septembre. Aucun modèle
+  synthétique seul n'y avait été entraîné : `vgg_v5_geo_ft_e30` les mélange à
+  du réel. D'où E3.0.
+- **29/10 — Apparence** : la planche de E3.1 montre la même table, le même sol
+  gris et les trois mêmes objets sur toutes les images. Seuls la caméra, la
+  pose et l'éclairage varient : c'est l'écart principal avec le papier.
+- **29/10 — Gazebo lancé depuis Claude Code (VSCode en snap)** : l'interface
+  plante au démarrage (`symbol lookup error … /snap/core20 … libpthread`) et,
+  le processus Gazebo étant `required`, le launch s'arrête sans rien
+  collecter. Lancer avec `env -u GTK_PATH -u GTK_EXE_PREFIX -u LOCPATH -u
+  GIO_MODULE_DIR -u GSETTINGS_SCHEMA_DIR -u GTK_IM_MODULE_FILE`. Un terminal
+  normal n'est pas touché.
+- **29/10 — Collecte et entraînement ne cohabitent pas sur le GPU** : pendant
+  l'entraînement E3.0, Gazebo tournait à 0,08× le temps réel (2,4 s simulées
+  en 31 s) ; il attend chaque rendu de capteur, et les contrôleurs ratent leur
+  activation (« Switch controller timed out after 5 seconds »), donc le bras
+  ne bouge pas et rien n'est collecté. Pour un essai court, mettre
+  l'entraînement en pause (`kill -STOP -<pgid>`, puis `-CONT`) ; pour une
+  collecte longue, ne pas les lancer ensemble. Gazebo sur les cœurs 16-19,
+  l'entraînement sur 20-27.
+- **29/10 — Masque du robot (E3.2)** : la caméra de segmentation de Gazebo
+  Harmonic (`type="segmentation"`, `semantic`) et le système `Label` sur le
+  modèle robot donnent un masque aligné quand il vient du même rendu que
+  l'image. Mais le flux du masque traîne de 0,1 à 0,7 s derrière l'image : 9
+  paires synchrones sur 40 en prenant le dernier message reçu, et ces masques
+  en retard suivent une autre pose du bras. Le CRC ne les voit pas, seul
+  l'horodatage les distingue. Le collecteur réessaie donc la capture toutes
+  les 0,1 s jusqu'à 1,5 s, bras immobile : 31 paires synchrones sur 40, les
+  autres marquées périmées.
+- **29/10 — Contrôleurs au démarrage** : avec le second capteur, le monde
+  charge plus longtemps et `joint_state_broadcaster` rate l'activation à 5 s.
+  Les spawners du launch caméra libre ont `--switch-timeout 60
+  --service-call-timeout 60`, et le collecteur attend `/joint_states` et un
+  masque avant la première pose.
+- **29/10 — Arrêter une collecte** : le launch ne s'arrête pas quand le
+  collecteur a fini, et un `ros2 launch` tué laisse Gazebo orphelin. Lancer
+  sous `setsid`, attendre « Collection complete » dans le journal, puis
+  `kill -INT -<pgid>`. Jamais `pgrep -f "gz sim"` dans une boucle d'attente :
+  il se trouve lui-même.
+- **29/10 — Mettre un entraînement en pause sans le tuer** : un entraînement
+  lancé en tâche de fond par Claude Code meurt si on le suspend (`kill -STOP`)
+  : le shell qui l'a lancé prend le processus suspendu pour terminé (`code
+  147`), sort, et l'outil nettoie le groupe de processus. E3.0 a perdu ses 6
+  premières époques ainsi, et la garde thermique (pause à 90 °C) aurait eu le
+  même effet. Lancer tout entraînement long détaché : `setsid nohup … >
+  journal 2>&1 < /dev/null &`, puis suivre le journal ; la pause et la garde
+  thermique (`scripts/garde_thermique.sh <pid> <journal>`) deviennent sûres.
+- **29/10 — Données** : jeux, checkpoints et sessions réelles sont dans
+  `~/Osama_ws` (216 Go pour `dream_data`), lus sur place ; les sorties de
+  mesure vont dans `~/dream_article/<expérience>/`, hors du dépôt.
 
 ## Rôles (outillage `.claude/`)
 

@@ -26,8 +26,17 @@ Si ce fichier et `docs/ARTICLE_DREAM.md` divergent, le second fait foi.
    dans l'article.
 5. **Faire juger** chaque chiffre par l'agent `metrologue`, puis l'inscrire au
    registre avec son verdict. Seul `tenu` entre dans le manuscrit.
-6. **Mettre à jour** la colonne « État » de `docs/ARTICLE_DREAM.md`, puis
+6. **Mettre à jour** la colonne « État » de `docs/ARTICLE_DREAM.md` (tableau
+   des expériences et feuille de route de l'expérience en cours), puis
    CHANGELOG et SESSION_RESUME (règle `auto-commit`).
+7. **Consigner ce qui a été appris** dans « Ce qu'on a appris » de
+   `docs/ARTICLE_DREAM.md`, daté, dans la même session que le constat : tout
+   ce qu'on a dit à l'utilisateur comme résultat, cause ou piège. Si un
+   constat change (hypothèse réfutée, chiffre corrigé), le **corriger en
+   place** (« corrigé le JJ/MM : … ») et propager la correction là où il est
+   cité (registre, CHANGELOG, mémoire). L'utilisateur reprend le chantier sur
+   plusieurs jours à partir de ces deux sections : elles doivent être justes
+   à la fin de chaque session, pas seulement au jalon.
 
 ## Qui fait quoi
 
@@ -66,6 +75,10 @@ expérience), jamais deux entraînements GPU à la fois.
   (`taskset -c 16-27`), arrêt au-delà de 90 °C.
 
 ## Démarrer une session sur l'article
+
+Le bandeau de démarrage (`scripts/etat_session.sh`) donne l'expérience en
+cours et sa prochaine étape. Commencer par là, puis relire « Ce qu'on a
+appris » avant de proposer quoi que ce soit.
 
 ```bash
 conda deactivate

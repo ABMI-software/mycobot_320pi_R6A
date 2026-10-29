@@ -121,6 +121,25 @@ Durée estimée : ~4-5 h (software rendering Mesa/llvmpipe, sans GPU).
 
 ---
 
+### Caméra libre avec masque du robot (29/10/2026)
+
+`synthetic_data_camera_libre.launch.py` tire une pose de caméra par image
+(`synthetic_data_collector_v3_camera_libre`) et enregistre, en plus de
+`images/libre/`, le **masque du robot** (bras et pince) dans `images/masque/`
+(255 sur le robot) et `masques.csv` (`index, frais, part_robot, ecart_s`). Le
+masque vient d'un capteur de segmentation placé sur la même caméra
+(`worlds/camera_libre.sdf`) et d'un label posé par
+`urdf/320_pi/mycobot_pro_320_pi_gazebo_masque.urdf.xacro`. Seuls les masques
+`frais = 1` viennent du même rendu que l'image ; les autres sont à ignorer.
+Il sert à composer des fonds derrière le robot (`docs/ARTICLE_DREAM.md`,
+E3.3).
+
+Depuis Claude Code lancé dans le VSCode en snap, ôter `GTK_PATH`,
+`GTK_EXE_PREFIX`, `LOCPATH`, `GIO_MODULE_DIR`, `GSETTINGS_SCHEMA_DIR` et
+`GTK_IM_MODULE_FILE` de l'environnement, sinon l'interface de Gazebo plante et
+le launch s'arrête. Ne pas collecter pendant un entraînement : ils se disputent
+le GPU et la simulation tombe à 0,08× le temps réel.
+
 ## Format de sortie
 
 ### labels.csv

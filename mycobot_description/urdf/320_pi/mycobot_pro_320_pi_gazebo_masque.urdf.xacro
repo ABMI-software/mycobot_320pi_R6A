@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!--
+  L'URDF de collecte caméra libre, plus une étiquette de segmentation sur tout
+  le modèle (bras et pince) : la caméra de segmentation de
+  worlds/camera_libre.sdf en tire le masque du robot, qui sert à composer des
+  fonds aléatoires derrière lui (E3.2-E3.3 de docs/ARTICLE_DREAM.md).
+
+  Une enveloppe plutôt qu'une modification de mycobot_pro_320_pi_gazebo.urdf :
+  cet URDF sert aussi au tri et à la saisie, qui n'ont pas besoin du label.
+  Le reste du monde n'a pas d'étiquette et vaut 0 dans le masque.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mycobot_320_pi">
+  <xacro:include filename="$(find mycobot_description)/urdf/320_pi/mycobot_pro_320_pi_gazebo.urdf"/>
+  <gazebo>
+    <plugin filename="gz-sim-label-system" name="gz::sim::systems::Label">
+      <label>1</label>
+    </plugin>
+  </gazebo>
+</robot>

@@ -9,6 +9,9 @@ Fais le point sur l'article DREAM, sans rien modifier.
    `training/dream/article/registre_resultats.yaml`.
 3. Rends, en quinze lignes au plus :
    - l'état de chaque expérience (une ligne chacune) ;
+   - pour l'expérience en cours, les étapes de sa feuille de route qui
+     restent, la prochaine en tête ;
+   - les constats de « Ce qu'on a appris » des sept derniers jours ;
    - le décompte des verdicts du registre (tenu / à préciser / non soutenu /
      en attente) ;
    - la prochaine action : la première expérience à faire dont les dépendances

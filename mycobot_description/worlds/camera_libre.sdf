@@ -16,6 +16,12 @@
   l'intrinseque de l'arducam reelle (cam_3, fx ~495). On ne randomise PAS la
   focale : le defaut qu'on corrige porte sur les EXTRINSEQUES, et melanger les
   deux empecherait d'attribuer le resultat.
+
+  Le second capteur rend le masque du robot (label 1, pose par
+  urdf/320_pi/mycobot_pro_320_pi_gazebo_masque.urdf.xacro ; le reste vaut 0).
+  Meme lien, donc meme pose, meme champ et meme taille que l'image : le masque
+  se superpose au pixel. Il sert a composer des fonds derriere le robot
+  (docs/ARTICLE_DREAM.md, E3.2-E3.3).
 -->
 <sdf version="1.9">
   <model name="cam_libre">
@@ -37,6 +43,17 @@
           <clip><near>0.05</near><far>10.0</far></clip>
         </camera>
         <topic>cam_libre/image</topic>
+      </sensor>
+      <sensor name="cam_libre_masque" type="segmentation">
+        <always_on>true</always_on>
+        <update_rate>10</update_rate>
+        <camera>
+          <segmentation_type>semantic</segmentation_type>
+          <horizontal_fov>1.15</horizontal_fov>
+          <image><width>640</width><height>480</height></image>
+          <clip><near>0.05</near><far>10.0</far></clip>
+        </camera>
+        <topic>cam_libre/masque</topic>
       </sensor>
     </link>
   </model>
