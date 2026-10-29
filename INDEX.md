@@ -92,6 +92,7 @@ position du socle (test de décalage : 0 %). Voir [CLAUDE.md § DREAM — Septem
 ### 🧠 Intelligence Artificielle
 | Document | Description |
 |----------|-------------|
+| [docs/ARTICLE_DREAM.md](docs/ARTICLE_DREAM.md) | **Projet d'article DREAM** : thèse (synthétique seul multi-vues), règles de comparabilité avec Lee et al. 2020 (PCK, ADD), expériences E1-E8 et leur état. Registre des chiffres : [training/dream/article/registre_resultats.yaml](training/dream/article/registre_resultats.yaml) ; bibliographie : [training/dream/article/biblio.md](training/dream/article/biblio.md) |
 | [training/README.md](training/README.md) | Pipeline ML (régression directe legacy + DREAM actif) |
 | [training/dream/README.md](training/dream/README.md) | Module DREAM keypoint detection — VGG-19. Modèles en service : `vgg_tri_mix_ft_e10` (Gazebo) et `vgg_tri_reel_ft_e10` (banc réel, 1,69 px sur le test réel). `vgg_montage0901_ft_e30` est invalidé (socle mémorisé) |
 | [training/SYNTHETIC_50K_V3.md](training/SYNTHETIC_50K_V3.md) | Génération du dataset synthétique 50K : distribution des angles, filtre d'auto-collision, rendu |

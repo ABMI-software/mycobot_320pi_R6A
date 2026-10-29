@@ -1,5 +1,29 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (29 octobre 2026 — après-midi, projet d'article DREAM)
+
+### Ce qui a été accompli aujourd'hui
+- Comparaison complète avec Lee et al. 2020 (DREAM, arXiv:1911.09231) : méthode, données, métriques, résultats. Plan d'article dans un document partagé (https://claude.ai/artifact/BRwGPWB832zmRZYrpSWqmo) et dans `docs/ARTICLE_DREAM.md` (thèse, 9 règles de comparabilité, expériences E1-E8).
+- Revue métrologique de tous les chiffres candidats : aucun n'est `tenu` à ce jour ; C (91,6 % real_3cam), D (1,81 px montage0901) et L (courbe J5) sont `non_soutenu`. Registre : `training/dream/article/registre_resultats.yaml`.
+- `training/dream/eval_papier.py` : PCK au sens du papier (non-détecté = faux) + AUC. Premier chiffre comparable : `vgg_tri_reel_ft_e10` sur real_tri_test, PCK@2,5/5/10 = 0,760 / 0,941 / 0,959, AUC 0,867, détection 0,96.
+- Outillage : skill `article-dream`, commande `/article`, agents `veilleur-biblio` et `redacteur-article` ; `dream-trainer` et `dream-workflow` remis à jour ; `etat_session.sh` affiche la prochaine expérience.
+
+### Décisions prises
+- Thèse : DREAM entraîné sur du synthétique Gazebo seul, caméras multiples, qui transfère au banc réel ; le fine-tuning réel n'est que la borne haute.
+- DREAM n'a jamais fermé la boucle de commande d'un tri (il a mesuré) ; seule l'extrinsèque figée DREAM a orienté le bras. La vraie boucle fermée est E7.
+- Seuil de pic : 0,01 (code NVlabs) déclaré à côté de 0,03 (texte du papier).
+
+### Prochaines actions
+1. [ROUGE] E1 : centraliser les données brutes réelles depuis `~/Osama_ws`, puis PCK de A, G, E' et ADD avec échecs comptés.
+2. [JAUNE] Test de décalage 10/20/40 px et jeu de test à point de vue réservé.
+3. [VERT] Compléter la bibliographie avec `veilleur-biblio` (références de mémoire, non vérifiées).
+
+### Commande rapide de reprise
+```bash
+conda deactivate && source ~/ros_jazzy/venv_dream/bin/activate
+cd training/dream && taskset -c 16-27 python eval_papier.py --weights <ckpt>/best_network.pth --data <ndds_dir> --sortie <out_dir>
+```
+
 ## État actuel (22 octobre 2026 — soir, audit et remise en ordre de la documentation)
 
 ### Ce qui a été accompli aujourd'hui

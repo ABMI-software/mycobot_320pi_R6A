@@ -192,6 +192,9 @@ and skills specific to this project. Two reviewer agents never edit anything:
 `metrologue` challenges a measured claim (reference, statistic, sample size,
 circularity) and `gardien-doc` checks that the documentation says the same
 thing everywhere. The skills `campagne-mesure` and `precision-iso9283` carry
-the measurement method. **This file is the source of truth**;
+the measurement method. The paper project on DREAM is orchestrated by the
+skill `article-dream` and the command `/article`; `veilleur-biblio` keeps the
+related work and `redacteur-article` writes the manuscript from numbers the
+`metrologue` has accepted (`docs/ARTICLE_DREAM.md`). **This file is the source of truth**;
 `.claude/` restates it for tooling. If the two disagree, this file wins and
 `.claude/` needs fixing.

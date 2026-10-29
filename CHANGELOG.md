@@ -9,6 +9,43 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — Projet d'article DREAM (29/10)
+
+- **`docs/ARTICLE_DREAM.md`** : thèse visée (DREAM entraîné sur du synthétique
+  Gazebo seul, à caméras multiples, qui transfère au banc réel), règles de
+  comparabilité avec Lee et al. 2020, expériences E1-E8 avec critère de sortie
+  et état. Ce qu'on ne revendique pas : DREAM n'a jamais commandé le bras ;
+  le tri sans marqueur valide une extrinsèque figée dérivée de DREAM.
+- **`training/dream/eval_papier.py`** : PCK au sens du papier (keypoint non
+  détecté compté faux) + AUC 0-20 px, par keypoint, option `--sans-link2`.
+  `vgg_tri_reel_ft_e10` sur `real_tri_test` : PCK@2,5/5/10 =
+  **0,760 / 0,941 / 0,959**, AUC 0,867 — contre 98,1 % « < 5 px » rapporté
+  par `evaluate_dream.py`, qui ne compte que les détectés.
+- **`training/dream/article/registre_resultats.yaml`** : les chiffres DREAM
+  candidats à l'article, avec le verdict de l'agent `metrologue` (29/10 :
+  aucun `tenu`, 9 à préciser, 3 non soutenus — C, D, L ; seule
+  l'invalidation de D est publiable, comme résultat négatif).
+- **`training/dream/article/biblio.md`** : état de l'art de départ, références
+  notées de mémoire et marquées non vérifiées.
+- **`.claude/`** : skill `article-dream` (cycle d'une expérience, qui fait
+  quoi, garde-fous), commande `/article`, agents `veilleur-biblio` et
+  `redacteur-article`. `dream-trainer` et `dream-workflow` remis à jour (ils
+  dataient d'avril : chemins `/tmp`, checkpoints périmés, script v4 à
+  l'augmentation fausse). `scripts/etat_session.sh` affiche la prochaine
+  expérience de l'article.
+
+### Constaté (29/10)
+
+- Le seuil de pic du code NVlabs est **0,01** après lissage σ = 3
+  (`~/DREAM/dream/image_proc.py:925`), alors que le texte du papier annonce
+  0,03 : tout « % de détection » comparé au papier doit déclarer son seuil.
+- `/tmp/DREAM`, codé en dur dans ~57 scripts, n'existe plus ; `import dream`
+  fonctionne quand même dans `venv_dream` (installation éditable depuis
+  `~/DREAM`).
+- Les données brutes des essais réels d'octobre (`results/dream_reel/`,
+  `real_tri_test_ndds`) sont dans le clone `~/Osama_ws`, pas dans
+  `~/ros_jazzy`.
+
 ### Ajoute — Garde-fous automatiques du dépôt (22/10)
 
 - **`scripts/verifier_depot.py`** (bibliothèque standard seule) : un seul

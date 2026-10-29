@@ -1,0 +1,140 @@
+# Registre des chiffres de l'article DREAM — docs/ARTICLE_DREAM.md, règle 9.
+#
+# Un chiffre n'entre dans le manuscrit que s'il figure ici avec
+# verdict: tenu, donné par l'agent metrologue. Les résultats bruts restent hors
+# du dépôt : `archive` donne leur dossier, `source` le document qui les rapporte.
+#
+# verdict : en_attente | tenu | a_preciser | non_soutenu
+# revue : metrologue, 29/10/2026 (lecture seule)
+# comparable_papier : oui | non | apres_recalcul (voir `recalcul`)
+
+resultats:
+  - id: A
+    affirmation: "Synthétique 50K, vgg_ultimate_v4_e50 : 99,4 % de détection, médiane 2,78 px"
+    source: training/dream/VGG_ULTIMATE_V4_50K.md
+    archive: null
+    tenu_a_l_ecart: poses
+    verdict: a_preciser
+    reserve: "médiane sur détectés ; même monde et mêmes 4 caméras fixes ; moyenne 2,61 < médiane 2,78 avec max 127 px, colonnes à revérifier"
+    comparable_papier: apres_recalcul
+    recalcul: "PCK@2,5/5/10 sur tous les keypoints dans l'image (E1)"
+
+  - id: B
+    affirmation: "Synthétique seul vers réel : 13 à 27 % de détection"
+    source: training/dream/README.md
+    archive: null
+    tenu_a_l_ecart: null
+    verdict: a_preciser
+    reserve: "172 px est une médiane, pas un maximum ; ~27 % approximatif ; ni n ni dossier brut"
+    comparable_papier: apres_recalcul
+    recalcul: "PCK sur un jeu réel figé (E1, E2)"
+
+  - id: C
+    affirmation: "vgg_ultimate_v4_mix_ft_e30 sur real_3cam val : 91,6 %, médiane 2,91 px"
+    source: training/dream/README.md
+    archive: null
+    tenu_a_l_ecart: poses
+    verdict: non_soutenu
+    reserve: "validation issue des mêmes sessions de capture que l'entraînement, 8 images communes"
+    comparable_papier: apres_recalcul
+    recalcul: "PCK, après retrait des images communes"
+
+  - id: D
+    affirmation: "montage0901 : 53,82 → 1,81 px ; invalidé (base mémorisée, 0 % d'équivariance)"
+    source: docs/DREAM_DIAGNOSTIC_BIAIS.md
+    archive: null
+    tenu_a_l_ecart: poses
+    verdict: non_soutenu
+    reserve: "le 1,81 px mesure la mémorisation ; seule l'invalidation est publiable, comme résultat négatif"
+    comparable_papier: non
+    recalcul: null
+
+  - id: E
+    affirmation: "vgg_tri_reel_ft_e10 sur real_tri_test (200 images) : 96,0 %, médiane 1,69 px"
+    source: docs/PROTOCOLE_REEL.md
+    archive: results/dream_reel/eval_avant_apres_1410.txt
+    tenu_a_l_ecart: "poses (graine 1002) ; même jour, mêmes caméras"
+    verdict: a_preciser
+    reserve: "2 positions de caméra vues à l'entraînement, même jour ; accord avec des labels ArUco"
+    comparable_papier: apres_recalcul
+    recalcul: "fait le 29/10 (metrologue) : PCK@2,5/5/10 = 0,760 / 0,941 / 0,959 sur 1 400 keypoints"
+
+  - id: F
+    affirmation: "Test de décalage vgg_tri_reel_ft_e10 : les keypoints suivent à 96-98 % (20 px)"
+    source: docs/PROTOCOLE_REEL.md
+    archive: null
+    tenu_a_l_ecart: null
+    verdict: a_preciser
+    reserve: "une seule amplitude (20 px), pas de n ; refaire à ±10/20/40 px en u et v"
+    comparable_papier: non
+    recalcul: null
+
+  - id: G
+    affirmation: "Scène de tri Gazebo : 52,6 % / 16,7 px avant, 99,7 % / 3,0 px après fine-tuning"
+    source: docs/PROTOCOLE_YOLO_GAZEBO.md
+    archive: null
+    tenu_a_l_ecart: "graines 2001-2003"
+    verdict: a_preciser
+    reserve: "n différents avant/après ; même décor ; le 98,7 → 99,2 % (pince) est à resourcer"
+    comparable_papier: apres_recalcul
+    recalcul: "PCK"
+
+  - id: H
+    affirmation: "Campagne Gazebo 10 graines : T_DREAM 8,3 / 12,9 mm, 1,8 / 2,6° (front / right)"
+    source: docs/PROTOCOLE_YOLO_GAZEBO.md
+    archive: results/yolo_gazebo/2026-10-06_campagne10_tri_mix_ft_e10/
+    tenu_a_l_ecart: graines
+    verdict: a_preciser
+    reserve: "vues corrélées, seulement à ≥ 5 keypoints ; 40/40 borne l'échec sous 7,5 % ; le tri n'utilise pas DREAM"
+    comparable_papier: apres_recalcul
+    recalcul: "ADD"
+
+  - id: I
+    affirmation: "Réel : T_DREAM ↔ ArUco arducam 5,4 mm / 0,9° (test) ; pointe 13-17 mm surtout en Z ; triangulation 4,5-7,6 mm"
+    source: docs/PROTOCOLE_REEL.md
+    archive: results/dream_reel/2026-10-14_16-17-42_dashboard/
+    tenu_a_l_ecart: "poses ; même jour"
+    verdict: a_preciser
+    reserve: "labels et référence issus du même ArUco ; vues à ≥ 5 keypoints seulement"
+    comparable_papier: apres_recalcul
+    recalcul: "ADD"
+
+  - id: J
+    affirmation: "Extrinsèque DREAM empilée : 4,7 mm / 1,14° de l'ArUco (arducam), point de table 7,4 mm"
+    source: docs/PROTOCOLE_REEL.md
+    archive: null
+    tenu_a_l_ecart: null
+    verdict: a_preciser
+    reserve: "partiellement circulaire ; aucune caméra déplacée de plus de 30 mm ; essais n = 4 dont un 3/4"
+    comparable_papier: non
+    recalcul: "erreur atteinte (E6)"
+
+  - id: K
+    affirmation: "Angles : 2 vues en simulation J1-J5 0,4-1,8° médian ; J6 inobservable (0,0000 mm)"
+    source: docs/PROTOCOLE_YOLO_GAZEBO.md
+    archive: null
+    tenu_a_l_ecart: graines
+    verdict: a_preciser
+    reserve: "simulation seulement ; le mode réel est amorcé sur les codeurs (non soutenu) ; J6 est une propriété du schéma"
+    comparable_papier: non
+    recalcul: null
+
+  - id: L
+    affirmation: "J5 réel : 100 % / ~6 px de 0 à −60°, 42,9 % / 47,7 px à −100°"
+    source: training/dream/README.md
+    archive: null
+    tenu_a_l_ecart: null
+    verdict: non_soutenu
+    reserve: "une pose par valeur de J5, autre checkpoint (vgg_v5_geo_ft_e30), non monotone"
+    comparable_papier: non
+    recalcul: null
+
+  - id: "E'"
+    affirmation: "vgg_tri_reel_ft_e10 sur le tri du 13/10 rejoué : arducam 81,7-86,7 % de détection, médiane 2,3 px, 91-94 % < 5 px"
+    source: docs/PROTOCOLE_REEL.md
+    archive: results/dream_reel/2026-10-13_16-26-05/
+    tenu_a_l_ecart: "tri jamais vu ; mêmes caméras"
+    verdict: a_preciser
+    reserve: "pose d'observation hors domaine (J5 ≈ 2°) ; cas courant à citer à côté de E"
+    comparable_papier: apres_recalcul
+    recalcul: "PCK au sens du papier, avec et sans la pose d'observation"
