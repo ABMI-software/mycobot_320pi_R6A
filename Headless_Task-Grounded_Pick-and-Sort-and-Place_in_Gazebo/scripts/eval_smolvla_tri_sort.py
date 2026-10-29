@@ -302,6 +302,7 @@ def main():
         bins = sorted(set(tri_scene.PAIRS.values()))
         node.bins = {k: np.asarray(v) for k, v in model_poses(node.world, bins).items()}
         node.lock()
+        node.warm_up(tri_scene.OBSERVATION_Q_DEG)
     rng = np.random.default_rng(args.seed)
     only = [p for p in args.only.split(',') if p]
     results = []

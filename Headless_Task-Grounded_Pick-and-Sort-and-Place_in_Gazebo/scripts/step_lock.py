@@ -44,6 +44,7 @@ DELIVERY_S = 0.25
 SETTLE_STEPS = 500
 START_SETTLE_STEPS = 3000
 GRIPPER_SETTLE_STEPS = 1500    # the free-running evaluator's spin_for(1.5)
+WARM_UP_OFFSET_DEG = np.array([10.0, -8.0, 6.0, 5.0, -5.0, 10.0])
 
 
 def sha(obj):
@@ -155,6 +156,23 @@ class StepLock:
         self.locked_move(q_up)
         self.locked_move(q_goal)
         return True
+
+    def warm_up(self, q_observe_deg):
+        """One identical locked motion of the arm and gripper right after lock.
+
+        The renderer redraws a link only when its pose changes by more than a small threshold, so
+        after the free-running start-up each run draws the settled arm at a pose that differs by
+        ~1e-8 (29/10: 30-60 specks of up to 15 levels on the arm in the first frame, identical
+        frames after any locked motion). Moving the arm and gripper the same way in every run makes
+        the first frame the policy sees identical too.
+        """
+        q = np.asarray(q_observe_deg, dtype=float)
+        self.locked_move(q)
+        self.locked_move(q + WARM_UP_OFFSET_DEG)
+        self.locked_move(q)
+        self.locked_gripper(0.0)
+        self.locked_gripper(-0.28)
+        self.step(START_SETTLE_STEPS)
 
     def locked_gripper(self, g, settle_steps=GRIPPER_SETTLE_STEPS):
         self.set_gripper(-float(g), settle=0.0)

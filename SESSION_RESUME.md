@@ -1,5 +1,24 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Test A du mode verrouillé : échec, cause trouvée, correctif partiel (29 octobre 2026, matin)
+
+- **Test A** (Run B 20k, graine 17, deux passages verrouillés et enregistrés, 04:24-06:10 Paris) :
+  mêmes issues (0/4, pavé jaune saisi non posé dans les deux), **pas identiques**. Départ identique
+  (pièces au bit, bras à 1e-15 rad, pince à 2e-8) mais **la première image diffère** sur les trois
+  caméras ; la politique part donc de 0,1-0,7° d'écart dès le pas 0, et les pièces 2-4 héritent de
+  l'écart de la pièce 1. `/workspace/eval/steplock_tests/`.
+- **Diagnostic sans politique** (deux passages, images enregistrées) : images **identiques pendant
+  et après tout mouvement verrouillé** ; seule la première, après le démarrage libre, diffère de
+  30-60 pixels isolés sur la surface du bras (≤ 15 niveaux). Interprétation : le moteur de rendu ne
+  redessine un maillon que si sa pose change au-delà d'un petit seuil ; après le démarrage libre le
+  bras reste dessiné à une pose qui diffère d'un passage à l'autre.
+- **Correctif partiel** (`StepLock.warm_up`, appelé après le verrouillage) : bras écarté puis
+  ramené et pince ouverte puis fermée, à l'identique : **1 pixel** d'écart sur deux caméras au lieu
+  de 30-60, tout le reste identique. Insuffisant pour l'identité au bit.
+- Correctif de fond proposé : plus aucune phase libre (verrouiller dès le temps 0, contrôleurs
+  activés pendant des blocs de pas, pose d'observation prise en mode verrouillé), pour que l'état
+  du bras soit identique au bit et non à 1e-15 près. En attente d'accord.
+
 ## Évaluation reproductible au bit près : parties 1-5 construites (29 octobre 2026, nuit)
 
 Objectif : pouvoir rejouer dans la fenêtre Gazebo n'importe quelle pièce d'une évaluation, réussie
