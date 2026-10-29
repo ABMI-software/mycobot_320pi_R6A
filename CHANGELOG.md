@@ -32,9 +32,12 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   (σ = 0,05 px). `create_belief_map` (`~/DREAM/dream/image_proc.py:866`)
   centre la gaussienne d'entraînement sur `int(x)` en sortie réseau, puis le
   décodage ajoute 0,4395. Un point dont la sortie vaut 49,9999… est appris à
-  49 et décodé à 49,44, soit −0,56 px réseau, ×4,8 = −2,7 px image. En Q
-  (100×100), cette quantification plafonne à elle seule le PCK@2,5 à 0,79
-  (erreur médiane 1,92 px, max 3,80 px) ; en H, 1,90 px max ; en F, 0,95 px.
+  49 et décodé à 49,44, soit −0,56 px réseau, ×4,8 = −2,7 px image ; link2
+  est touché comme link1. En Q (100×100), la quantification seule donne un
+  PCK@2,5 de 0,79 (médiane 1,92 px, max 3,80 px) — référence, pas plafond
+  strict ; en H, 1,90 px max ; en F, sans décalage, 1,70 px max.
+- **E1 clos** : IC 95 % bootstrap par blocs (100 poses pour E, blocs de 2 s
+  pour E'), aucune image commune entre tests et fine-tuning (md5).
 
 ### Ajouté — Projet d'article DREAM (29/10)
 

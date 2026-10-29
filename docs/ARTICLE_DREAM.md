@@ -59,7 +59,7 @@ Chaque expérience suit `.claude/skills/campagne-mesure` (protocole écrit avant
 
 | Id | Expérience | Dépend de | Critère de sortie | Priorité | État |
 |---|---|---|---|---|---|
-| E1 | Métriques du papier (PCK + AUC, ADD, seuils 0,01 et 0,03) recalculées pour les modèles existants | — | Tableau au format du tableau I du papier pour les jeux A, E, E', G du registre | rouge | en cours : tableau calculé le 29/10 pour A, E, E', G (registre, `~/dream_article/E1/`), tout `a_preciser` ; biais du PCK@2,5 expliqué (quantification des cartes, ci-dessous) ; reste le bootstrap par blocs pour E' et le md5 train/test pour E et E' |
+| E1 | Métriques du papier (PCK + AUC, ADD, seuils 0,01 et 0,03) recalculées pour les modèles existants | — | Tableau au format du tableau I du papier pour les jeux A, E, E', G du registre | rouge | fait le 29/10 : tableau pour A, E, E', G avec PCK 7 et 6 points, ADD, deux seuils, IC bootstrap par blocs, md5 train/test (registre, `~/dream_article/E1/`). Tout reste `a_preciser` : référence ArUco et point de vue unique, que seul E2 lève |
 | E2 | Jeu réel multi-vues : 6 à 10 positions de caméra jamais vues, référence indépendante de DREAM | — | Jeu figé, md5, positions relevées, leave-one-out de l'extrinsèque publié | rouge | à faire |
 | E3 | Synthétique seul multi-vues : caméra libre + randomisation du papier + augmentation v5, aucune image réelle | E1 | PCK@5 ≥ 0,83 et PCK@10 ≥ 0,90 sur E2 ; test de décalage ≥ 95 % ; ADD ≥ 0,80 à 20 mm | rouge | à faire |
 | E4 | Ablations : résolution Q/H/F, encodage des cartes (entier contre sous-pixel), volume 25k/50k/100k, perte L2 contre pondérée, recette du papier, randomisation par bloc | E3 | Un tableau par facteur, 3 graines minimum | jaune | à faire |
@@ -76,14 +76,21 @@ format des labels : à lancer une fois E3 stabilisé.
 DREAM apprend chaque keypoint sur une gaussienne centrée sur `int(x)` en
 sortie réseau (`~/DREAM/dream/image_proc.py:866`) et décode le pic à
 +0,4395. L'erreur, uniforme sur [−0,56 ; +0,44] px réseau, vaut ×4,8 en pixels
-image en Q. Elle plafonne le PCK@2,5 à **0,79** (erreur médiane 1,92 px), avant
-toute erreur du réseau ; H et F la ramènent sous 1,9 et 0,95 px. Les points
-fixes dans l'image (base, link1) restent sur une seule phase : (+2,1 ; −2,6) px
-constants sur nos trois modèles synthétiques. Conséquences :
+image en Q, de moyenne −0,29 px (c'est le −0,3 px mesuré sur link3-6). Seule,
+avec une phase uniforme, elle donne un PCK@2,5 de **0,79** (erreur médiane
+1,92 px, max 3,80 px) ; c'est une référence et non un plafond strict : nos
+keypoints mobiles font un peu mieux (0,81-0,84, médiane 1,6-1,7 px). H
+(200×200, même décalage) borne l'erreur à 1,90 px ; F (400×400) décode sans
+décalage (`network.py:535-538`), erreur dans ]−1 ; 0] px réseau, max 1,70 px.
+Les points fixes dans l'image (base, link1, link2) restent sur une seule phase :
+(+2,1 ; −2,6) px pour base, (+2,1 ; −2,1) px pour link1-2 sur la caméra du
+dessus, constants sur nos modèles synthétiques. Conséquences :
 
 - Le PCK@2,5 en Q mesure surtout cette quantification. Ne le comparer qu'à
-  une variante de même résolution de sortie ; PCK@5 et PCK@10 n'en sont pas
-  affectés (3,8 px max).
+  une variante de même résolution de sortie ; PCK@5 et PCK@10 restent sous
+  le maximum de 3,8 px de la quantification.
+- Elle n'explique pas le PCK@2,5 réel du papier (0,24, loin de 0,79) : là,
+  l'écart vient du transfert sim-réel.
 - Pour E3 : encoder la gaussienne à la position réelle (sous-pixel) et
   décoder sans décalage, dans notre script d'entraînement, sans toucher à
   `~/DREAM`. L'écart avec l'encodage d'origine devient un facteur de E4.
