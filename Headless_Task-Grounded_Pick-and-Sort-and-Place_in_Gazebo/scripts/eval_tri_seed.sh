@@ -4,6 +4,14 @@
 #   eval_tri_seed.sh <checkpoint/pretrained_model> <seed> <out dir> [eval_smolvla_tri_sort.py args...]
 #   PREPLACE=1 eval_tri_seed.sh ... <seed 1001-1400> ...   # the recorded target only, as recorded
 #   HEADLESS=false eval_tri_seed.sh ...                     # Gazebo window, left open after the run
+#   STEP_LOCKED=1 eval_tri_seed.sh ...                      # step_lock.py: reproducible to the bit
+#   VIEWER=1 eval_tri_seed.sh ...                           # headless server + a view-only window
+#   RECORD=1 eval_tri_seed.sh ...                           # Gazebo state log in <out>/gzlog
+#
+# VIEWER=1 is how to watch a run that must match a headless one: the cameras and the physics are
+# the headless server's, the window (gz sim -g) only displays them. HEADLESS=false renders the
+# cameras through the window's own process, which can change their pixels. RECORD=1 keeps the
+# simulation state every 20 ms of sim time; play_eval_gui.sh replays it without recomputing.
 #
 # Same scene as record_tri_seed.sh (tri_yolo.launch.py, piece_reach 0.28, headless, no YOLO),
 # without the recorder. <out dir>/ gets result.json, trace_*.jsonl and the logs. Everything is
@@ -24,9 +32,21 @@ ros2 daemon stop >/dev/null 2>&1 || true
 source "$HERE/tri_cleanup.sh"
 stage() { echo "[$(TZ=Europe/Paris date +%H:%M:%S)] $*" | tee -a "$OUT/stages.log"; }
 
+SCENE=(headless:="${HEADLESS:-true}")
+[ "${VIEWER:-0}" = 1 ] && SCENE=(headless:=true gui_client:=true)
+[ "${RECORD:-0}" = 1 ] && SCENE+=("gz_extra_args:=--record-path $OUT/gzlog --record-period 0.02")
+[ "${STEP_LOCKED:-0}" = 1 ] && SCENE+=(run_on_start:=false)
 ros2 launch mycobot_gateway tri_yolo.launch.py seed:="$SEED" piece_reach:=0.28 \
-    headless:="${HEADLESS:-true}" yolo:=false > "$OUT/scene.log" 2>&1 &
+    "${SCENE[@]}" yolo:=false > "$OUT/scene.log" 2>&1 &
 stage "seed $SEED: scene starting ($CKPT)"
+# Step-locked: the server starts paused; the robot is spawned at simulation time 0 (controller loop
+# and cameras on one time grid, step_lock.py), then the simulation runs until lock.
+if [ "${STEP_LOCKED:-0}" = 1 ]; then
+    until gz model --list 2>/dev/null | grep -q mycobot_320; do sleep 1; done
+    gz service -s /world/tri_yolo/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \
+        --timeout 5000 --req 'pause: false' > /dev/null
+    stage "robot spawned at sim time 0; simulation started"
+fi
 # "inactive" contains "active": match the state as a whole word.
 until ros2 control list_controllers 2>/dev/null \
         | grep -qE 'gripper_position_controller.*[[:space:]]active([[:space:]]|$)'; do
@@ -40,6 +60,7 @@ stage "controllers active"
 # (PREPLACE_REF, <dir>/seed_<seed>/preplaced.json), and only the target is evaluated, from the
 # random start the recording drew first (draw 0 of default_rng(seed), --start-pose random).
 EXTRA=()
+[ "${STEP_LOCKED:-0}" = 1 ] && EXTRA+=(--step-locked)
 if [ "${PREPLACE:-0}" = 1 ]; then
     TARGET=$(python3 "$HERE/preplace_pieces.py" --seed "$SEED" --out "$OUT" 2>> "$OUT/preplace.log" | tail -1) \
         || { stage "FATAL: preplace failed: $(tail -1 "$OUT/preplace.log")"; exit 1; }
@@ -53,7 +74,7 @@ print(f"preplacement vs recording: target {a['target']}, presorted {sorted(a['pr
 sys.exit(0 if ok else 1)
 EOF
     stage "preplaced like the recording; target $TARGET"
-    EXTRA=(--only "$TARGET" --start-pose random)
+    EXTRA+=(--only "$TARGET" --start-pose random)
 fi
 
 /workspace/venv_lerobot/bin/python -W ignore "$HERE/eval_smolvla_tri_sort.py" \
@@ -64,7 +85,7 @@ print(sum(p.get('placed_after_pick', False) for p in r), '/', len(r), 'sorted')"
 # With the GUI (HEADLESS=false), the scene stays up after the evaluation, simulation running, until
 # the Gazebo window is closed or Ctrl+C: any Gazebo process ending (the window) or the launch
 # ending stops everything (tri_cleanup). KEEP_GUI=0 closes it at once, as headless runs do.
-if [ "${HEADLESS:-true}" = false ] && [ "${KEEP_GUI:-1}" = 1 ]; then
+if { [ "${HEADLESS:-true}" = false ] || [ "${VIEWER:-0}" = 1 ]; } && [ "${KEEP_GUI:-1}" = 1 ]; then
     stage "Gazebo window left open: close it (or Ctrl+C here) to stop the scene"
     n=$(pgrep -fc "gz sim" || true)
     while kill -0 %1 2>/dev/null && [ "$(pgrep -fc "gz sim" || true)" -ge "$n" ]; do sleep 2; done

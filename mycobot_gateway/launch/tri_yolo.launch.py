@@ -205,6 +205,9 @@ def launch_scene(context):
                 'world_name': world_name, 'world_file': world_file,
                 'camera_layout': 'dream50k', 'bridge_multicam': 'true',
                 'headless': LaunchConfiguration('headless'),
+                'gui_client': LaunchConfiguration('gui_client'),
+                'gz_extra_args': LaunchConfiguration('gz_extra_args'),
+                'run_on_start': LaunchConfiguration('run_on_start'),
                 'robot_appearance': LaunchConfiguration('robot_appearance'),
                 'robot_model_suffix': ROBOTS[LaunchConfiguration('robot').perform(context)],
                 'gui_config': gui_config,
@@ -266,6 +269,13 @@ def sorting_nodes(seed, run_yaml, csv_path, panel):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('headless', default_value='false'),
+        DeclareLaunchArgument('gui_client', default_value='false', choices=['true', 'false'],
+                              description='with headless:=true, a Gazebo window as a viewer only '
+                                          '(sim_grasp.launch.py)'),
+        DeclareLaunchArgument('gz_extra_args', default_value='',
+                              description='appended to the headless server arguments'),
+        DeclareLaunchArgument('run_on_start', default_value='true', choices=['true', 'false'],
+                              description='false: the headless server starts paused (sim_grasp.launch.py)'),
         DeclareLaunchArgument('seed', default_value='-1',
                               description='Scene seed; -1 draws one and logs it'),
         DeclareLaunchArgument('piece_reach', default_value='0.0',

@@ -1,5 +1,37 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Évaluation reproductible au bit près : parties 1-5 construites (29 octobre 2026, nuit)
+
+Objectif : pouvoir rejouer dans la fenêtre Gazebo n'importe quelle pièce d'une évaluation, réussie
+ou non, **avec le même résultat**. Le 27/10, la reprise de la graine 17 (pavé jaune) a divergé :
+0,02° au départ → 2,3 mm à la fermeture → 13 mm un segment plus tard. Cause : la commande passe par
+le temps réel (arrivée des messages, pauses, image la plus récente), pas la physique elle-même.
+
+- **Partie 1, `--step-locked`** (`scripts/step_lock.py`, `eval_smolvla_tri_sort.py`,
+  `eval_tri_seed.sh STEP_LOCKED=1`) : Gazebo n'avance que par blocs exacts de pas de 1 ms
+  (`multi_step`), toute commande part pendant la pause, trajectoire datée du temps simulé,
+  observations sur les instants caméra (10 Hz) avec images datées exactement, mouvements de durée
+  fixe, PyTorch déterministe. Démarrage en pause : le robot naît au temps 0, si bien que la boucle
+  des contrôleurs (100 Hz) et les caméras partagent la même grille dans chaque passage.
+- **Partie 2, fenêtre en simple spectatrice** (`VIEWER=1`, `gui_client:=true`) : le même serveur
+  sans fenêtre que le lot, plus `gz sim -g` qui ne fait qu'afficher.
+- **Partie 3, empreinte par pièce** : sha256 de l'état de départ (pleine précision), de chaque pas
+  (état, action), des poses des pièces et de chaque image vue par la politique.
+- **Partie 4** : `compare_runs.py` (identique, ou premier écart : pas, grandeur) et
+  `repeat_eval_gui.sh` (rejoue une graine d'un lot avec `VIEWER=1`, compare, fenêtre ouverte).
+- **Partie 5** : `RECORD=1` (journal d'états Gazebo toutes les 20 ms, `<sortie>/gzlog`) et
+  `play_eval_gui.sh` (relecture sans rien recalculer).
+- **Contrôles faits (sans politique)** : blocs de 1/7/100/250 pas exacts ; deux passages de la
+  graine 17 → **images des trois caméras identiques au bit**, boucle de contrôle sur l'instant
+  caméra dans les deux ; état du bras différent de 4,4e-16 rad (reste du démarrage libre) ;
+  journal enregistré et relu (tous les modèles présents).
+- **Écart trouvé** : le `controller.yaml` du conteneur a `update_rate: 100`, celui du dépôt 500 ;
+  tous les enregistrements et évaluations depuis le 16/10 ont tourné à 100 Hz. Rien changé.
+
+Prochaine étape, **sur accord** (calcul CPU) : tests A (graine 17 deux fois, ~80 min), B (graine
+17 avec la fenêtre spectatrice, ~45-60 min), C (graine 1001 deux fois, ~25 min) ; puis le lot de
+50 graines en mode verrouillé (~15 h).
+
 ## Run B 20k dans Gazebo, format de l'article ROS2SmolVLA (28 octobre 2026, matin)
 
 50 graines, 27/10 16:20 → 28/10 05:16 (Paris), toutes rc 0, aucune erreur, aucun OOM. Résultats :

@@ -9,6 +9,18 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — évaluation Gazebo reproductible au bit près (29/10)
+
+- **`scripts/step_lock.py`** et **`eval_smolvla_tri_sort.py --step-locked`** : Gazebo n'avance
+  que par blocs exacts de pas, commandes envoyées en pause, observations sur les instants caméra,
+  PyTorch déterministe, empreinte sha256 par pièce. Sans le drapeau, comportement inchangé.
+- **`eval_tri_seed.sh`** : `STEP_LOCKED=1` (démarrage en pause, robot au temps 0), `VIEWER=1`
+  (serveur sans fenêtre + fenêtre spectatrice), `RECORD=1` (journal d'états Gazebo).
+- **`sim_grasp.launch.py` / `tri_yolo.launch.py`** : arguments `gui_client`, `gz_extra_args`,
+  `run_on_start` (défauts inchangés).
+- **`scripts/compare_runs.py`**, **`scripts/play_eval_gui.sh`** ; **`repeat_eval_gui.sh`** passe
+  à la fenêtre spectatrice et à la comparaison par empreinte.
+
 ### Ajouté — `scripts/repeat_eval_gui.sh` (28/10)
 
 - Rejoue une graine d'un lot d'évaluation comme le lot l'a fait (mêmes point de reprise, graine,
