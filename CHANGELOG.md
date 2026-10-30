@@ -9,6 +9,17 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Documentation — spécification et rapport du tri à quatre objets mis à jour (30/10)
+
+- **`FOUR_OBJECT_SORTING_SPECIFICATION.docx`** : annexe E (plan et critères depuis le dépôt de la
+  PR #25 le 11/10 : reconstruction du 16/10, données, Runs A/B/C, mesures fixées d'avance,
+  évaluation au format de l'article, mode verrouillé recalculable, E.9 « pas encore fait »).
+- **Nouveaux** : `FOUR_OBJECT_SORTING_SPECIFICATION_FR.docx` (traduction intégrale) et les versions
+  HTML des deux (`FOUR_OBJECT_SORTING_SPECIFICATION.html`, `…_FR.html`).
+- **`FOUR_OBJECT_SORTING_REPORT{,_FR}.{docx,html}`** : addendum du 30/10, §44–58 (déroulé
+  manuel avec les commandes exactes, résultats étape par étape) et une référence « ce qui n'est
+  pas encore fait », point par point en accord avec E.9.
+
 ### Ajouté — remise à zéro exacte par pièce en mode verrouillé (29/10, test A en cours)
 
 - **`scripts/gz_systems/state_reset.py`**, **`StepLock.snapshot` / `start_from`**,

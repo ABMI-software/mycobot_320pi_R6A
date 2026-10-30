@@ -1,5 +1,16 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Documentation du tri mise à jour ; test A2 en cours (30 octobre 2026, début d'après-midi)
+
+- Spécification : annexe E ajoutée (EN), **version française complète** (docx) et versions HTML
+  des deux, dans `Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/doc/`.
+- Rapports EN et FR (docx + HTML) : addendum §44–58 depuis le dépôt de la PR #25 (11/10), avec
+  les commandes pour tout refaire à la main, et la liste « pas encore fait » alignée sur E.9.
+- Test A2 relancé à 13:17 (Paris), Gazebo avance en mode verrouillé (temps simulé 46,8 s à
+  13:52) ; résultat attendu vers 15:40 dans `/workspace/eval/steplock_tests/A_compare.txt`.
+- Code du mode verrouillé (`step_lock.py`, `state_reset.py`, `eval_*`) **toujours non commité** :
+  il le sera avec les améliorations (relance automatique, instantanés conservés) après le test A.
+
 ## Mode verrouillé : remise à zéro exacte par pièce, test A en cours (29 octobre 2026, après-midi)
 
 Objectif fixé par l'utilisateur : **recalculer** (politique + physique) dans la fenêtre Gazebo une
