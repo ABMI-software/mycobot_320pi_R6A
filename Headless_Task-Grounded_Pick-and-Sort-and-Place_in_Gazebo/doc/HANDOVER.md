@@ -1,10 +1,10 @@
-# Handover — four-object sorting acquisition (Role A → Role B)
+# Handover — four-object sorting acquisition (state on 2026-09-23)
 
 Read this first, then `RUNNING.md`. This is the Part 12/13-style honesty
 pass: what's actually done, what isn't, and why — matched against the
 specification's own Appendix A order-of-work table.
 
-## What Role A completed
+## What was completed by 2026-09-23
 
 Everything in Appendix A that doesn't step physics, per its own "Done
 when" column:
@@ -22,8 +22,8 @@ when" column:
 | 9 | Verification + wrong-bin check | 3 deliberate failures correctly rejected | ✅ `test_verifier.py`: wrong-bin→WRONG_BIN, no-lift→FAIL, disturbed-distractor→PASS-flagged, clean→PASS |
 | **10** | **Smoke test, 1/object** | **Four episodes pass end to end, cylinder included** | **❌ NOT DONE** |
 | 11 | preflight.sh/RUNNING.md/package | Preflight passes locally | ✅ `PREFLIGHT PASSED`; package matches §11.4 |
-| 12 | 60-episode batch | — | Role B's, by design |
-| 13 | Convert, README, report | Two datasets, five caveats | ⚠️ Caveats done (`doc/LIMITATIONS.md`); datasets don't exist yet — correctly sequenced *after* Role B returns data per §11.7, not a handover blocker |
+| 12 | 60-episode batch | — | Deferred to a machine with more memory, by design (done 2026-10-04: `MEASUREMENTS.md` §10) |
+| 13 | Convert, README, report | Two datasets, five caveats | ⚠️ Caveats done (`doc/LIMITATIONS.md`); datasets don't exist yet — correctly sequenced *after* the batch per §11.7, not a blocker |
 
 **Row 8 is marked partial, not complete, to match row 10.** The code
 genuinely supports all four objects (`episode_matrix.csv` has 60 rows
@@ -86,7 +86,7 @@ authored as bounded. Full evidence trail in `doc/SMOKE_TEST.md`'s
 (`py-spy dump` on the hung process) to actually resolve** — attempted
 here, blocked by the container lacking `CAP_SYS_PTRACE`, and not pursued
 further once this session moved to stopping all hardware-bound work for
-the night. Whoever runs the four smoke episodes on Role B hardware
+the night. Whoever runs the four smoke episodes on another machine
 should expect to hit this too, and a stack trace at that point — on
 hardware that isn't also fighting the memory ceiling — would settle
 definitively whether it's a `rosetta` package defect or something
@@ -96,10 +96,9 @@ upstream in `rclpy`/`rosbag2_py`.
 
 Not attempted, and correctly so: `port_bag.py` only ports episodes whose
 `grasp_meta.verdict.json` says `PASS`, and none exist yet. Per §11.7,
-this step belongs to Role A *after* Role B returns data, not before
-handover.
+this step comes *after* the batch data exist, not before.
 
-## What Role A needs back from Role B
+## What to collect from the batch run
 
 1. **Run the four smoke episodes first** (`RUNNING.md` step 2) — not the
    full batch. If any of the four fails, stop and send back:
@@ -112,12 +111,12 @@ handover.
    - If it's the recorder hang: a `py-spy dump --pid <episode_recorder
      pid>` taken while it's stuck, if `py-spy` is available or can be
      installed (`pip install py-spy`; needs `CAP_SYS_PTRACE`, which
-     Role B's `docker run` should grant explicitly if not already
+     the `docker run` should grant explicitly if not already
      present).
 2. **Once all four pass**: proceed to the full 60-episode batch per
    `RUNNING.md` step 3, exactly as written.
 3. **Whatever comes back** — either `datasets/` or the raw episodes
-   under `/workspace/htgspp/episodes/` — goes back to Role A for
+   under `/workspace/htgspp/episodes/` — goes on to
    `status.sh` verification, conversion (if not already done), and the
    final report (Appendix A row 13).
 

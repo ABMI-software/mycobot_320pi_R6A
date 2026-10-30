@@ -52,9 +52,9 @@
       <parent_link>link</parent_link>
       <child_model>mycobot_320</child_model>
       <child_link>link6</child_link>
-      <attach_topic>/htgspp/attach</attach_topic>
-      <detach_topic>/htgspp/detach</detach_topic>
-      <output_topic>/htgspp/attached</output_topic>
+      <attach_topic>/htgspp/yellow_box/attach</attach_topic>
+      <detach_topic>/htgspp/yellow_box/detach</detach_topic>
+      <output_topic>/htgspp/yellow_box/attached</output_topic>
     </plugin>
   </model>
 </sdf>

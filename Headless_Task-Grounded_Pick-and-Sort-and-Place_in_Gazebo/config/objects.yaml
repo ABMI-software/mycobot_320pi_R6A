@@ -72,6 +72,11 @@ objects:
     instruction: "pick up the yellow box and place it in the yellow bin"
 
 bins:
+  # 2026-10-04: bins shrunk to an 80 mm opening (inner faces at +-40 mm), 3 mm walls,
+  # 86 mm outer; inner_radius = the inscribed circle of the opening. A 70 mm opening
+  # failed the blue placement probe first (rim landings, 28 deg tilt). See the bin
+  # models' header and MEASUREMENTS.md section 9. Comments below about 47.5 mm /
+  # 100 mm bins describe the geometry BEFORE that change.
   # All four are identical geometry (100x100mm floor, four 5mm walls 30mm
   # tall) placed at different world poses. inner_radius is the INSCRIBED
   # circle of the square clear opening (wall inner faces at +-47.5mm from
@@ -83,27 +88,29 @@ bins:
   # half wall height (0.015) = 0.030 for all four.
   red_bin:
     pose: [0.220, 0.100, 0.0]
-    inner_radius: 0.0475
+    inner_radius: 0.040
     rim_z: 0.030
     static: true
   blue_bin:
     # Repositioned 2026-09-23 from [0.340, 0.130] (r=0.363m): confirmed
     # UNREACHABLE by offline IK on any branch, any height -- see
     # doc/BIN_REPOSITIONING.md. New pose verified reachable at r=0.241m.
-    pose: [0.240, 0.020, 0.0]
-    inner_radius: 0.0475
+    # 2026-10-04: y 0.020 -> 0.010, 10 mm away from the red bin, so the 86 mm
+    # outer walls keep a 4 mm gap (MEASUREMENTS.md section 9).
+    pose: [0.240, 0.010, 0.0]
+    inner_radius: 0.040
     rim_z: 0.030
     static: true
   green_bin:
     # Repositioned 2026-09-23 from [0.340, -0.040] (r=0.343m), same reason.
     pose: [0.180, 0.190, 0.0]
-    inner_radius: 0.0475
+    inner_radius: 0.040
     rim_z: 0.030
     static: true
   yellow_bin:
     # Repositioned 2026-09-23 from [0.330, -0.170] (r=0.371m), same reason.
     pose: [0.0, 0.120, 0.0]
-    inner_radius: 0.0475
+    inner_radius: 0.040
     rim_z: 0.030
     static: true
 

@@ -44,9 +44,22 @@ mycobot_controller:
     hardware_state_has_offset: true
     deduce_states_from_derivatives: true
 
+    # Goal tolerances (2026-10-03). With goal_time 0 and no per-joint goal
+    # tolerance, a FollowJointTrajectory goal returned SUCCESSFUL as soon as
+    # the trajectory's time was up, with the arm measured 2.5-8.2 deg short
+    # (Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/MEASUREMENTS.md).
+    # Now SUCCESSFUL means every joint is within 0.026 rad (1.5 deg) of its
+    # goal; the controller allows 1.0 s of SIMULATED time after the
+    # trajectory ends to get there, then reports GOAL_TOLERANCE_VIOLATED.
     constraints:
       stopped_velocity_tolerance: 0.01
-      goal_time: 0.0
+      goal_time: 1.0
+      joint2_to_joint1:       {trajectory: 0.0, goal: 0.026}
+      joint3_to_joint2:       {trajectory: 0.0, goal: 0.026}
+      joint4_to_joint3:       {trajectory: 0.0, goal: 0.026}
+      joint5_to_joint4:       {trajectory: 0.0, goal: 0.026}
+      joint6_to_joint5:       {trajectory: 0.0, goal: 0.026}
+      joint6output_to_joint6: {trajectory: 0.0, goal: 0.026}
 
     # Gains d'origine. Les monter a 2000-4000 a ete essaye le 28/08 et RETIRE :
     # le suivi empire au lieu de s'ameliorer (J1 rate de 34 deg, J5 de 22 deg au

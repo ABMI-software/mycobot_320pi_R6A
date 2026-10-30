@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Four-Object Sorting Specification</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --paper: #E9ECEA;
+  --surface: #FFFFFF;
+  --surface-sunk: #DEE3E0;
+  --ink: #172422;
+  --ink-soft: #4B5B57;
+  --ink-faint: #7C8985;
+  --line: #C4CBC7;
+  --accent: #146356;
+  --accent-ink: #0E4A40;
+  --accent-soft: #DBEAE6;
+  --verify: #8A5A12;
+  --verify-soft: #F1E6D3;
+  --bug: #9C3B23;
+  --bug-soft: #F3E1DA;
+  --code-bg: #10201D;
+  --code-text: #D9EDE8;
+  --code-accent: #7FD9C4;
+  --code-comment: #7C978F;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101615;
+    --surface: #171F1D;
+    --surface-sunk: #0C1312;
+    --ink: #E7EDEA;
+    --ink-soft: #9FB0AB;
+    --ink-faint: #6C7C77;
+    --line: #2A3532;
+    --accent: #57C4AE;
+    --accent-ink: #7FD9C4;
+    --accent-soft: #14322C;
+    --verify: #D6A44B;
+    --verify-soft: #33270F;
+    --bug: #E08468;
+    --bug-soft: #3A1D15;
+    --code-bg: #0A1513;
+    --code-text: #CFEAE3;
+    --code-accent: #7FD9C4;
+    --code-comment: #5D766F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #101615;
+  --surface: #171F1D;
+  --surface-sunk: #0C1312;
+  --ink: #E7EDEA;
+  --ink-soft: #9FB0AB;
+  --ink-faint: #6C7C77;
+  --line: #2A3532;
+  --accent: #57C4AE;
+  --accent-ink: #7FD9C4;
+  --accent-soft: #14322C;
+  --verify: #D6A44B;
+  --verify-soft: #33270F;
+  --bug: #E08468;
+  --bug-soft: #3A1D15;
+  --code-bg: #0A1513;
+  --code-text: #CFEAE3;
+  --code-accent: #7FD9C4;
+  --code-comment: #5D766F;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding-inline: 20px;
+}
+
+h1, h2, h3, h4 { font-family: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif; text-wrap: balance; color: var(--ink); }
+
+.shell {
+  max-width: 1180px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 40px;
+  padding-block: 32px 80px;
+}
+
+.rail {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.rail-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+}
+.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail a {
+  display: flex;
+  gap: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+  line-height: 1.35;
+}
+.rail a:hover, .rail a:focus-visible { background: var(--surface-sunk); color: var(--ink); outline: none; }
+.rail a .n { color: var(--accent); font-weight: 600; flex-shrink: 0; }
+.rail .rail-group-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 16px 0 4px 8px;
+}
+.rail .rail-group-label:first-child { margin-top: 0; }
+
+main { min-width: 0; }
+
+.cover {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 28px;
+  margin-bottom: 36px;
+}
+.cover .eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+.cover h1 { font-size: 2.55rem; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
+.cover .dek { font-family: "IBM Plex Serif", serif; font-style: italic; font-size: 1.1rem; color: var(--ink-soft); max-width: 62ch; margin: 0 0 20px; }
+.cover .meta {
+  display: flex; flex-wrap: wrap; gap: 22px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+.cover .meta b { color: var(--ink-soft); font-weight: 600; }
+
+section.block { margin-bottom: 44px; }
+section.block > h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  scroll-margin-top: 20px;
+}
+section.block > .block-dek {
+  color: var(--ink-soft);
+  max-width: 68ch;
+  margin: 0 0 20px;
+}
+p { max-width: 70ch; }
+.prose { max-width: 70ch; }
+
+code, .mono { font-family: "IBM Plex Mono", monospace; }
+p code, li code, td code, dd code, h4 code { background: var(--surface-sunk); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.88em; color: var(--accent-ink); }
+
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 14px 0;
+}
+pre .c { color: var(--code-comment); }
+pre .k { color: var(--code-accent); }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; background: var(--surface); }
+thead th {
+  text-align: left;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--surface-sunk);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody td:first-child { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--accent-ink); white-space: nowrap; }
+
+.step {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 22px 24px 24px;
+  margin-bottom: 18px;
+}
+.step-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.step-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+.step-head h3 { margin: 0; font-size: 1.18rem; font-weight: 600; }
+.step-purpose { color: var(--ink-soft); margin: 2px 0 16px; font-size: 0.95rem; }
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) { .panels { grid-template-columns: 1fr; } }
+.panel { border-radius: var(--radius); padding: 14px 16px 16px; }
+.panel.procedure { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+.panel.verify { background: var(--verify-soft); border: 1px solid color-mix(in srgb, var(--verify) 35%, transparent); }
+.panel-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin: 0 0 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.panel.procedure .panel-tag { color: var(--accent-ink); }
+.panel.verify .panel-tag { color: var(--verify); }
+.panel p, .panel ul, .panel pre { margin-top: 8px; margin-bottom: 8px; }
+.panel p:first-of-type { margin-top: 0; }
+.panel ul { padding-left: 18px; margin: 8px 0; }
+.panel li { margin-bottom: 4px; font-size: 0.94rem; }
+.panel pre { font-size: 12px; }
+
+.bugcard {
+  border: 1px solid color-mix(in srgb, var(--bug) 35%, var(--line));
+  background: var(--bug-soft);
+  border-radius: 12px;
+  padding: 20px 22px 22px;
+  margin-bottom: 18px;
+}
+.bugcard h4 { margin: 0 0 4px; font-size: 1.08rem; color: var(--ink); }
+.bugcard .repo {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--bug);
+  margin: 0 0 14px;
+}
+.bugcard dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.bugcard dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 3px;
+  white-space: nowrap;
+}
+.bugcard dd { margin: 0; max-width: 62ch; }
+.bugcard pre { margin-top: 4px; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 3px 9px; border-radius: 999px;
+  margin-left: 8px;
+}
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+  padding: 12px 18px;
+  margin: 16px 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.callout b { color: var(--ink); }
+.callout.warn { border-left-color: var(--verify); }
+.callout.bug { border-left-color: var(--bug); }
+
+.ladder { display: flex; flex-direction: column; gap: 0; margin: 18px 0; }
+.rung {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.rung:first-child { border-top: none; }
+.rung .level {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+.rung.reached .level { color: var(--accent-ink); font-weight: 600; }
+.rung.stopped .level { color: var(--verify); font-weight: 600; }
+.rung h5 { margin: 0 0 4px; font-size: 1rem; }
+.rung p { margin: 0 0 6px; color: var(--ink-soft); font-size: 0.94rem; }
+.rung .tag {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 999px;
+  margin-bottom: 6px;
+}
+.rung.reached .tag { background: var(--accent-soft); color: var(--accent-ink); }
+.rung.stopped .tag { background: var(--verify-soft); color: var(--verify); }
+
+.manifest-tree {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+.manifest-tree .c { color: var(--code-comment); }
+.manifest-tree .k { color: var(--code-accent); }
+
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+  padding-top: 18px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { position: static; max-height: none; }
+  .cover h1 { font-size: 1.9rem; }
+}
+</style>
+<style>
+@media (max-width: 860px) { .shell { grid-template-columns: 1fr; } .rail { position: static; max-height: none; } body { padding-inline: 16px; } }
+main ol.prose, main ul.prose { max-width: 70ch; }
+main a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <p class="rail-eyebrow">Contents</p>
+    <nav>
+      <a href="#part-0-scope-and-reading-guide"><span class="n">&sect;</span>Part 0 — Scope and reading guide</a>
+      <a href="#part-1-the-assumption-register"><span class="n">&sect;</span>Part 1 — The assumption register</a>
+      <a href="#part-2-step-1-identify-the-target-world"><span class="n">&sect;</span>Part 2 — Step 1: Identify the target world</a>
+      <a href="#part-3-step-2-the-grasp-decision-gate"><span class="n">&sect;</span>Part 3 — Step 2: The grasp decision gate</a>
+      <a href="#part-4-step-3-object-and-bin-geometry"><span class="n">&sect;</span>Part 4 — Step 3: Object and bin geometry</a>
+      <a href="#part-5-step-4-task-definition-and-instru"><span class="n">&sect;</span>Part 5</a>
+      <a href="#part-6-step-5-the-episode-matrix"><span class="n">&sect;</span>Part 6 — Step 5: The episode matrix</a>
+      <a href="#part-7-step-6-inverse-kinematics-and-way"><span class="n">&sect;</span>Part 7</a>
+      <a href="#part-8-step-7-the-episode-sequence"><span class="n">&sect;</span>Part 8 — Step 7: The episode sequence</a>
+      <a href="#part-9-step-8-per-episode-verification"><span class="n">&sect;</span>Part 9 — Step 8: Per-episode verification</a>
+      <a href="#part-10-step-9-contracts-recording-and-d"><span class="n">&sect;</span>Part 10</a>
+      <a href="#part-11-running-the-acquisition-on-one-m"><span class="n">&sect;</span>Part 11</a>
+      <a href="#part-12-what-this-does-not-prove"><span class="n">&sect;</span>Part 12 — What this does not prove</a>
+      <a href="#part-13-what-to-measure"><span class="n">&sect;</span>Part 13 — What to measure</a>
+      <a href="#appendix-a-order-of-work"><span class="n">&sect;</span>Appendix A — Order of work</a>
+      <a href="#appendix-b-items-to-refer-to-the-robotic"><span class="n">&sect;</span>Appendix B</a>
+      <a href="#appendix-c-implementation-record-added-2"><span class="n">&sect;</span>Appendix C</a>
+      <a href="#appendix-d-recording-osama-s-four-object"><span class="n">&sect;</span>Appendix D</a>
+      <a href="#appendix-e-training-smolvla-on-the-sort-"><span class="n">&sect;</span>Appendix E</a>
+    </nav>
+  </aside>
+  <main>
+    <div class="cover">
+      <p class="eyebrow">Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo — specification</p>
+      <h1>Four-Object Sorting Data Acquisition in Gazebo</h1>
+      <p class="dek">Specification for sixty task-grounded episodes, run end to end on one Windows laptop with WSL2</p>
+      <div class="meta"><span><b>Author</b> Tomislav Ilic</span><span><b>Date</b> 23 September 2026 (revised 30 October 2026)</span></div>
+      <p class="prose" style="margin-top:14px">Same content as <code>FOUR_OBJECT_SORTING_SPECIFICATION.docx</code>; the French version is <a href="FOUR_OBJECT_SORTING_SPECIFICATION_FR.html">FOUR_OBJECT_SORTING_SPECIFICATION_FR.html</a>.</p>
+    </div>
+<p class="prose"><b>Revised 2026-10-04:</b> one person performs every step on one Windows laptop running WSL2; the earlier split of the work between two parties on two machines is removed throughout. <b>Implementation status:</b> implemented and run; 60/60 episodes recorded and converted. Departures from this specification are recorded in Appendix C.</p>
+<p class="prose">Revised 2026-10-10: <b>Appendix D</b> adds a second acquisition, Osama's four-object sort (<code>tri_yolo</code>) recorded with rosetta as one episode per pick-and-place and converted to LeRobot and RLDS; Parts 1–13 and Appendix C are unchanged. Revised 2026-10-30: <b>Appendix E</b> adds what was planned and done with that data from the filing of PR #25 (2026-10-11): SmolVLA training on Kaggle (Runs A, B and C), the measurements fixed before they were run, the Gazebo evaluation in the format of the ROS2SmolVLA paper, recomputable step-locked evaluations, and the list of what is not done yet (E.9).</p>
+<section class="block" id="part-0-scope-and-reading-guide"><h2>Part 0 — Scope and reading guide</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">0.1 What this specification covers</h3>
+<p class="prose">This document specifies the acquisition of <b>sixty task-grounded pick-and-place episodes</b> in the project’s four-object, four-bin Gazebo world, recorded in LeRobot format, verified per episode, and split into a training set and a held-out-condition validation set.</p>
+<p class="prose">It is written to be executed end to end by one person on one machine.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">0.2 Who performs the work, and on what</h3>
+<p class="prose">One person performs every step in this document: the specification artefacts, the configuration, the scripts, the verification logic, the smoke test, the acquisition batch, any graphical verification and the report, all on one Windows laptop running WSL2. Hardware, measured on 2026-10-04:</p>
+<div class="table-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody><tr><td>Usable RAM</td><td>7.8 GB visible in WSL2, plus 2 GB swap</td></tr><tr><td>CPU</td><td>Intel Core i7-11370H, 4 cores / 8 threads; rendering in software (llvmpipe)</td></tr><tr><td>Host OS</td><td>Windows with WSL2 Ubuntu 22.04.3</td></tr><tr><td>Runtime</td><td>Docker container (Ubuntu 24.04, ROS 2 Jazzy, Gazebo Harmonic)</td></tr><tr><td>Measured simulation real-time factor</td><td>0.344 (median over the 60-episode batch)</td></tr><tr><td>Graphical Gazebo session</td><td>available (WSLg, <code>DISPLAY=:0</code>, software OpenGL)</td></tr><tr><td>Physical robot access</td><td>none</td></tr></tbody></table></div>
+<p class="prose">At that real-time factor a 25-second episode takes about 73 s of wall clock for its motion; a full episode, bring-up and verification included, took a median of 160 s, and the 60-episode batch about 2.7 hours (Appendix C).</p>
+<h3 style="margin-top:26px;font-size:1.1rem">0.3 Provenance of the inputs</h3>
+<p class="prose">The premises this specification is built on were gathered in preparation and are recorded in <b>Part 1 as an explicit assumption register</b>, not woven into the narrative. Each one is stated, explained, traced to what depends on it, given a cheap verification procedure, and given a fallback if it proves false.</p>
+<p class="prose">This structure is deliberate. Several of the premises are second-hand, one pair of them is mutually inconsistent, and at least one — if true — materially improves the deliverable. Treating them as assumptions rather than as settled fact is what makes the specification safe to execute without further clarification.</p>
+<p class="prose">Where this document needs a decision that only the wider group can make, it says <b>“refer to the robotics team”</b>. Those points are collected in Appendix B.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">0.4 Files are local</h3>
+<p class="prose">All world files, model files, launch files and the reference pipeline named in this document are assumed present on the local filesystem of whoever is executing the step. No repository synchronisation procedure is specified. If a named file is absent, that is an assumption failure — see Part 1, A3.</p>
+</section>
+<section class="block" id="part-1-the-assumption-register"><h2>Part 1 — The assumption register</h2>
+<p class="prose">Twelve assumptions. Each carries a <b>verification</b> that costs minutes, and a <b>fallback</b>. Work through them in order before starting Part 2; the register is the cheapest part of the project and the one that prevents the expensive mistakes.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A1 — A merged world containing four objects and four colour-matched bins exists</h3>
+<p class="prose"><b>Statement.</b> A Gazebo world file exists on disk containing four graspable objects and four destination bins, colour-matched one-to-one.</p>
+<p class="prose"><b>Two candidate paths are in circulation, and they are inconsistent.</b> One premise names <code>mycobot_description/worlds/pick_and_place_sorting.sdf</code> as the target and describes it as containing exactly the four objects and four bins. A second premise states that the four objects were added to the <b>photorealistic, ArUco-calibrated world</b> derived from <code>real_table.sdf</code>, and explicitly characterises <code>pick_and_place_sorting.sdf</code> as <i>the older generic 4-object world</i>.</p>
+<p class="prose">These cannot both describe the target. One describes a world that exists; the other may describe an intent.</p>
+<p class="prose"><b>What depends on it.</b> Everything. Object poses, bin poses, table height, the reachability envelope, the camera topic names, the visual realism of every recorded frame.</p>
+<p class="prose"><b>Verification.</b> Part 2 in full — roughly two hours.</p>
+<p class="prose"><b>Fallback.</b> If the ArUco/photorealistic world contains only one object-bin pair while the generic world contains all eight, then merging the four objects into the ArUco world is itself a work item, and a substantial one. Refer to the robotics team the same day, with the enumeration from Part 2.3 attached as evidence.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A2 — The object and bin set is fixed and colour-matched</h3>
+<p class="prose"><b>Statement.</b> The four objects are <code>red_cube</code>, <code>blue_cube</code>, <code>green_cylinder</code>, <code>yellow_box</code>. The four destinations are <code>red_bin</code>, <code>blue_bin</code>, <code>green_bin</code>, <code>yellow_bin</code>. Each object belongs in the bin of its own colour.</p>
+<p class="prose"><b>Explanation.</b> These names correspond to eight physically 3D-printed and hand-coloured parts, and to the eight classes of the team’s object detector (<code>cube_rouge</code>, <code>cube_bleu</code>, <code>cylindre_vert</code>, <code>pave_jaune</code>, <code>bac_rouge</code>, <code>bac_bleu</code>, <code>bac_vert</code>, <code>bac_jaune</code>). The Gazebo model names are the English equivalents of the detector class names. This correspondence is not incidental — it is the reason the instruction vocabulary in Part 5 should be adopted rather than invented.</p>
+<p class="prose"><b>Note the shape heterogeneity.</b> Two cubes, one cylinder, one box. This is not four instances of one problem; see Part 4.1.</p>
+<p class="prose"><b>What depends on it.</b> The instruction set, the object manifest, the per-object grasp parameters, the verification logic.</p>
+<p class="prose"><b>Verification.</b> Part 2.3’s model enumeration lists exactly these eight names.</p>
+<p class="prose"><b>Fallback.</b> If the names differ, adopt whatever the world actually declares and propagate through <code>config/objects.yaml</code> — nothing else hardcodes them.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A3 — All world, model and pipeline files are present on the local filesystem</h3>
+<p class="prose"><b>Statement.</b> The world SDF, the eight model SDFs, the ArUco marker models, the table camera definition and the reference launch pipeline are real files on disk — not screenshots, not planned work.</p>
+<p class="prose"><b>Explanation.</b> This assumption is what permits this specification to omit any synchronisation procedure. Every command in this document reads local paths.</p>
+<p class="prose"><b>Verification.</b> Part 2.2’s <code>find</code> sweep locates each of them. Any file that does not appear is an assumption failure.</p>
+<p class="prose"><b>Fallback.</b> Missing files are reported to the robotics team as a blocking gap, naming exactly which artefacts are absent. Do not reconstruct a model from a presentation image — a reconstructed object has the wrong dimensions, the wrong mass and the wrong friction, and every downstream number inherits those errors invisibly.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A4 — A reference pipeline achieving a physically-verified grasp exists locally</h3>
+<p class="prose"><b>Statement.</b> A launch file — named in the premises as <code>sim_grasp.launch.py</code>, under a <code>mycobot_gateway</code> package — loads this world and, together with a companion node, performs a grasp in which <i>the gripper closes for real and the result is checked against Gazebo’s own object pose</i>, explicitly described as <b>not teleportation</b>.</p>
+<p class="prose"><b>Why this assumption deserves its own evaluation.</b> The previous acquisition spent two working days attempting a rigid-body friction grasp and did not achieve one. It fell back to an explicitly labelled <code>DetachableJoint</code> weld, and that weld is the single largest caveat on the resulting dataset — a model trained on it learns <i>approach, close, carry, open</i>, not the physics of grasping.</p>
+<p class="prose">If A4 is true, that caveat can be retired at the cost of reading someone else’s working code, rather than at the cost of another physics-tuning campaign.</p>
+<p class="prose"><b>Interaction with A8.</b> A separate premise states that the simulated attachment remains the sanctioned mechanism. These are not in conflict. The sanction against further physics tuning was issued in response to a request made <i>after</i> two days of failure; it is a refusal to authorise more tuning, not an instruction to ignore a working mechanism that already exists. Part 3 resolves this with a one-day bounded evaluation and a written decision.</p>
+<p class="prose"><b>What depends on it.</b> The single most consequential caveat in the dataset README, and therefore the scientific value of the sixty episodes.</p>
+<p class="prose"><b>Verification.</b> Part 3 in full — one day, hard cap.</p>
+<p class="prose"><b>Fallback.</b> A8 applies unchanged: the labelled weld, with four attachment configurations.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A5 — The demonstrator may use ground-truth object poses</h3>
+<p class="prose"><b>Statement.</b> The recording script is permitted to read object positions directly from the simulator rather than detecting them from camera images.</p>
+<p class="prose"><b>Explanation, because this is widely misunderstood.</b> A vision-language-action model learns the mapping <i>instruction + image → action</i>. During training it observes the recorded images, the recorded language and the recorded actions. It never observes <b>how the demonstrator knew where the object was</b>. The demonstrator is an oracle whose only job is to produce correct, clean trajectories; the provenance of its knowledge is not part of the training signal.</p>
+<p class="prose">Consequently the demonstrator is allowed to “cheat” by querying <code>gz model -p</code>. This is standard practice in scripted-demonstration data generation, and it saves an order of magnitude of effort relative to closing a perception loop that contributes nothing to the recorded data.</p>
+<p class="prose"><b>What it does not license.</b> It does not license <i>recording</i> ground-truth poses into the observation stream. The observation contains images and proprioception only. If ground-truth object poses leak into <code>observation.*</code>, the model will learn to read them and will fail catastrophically at inference when they are absent. Keep them in the episode metadata, never in the observation.</p>
+<p class="prose"><b>What depends on it.</b> The entire architecture of the spawn and sequence scripts, and the absence of any perception component from this work.</p>
+<p class="prose"><b>Verification.</b> Inspect the rosetta contract: <code>observation.state</code> must contain joint positions and the gripper only. Part 10.1.</p>
+<p class="prose"><b>Fallback.</b> If camera-driven acquisition is later required, that is a separate work item with its own specification; it is not a variation on this one.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A6 — Sorting assignment is by colour</h3>
+<p class="prose"><b>Statement.</b> Each object goes to the bin of its own colour. Assignment is not by size, shape, or any other property.</p>
+<p class="prose"><b>Explanation.</b> This resolves an ambiguity inherited from earlier work on the physical bench, where two cartons of different sizes were distinguished by area and associated with ArUco-tagged destinations. That size-based logic belongs to a different task and must not be carried into this one.</p>
+<p class="prose"><b>What depends on it.</b> The instruction strings, the expected-bin field in every episode’s metadata, and the wrong-bin check in Part 9.2.</p>
+<p class="prose"><b>Verification.</b> Self-evident from the model names once A1 and A2 are confirmed.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A7 — ArUco IDs 10 and 11 are not sorting destinations</h3>
+<p class="prose"><b>Statement.</b> The markers with IDs 10 and 11, which appear in earlier hand-crafted detection work as identifiers for a large and a small carton, play no role in this task.</p>
+<p class="prose"><b>Explanation.</b> The four ArUco markers relevant to this world carry IDs <b>19, 23, 25 and 26</b>, and they serve extrinsic camera calibration, not sorting. Confusing the two sets would attach meaning to markers that carry none here.</p>
+<p class="prose"><b>What depends on it.</b> Nothing functional — but it prevents a category of wasted investigation.</p>
+<p class="prose"><b>Verification.</b> <code>grep -o 'aruco_[0-9]*' &lt;world.sdf&gt; | sort -u</code> returns 19, 23, 25, 26 and nothing else.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A8 — The simulated attachment remains sanctioned</h3>
+<p class="prose"><b>Statement.</b> Carrying the object by an explicitly labelled <code>DetachableJoint</code> weld, triggered on gripper close and released on gripper open, remains acceptable for this acquisition.</p>
+<p class="prose"><b>Explanation.</b> This is the mechanism used in the previous acquisition. It is labelled <code>SIMULATED ATTACHMENT</code> in code comments, in log lines, and in every episode’s metadata file. It is honest, it is reproducible, and it removes an entire class of non-convergent tuning from the critical path.</p>
+<p class="prose"><b>Its cost, stated plainly.</b> No slip. No compliance. No grasp-failure examples. A policy trained on this data cannot learn when a grasp will fail, because the dataset contains no failures of that kind.</p>
+<p class="prose"><b>Interaction with A4.</b> A8 is the floor, not the ceiling. If Part 3 shows a physical grasp is available essentially for free, taking it is strictly better and should be reported as an improvement.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A9 — Target volume is fifteen clean successful episodes per object</h3>
+<p class="prose"><b>Statement.</b> Sixty episodes total, fifteen per object, where <i>clean successful</i> means the episode passed every check in Part 9. Failed attempts are re-run, not counted toward the fifteen.</p>
+<p class="prose"><b>Explanation.</b> The distinction matters for scheduling. At the measured real-time factor (Part 0.2), and allowing for bring-up, settle time and a realistic retry rate, sixty clean episodes is about three hours of wall clock. A naive reading of “sixty episodes” that counted failures would finish sooner and deliver less.</p>
+<p class="prose"><b>What depends on it.</b> The episode matrix in Part 6, and the batch scheduling in Part 11.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A10 — The acquisition batch runs on a machine with memory headroom</h3>
+<p class="prose"><b>Statement.</b> The sixty-episode batch executes on a machine with enough memory to run the full stack without pressure: the laptop of Part 0.2, where three full simulator stacks at once still left 4.75 GB available.</p>
+<p class="prose"><b>Explanation, in two parts.</b></p>
+<p class="prose"><b>Duration.</b> About three hours at the measured real-time factor of 0.344. The 0.082 measured on the memory-constrained machine of the previous acquisition would make it about four times longer.</p>
+<p class="prose"><b>Correctness.</b> This is the stronger argument. The previous acquisition, run on a memory-constrained machine, produced documented symptoms of memory exhaustion: <code>robot_state_publisher</code> terminated and presenting as “TF loss after prolonged uptime”; <code>move_group</code> stuck in executing after a peer was killed; container restarts destroying an installed virtual environment twice; and — decisively — a pair of physics measurements that cannot both be true. A gripper tip offset of 0.105 m was recorded as “touched the object”; 0.100 m as “never touched it”. Lowering a target by five millimetres cannot cause contact to cease. That was memory pressure wearing the costume of physics, and two days were spent tuning contact geometry against a simulator being dismembered underneath the experiment.</p>
+<p class="prose">A four-object, four-bin world has substantially more collision pairs than the single block and static plate of the previous acquisition. Running the batch without memory headroom does not risk being slow. It risks being wrong in a way that looks like data.</p>
+<p class="prose"><b>What depends on it.</b> The whole of Part 11.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A11 — The runtime environment matches the previous acquisition</h3>
+<p class="prose"><b>Statement.</b> Every step executes inside the same container image — Ubuntu 24.04, ROS 2 Jazzy, Gazebo Harmonic — as used for the previous headless acquisition.</p>
+<p class="prose"><b>Explanation.</b> This is the reproducibility guarantee, and it is what makes moving the work to another Windows host tractable at all. The container is the contract; the host supplies CPU, RAM, disk and a display.</p>
+<p class="prose"><b>What depends on it.</b> <code>preflight.sh</code> in Part 11.6, and the credibility of the statement “it runs the same on your machine”.</p>
+<p class="prose"><b>Verification.</b> <code>preflight.sh</code> checks ROS distribution, Gazebo presence, <code>ros_gz_sim</code>, <code>moveit_py</code>, <code>pyarrow</code> and <code>ffmpeg</code> before any batch begins.</p>
+<p class="prose"><b>Residual risk, to be stated rather than hidden.</b> Every artefact from the previous acquisition ran <code>gz sim -s</code>. Display passthrough from a container to a Windows host is the one class of problem that scripting does not anticipate; on WSL2 it needed <code>DISPLAY=:0</code> and software OpenGL. Part 11.8 specifies how to handle this honestly.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A12 — The 0.63 mm figure is not the benchmark for this work</h3>
+<p class="prose"><b>Statement.</b> The end-to-end positioning figure of 0.63 mm from the team’s precision campaign is <b>not</b> the target against which this acquisition, or any policy trained on it, should be measured.</p>
+<p class="prose"><b>Explanation.</b> That figure is the converged accuracy of a <b>closed-loop classical pipeline</b> after two visual correction passes — 10.79 mm open loop, 1.29 mm after one correction, 0.63 mm after two, with 18 of 20 trials under 1 mm. It measures how precisely a system converges on a commanded metrology point when permitted to look, correct and look again.</p>
+<p class="prose">A vision-language-action policy does none of that at inference. It emits actions from pixels and language, open loop, with no metrology target and no correction cycle. Holding it to a servoing figure measures a different quantity and reports the mismatch as failure.</p>
+<p class="prose"><b>What replaces it.</b> Part 13 specifies the correct metric set. The headline: <b>correct-bin rate</b>, because it is the only metric that distinguishes a policy that reads the instruction from one that ignores it.</p>
+<p class="prose"><b>Where 0.63 mm does belong.</b> In the comparative analysis of the current production architecture, quoted honestly as what it is.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">1.13 Assumption summary</h3>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Assumption</th><th>Verified by</th><th>If false</th></tr></thead><tbody><tr><td>A1</td><td>Four-object world exists</td><td>Part 2</td><td>Refer to robotics team — merge may be needed</td></tr><tr><td>A2</td><td>Object/bin names and colour matching</td><td>Part 2.3</td><td>Propagate real names via objects.yaml</td></tr><tr><td>A3</td><td>Files present locally</td><td>Part 2.2</td><td>Blocking; report the gap</td></tr><tr><td>A4</td><td>Physical-grasp reference pipeline exists</td><td>Part 3</td><td>A8 applies</td></tr><tr><td>A5</td><td>Ground-truth demonstrator permitted</td><td>Part 10.1</td><td>Separate specification required</td></tr><tr><td>A6</td><td>Sorting by colour</td><td>Part 2.3</td><td>Rewrite instruction set</td></tr><tr><td>A7</td><td>ArUco 10/11 irrelevant</td><td>Part 2.3</td><td>Investigate before proceeding</td></tr><tr><td>A8</td><td>Weld sanctioned</td><td>—</td><td>—</td></tr><tr><td>A9</td><td>15 clean per object</td><td>Part 6</td><td>Rescale matrix</td></tr><tr><td>A10</td><td>Batch with memory headroom</td><td>Part 11</td><td>Project timeline changes materially</td></tr><tr><td>A11</td><td>Same container as the previous acquisition</td><td>Part 11.6</td><td>Preflight fails loudly</td></tr><tr><td>A12</td><td>0.63 mm not the benchmark</td><td>Part 13</td><td>—</td></tr></tbody></table></div>
+<p class="prose"><b>✅ Definition of done for Part 1:</b> every assumption either confirmed, or recorded as failed with its fallback triggered and the robotics team informed.</p>
+</section>
+<section class="block" id="part-2-step-1-identify-the-target-world"><h2>Part 2 — Step 1: Identify the target world</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">2.1 Why this is step one</h3>
+<p class="prose">A1 is unresolved, and every subsequent number in this specification — object poses, table height, reachable envelope, camera topics — is read from whichever world turns out to be the target. Guessing costs a week.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">2.2 Locate the candidates</h3>
+<pre>cd &lt;repository root&gt;# every world file, newest firstfind . -name "*.sdf" -path "*world*" -printf '%T@ %p\n' 2&gt;/dev/null \  | sort -rn | cut -d' ' -f2-# the reference pipeline named in A4find . -name "sim_grasp.launch.py" -o -name "*gateway*" -type d# model directoriesfind . -type d \( -name "*cube*" -o -name "*bin*" -o -name "*cylinder*" \) | head -20</pre>
+<p class="prose">Record which of A3’s named artefacts are present and which are not.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">2.3 Enumerate what each candidate contains</h3>
+<pre>for w in $(find . -name "*.sdf" -path "*world*" 2&gt;/dev/null); do  echo "=========================================================="  echo "WORLD: $w"  echo "-- models declared:"  grep -oP '&lt;model name="\K[^"]+' "$w" | sort -u | tr '\n' ' '; echo  echo "-- included uris:"  grep -oP '&lt;uri&gt;\K[^&lt;]+' "$w" | sort -u | head -20  echo "-- aruco ids:      $(grep -oP 'aruco_\K[0-9]+' "$w" | sort -un | tr '\n' ' ')"  echo "-- camera sensors: $(grep -c 'sensor .*type="camera"' "$w")"  echo "-- camera names:   $(grep -oP '&lt;sensor name="\K[^"]+' "$w" | tr '\n' ' ')"  echo "-- textured:       $(grep -ci 'albedo_map\|&lt;texture\|\.png\|\.jpg' "$w")"  echo "-- static bins:    $(grep -A6 '_bin"' "$w" | grep -c '&lt;static&gt;true')"done</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">2.4 The decision rule</h3>
+<p class="prose">The target world is the one satisfying <b>all four</b> criteria:</p>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Criterion</th><th>Why it matters</th></tr></thead><tbody><tr><td>1</td><td>Declares all eight models from A2</td><td>Without four objects there is no selection task</td></tr><tr><td>2</td><td>Contains ArUco markers 19, 23, 25, 26</td><td>Visual correspondence with the physical bench</td></tr><tr><td>3</td><td>Contains a table camera sensor</td><td>The observation stream depends on it</td></tr><tr><td>4</td><td>Has a textured table, not a bare ground plane</td><td>Visual realism; reduces the sim-to-real gap</td></tr></tbody></table></div>
+<p class="prose"><b>If exactly one world satisfies all four</b>, A1 is resolved and this part is complete.</p>
+<p class="prose"><b>If the ArUco/textured world contains only one object-bin pair while a generic world contains all eight</b>, then the two premises in A1 describe different things: one describes reality, the other intent. Merging four objects into the ArUco world is then a work item in its own right. Refer to the robotics team the same day, attaching the enumeration output verbatim.</p>
+<p class="prose"><b>If no world satisfies criterion 1</b>, stop. A1 has failed and the acquisition cannot proceed as specified.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">2.5 Pin the choice</h3>
+<p class="prose">Write <code>doc/WORLD_SELECTION.md</code> containing:</p>
+<ul class="prose">
+<li>the full enumeration output from 2.3, verbatim</li>
+<li>the chosen world path</li>
+<li>its content hash, so the choice is unambiguous later:</li>
+</ul>
+<pre>sha256sum &lt;chosen world&gt;.sdf | tee -a doc/WORLD_SELECTION.md</pre>
+<ul class="prose">
+<li>one paragraph justifying the choice against the four criteria</li>
+</ul>
+<p class="prose">Also write the bare path to <code>config/WORLD_PATH</code>, a one-line file that <code>preflight.sh</code> and every script reads. Nothing else hardcodes a world path.</p>
+<pre>echo "mycobot_description/worlds/&lt;chosen&gt;.sdf" &gt; config/WORLD_PATH</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Definition of done for Part 2</h3>
+<p class="prose"><code>config/WORLD_PATH</code> written, <code>doc/WORLD_SELECTION.md</code> committed with evidence and hash, A1 marked confirmed or failed.</p>
+</section>
+<section class="block" id="part-3-step-2-the-grasp-decision-gate"><h2>Part 3 — Step 2: The grasp decision gate</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">3.1 The question</h3>
+<p class="prose">Is a physically-verified grasp available essentially for free (A4), or does the labelled weld remain necessary (A8)?</p>
+<p class="prose">This is decided once, in writing, before any episode is recorded. It cannot be revisited later without invalidating every episode already captured.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">3.2 First, read the reference pipeline</h3>
+<p class="prose">Twenty minutes, and it may answer the question without running anything.</p>
+<pre>sed -n '1,240p' $(find . -name "sim_grasp.launch.py" | head -1)# what nodes does it launch, and what do they do at grasp time?ls $(find . -type d -name "*gateway*" | head -1)/*/# THE DECISIVE GREPgrep -rniE "detachable|attach|weld|fixed_joint|SIMULATED" \     --include="*.py" --include="*.sdf" --include="*.xml" --include="*.yaml" . \  | grep -v "^./doc/" | head -40</pre>
+<p class="prose">Interpretation:</p>
+<div class="table-wrap"><table><thead><tr><th>Grep result</th><th>Meaning</th><th>Action</th></tr></thead><tbody><tr><td>No matches anywhere</td><td>The reference grasp is genuine contact physics</td><td>Proceed to 3.3 — high value</td></tr><tr><td>Matches only in previous-acquisition files</td><td>Same as above</td><td>Proceed to 3.3</td></tr><tr><td>Matches inside the reference pipeline itself</td><td>The team’s own pipeline also uses attachment</td><td><b>Stop.</b> A8 confirmed, and the previous decision is retroactively validated. Record this — it is a finding worth reporting</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">3.3 Then run it, once, unmodified</h3>
+<pre># Terminal 1 — the reference pipeline exactly as shipped, no editsros2 launch mycobot_gateway sim_grasp.launch.py# Terminal 2 — independent pose logging; do NOT trust console outputpython3 scripts/track_grasp.py --model red_cube --out /tmp/refgrasp.csv --hz 10# Terminal 3 — is anything being welded at runtime?ros2 topic list | grep -iE "attach|detach|weld"gz topic -l | grep -iE "attach|detach"</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">3.4 Read the verdict from the CSV, not the screen</h3>
+<pre># scripts/assess_reference_grasp.pyimport csv, statistics, sysrows = list(csv.DictReader(open(sys.argv[1])))lift = [r for r in rows if r["phase"] in ("lift", "transport")]if not lift:    sys.exit("no lift/transport samples — the run did not reach the lift phase")dz   = [float(r["dz"]) for r in lift]bz   = [float(r["bz"]) for r in lift]rise = max(bz) - min(float(r["bz"]) for r in rows if r["phase"] == "grasp")print(f"samples in lift/transport : {len(dz)}")print(f"dz mean / stdev / range   : {statistics.mean(dz):.4f} / "      f"{statistics.pstdev(dz):.4f} / {max(dz)-min(dz):.4f} m")print(f"object rise               : {rise:.4f} m")held = (max(dz) - min(dz)) &lt; 0.005 and rise &gt; 0.05print("VERDICT:", "GRASP HELD" if held else "NOT HELD")sys.exit(0 if held else 1)</pre>
+<p class="prose">Three questions, answered numerically:</p>
+<ol class="prose">
+<li>Does the object’s z rise while the end-effector’s z rises?</li>
+<li>Is <code>dz</code> constant through lift and transport, within 5 mm?</li>
+<li>Was any attach topic published at grasp time?</li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">3.5 The decision rule</h3>
+<div class="table-wrap"><table><thead><tr><th>Outcome</th><th>Decision</th><th>Consequence</th></tr></thead><tbody><tr><td>Genuine contact grasp, works unmodified</td><td><b>Adopt it</b></td><td>The dataset’s largest caveat is retired. Report to the robotics team the same day</td></tr><tr><td>Genuine contact grasp, works after &lt; 1 day adaptation</td><td><b>Adopt it</b></td><td>Document the adaptation precisely</td></tr><tr><td>Reference pipeline uses attachment internally</td><td><b>Keep the weld</b></td><td>A8 confirmed; report that the team’s own pipeline does the same</td></tr><tr><td>Cannot be made to work within one day</td><td><b>Keep the weld</b></td><td>Report exactly where it stopped and what was tried</td></tr></tbody></table></div>
+<p class="prose"><b>The cap is one day and it does not move.</b> The previous acquisition established, at a cost of two days, that this particular problem has no measurable bottom: the failure surface is non-convex, the evaluation is expensive, and on constrained hardware the measurement is not even reproducible.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">3.6 If the weld is retained — the four-configuration trap</h3>
+<p class="prose">Each of the four objects needs its own attachment configuration, and every one must target <b><code>link6</code></b>, never <code>gripper_base</code>.</p>
+<p class="prose"><b>Why, and why it is silent.</b> <code>gripper_base</code> is a TF/URDF frame only. The URDF-to-SDF conversion folds it into the <code>link6</code> Gazebo link, so it does not exist as an addressable Gazebo link name. A <code>DetachableJoint</code> declaring <code>child_link: gripper_base</code> <b>accepts the attach message and does nothing — no error, no warning, no log line.</b> The symptom is identical to a genuine friction-grasp failure: the object does not move. The previous acquisition lost a full debugging cycle to exactly this. With four objects there are now four opportunities to repeat it.</p>
+<p class="prose">Validate all four at authoring time, before the batch:</p>
+<pre># link6 must be a real Gazebo linkgz model -m mycobot_320pi --link | grep -qx "link6" \  &amp;&amp; echo "OK link6 addressable" \  || echo "FATAL: link6 is not a Gazebo link name"# each object must expose the link its DetachableJoint namesfor m in red_cube blue_cube green_cylinder yellow_box; do  printf '%-16s links: ' "$m"  gz model -m "$m" --link 2&gt;/dev/null | tr '\n' ' ' || echo "NOT SPAWNED"  echodone</pre>
+<p class="prose">And prove each attachment actually attaches, rather than assuming:</p>
+<pre># per object: attach, command a 5 cm lift, verify the object followedfor m in red_cube blue_cube green_cylinder yellow_box; do  python3 scripts/attach_smoke_test.py --model "$m" --lift 0.05 \    &amp;&amp; echo "$m ATTACH OK" || echo "$m ATTACH FAILED"done</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">3.7 Record the decision</h3>
+<p class="prose">Write <code>doc/GRASP_DECISION.md</code>: the verdict, the CSV evidence, the grep output from 3.2, and one paragraph on why. If the physical grasp was adopted, state explicitly why it succeeded here and not in the previous acquisition — that comparison is itself a reportable finding.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Definition of done for Part 3</h3>
+<p class="prose">A written decision with numeric evidence, and — if the weld is retained — all four attachments smoke-tested and passing.</p>
+<p class="prose">A single run of the reference pipeline in a four-object world is heavier than anything the previous acquisition attempted on its memory-constrained machine. If it will not start, that is itself the answer: escalate to the robotics team rather than fighting it.</p>
+</section>
+<section class="block" id="part-4-step-3-object-and-bin-geometry"><h2>Part 4 — Step 3: Object and bin geometry</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">4.1 Four objects is not four times one object</h3>
+<p class="prose">Two cubes, one cylinder, one box. The differences are load-bearing.</p>
+<p class="prose"><b>The cylinder has no opposed flat faces at arbitrary yaw.</b> A parallel-jaw gripper closing on a cylinder makes line contact rather than surface contact, and the object remains free to roll about its axis. If a physical grasp was adopted in Part 3, the cylinder is the case most likely to fail — <b>test it first, not last</b>. If the weld was retained, the cylinder costs nothing, which is a legitimate secondary argument for the weld in <i>this</i> dataset.</p>
+<p class="prose"><b>The box has a long axis.</b> The gripper must close across its <b>short</b> dimension. This requires a per-object wrist yaw, which the previous acquisition never needed because a cube is rotationally symmetric under a top-down grasp.</p>
+<p class="prose"><b>The two cubes are presumed identical in shape.</b> Verify rather than presume — a differing edge length changes the grasp height.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">4.2 Extract the real numbers</h3>
+<p class="prose">Never invent a dimension. Read every one from the merged SDFs.</p>
+<pre>python3 - &lt;&lt;'PY'import glob, re, osNAMES = ("red_cube|blue_cube|green_cylinder|yellow_box|"         "red_bin|blue_bin|green_bin|yellow_bin")pat = re.compile(rf'&lt;model name="({NAMES})"(.*?)&lt;/model&gt;', re.S)print(f"{'model':16s} {'file':30s} {'box size':22s} {'cyl r,l':16s} "      f"{'mass':8s} {'mu':6s} {'static':7s} pose")for f in glob.glob('**/*.sdf', recursive=True):    try:        s = open(f, errors='replace').read()    except OSError:        continue    for name, body in pat.findall(s):        box  = re.search(r'&lt;box&gt;\s*&lt;size&gt;([^&lt;]+)&lt;/size&gt;', body)        cyl  = re.search(r'&lt;cylinder&gt;\s*&lt;radius&gt;([^&lt;]+)&lt;/radius&gt;\s*'                         r'&lt;length&gt;([^&lt;]+)&lt;/length&gt;', body)        mass = re.search(r'&lt;mass&gt;([^&lt;]+)&lt;/mass&gt;', body)        mu   = re.search(r'&lt;mu&gt;([^&lt;]+)&lt;/mu&gt;', body)        stat = re.search(r'&lt;static&gt;([^&lt;]+)&lt;/static&gt;', body)        pose = re.search(r'&lt;pose&gt;([^&lt;]+)&lt;/pose&gt;', body)        g = lambda m, i=1: m.group(i).strip() if m else '-'        print(f"{name:16s} {os.path.basename(f):30s} {g(box):22s} "              f"{(g(cyl)+','+g(cyl,2)) if cyl else '-':16s} "              f"{g(mass):8s} {g(mu):6s} {g(stat):7s} {g(pose)}")PY</pre>
+<p class="prose">Also extract the table top height, which every grasp z depends on:</p>
+<pre>grep -B4 -A20 '&lt;model name="table"' $(cat config/WORLD_PATH) \  | grep -E '&lt;pose&gt;|&lt;size&gt;|&lt;box&gt;'</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">4.3 Determine the bin rim height</h3>
+<p class="prose">A bin is a container, not a plate. Three geometric quantities are needed per bin:</p>
+<div class="table-wrap"><table><thead><tr><th>Quantity</th><th>Meaning</th><th>Used by</th></tr></thead><tbody><tr><td><code>pose</code></td><td>Bin centre in world frame</td><td>Transport waypoint</td></tr><tr><td><code>inner_radius</code></td><td>Largest radius an object can occupy without touching a wall</td><td>Placement check (Part 9.2)</td></tr><tr><td><code>rim_z</code></td><td>Top edge height in world frame</td><td>Release height, and the “not resting on the rim” check</td></tr></tbody></table></div>
+<p class="prose">If the bin is modelled as a composite of walls and a floor rather than a single primitive, <code>inner_radius</code> and <code>rim_z</code> must be derived from the wall geometry. Measure it directly if the SDF is awkward to parse:</p>
+<pre>ros2 run ros_gz_sim create -world &lt;world&gt; -file &lt;bin&gt;.sdf -name probe_bin \  -x 0.30 -y 0.0 -z 0.10sleep 15gz model -m probe_bin -p        # settled posegz model -m probe_bin --link    # link names, to inspect wall geometry</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">4.4 Confirm the bins are static</h3>
+<pre>for b in red_bin blue_bin green_bin yellow_bin; do  printf '%-12s ' "$b"  grep -A8 "name=\"$b\"" $(cat config/WORLD_PATH) | grep -q '&lt;static&gt;true' \    &amp;&amp; echo "static OK" || echo "DYNAMIC — destination can move mid-episode"done</pre>
+<p class="prose">A non-static bin can be displaced by a clumsy approach, after which every placement check is measured against a target that has moved. If any bin is dynamic, either make it static for acquisition — a local world override, documented — or record bin poses at episode start and evaluate placement against those rather than against the configured values.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">4.5 The manifest</h3>
+<p class="prose">Create <code>config/objects.yaml</code>. <b>This is the single source of truth.</b> Nothing downstream hardcodes a dimension, a pose or an instruction.</p>
+<pre># config/objects.yaml# Every numeric field READ FROM THE MERGED SDFs (Part 4.2). Placeholders below# are shaped correctly but must be replaced. Do not ship this file unedited.world_path_file: config/WORLD_PATHtable_top_z:     0.000        # &lt;-- READ: world frame z of the table surfaceobjects:  red_cube:    shape:       box    size:        [0.040, 0.040, 0.040]   # &lt;-- READ    mass:        0.050                   # &lt;-- READ    mu:          1.500                   # &lt;-- READ    grasp_dz:    0.010      # above object CENTRE; see Part 4.6    grasp_yaw:   0.0        # rotationally symmetric top-down    bin:         red_bin    instruction: "pick up the red cube and place it in the red bin"  blue_cube:    shape:       box    size:        [0.040, 0.040, 0.040]   # &lt;-- READ; verify it matches red_cube    mass:        0.050    mu:          1.500    grasp_dz:    0.010    grasp_yaw:   0.0    bin:         blue_bin    instruction: "pick up the blue cube and place it in the blue bin"  green_cylinder:    shape:       cylinder    radius:      0.020                   # &lt;-- READ    length:      0.050                   # &lt;-- READ    mass:        0.050    mu:          1.500    grasp_dz:    0.012      # above mid-height, below the top edge    grasp_yaw:   0.0        # symmetric about its own axis    bin:         green_bin    instruction: "pick up the green cylinder and place it in the green bin"  yellow_box:    shape:       box    size:        [0.060, 0.035, 0.035]   # &lt;-- READ; note the asymmetry    mass:        0.050    mu:          1.500    grasp_dz:    0.008    grasp_yaw:   1.5708     # 90 deg — close across the SHORT axis    bin:         yellow_bin    instruction: "pick up the yellow box and place it in the yellow bin"bins:  red_bin:    pose:         [0.000, 0.000, 0.000]  # &lt;-- READ    inner_radius: 0.000                  # &lt;-- READ or measure (Part 4.3)    rim_z:        0.000                  # &lt;-- READ or measure    static:       true                   # &lt;-- CONFIRM (Part 4.4)  blue_bin:   {pose: [0,0,0], inner_radius: 0.0, rim_z: 0.0, static: true}  green_bin:  {pose: [0,0,0], inner_radius: 0.0, rim_z: 0.0, static: true}  yellow_bin: {pose: [0,0,0], inner_radius: 0.0, rim_z: 0.0, static: true}release:  height_above_bin_rim: 0.030    # see Part 8.3 for why 3 cm and not 0spawn:  settle_seconds_sim: 3.0        # SIMULATION seconds, not wall clock  min_object_separation: 0.080   # centre-to-centre  bin_keepout_radius:   0.090    # object centre to bin centre</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">4.6 Why grasp height is measured from the object centre</h3>
+<p class="prose">For a cube of edge <code>a</code> whose <i>centre</i> sits at height <code>z</code>, the top face is at <code>z + a/2</code>. Aiming the fingertips at <code>z</code> would drive them through the object. Aiming at <code>z + grasp_dz</code> with <code>grasp_dz</code> slightly less than <code>a/2</code> places the finger pads around the upper portion of the object.</p>
+<p class="prose">For the cylinder, <code>grasp_dz</code> must be below <code>length/2</code> so the pads contact the curved wall rather than closing above the top face — a failure mode observed directly in the previous acquisition, where a grasp height of 0.12 m left the object completely undisturbed.</p>
+<p class="prose">This is the single number most likely to need adjustment, and the cheapest to change. It lives in <code>objects.yaml</code> for exactly that reason.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">4.7 Validate the manifest before proceeding</h3>
+<pre># scripts/validate_objects.pyimport yaml, sysc = yaml.safe_load(open("config/objects.yaml"))errs = []for name, o in c["objects"].items():    if o["bin"] not in c["bins"]:        errs.append(f"{name}: bin {o['bin']} not declared")    if o["shape"] == "box" and (not o.get("size") or any(v &lt;= 0 for v in o["size"])):        errs.append(f"{name}: invalid or placeholder size")    if o["shape"] == "cylinder" and not (o.get("radius", 0) &gt; 0 and o.get("length", 0) &gt; 0):        errs.append(f"{name}: invalid or placeholder cylinder dims")    half = (o["size"][2] / 2) if o["shape"] == "box" else (o["length"] / 2)    if o["grasp_dz"] &gt;= half:        errs.append(f"{name}: grasp_dz {o['grasp_dz']} &gt;= half-height {half} "                    f"— fingers will close above the object")    if not o["instruction"].strip():        errs.append(f"{name}: empty instruction")for bn, b in c["bins"].items():    if b["inner_radius"] &lt;= 0 or b["rim_z"] == 0:        errs.append(f"{bn}: placeholder geometry not replaced")    if not b.get("static", False):        errs.append(f"{bn}: NOT static — see Part 4.4")print("\n".join(errs) if errs else "objects.yaml OK")sys.exit(1 if errs else 0)</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Definition of done for Part 4</h3>
+<p class="prose"><code>config/objects.yaml</code> complete with every field read from the SDFs, <code>validate_objects.py</code> exiting 0, bin static-ness confirmed, cylinder and box grasp orientations decided.</p>
+</section>
+<section class="block" id="part-5-step-4-task-definition-and-instru"><h2>Part 5 — Step 4: Task definition and instruction vocabulary</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">5.1 The instruction becomes load-bearing — this is the point of the exercise</h3>
+<p class="prose">In the previous acquisition, all twenty episodes carried one instruction: <i>“pick up the red block and place it on the plate.”</i> There was one object and one destination.</p>
+<p class="prose">A policy trained on that data could discard the language stream entirely, learn <i>“move to the one red thing, close, move to the one white thing, open”</i>, and score 100%. <b>The dataset could not distinguish a model that reads instructions from one that ignores them.</b> Every episode was consistent with both hypotheses.</p>
+<p class="prose">With four objects present in every frame and four instructions, that is no longer true. A policy ignoring the language can do no better than chance — 25%. The instruction now carries exactly two bits, and the dataset can measure whether the model uses them.</p>
+<p class="prose">That is the difference between demonstrating a pipeline and producing data with a learnable signal in it. It is also why Part 13’s headline metric is correct-bin rate.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">5.2 All four objects appear in every episode</h3>
+<p class="prose">This requirement is what makes 5.1 true, and it is easy to violate by accident.</p>
+<p class="prose"><b>Every episode spawns all four objects and all four bins.</b> The instruction names one object. The other three are distractors, and their positions are randomised independently per episode.</p>
+<p class="prose">If only the target is spawned, the previous acquisition has been rebuilt four times and nothing has been learned. If the distractors are always in the same place, the model learns <i>“the red cube is always at the left”</i> rather than <i>“find the red cube”</i>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">5.3 Adopt the existing vocabulary</h3>
+<p class="prose">The team’s object detector is trained on eight classes: <code>cube_rouge</code>, <code>cube_bleu</code>, <code>cylindre_vert</code>, <code>pave_jaune</code>, <code>bac_rouge</code>, <code>bac_bleu</code>, <code>bac_vert</code>, <code>bac_jaune</code>. The Gazebo model names are the English equivalents.</p>
+<p class="prose">Use instructions that map one-to-one onto those classes. Do not introduce synonyms — not “the red block”, “the crimson cube”, “the red container”. <b>One phrasing per object, byte-identical across all fifteen of its episodes.</b></p>
+<p class="prose">Paraphrase robustness is a deliberate later experiment with its own held-out design. Introducing variation now, by accident, makes it impossible to run that experiment cleanly later.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">5.4 The task table</h3>
+<pre>{"task_index": 0, "task": "pick up the red cube and place it in the red bin"}{"task_index": 1, "task": "pick up the blue cube and place it in the blue bin"}{"task_index": 2, "task": "pick up the green cylinder and place it in the green bin"}{"task_index": 3, "task": "pick up the yellow box and place it in the yellow bin"}</pre>
+<p class="prose">Generate this file from <code>objects.yaml</code> rather than typing it, so the two cannot drift apart:</p>
+<pre># scripts/make_tasks.pyimport yaml, jsonc = yaml.safe_load(open("config/objects.yaml"))order = ["red_cube", "blue_cube", "green_cylinder", "yellow_box"]with open("config/tasks.jsonl", "w") as f:    for i, name in enumerate(order):        f.write(json.dumps({"task_index": i,                            "task": c["objects"][name]["instruction"]}) + "\n")print("wrote config/tasks.jsonl")</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">5.5 Assignment is by colour</h3>
+<p class="prose">Per A6. Each object goes to the bin of its own colour. No size logic, no ArUco-tagged destinations, no exceptions.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Definition of done for Part 5</h3>
+<p class="prose"><code>config/tasks.jsonl</code> generated from the manifest, four tasks, instructions frozen, and the spawn script implementing “all four objects always present”.</p>
+</section>
+<section class="block" id="part-6-step-5-the-episode-matrix"><h2>Part 6 — Step 5: The episode matrix</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">6.1 Target and definition of “clean”</h3>
+<p class="prose">Per A9: <b>fifteen clean successful episodes per object, sixty total.</b> An episode counts only if it passed every check in Part 9. Failures are re-run.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">6.2 The split</h3>
+<div class="table-wrap"><table><thead><tr><th>Per object</th><th>Count</th><th>Camera</th><th>Split</th><th>Purpose</th></tr></thead><tbody><tr><td>Nominal position</td><td>4</td><td>table camera</td><td>train</td><td>Establish the task works</td></tr><tr><td>x variation</td><td>4</td><td>table camera</td><td>train</td><td>Longitudinal generalisation</td></tr><tr><td>y variation</td><td>4</td><td>table camera</td><td>train</td><td>Lateral generalisation</td></tr><tr><td><b>Held out</b></td><td><b>3</b></td><td><b>second camera</b></td><td><b>heldout</b></td><td><b>Unseen-condition validation</b></td></tr><tr><td></td><td><b>15</b></td><td></td><td></td><td></td></tr></tbody></table></div>
+<p class="prose"><b>48 training episodes, 12 held out</b> — an 80/20 split.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">6.3 Why a held-out <i>condition</i>, not held-out images</h3>
+<p class="prose">This is not a formality, and the project has direct in-house evidence for it.</p>
+<p class="prose">The markerless pose-estimation work failed because the model memorised two fixed camera mounts rather than learning to localise. It performed well on held-out <i>images</i> from those mounts and collapsed on an unseen mount. <b>Holding out images tests memorisation of pixels; holding out conditions tests generalisation.</b></p>
+<p class="prose">The team’s own object-detector evaluation follows the same principle — full detection on the training camera, degraded detection on a camera never seen during training, reported honestly as a snapshot rather than a measured rate. This held-out split is the established practice, not an import.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">6.4 The second camera must actually exist</h3>
+<p class="prose">A held-out camera that does not exist is a held-out set that does not exist. Before generating the matrix:</p>
+<pre># cameras declared in the target worldgrep -oP '&lt;sensor name="\K[^"]+' $(cat config/WORLD_PATH)grep -oP '&lt;topic&gt;\K[^&lt;]+' $(cat config/WORLD_PATH) | grep -i cam# and at runtime, with the world loadedros2 topic list | grep -iE "image|camera"</pre>
+<p class="prose">If only one camera exists, refer to the robotics team with three options, in order of preference:</p>
+<ol class="prose">
+<li>Add a second camera to a local world override at a different pose — cheapest, and closest to the intent</li>
+<li>Hold out a different condition instead — for example a distinct lighting configuration, or a table-camera pose offset</li>
+<li>Record all sixty against one camera and declare that no held-out condition exists — <b>honest, but materially weaker</b>, and it must be stated in the dataset README</li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">6.5 Re-measure the reachable envelope</h3>
+<p class="prose">The previous acquisition established that top-down IK on the elbow-up branch had <b>no solution below x ≈ 0.245 m</b>, which forced the x range from a planned 0.22–0.28 to an actual 0.25–0.31.</p>
+<p class="prose"><b>That boundary belongs to the previous world’s table geometry.</b> This world has a real measured table at a possibly different height. Re-derive rather than inherit:</p>
+<pre>python3 scripts/precompute_ik.py --sweep \  --x-range 0.18 0.36 --x-step 0.005 \  --y-range -0.14 0.14 --y-step 0.01 \  --z-from-config config/objects.yaml \  --require-elbow-up \  --out config/reach_map.csv
+# scripts/summarise_reach.py — the usable rectangleimport csvok = [(float(r["x"]), float(r["y"])) for r in csv.DictReader(open("config/reach_map.csv"))      if r["solved"] == "1" and r["elbow_up"] == "1"]xs, ys = [p[0] for p in ok], [p[1] for p in ok]print(f"solved points: {len(ok)}")print(f"x range: {min(xs):.3f} .. {max(xs):.3f}")print(f"y range: {min(ys):.3f} .. {max(ys):.3f}")print(f"SAFE (5 mm margin): x {min(xs)+0.005:.3f} .. {max(xs)-0.005:.3f}, "      f"y {min(ys)+0.005:.3f} .. {max(ys)-0.005:.3f}")</pre>
+<p class="prose"><b>Use the margined rectangle, never the raw boundary.</b> A position that solves exactly at the edge will fail intermittently once the object settles a few millimetres from its spawn pose — and an intermittent IK failure mid-batch is expensive.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">6.6 Positions must not collide</h3>
+<p class="prose">Four objects and four bins share one table. Two constraints the previous acquisition never faced:</p>
+<ol class="prose">
+<li>Two objects overlapping at spawn causes the physics engine to eject one violently</li>
+<li>An object spawned inside a bin’s footprint starts the episode in its own goal state</li>
+</ol>
+<pre># scripts/layout.pyimport math, randomdef validate_layout(obj_xy, bin_xy, min_sep, bin_keepout):    """Return (ok, reason). obj_xy/bin_xy are {name: (x, y)}."""    names = list(obj_xy)    for i, a in enumerate(names):        for b in names[i+1:]:            d = math.dist(obj_xy[a], obj_xy[b])            if d &lt; min_sep:                return False, f"{a}/{b} separated by {d:.3f} m &lt; {min_sep}"    for o, p in obj_xy.items():        for bn, q in bin_xy.items():            d = math.dist(p, q)            if d &lt; bin_keepout:                return False, f"{o} is {d:.3f} m from {bn} (keepout {bin_keepout})"    return True, "ok"def sample_distractors(target, target_xy, bin_xy, safe_rect,                       min_sep, bin_keepout, others, rng, tries=500):    """Place the three non-target objects at valid random positions."""    x0, x1, y0, y1 = safe_rect    for _ in range(tries):        layout = {target: target_xy}        for name in others:            layout[name] = (round(rng.uniform(x0, x1), 4),                            round(rng.uniform(y0, y1), 4))        ok, _ = validate_layout(layout, bin_xy, min_sep, bin_keepout)        if ok:            return layout    raise RuntimeError("could not find a valid layout — relax the rectangle "                       "or reduce min_sep")</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">6.7 Generate the matrix</h3>
+<pre># scripts/make_matrix.py  -&gt;  config/episode_matrix.csvimport csv, yaml, randomfrom layout import sample_distractorsrandom.seed(20260923)          # reproducibility is not optionalrng = random.Random(20260923)cfg  = yaml.safe_load(open("config/objects.yaml"))OBJ  = ["red_cube", "blue_cube", "green_cylinder", "yellow_box"]bins = {k: (v["pose"][0], v["pose"][1]) for k, v in cfg["bins"].items()}# from Part 6.5's margined rectangle — REPLACE with measured valuesSAFE = (0.250, 0.310, -0.080, 0.080)X_NOM, Y_NOM = 0.270, 0.000X_VAR = [0.250, 0.265, 0.285, 0.305]Y_VAR = [-0.070, -0.035, 0.035, 0.070]rows, idx = [], 1for obj in OBJ:    others = [o for o in OBJ if o != obj]    plan = ([("nominal",  X_NOM, Y_NOM)] * 4          + [("x_var",    x,     Y_NOM) for x in X_VAR]          + [("y_var",    X_NOM, y)     for y in Y_VAR]          + [("heldout",  X_NOM, Y_NOM),             ("heldout",  X_VAR[1], Y_NOM),             ("heldout",  X_NOM, Y_VAR[2])])    for kind, x, y in plan:        layout = sample_distractors(            obj, (x, y), bins, SAFE,            cfg["spawn"]["min_object_separation"],            cfg["spawn"]["bin_keepout_radius"], others, rng)        row = {"episode": idx, "target": obj, "kind": kind,               "target_x": x, "target_y": y,               "camera": "heldout" if kind == "heldout" else "table",               "split":  "heldout" if kind == "heldout" else "train",               "task_index": OBJ.index(obj)}        for name, (px, py) in layout.items():            row[f"{name}_x"], row[f"{name}_y"] = px, py        rows.append(row); idx += 1with open("config/episode_matrix.csv", "w", newline="") as f:    w = csv.DictWriter(f, fieldnames=list(rows[0]))    w.writeheader(); w.writerows(rows)print(f"{len(rows)} episodes  "      f"train={sum(r['split']=='train' for r in rows)}  "      f"heldout={sum(r['split']=='heldout' for r in rows)}")for o in OBJ:    print(f"  {o:16s} {sum(r['target']==o for r in rows)}")</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">6.8 Check for an existing randomiser first</h3>
+<p class="prose">The team’s simulation tooling includes a dialog offering <i>“Randomiser cube + bac”</i> — new positions within the arm’s reachable zone — and a <i>“Lancer la prise”</i> action. If that code exists locally, it already encodes the team’s own reachable-zone knowledge.</p>
+<pre>grep -rniE "randomis|randomiz|lancer.la.prise|zone accessible" \     --include="*.py" . | head</pre>
+<p class="prose">If it produces reachable, non-colliding poses, <b>use it instead of §6.6</b>. Matching the team’s sampling keeps this dataset’s distribution consistent with theirs, which matters if the two are ever combined.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Definition of done for Part 6</h3>
+<p class="prose"><code>config/episode_matrix.csv</code> with 60 rows, 48/12 split, 15 per object, every target inside the re-measured margined rectangle, every layout passing <code>validate_layout</code>, and the second camera confirmed to exist.</p>
+<p class="prose">§6.5’s sweep requires <code>moveit_py</code> and the robot model but performs no physics stepping.</p>
+</section>
+<section class="block" id="part-7-step-6-inverse-kinematics-and-way"><h2>Part 7 — Step 6: Inverse kinematics and waypoints</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">7.1 What carries forward unchanged</h3>
+<p class="prose"><b>Solve IK locally, command joints.</b> The manufacturer’s Cartesian interface measured <b>247.8 mm</b> final error against <b>18.2 mm</b> for joint commands plus differential IK, on an identical 267 mm target — and it failed <i>silently</i>, returning success from the bridge either way. The cause was gimbal lock with RY between −78° and −83°. Never use it.</p>
+<p class="prose"><b>Force the elbow-up branch.</b> Reject any solution with <code>J3 &gt;= 0</code> and re-seed. Historical poses are elbow-down against the J2 limit with zero margin, which produces 150° branch jumps on J4 under closed-loop control.</p>
+<p class="prose"><b>Approach from directly above, always.</b> The team’s own campaign measured the cost of mixing approach directions across four sides: <b>5.918 mm of spread</b>, against a worst single-side repeatability of 0.84 mm. Approach direction costs roughly <b>seven times</b> the worst repeatability. Every descent in this dataset comes from above, without exception. This is not a preference; it is a measured constraint, and it is also — see Part 12 — a constraint a learned policy does not inherit automatically.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">7.2 The gripper frame, re-measured</h3>
+<p class="prose">The previous acquisition lost a full debugging cycle here. With four objects, there are four chances to repeat it.</p>
+<ul class="prose">
+<li>The IK target frame is <b><code>gripper_base</code></b>, not <code>link6</code></li>
+<li>Fingertips sit approximately <b>0.10 m below</b> <code>gripper_base</code></li>
+<li>The fingers meet approximately <b>0.036 m ahead of</b> <code>gripper_base</code> — the frame is <b>not symmetric</b> between the fingers</li>
+</ul>
+<p class="prose">So the Cartesian target for a grasp is not the object centre. It is the object centre displaced by the fingertip vector, expressed in <code>gripper_base</code>.</p>
+<p class="prose"><b>Re-measure in this world rather than copying</b>, because the gripper attachment may differ:</p>
+<pre># Move the arm to a known pose, WAIT for it to settle, then readpython3 scripts/goto_home.pysleep 60        # at RTF ~0.1, 60 s wall clock is ~6 s of simulation timeros2 run tf2_ros tf2_echo gripper_base gripper_left_finger_tipros2 run tf2_ros tf2_echo gripper_base gripper_right_finger_tipros2 run tf2_ros tf2_echo base_link gripper_base</pre>
+<p class="prose"><b>Read these only after the arm has settled.</b> At a real-time factor near 0.08, a transform read while the arm is still moving is meaningless. The previous acquisition made exactly this mistake and drew a wrong conclusion from the result, then spent runs chasing it.</p>
+<pre># config/gripper_frame.yaml — measured in THIS world, not inheritedgripper_base_to_fingertip:  dz: -0.100      # fingertips below gripper_base   &lt;-- MEASURE  dx:  0.036      # meeting point ahead of base     &lt;-- MEASURE  asymmetric: truemeasured_at: "2026-09-__"measured_after_settle_seconds: 60</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">7.3 The seven waypoints per episode</h3>
+<pre>1. HOME        joint space, fixed constant2. APPROACH    (obj_x, obj_y, obj_z + 0.10)        yaw = grasp_yaw3. DESCEND     (obj_x, obj_y, obj_z + grasp_dz)    yaw = grasp_yaw   [GRASP      gripper close; attach if A8 — no motion]4. LIFT        (obj_x, obj_y, obj_z + 0.10)        yaw unchanged5. TRANSPORT   (bin_x, bin_y, bin_rim_z + 0.10)6. RELEASE     (bin_x, bin_y, bin_rim_z + 0.03)   [OPEN       gripper open; detach if A8 — no motion]7. RETREAT     (bin_x, bin_y, bin_rim_z + 0.10)    then HOME</pre>
+<p class="prose">Sixty episodes × seven waypoints is <b>420 IK solves</b>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">7.4 Precompute, never solve in the loop</h3>
+<p class="prose">An IK failure discovered inside an episode wastes the whole episode plus its bring-up. Discovered offline it costs nothing.</p>
+<pre>python3 scripts/precompute_ik.py \  --matrix         config/episode_matrix.csv \  --objects        config/objects.yaml \  --gripper-frame  config/gripper_frame.yaml \  --require-elbow-up \  --branch-max-step 0.6 \  --seeds 12 \  --out            config/waypoints.json
+# scripts/check_waypoints.py — must pass before any episode is recordedimport json, sysw = json.load(open("config/waypoints.json"))problems = []if len(w) != 60:    problems.append(f"expected 60 episode entries, found {len(w)}")for k, seq in w.items():    if seq is None:        problems.append(f"{k}: no solution"); continue    if len(seq) != 7:        problems.append(f"{k}: {len(seq)} waypoints, expected 7")    for i, q in enumerate(seq):        if q is None:            problems.append(f"{k}: waypoint {i} unsolved")        elif q[2] &gt;= 0:            problems.append(f"{k}: waypoint {i} elbow-DOWN (J3={q[2]:.3f})")    for i, (a, b) in enumerate(zip(seq, seq[1:])):        if a and b:            step = max(abs(x - y) for x, y in zip(a, b))            if step &gt; 0.6:                problems.append(f"{k}: branch jump {step:.2f} rad "                                f"between waypoints {i} and {i+1}")print("\n".join(problems) if problems else f"{len(w)} episodes: all waypoints OK")sys.exit(1 if problems else 0)</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">7.5 Branch consistency across the whole episode</h3>
+<p class="prose"><code>J3 &lt; 0</code> per solve is necessary but not sufficient. The <i>sequence</i> must stay on one branch. A branch flip between LIFT and TRANSPORT produces a large wrist rotation mid-carry, which flings a physically-grasped object and, either way, looks bizarre in the recorded frames — teaching the policy a motion no sensible controller would produce.</p>
+<p class="prose">The 0.6 rad per-joint, per-waypoint threshold in <code>check_waypoints.py</code> catches this. If a sequence fails, re-seed that episode’s solve rather than lowering the threshold.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">7.6 If a position cannot be solved</h3>
+<p class="prose">Change the position in the matrix and regenerate. Do not let the batch discover it at runtime, and do not relax the elbow-up requirement to make a stubborn position solve — an elbow-down episode in an otherwise elbow-up dataset is a contaminant.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Definition of done for Part 7</h3>
+<p class="prose"><code>config/waypoints.json</code> with 60 entries, 420 solved waypoints, zero unsolved, zero elbow-down, zero branch jumps — <code>check_waypoints.py</code> exiting 0.</p>
+<p class="prose"><code>precompute_ik.py</code> uses <code>moveit_py</code> and the robot model only — no Gazebo, no physics stepping.</p>
+</section>
+<section class="block" id="part-8-step-7-the-episode-sequence"><h2>Part 8 — Step 7: The episode sequence</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">8.1 Scene spawn</h3>
+<pre># scripts/spawn_scene.pyimport subprocess, yaml, csv, sys, time, argparsedef spawn(model_file, name, x, y, z, world):    subprocess.run(["ros2", "run", "ros_gz_sim", "create",                    "-world", world, "-file", model_file, "-name", name,                    "-x", str(x), "-y", str(y), "-z", str(z)],                   check=True, timeout=90)          # bounded — see Part 10.2def main():    ap = argparse.ArgumentParser()    ap.add_argument("--episode", type=int, required=True)    args = ap.parse_args()    cfg   = yaml.safe_load(open("config/objects.yaml"))    world = open(cfg["world_path_file"]).read().strip()    row   = next(r for r in csv.DictReader(open("config/episode_matrix.csv"))                 if int(r["episode"]) == args.episode)    # bins first — they are static and define the keepout regions    for bn in cfg["bins"]:        spawn(f"models/{bn}.sdf", bn, *cfg["bins"][bn]["pose"], world)    # then ALL FOUR objects — target and distractors alike (Part 5.2)    for name, o in cfg["objects"].items():        half = (o["size"][2] / 2) if o["shape"] == "box" else (o["length"] / 2)        z = cfg["table_top_z"] + half + 0.0005      # 0.5 mm above, let it settle        spawn(f"models/{name}.sdf", name,              float(row[f"{name}_x"]), float(row[f"{name}_y"]), z, world)    # settle in SIMULATION time, not wall clock    settle_sim = cfg["spawn"]["settle_seconds_sim"]    rtf = float(subprocess.run(["python3", "scripts/measure_rtf.py"],                               capture_output=True, text=True).stdout or 0.1)    time.sleep(settle_sim / max(rtf, 0.02))    # verify every object landed where intended    bad = []    for name in cfg["objects"]:        p = read_pose(name)                          # gz model -m &lt;name&gt; -p        want = (float(row[f"{name}_x"]), float(row[f"{name}_y"]))        if abs(p[0]-want[0]) &gt; 0.01 or abs(p[1]-want[1]) &gt; 0.01:            bad.append((name, want, p[:2]))    if bad:        print("SPAWN DRIFT:", bad); sys.exit(1)    print("scene OK")if __name__ == "__main__":    main()</pre>
+<p class="prose"><b>Note the settle computation.</b> Waiting <code>sleep 3</code> waits three <i>wall-clock</i> seconds, which at RTF 0.082 is a quarter of a simulation second — not enough for anything to settle. Every wait in this pipeline that concerns physics must be expressed in simulation time and divided by the measured real-time factor. The previous acquisition had settle waits in wall-clock time, and it is listed there as a candidate cause of non-reproducibility.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">8.2 The sequence driver</h3>
+<pre># scripts/run_pick_and_place.py — the changed coreimport yaml, json, time, csv, argparsecfg = yaml.safe_load(open("config/objects.yaml"))wps = json.load(open("config/waypoints.json"))ap = argparse.ArgumentParser()ap.add_argument("--episode", type=int, required=True)ap.add_argument("--target", required=True)ap.add_argument("--record", action="store_true")ap.add_argument("--log",  default="grasp_log.csv")ap.add_argument("--meta", default="grasp_meta.json")args = ap.parse_args()spec     = cfg["objects"][args.target]bin_name = spec["bin"]seq      = wps[f"ep{args.episode:03d}"]STEPS = [    ("home",      lambda: goto_joints(HOME_Q),              1.0),    ("approach",  lambda: goto_joints(seq[0]),              2.0),    ("descend",   lambda: goto_joints(seq[1]),              2.0),    ("grasp",     lambda: close_gripper_and_attach(args.target), 2.0),  # &gt; 1.6 s    ("lift",      lambda: goto_joints(seq[2]),              2.0),    ("transport", lambda: goto_joints(seq[3]),              3.0),    ("release",   lambda: goto_joints(seq[4]),              2.0),    ("open",      lambda: open_gripper_and_detach(args.target),   2.0),  # &gt; 1.6 s    ("retreat",   lambda: goto_joints(seq[5]),              2.0),    ("home",      lambda: goto_joints(HOME_Q),              2.0),]start_poses = snapshot_all_objects("start")     # ALL FOUR — Part 9.3 needs thisfailed_at = Nonefor name, action, settle_sim in STEPS:    log(f"--- {name}  [{args.target} -&gt; {bin_name}] ---")    if action() is False:        log(f"FAILED at {name}"); failed_at = name; break    time.sleep(settle_sim / max(current_rtf(), 0.02))   # sim time, not wall    snapshot_all_objects(name)end_poses = snapshot_all_objects("end")</pre>
+<p class="prose">Four changes from the previous acquisition, all small:</p>
+<ol class="prose">
+<li><b>Target selection</b> — <code>--target</code> from the matrix row, not a hardcoded object</li>
+<li><b>Per-object wrist yaw</b> — from <code>objects.yaml</code>, baked into the precomputed waypoints</li>
+<li><b>Bin-aware release</b> — descend to <code>rim_z + 0.03</code>, not to a plate surface</li>
+<li><b>Per-object attach</b> — if A8 applies, attach the <i>named</i> object</li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">8.3 Why release from 3 cm above the rim</h3>
+<p class="prose">Three reasons; the third is the one that bites.</p>
+<ol class="prose">
+<li>Descending into the bin drives the finger pads against the bin walls</li>
+<li>A short drop settles the object flat rather than balanced on an edge</li>
+<li><b>If the weld is in use, detaching while the object is in contact with the bin floor can produce a solver impulse</b> — the same class of event that punted an object 4 cm laterally in the previous acquisition. Detach in free space and let it fall three centimetres.</li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">8.4 Timing constraints, unchanged and not optional</h3>
+<div class="table-wrap"><table><thead><tr><th>Constraint</th><th>Value</th><th>Consequence if violated</th></tr></thead><tbody><tr><td>Command cooldown</td><td>200 ms minimum</td><td>5 Hz ceiling; faster and commands are silently dropped</td></tr><tr><td>Gripper actuation interval</td><td>~1.6 s</td><td>~0.6 Hz. The gripper, not the arm, is the slowest link</td></tr><tr><td>Real-time factor, the laptop of Part 0.2</td><td>0.344 (median)</td><td>A 25 s episode is ~73 s of motion; a full episode ~160 s</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Definition of done for Part 8</h3>
+<p class="prose">One episode per object — four in total — runs start to finish without intervention, each ending with its object in its matching bin.</p>
+<p class="prose">Four smoke-test episodes take well under an hour. It is worth it: never start the batch on a pipeline that has not been seen to complete once per object. The cylinder in particular must be exercised before the batch.</p>
+</section>
+<section class="block" id="part-9-step-8-per-episode-verification"><h2>Part 9 — Step 8: Per-episode verification</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">9.1 The checks carried forward</h3>
+<ul class="prose">
+<li><b><code>rc = 0</code></b> — the sequence script exited cleanly</li>
+<li><b><code>grasp_held</code></b> — <code>dz</code> between end-effector and object constant through LIFT and TRANSPORT, within 5 mm</li>
+<li><b><code>rise ≥ 0.05 m</code></b> — the object actually left the table</li>
+</ul>
+<p class="prose">Note for the report: if A8 applies, <code>grasp_held</code> is true <b>by construction</b> — the object is welded, so <code>dz</code> cannot vary. It remains a valid check that the object was <i>carried</i>, and an invalid one that it was <i>grasped</i>. Phrase it accordingly in every written output: <i>“the object was carried and placed, under a labelled simulated attachment”</i>, never <i>“grasp verified”</i>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">9.2 The check this task requires and the previous one did not</h3>
+<p class="prose"><b>Was it the <i>right</i> bin?</b></p>
+<p class="prose">The previous acquisition had one destination, so “placed” and “placed correctly” were the same question. They are now different, and the wrong-bin failure is <b>invisible to every check in 9.1</b>: the object was grasped, carried, and released into <i>a</i> bin. Every numeric criterion passes. The episode is wrong anyway, and the instruction attached to it is false.</p>
+<p class="prose"><b>An episode with a false instruction is worse than no episode.</b> It teaches the model the opposite of the task, and it does so with the same confidence as a correct one.</p>
+<pre># scripts/checks.pyimport mathdef placed_in_correct_bin(target, cfg, obj_pose, tol=0.005):    """Inside its OWN bin footprint, and below the rim — not resting on it."""    b = cfg["bins"][cfg["objects"][target]["bin"]]    dx, dy = obj_pose[0] - b["pose"][0], obj_pose[1] - b["pose"][1]    inside  = math.hypot(dx, dy) &lt;= (b["inner_radius"] - tol)    settled = obj_pose[2] &lt;= b["rim_z"]    return inside and settled, {"inside": inside, "below_rim": settled}def landed_in_wrong_bin(target, cfg, obj_pose):    """Explicitly detect the silent failure."""    own = cfg["objects"][target]["bin"]    for bn, b in cfg["bins"].items():        if bn == own:            continue        if math.hypot(obj_pose[0] - b["pose"][0],                      obj_pose[1] - b["pose"][1]) &lt;= b["inner_radius"]:            return bn    return None</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">9.3 Were the distractors disturbed?</h3>
+<p class="prose">An episode in which the gripper knocked the blue cube across the table while fetching the red one is a poor demonstration: the frames show motion the instruction does not describe.</p>
+<pre>def distractors_undisturbed(target, start_poses, end_poses, tol=0.02):    moved = []    for name, p0 in start_poses.items():        if name == target:            continue        d = math.dist(p0[:2], end_poses[name][:2])        if d &gt; tol:            moved.append([name, round(d, 4)])    return (not moved), moved</pre>
+<p class="prose">Treat a disturbed distractor as a <b>warning, not a hard failure</b>. Record it; decide at dataset-assembly time whether to exclude. Real demonstrations contain incidental contact. What must never be recorded is a <i>mislabelled</i> episode.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">9.4 The episode verdict file</h3>
+<pre>{  "episode": 27,  "target": "green_cylinder",  "task_index": 2,  "instruction": "pick up the green cylinder and place it in the green bin",  "expected_bin": "green_bin",  "rc": 0,  "grasp_held": true,  "rise_m": 0.132,  "placed_in_correct_bin": true,  "landed_in_wrong_bin": null,  "distractors_moved": [["yellow_box", 0.031]],  "simulated_attachment": true,  "attach_target_link": "link6",  "camera": "table_camera",  "split": "train",  "rtf_observed": 0.271,  "wall_seconds": 312,  "sim_seconds": 84.6,  "host_role": "B",  "world_sha256": "…",  "verdict": "PASS"}</pre>
+<p class="prose"><code>simulated_attachment</code> appears in every record whatever Part 3 decided. If the physical grasp was adopted it is <code>false</code>, and that single field becomes the most valuable line in the file.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">9.5 Test the verifier against a known-bad episode</h3>
+<p class="prose">A verifier that has never rejected anything is not a verifier.</p>
+<pre># deliberately mis-target: fetch the red cube, aim at the blue binpython3 scripts/run_pick_and_place.py --episode 901 --target red_cube \        --force-bin blue_bin --log /tmp/bad.csv --meta /tmp/bad.jsonpython3 scripts/verify_episode.py /tmp/bad.json \  &amp;&amp; echo "FAIL: verifier accepted a wrong-bin episode" \  || echo "OK: verifier rejected it"</pre>
+<p class="prose">Do the same for a no-lift case and for a disturbed-distractor case. Three deliberate failures, three correct rejections, before the batch runs.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">9.6 Batch status reporting</h3>
+<p class="prose">Extend the ground-truth status script — which reads the filesystem, never the agent’s or the operator’s memory — to break down by object and split:</p>
+<pre>=== status.sh — read at ===  UTC:          2026-09-__ __:__:__ UTC  Europe/Paris: 2026-09-__ __:__:__ CEST=== per-object status ===red_cube        12/12 train   3/3 heldout   OKblue_cube       12/12 train   3/3 heldout   OKgreen_cylinder  11/12 train   3/3 heldout   1 FAILED  (grasp_held=false, ep 34)yellow_box      12/12 train   2/3 heldout   1 WRONG_BIN (ep 58 -&gt; green_bin)=== totals (counted above, not asserted) ===  PASSED=57  FAILED=1  WRONG_BIN=1  MISSING=1  (sum=60 of 60)=== most recently modified episode folder ===  ep_058, 7 minutes ago=== container uptime vs wall-clock elapsed (reveals a host suspend) ===  GAP: +0s — no evidence of a suspend since container start</pre>
+<p class="prose">Three properties of this output are deliberate and must be preserved:</p>
+<ol class="prose">
+<li><b>Both clocks, labelled.</b> Mixing UTC and local time without saying which produced a genuine, hours-long contradiction during the previous acquisition.</li>
+<li><b><code>counted above, not asserted</code>.</b> The total is computed from the list printed immediately above it. A hand-written total produced an off-by-one error in the previous acquisition.</li>
+<li><b>Uptime versus wall clock.</b> A large positive gap proves the host suspended. Several apparent multi-hour “stalls” in the previous acquisition were the host sleeping, and effort was spent hardening scripts against a hang that never occurred.</li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Definition of done for Part 9</h3>
+<p class="prose">Every check implemented, and all three deliberate failure cases correctly rejected.</p>
+</section>
+<section class="block" id="part-10-step-9-contracts-recording-and-d"><h2>Part 10 — Step 9: Contracts, recording and dataset assembly</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">10.1 The two contracts</h3>
+<ul class="prose">
+<li><code>contracts/mycobot_sorting.yaml</code> — table camera, 48 training episodes</li>
+<li><code>contracts/mycobot_sorting_heldout.yaml</code> — second camera, 12 held-out episodes</li>
+</ul>
+<p class="prose">Both must include the <b>gripper joint</b> in <code>observation.state</code> and <code>action</code>. A sorting policy that cannot command the gripper cannot perform the task. The previous acquisition added this to its contracts; carry it forward.</p>
+<p class="prose"><b>And both must exclude object poses from <code>observation.*</code></b> — see A5. Ground truth belongs in the episode metadata only. Verify explicitly:</p>
+<pre>for c in contracts/mycobot_sorting*.yaml; do  echo "== $c"  grep -A20 'observation' "$c" | grep -iE "cube|cylinder|box|bin|model_pose" \    &amp;&amp; echo "  FATAL: ground truth is leaking into the observation stream" \    || echo "  observation stream clean"done</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">10.2 Recorder bring-up, with the fixes already paid for</h3>
+<p class="prose">Three hard-won details from the previous acquisition:</p>
+<p class="prose"><b>Use the non-daemon lifecycle form.</b> The <code>ros2 lifecycle</code> CLI reports “node not found” for a recorder that has in fact started, because of a stale daemon cache. This cost three failed attempts and roughly 1 h 49 min on a single episode.</p>
+<pre>ros2 lifecycle set --no-daemon --spin-time 15 /episode_recorder configureros2 lifecycle set --no-daemon --spin-time 15 /episode_recorder activate</pre>
+<p class="prose">Never use the bare form.</p>
+<p class="prose"><b>Never wait on an exit-marker file alone.</b> A watcher that polls only for a success sentinel cannot distinguish “still working” from “process killed”, and it will always report the reassuring one. The previous acquisition lost an entire night to a watcher polling for a marker that a dead process would never write.</p>
+<pre>wait_for() {                       # usage: wait_for &lt;pid&gt; &lt;marker&gt; &lt;timeout_s&gt;  local pid=$1 marker=$2 deadline=$(( $(date +%s) + $3 ))  while [ ! -f "$marker" ]; do    kill -0 "$pid" 2&gt;/dev/null || { echo "PROCESS DIED before marker"; return 2; }    [ "$(date +%s)" -gt "$deadline" ] &amp;&amp; { echo "TIMEOUT"; return 3; }    sleep 2  done  return 0}</pre>
+<p class="prose"><b>Bound every step.</b> Each <code>ros_gz_sim create</code> gets a 90 s timeout; each attempt gets a 25-minute watchdog; the recorder configure step is retried once with a 60 s cap. A normal attempt takes about 3 minutes on the laptop of Part 0.2.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">10.3 Per-episode clean restart</h3>
+<p class="prose">Restart the whole simulation stack for every episode. It costs bring-up time and it buys reproducibility. The previous acquisition documented <code>move_group</code> entering a stuck <code>executing</code> state after a leftover trajectory, silently failing every subsequent motion — a restart is the only reliable remedy, and detecting the condition mid-batch is harder than avoiding it.</p>
+<pre># scripts/episode.sh (structure)#   1. kill the stack        pkill gz sim / move_group / robot_state_publisher#   2. relaunch sim          + wait for all controllers 'active'#   3. spawn_scene.py        bins, then all four objects, then settle#   4. launch move_group     + wait for readiness in its log#   5. recorder configure/activate   (--no-daemon --spin-time 15)#   6. run_pick_and_place.py --record#   7. verify_episode.py     -&gt; PASS / FAIL / WRONG_BIN#   8. stage timestamps to  /workspace/stage_&lt;idx&gt;.log  (OUTSIDE the episode#      folder, so a retry that deletes the folder does not erase the evidence)</pre>
+<p class="prose">That last point matters: when the previous acquisition retried a failed episode, the retry deleted the folder containing the evidence of why it failed, making the root cause unrecoverable.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">10.4 Dataset layout</h3>
+<pre>datasets/├── mycobot_sorting_train/               # 48 episodes, table camera│   ├── meta/info.json│   ├── meta/episodes.jsonl│   ├── meta/tasks.jsonl                 # exactly the four tasks from Part 5.4│   ├── data/chunk-000/episode_XXX.parquet│   └── videos/chunk-000/observation.images.table/episode_XXX.mp4└── mycobot_sorting_heldout/             # 12 episodes, second camera    └── … same structure …</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">10.5 Convert without PyTorch</h3>
+<pre>python3 scripts/port_bag.py --out datasets/mycobot_sorting_train \        --matrix config/episode_matrix.csv --split trainpython3 scripts/port_bag.py --out datasets/mycobot_sorting_heldout \        --matrix config/episode_matrix.csv --split heldout</pre>
+<p class="prose"><b>This is settled and must not be revisited.</b> The LeRobot layout is parquet, MP4 and JSON; <code>pyarrow</code> and <code>ffmpeg</code> produce all of it. PyTorch is required to <i>train</i>, not to <i>serialise</i>. The previous acquisition lost a night installing a 999 MB CPU build of PyTorch into a container directory that was subsequently destroyed by a container restart — twice, because the virtual environment lived inside the container filesystem rather than on a mounted path.</p>
+<p class="prose"><b>Corollary:</b> anything that must survive a container restart goes on the mounted path beside the episodes, never in the container filesystem.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">10.6 Validation is deferred — say so</h3>
+<p class="prose">The on-disk layout is written to the documented specification but is <b>not proven to load</b> until opened by the real <code>LeRobotDataset</code> class on a machine that has PyTorch. State this plainly in the README rather than implying validation has occurred.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">10.7 The README carries the caveats</h3>
+<p class="prose">Whoever trains on this dataset in three months will read the README and nothing else. Its first paragraph must state:</p>
+<ol class="prose">
+<li>Whether the grasp is <b>physical</b> or a <b>labelled simulated attachment</b> (Part 3’s verdict)</li>
+<li>That the demonstrator used <b>ground-truth object poses</b>, not perception</li>
+<li>That motion is <b>scripted</b>, not teleoperated</li>
+<li>The train / held-out split and <b>which condition</b> is held out</li>
+<li>That sixty episodes is a <b>smoke test with real task semantics, not a training set</b></li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">10.8 Storage</h3>
+<p class="prose">The previous acquisition’s twenty episodes were 1.7 GB of bags. Sixty will approach <b>5 GB</b>, plus converted output.</p>
+<pre>df -h .          # before starting anything</pre>
+<p class="prose">Bags stay out of version control and are regenerable from <code>batch.sh</code>; only the <code>datasets/</code> directories need to leave the container — a far smaller transfer.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Definition of done for Part 10</h3>
+<p class="prose">Both datasets written, <code>meta/tasks.jsonl</code> containing exactly four tasks, every episode’s <code>task_index</code> matching its instruction, observation streams verified free of ground truth, README carrying all five caveats.</p>
+</section>
+<section class="block" id="part-11-running-the-acquisition-on-one-m"><h2>Part 11 — Running the acquisition on one machine</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">11.1 The work, in order</h3>
+<p class="prose">One person does all of it, on the laptop of Part 0.2: first everything that does not step physics continuously, then the smoke test, then the batch.</p>
+<div class="table-wrap"><table><thead><tr><th>Part</th><th>Work</th><th>What it needs</th></tr></thead><tbody><tr><td>1</td><td>Assumption verification</td><td>File inspection</td></tr><tr><td>2</td><td>World identification</td><td>grep, find, sha256sum</td></tr><tr><td>3</td><td>Grasp decision</td><td>One bounded run; escalate on failure</td></tr><tr><td>4</td><td>Object manifest</td><td>XML parsing, one short spawn probe</td></tr><tr><td>5</td><td>Task definition</td><td>YAML and JSON generation</td></tr><tr><td>6</td><td>Episode matrix</td><td>Arithmetic and constraint checking</td></tr><tr><td>6.5</td><td>Reachability sweep</td><td>moveit_py + robot model, no physics stepping</td></tr><tr><td>7</td><td>Waypoint precompute</td><td>Same — no simulator</td></tr><tr><td>8</td><td>Sequence script</td><td>Editing Python</td></tr><tr><td>8</td><td>Smoke test: 4 episodes</td><td>One per object; about 3 min each</td></tr><tr><td>9</td><td>Verification logic</td><td>Unit-tested against synthetic poses</td></tr><tr><td>10</td><td>Contracts, README, conversion</td><td>Text and file transformation</td></tr><tr><td>11</td><td>The 60-episode batch</td><td>About 2.7 h unattended, host sleep disabled</td></tr><tr><td>12–13</td><td>The report</td><td>Text</td></tr></tbody></table></div>
+<p class="prose">About 80% of the work by effort, and all of the design, needs no running simulator; only the smoke test and the batch step physics continuously.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">11.2 What needs the machine's full capacity</h3>
+<div class="table-wrap"><table><thead><tr><th>Work</th><th>Why</th></tr></thead><tbody><tr><td>The 60-episode batch</td><td>About 2.7 h at a median real-time factor of 0.344, with memory headroom needed throughout (11.3)</td></tr><tr><td>Graphical verification</td><td>The GUI launch file under WSLg with software OpenGL; the GPU path renders spawned objects white</td></tr><tr><td>Part 3 grasp evaluation, if it requires iteration</td><td>A tuning loop is many full simulator runs</td></tr><tr><td>Bag storage — ~8 GB</td><td>The container's disk; the converted datasets/ are ~19 MB</td></tr><tr><td>Any correspondence with the physical bench</td><td>Hardware access, which the laptop does not have</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">11.3 Why memory headroom is not optional</h3>
+<p class="prose">Restating A10’s second argument, because it is the one that matters: the previous acquisition, run on a memory-constrained machine, produced results that cannot both be true — a gripper tip offset of 0.105 m recorded as “touched the object” and 0.100 m as “never touched it”. Lowering a target by five millimetres cannot cause contact to cease.</p>
+<p class="prose">That was memory pressure presenting as physics. Two days were spent tuning contact geometry against a simulator being dismembered underneath the experiment, and the resulting “measurements” were noise.</p>
+<p class="prose">A four-object, four-bin world has substantially more collision pairs than a single block and a static plate. Running the batch without memory headroom does not risk being slow. It risks being wrong in a way that looks like data.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">11.4 The package</h3>
+<p class="prose">The project directory contains exactly this, and nothing requiring explanation:</p>
+<pre>Four_Object_Sorting_Acquisition/├── RUNNING.md                    # three commands; expected output; success criteria├── preflight.sh                  # environment check, pass/fail, run FIRST├── config/│   ├── WORLD_PATH                # one line: the chosen world│   ├── objects.yaml              # geometry, grasp params, instructions, bins│   ├── gripper_frame.yaml        # measured fingertip offsets│   ├── episode_matrix.csv        # 60 rows: target, positions, camera, split│   ├── waypoints.json            # 420 pre-solved, elbow-up, branch-consistent│   ├── tasks.jsonl               # the four instructions│   └── reach_map.csv             # the measured reachable envelope├── scripts/│   ├── spawn_scene.py            # 4 objects + 4 bins, collision-checked│   ├── run_pick_and_place.py     # per-object sequence│   ├── episode.sh                # one episode, clean restart, watchdog│   ├── batch.sh                  # 1..60, 3 retries each│   ├── verify_episode.py         # PASS / FAIL / WRONG_BIN│   ├── status.sh                 # per-object, per-split ground truth│   ├── track_grasp.py            # pose logger│   ├── grab_frame.py             # headless camera capture│   └── port_bag.py               # bag -&gt; LeRobot, no PyTorch├── contracts/│   ├── mycobot_sorting.yaml│   └── mycobot_sorting_heldout.yaml├── models/                       # local copies or symlinks, as spawned└── doc/    ├── WORLD_SELECTION.md        # Part 2 verdict, with hash    ├── GRASP_DECISION.md         # Part 3 verdict, with CSV evidence    └── ASSUMPTIONS.md            # Part 1 register, annotated with outcomes</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">11.5 <code>RUNNING.md</code> — what it must contain</h3>
+<p class="prose">Three commands, and nothing else above the fold.</p>
+<pre># Running the four-object sorting acquisition## 1. Check the environment    bash preflight.shExpect `PREFLIGHT PASSED`. If not, stop — the failing line names the cause.## 2. Run the batch                       (~5–8 hours)    bash scripts/batch.sh 1 60Restarts the simulator per episode, up to 3 attempts each, 25-minutewatchdog per attempt. Safe to leave unattended.IMPORTANT: disable system sleep first — a suspended host presents as a stall.    powercfg /change standby-timeout-ac 0      (in Windows PowerShell, as admin)## 3. Check progress or the result — any time, in a separate terminal    bash scripts/status.sh## Success looks like    PASSED=60  FAILED=0  WRONG_BIN=0  MISSING=0  (sum=60 of 60)and 15 per object across train + heldout.## If an episode fails three times`status.sh` names it. Its stage log is at /workspace/stage_&lt;idx&gt;.log,outside the episode folder, so a retry cannot erase it. Send that file back.## What to returnEither `datasets/` (small) or the bags under /workspace/episodes/ (~5 GB).</pre>
+<p class="prose">If starting the batch needs a seven-step walkthrough, the package has failed.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">11.6 <code>preflight.sh</code></h3>
+<p class="prose">No one should discover a missing dependency forty minutes into a batch.</p>
+<pre>#!/usr/bin/env bash# preflight.sh — verify this host can run the batch. Read-only. Exit 1 on failure.fail=0chk(){ printf '%-46s' "$1"; shift       if "$@" &gt;/dev/null 2&gt;&amp;1; then echo "OK"; else echo "FAIL"; fail=1; fi; }chk "container image present"        docker images --format '{{.Repository}}' \                                        --filter reference=gazebo_to_lerobotchk "ROS 2 Jazzy present"            test -f /opt/ros/jazzy/setup.bashchk "Gazebo (gz) on PATH"            which gzchk "ros_gz_sim create available"    bash -c 'ros2 pkg executables ros_gz_sim | grep -q create'chk "moveit_py importable"           python3 -c 'import moveit'chk "pyarrow importable"             python3 -c 'import pyarrow'chk "ffmpeg present"                 which ffmpegchk "config/WORLD_PATH readable"     test -s config/WORLD_PATHchk "target world file exists"       bash -c 'test -f "$(cat config/WORLD_PATH)"'chk "objects.yaml validates"         python3 scripts/validate_objects.pychk "60 episodes in matrix"          bash -c '[ $(($(wc -l &lt; config/episode_matrix.csv)-1)) -eq 60 ]'chk "420 waypoints solved"           python3 scripts/check_waypoints.pychk "tasks.jsonl has 4 tasks"        bash -c '[ $(wc -l &lt; config/tasks.jsonl) -eq 4 ]'chk "RAM &gt;= 16 GB"                   bash -c '[ $(free -g | awk "/^Mem:/{print \$2}") -ge 16 ]'chk "free disk &gt;= 20 GB"             bash -c '[ $(df -BG --output=avail . | tail -1 | tr -dc 0-9) -ge 20 ]'echoif [ $fail -eq 0 ]; then echo "PREFLIGHT PASSED"; else  echo "PREFLIGHT FAILED — do not start the batch"; fiexit $fail</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">11.7 The order of execution</h3>
+<ol class="prose">
+<li>Complete Parts 1–10 and the four smoke-test episodes, then assemble §11.4.</li>
+<li>Write one sentence stating what the smoke test proved and what remains unproven.</li>
+<li>Run <code>preflight.sh</code>, then <code>batch.sh 1 60</code>, then <code>status.sh</code>.</li>
+<li>Convert to the <code>datasets/</code> directories; the raw bags stay in the container.</li>
+<li>Verify with <code>status.sh</code> and write the report.</li>
+</ol>
+<p class="prose">Step 3 is a single command. That is the entire objective of the package.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">11.8 Be honest about what cannot be guaranteed</h3>
+<p class="prose">The pipeline cannot be promised to work on hardware it has never run on. What can be promised, and should be said in these terms:</p>
+<ul class="prose">
+<li>It executes inside the <b>same container image</b>, so the software environment is identical</li>
+<li><b><code>preflight.sh</code> catches environment differences before the batch</b>, not during it</li>
+<li>The graphical path is the one most likely to fail on a new host: headless runs (<code>gz sim -s</code>) do not exercise it</li>
+<li>The first graphical run on a new host should be short and watched, because display passthrough from a container to a Windows host is precisely the class of problem that scripting does not anticipate</li>
+</ul>
+<p class="prose">Stating the third point before it is discovered the hard way is worth more than being right by luck.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">11.9 Host sleep — configure it out before the batch</h3>
+<p class="prose">Several apparent multi-hour stalls in the previous acquisition were the host suspending, visible as a jump between wall-clock time and the container’s monotonic uptime. Before an unattended batch, on the Windows host, in an elevated PowerShell:</p>
+<pre>powercfg /change standby-timeout-ac 0powercfg /change hibernate-timeout-ac 0powercfg /change monitor-timeout-ac 15</pre>
+<p class="prose">The display still sleeps; the machine does not. <code>status.sh</code> reports the uptime gap so a suspend, if it happens anyway, is visible rather than mysterious.</p>
+</section>
+<section class="block" id="part-12-what-this-does-not-prove"><h2>Part 12 — What this does not prove</h2>
+<p class="prose">Volunteering the limits is what makes the rest credible.</p>
+<p class="prose"><b>If the weld is retained: the carry is not a grasp.</b> A policy trained on this learns <i>approach, close near the object, carry, open</i> — not the physics of grasping. It is labelled in code, in logs, in every episode’s metadata and in the README.</p>
+<p class="prose"><b>If a physical grasp is adopted: it is still rigid-body contact with tuned friction.</b> The physical gripper is an adaptive unit that stalls on the object at an angle that is not the commanded one — 52° measured for a command of 20°. None of that is modelled.</p>
+<p class="prose"><b>The demonstrator used ground-truth poses.</b> Correct and deliberate — but it means the dataset contains no perception failures, no partial-occlusion recoveries, and no cases where the object was not where the camera believed it to be. Real deployment contains all three.</p>
+<p class="prose"><b>Object selection was scripted, not perceived.</b> The demonstrator always reaches the correct object because it was told which one. The <i>policy</i> must learn selection from pixels and language, but the dataset contains no examples of a demonstrator hesitating, disambiguating or correcting. Selection is the hard part of this task, and the data shows only its solved form.</p>
+<p class="prose"><b>Two limitations a learned policy inherits that the classical pipeline does not.</b> Both are first-party measurements from this project:</p>
+<ul class="prose">
+<li><i>Approach direction.</i> Mixing approach directions costs <b>5.918 mm</b>, roughly seven times the worst single-side repeatability. The classical pipeline avoids this by construction — it always descends from above. A policy emitting Cartesian or joint actions has no such guarantee and will reproduce whatever the demonstrations contained. Constraining the action space, or enforcing unidirectional approach at recording time, is not optional.</li>
+<li><i>Frame corruption.</i> One camera frame in sixty arrives corrupted and reports a position <b>17.5 mm</b> wrong. The classical pipeline defends with a six-frame median, taking worst-case error from 17.5 mm to 0.8 mm. A policy consuming single raw frames at inference has <b>no such filter</b> and will act on the bad frame.</li>
+</ul>
+<p class="prose"><b>Sim-trained data carries a visual domain gap.</b> The project’s own pose-estimation result is the evidence: 10.9% real-image detection from synthetic-only training, rising to 91.6% only after mixing real data with ×5 oversampling. Mixing beats scaling, and that applies here.</p>
+<p class="prose"><b>Sixty episodes is not a training set.</b> The community figure for fine-tuning is 100–500 episodes <i>per task</i>. This is four tasks × fifteen. It is a smoke test with real semantics and a real held-out condition, not a dataset ready to train on.</p>
+<p class="prose"><b>What it does prove, precisely:</b> that the pipeline produces task-grounded episodes in the project’s real ArUco-calibrated world, with four distinct instructions whose language is load-bearing, verified per episode including correct-bin placement, split against an unseen condition — and that all of it except the batch run itself is feasible on commodity hardware.</p>
+</section>
+<section class="block" id="part-13-what-to-measure"><h2>Part 13 — What to measure</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">13.1 Why the 0.63 mm figure is the wrong target</h3>
+<p class="prose">Per A12. That figure is the converged accuracy of a <b>closed-loop classical pipeline</b> after two visual correction passes — 10.79 mm open loop, 1.29 mm after one correction, 0.63 mm after two, with 18 of 20 trials under 1 mm. It measures how precisely a system converges on a commanded metrology point when permitted to look, correct and look again.</p>
+<p class="prose">A vision-language-action policy does none of that at inference. It emits actions from pixels and language, open loop, with no metrology target and no correction cycle. Holding it to a servoing figure measures a different quantity and reports the mismatch as failure.</p>
+<p class="prose">Its legitimate place is as the measured performance of the current production architecture — the system a learned policy would eventually have to match or complement — quoted honestly as what it is.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">13.2 The metric set for this dataset</h3>
+<div class="table-wrap"><table><thead><tr><th>Metric</th><th>Definition</th><th>Reference value</th></tr></thead><tbody><tr><td><b>Task success rate</b></td><td>Correct object, correct bin, per episode</td><td>Scripted demonstrator: 100% by construction</td></tr><tr><td><b>Correct-bin rate</b></td><td>Of successful grasps, the fraction landing in the <i>right</i> bin</td><td>The language-following measure</td></tr><tr><td><b>Held-out-condition success</b></td><td>Success rate under the unseen camera</td><td>The generalisation measure</td></tr><tr><td><b>Placement margin</b></td><td>Object centre to bin centre, as a fraction of inner radius</td><td>Centimetres, not millimetres</td></tr><tr><td><b>Distractor disturbance rate</b></td><td>Episodes where a non-target object moved &gt; 2 cm</td><td>Demonstration cleanliness</td></tr><tr><td><b>Episode yield</b></td><td>Clean episodes per attempt</td><td>Pipeline reliability; feeds scheduling</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">13.3 Why correct-bin rate is the headline</h3>
+<p class="prose"><b>It is the only metric that distinguishes a policy that reads the instruction from one that ignores it.</b> A policy discarding the language stream ceilings at 25% — chance across four bins. No millimetre figure can reveal that, and it is the precise question the four-object exercise exists to make answerable.</p>
+<p class="prose">Report it alongside overall success rate, never instead of it: a policy can achieve high grasp success and chance-level bin selection, and those are very different failures with very different remedies.</p>
+</section>
+<section class="block" id="appendix-a-order-of-work"><h2>Appendix A — Order of work</h2>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Step</th><th>Effort</th><th>Done when</th></tr></thead><tbody><tr><td>1</td><td>Walk the assumption register</td><td>2 h</td><td>Every assumption confirmed or failed in writing</td></tr><tr><td>2</td><td>Identify the target world</td><td>2 h</td><td>WORLD_PATH + WORLD_SELECTION.md with hash</td></tr><tr><td>3</td><td>Grasp decision gate</td><td>1 day, hard cap</td><td>GRASP_DECISION.md with CSV evidence</td></tr><tr><td>4</td><td>Object manifest from real SDF values</td><td>3 h</td><td>validate_objects.py exits 0</td></tr><tr><td>5</td><td>Task definition, tasks.jsonl</td><td>1 h</td><td>Four instructions frozen, generated not typed</td></tr><tr><td>6</td><td>Reachability sweep + episode matrix</td><td>4 h</td><td>60 rows, all layouts valid, second camera confirmed</td></tr><tr><td>7</td><td>Waypoint precompute</td><td>4 h</td><td>check_waypoints.py exits 0</td></tr><tr><td>8</td><td>Extend spawn and sequence scripts</td><td>5 h</td><td>Runs for all four objects</td></tr><tr><td>9</td><td>Verification incl. wrong-bin check</td><td>4 h</td><td>Three deliberate failures correctly rejected</td></tr><tr><td>10</td><td>Smoke test — one episode per object</td><td>1 evening</td><td>Four episodes pass end to end, cylinder included</td></tr><tr><td>11</td><td>preflight.sh, RUNNING.md, package</td><td>3 h</td><td>Preflight passes locally</td></tr><tr><td>12</td><td>The 60-episode batch</td><td>5–8 h wall</td><td>status.sh shows 60/60, 15 per object</td></tr><tr><td>13</td><td>Convert, README, report</td><td>4 h</td><td>Two datasets, five caveats stated</td></tr></tbody></table></div>
+<p class="prose">Total: roughly one week of work, plus about three hours of unattended machine time for the batch.</p>
+<p class="prose"><b>Begin with steps 1–3.</b> A day and a half determines which world is the target, whether a physical grasp is available at no cost, and therefore whether this deliverable is qualitatively stronger than its predecessor or merely broader.</p>
+</section>
+<section class="block" id="appendix-b-items-to-refer-to-the-robotic"><h2>Appendix B — Items to refer to the robotics team</h2>
+<ol class="prose">
+<li><b>The world conflict (A1, Part 2).</b> Resolve on disk first, then report which of the two premises matched reality. If merging four objects into the ArUco world is required, that is a new work item and needs an owner.</li>
+<li><b>The reference pipeline’s grasp mechanism (A4, Part 3).</b> If it is genuinely physical, should the dataset be cut with it, superseding the simulated-attachment decision?</li>
+<li><b>The second camera (Part 6.4).</b> Does the target world contain one? If not, which of the three options in 6.4 is preferred? A held-out camera that does not exist is a held-out set that does not exist.</li>
+<li><b>Bin static-ness (Part 4.4).</b> If any bin is dynamic, is a local static override acceptable for acquisition, or should placement be evaluated against poses recorded at episode start?</li>
+<li><b>Object-detector licensing.</b> The detector in use is built on a framework distributed under AGPL-3.0 with a paid enterprise alternative. This does not affect the acquisition — the demonstrator uses ground truth, per A5 — but it belongs in any industrial-limitations analysis, in the same category as previously identified non-commercial model licences. Raise with whoever handles licensing rather than asserting it as a blocker.</li>
+<li><b>Long-term storage of the bags (Part 10.8).</b> Approximately 5 GB, regenerable from <code>batch.sh</code>, excluded from version control. Confirm that policy explicitly.</li>
+<li><b>Machine time for the batch (A10).</b> About three hours, uninterrupted, with host sleep disabled; no other machine is needed.</li>
+</ol>
+</section>
+<section class="block" id="appendix-c-implementation-record-added-2"><h2>Appendix C — Implementation record (added 2026-10-04)</h2>
+<p class="prose">The parts above are unchanged. This appendix records how the specification was implemented on 2–4 October 2026, and every place where the implementation departed from it, with the reason and the evidence. Full detail: <code>doc/FOUR_OBJECT_SORTING_REPORT</code> (addendum §16–28) and <code>MEASUREMENTS.md</code>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">C.1 Outcome</h3>
+<ul class="prose">
+<li>Smoke test (Part 8, Appendix A row 10): episodes 1, 16, 43, 46 PASS on 2026-10-03.</li>
+<li>Batch (Appendix A row 12): 60 episodes under one code version (<code>f977d7af65dc</code>), <b>60/60 PASS on the first attempt</b>, zero trajectory re-sends, camera frames complete in every episode, circuit breaker never fired.</li>
+<li>Datasets (Part 10): <code>mycobot_sorting_train</code> 48 episodes, 29 687 frames; <code>mycobot_sorting_heldout</code> 12 episodes, 7 411 frames; 320×240 at 30 fps, LeRobot v3.0, written by LeRobot's own writer and <b>loaded by the real <code>LeRobotDataset</code> class under lerobot 0.4.4</b> (provisional pin: the current release, to be confirmed against the version the team trains with). A SmolVLA CPU smoke-train (<code>lerobot/smolvla_base</code>, batch 1, 10 steps) ran with a finite loss at every step.</li>
+<li><b>Correction, 2026-10-05:</b> this appendix first gave 29 735 / 7 423 frames, from a hand-written conversion of 2026-10-04 that did not load. Redone with LeRobot's own writer: 29 687 / 7 411, one frame fewer per episode. Why: action one frame early (<code>action[t]</code> equal to <code>state[t]</code>), wall-clock timestamps, a different camera key per split, no statistics.</li>
+<li>Two launch files run any one episode, with the Gazebo GUI or headless with a pass/fail exit code.</li>
+</ul>
+<h3 style="margin-top:26px;font-size:1.1rem">C.2 Departures from the specification</h3>
+<div class="table-wrap"><table><thead><tr><th>Clause</th><th>Spec says</th><th>Implemented</th><th>Why, and evidence</th></tr></thead><tbody><tr><td>A8, 3.6</td><td>Simulated attachment sanctioned.</td><td>Retained: one DetachableJoint per object, each with its own topics; every attach and detach confirmed by the plugin's own state report and re-published if unconfirmed.</td><td>The plugin welds on load (the arm could not leave HOME) and ignores a detach that arrives before it creates the joint (held-out episode 13).</td></tr><tr><td>A10, Part 11</td><td>The batch runs on a separate high-performance workstation (version of 2026-09-23).</td><td>Everything ran on one WSL2 laptop (7.8 GB visible to WSL, i7-11370H); the 60-episode batch took ~2.7 h. The specification was revised accordingly (Part 0.2).</td><td>The memory symptoms A10 warns about did not occur: frames complete, no re-sends, 60/60 first-attempt PASS under one code version.</td></tr><tr><td>2.5, 4</td><td>World real_table.sdf with its objects.</td><td>worlds/sorting_table.sdf: the same bench with no objects or bins; spawn_scene.py places all four objects and four bins per episode.</td><td>real_table.sdf carries one red cube and one red bin only.</td></tr><tr><td>4.5</td><td>Bins as in the world: 100 mm.</td><td>80 mm square opening, 3 mm walls, 86 mm outer; blue bin moved to (0.24, 0.01).</td><td>100 mm bins interpenetrate (red/green walls 15 mm): tilted landings, false WRONG_BIN. A 70 mm opening failed the placement probe.</td></tr><tr><td>6.2, 6.4</td><td>Held-out split on a second camera.</td><td>Option 2 of 6.4: a reserved configuration of the table camera (heldout_oblique), on the same topic /camera/image_raw.</td><td>No second sensor or bridge needed; the condition is never seen in training.</td></tr><tr><td>6.5, 6.6</td><td>Reachable envelope; positions must not collide.</td><td>Target positions restricted to lift J2 ≤ 48° (blue base x 0.10 → 0.120, green 0.10 → 0.135); non-target objects 120 mm from the robot axis, footprints on the board and 5 mm outside every bin's real square.</td><td>Folded lift poses fail loaded only (simulation collision defect, not sag); the robot base has no collision at table height; a circle keep-out missed the bins' corners.</td></tr><tr><td>7.3</td><td>Release yaw not specified.</td><td>The place column is solved with the gripper's world yaw constrained so boxes land square to the bin (0/90/180/270° cubes, 90/270° yellow box; cylinder free).</td><td>The cube lands at the gripper's world yaw at release, mod 90°; with a free yaw a 50 mm cube spans up to 70.7 mm and no bin size fits.</td></tr><tr><td>7.4</td><td>420 IK solves (60 × 7).</td><td>360 (60 × 6): HOME is a fixed joint constant.</td><td>Arithmetic in 7.4, confirmed with the author on 2026-09-23.</td></tr><tr><td>8.2, 10.3</td><td>Sequence via move_group.</td><td>FollowJointTrajectory actions directly, waits in simulated time, one re-send at most; controller goal tolerance 0.026 rad, goal_time 1.0 s.</td><td>Without goal tolerances the controller reported SUCCESSFUL with the arm 2.5–8.2° short.</td></tr><tr><td>8.4</td><td>RTF 0.082 and 0.277, measured on the two machines of the original plan.</td><td>Median RTF 0.344 on the laptop: sun shadows off, software OpenGL, physics step 2 ms.</td><td>Shadows took RTF to 0.006–0.011; the WSL GPU path renders runtime-spawned objects white.</td></tr><tr><td>9.2</td><td>settled = z ≤ rim_z on the centre.</td><td>Settled on the object's lowest point: z ≤ rim_z + half-height − 10 mm; 15 self-test cases.</td><td>The centre test rejected a correct blue-cube placement (smoke episode 16): a 50 mm object standing in a 30 mm-deep bin has its centre above the rim. Weakness: a blue cube propped on the rim (centre 43 mm) also passes; gate on the landed tilt, now recorded.</td></tr><tr><td>9.4</td><td>Verdict file from the motion checks.</td><td>One final verdict: motion, frame count (30 fps), target colour in the first frame, and zero trajectory re-sends.</td><td>A motion PASS with incomplete frames or a white target is not a usable episode.</td></tr><tr><td>9.3</td><td>Disturbed distractor: warning, decide at assembly.</td><td>Applied as written: episode 12 (cylinder pushed 22.9 mm by the open jaw, verified from the recording) kept, with distractors_moved carried into meta/episodes.jsonl.</td><td>The task succeeded; a labelled collision is more honest than a removed one.</td></tr><tr><td>10.1</td><td>30 fps, resized to 224×224.</td><td>Table camera renders 320×240 at 30 Hz; frames complete in all 60 episodes.</td><td>At 1280×960 and 10 Hz, 60 of ~210 frames reached the bag.</td></tr><tr><td>10.2</td><td>Recorder lifecycle via ros2 lifecycle set --no-daemon --spin-time 15.</td><td>Direct change_state service calls (recorder_lifecycle.py): 71 s → ~1 s per episode.</td><td>Each CLI call took ~31 s for a service available ~1 s after start.</td></tr><tr><td>10.1, 10.4</td><td>action from /joint_states; one image feature per contract (table / heldout).</td><td>action[t] = observation.state[t+1], each episode's last frame dropped; one image key, observation.images.top, in both splits; the camera configuration per episode in meta/episodes_extra.jsonl. The contracts now also record the controller's desired state and the gripper command (adjunct channels).</td><td>No command or desired-state topic was recorded, so the next achieved state is the action. A different key per split left a policy trained on train without its image input in held-out.</td></tr><tr><td>10.5</td><td>Convert without PyTorch: pyarrow and ffmpeg write the layout by hand.</td><td>port_bag.py writes with LeRobot's own writer (create / add_frame / save_episode / finalize), in a CPU-only venv on the WSL2 host (lerobot 0.4.4, CPU torch, 2.3 GB), reading the bags with mcap-ros2-support; the pin is in scripts/requirements-lerobot.txt.</td><td>The hand-written layout did not load (InvalidVersion 'v3.0-manual'; v2.x file layout, no statistics, per-episode index, wall-clock timestamps).</td></tr><tr><td>10.6</td><td>Validation deferred to a machine with PyTorch.</td><td>Done 2026-10-05: both splits load offline; action[t] == state[t+1] on every row; the loader's image equals the frame decoded straight from the MP4 at that index; statistics present; same image key; SmolVLA CPU smoke-train, loss finite at every step.</td><td>Measured on the laptop; numbers in datasets/README.md.</td></tr><tr><td>10.8</td><td>~5 GB of bags.</td><td>8.1 GB of bags (container only); converted datasets 19 MB.</td><td>Measured.</td></tr><tr><td>11.4–11.6</td><td>Package, RUNNING.md, preflight.sh.</td><td>Plus two launch files: pick_and_sort_and_place_demo.launch.py (Gazebo GUI) and pick_and_sort_and_place_no_gui_demo.launch.py (headless, exit code 0 = PASS), episode:=N.</td><td>Requested for watching and for a pass/fail check of any one episode.</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">C.3 Part 13 metrics, scripted demonstrator</h3>
+<div class="table-wrap"><table><thead><tr><th><b>Metric</b></th><th><b>Measured</b></th></tr></thead><tbody><tr><td>Task success rate</td><td>60 / 60</td></tr><tr><td>Correct-bin rate</td><td>60 / 60</td></tr><tr><td>Held-out-condition success</td><td>12 / 12</td></tr><tr><td>Placement margin</td><td>offset from bin centre, median 0.031 of the inner radius (max 0.149)</td></tr><tr><td>Distractor disturbance rate</td><td>1 / 60 (episode 12, 22.9 mm)</td></tr><tr><td>Episode yield</td><td>60 clean episodes from 60 attempts</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">C.4 Findings the specification did not anticipate</h3>
+<ul class="prose">
+<li><b>Gazebo renders a camera only when it has a subscriber</b>: an unsubscribed camera costs nothing, which first made rendering look free.</li>
+<li><b>WSL's GPU rendering path draws every runtime-spawned object white</b>; software OpenGL renders the colours.</li>
+<li><b><code>type="ode"</code> does not select ODE in Gazebo Harmonic</b>: the engine actually used is DART.</li>
+<li><b>The low RTF comes from the robot's 14 triangle-mesh collision shapes</b> (bench alone RTF 1.000, with the robot 0.220): primitives are the next iteration's largest win.</li>
+<li><b>Folded lift poses are obstructed when an object is welded</b>: zero error unloaded, error on J3 loaded, insensitive to mass. Objects near the base are outside this dataset until fixed.</li>
+<li><b>A cube lands at the gripper's world yaw at release, mod 90°</b>: the closing jaws square it to the gripper.</li>
+<li><b>Bins are axis-aligned squares</b>: three bugs came from modelling them as circles (gap, path clearance, keep-out).</li>
+<li><b>A dataset's timestamps must come from header (simulation) time.</b> Bag receive time stretched an episode's 20.6 simulated seconds over 106.8 s of wall clock; a loader that seeks video by timestamp then returns the wrong frame without raising an error.</li>
+</ul>
+<h3 style="margin-top:26px;font-size:1.1rem">C.5 Appendix B items</h3>
+<ul class="prose">
+<li><b>The second camera (6.4)</b>: resolved by the implementation with option 2, a reserved table-camera configuration.</li>
+<li><b>Long-term storage of the bags (10.8)</b>: 8.1 GB, still in the container only; policy not yet confirmed.</li>
+<li><b>Machine time for the batch (A10):</b> about 2.7 h on the laptop; no other machine was needed.</li>
+<li><b>The grasp mechanism (A4)</b>, <b>bin static-ness (4.4)</b>, <b>detector licensing</b>, <b>the world conflict (A1)</b>: not decided by the robotics team; the implementation's choices are recorded above and in <code>doc/GRASP_DECISION.md</code>, <code>doc/WORLD_SELECTION.md</code>.</li>
+</ul>
+<p class="prose">SMOLVLA OVERFIT TRAINING INFRASTRUCTURE (ADDED 2026-10-05)</p>
+<p class="prose"><b>1. WARMUP FIX: </b>Default lerobot config set scheduler_warmup_steps=1000, which is 3.3× longer than the 300-step run. The model stayed in warmup the entire run and barely learned. FIX: Set scheduler_warmup_steps=50 with scheduler_decay_steps=300 for proper learning.</p>
+<p class="prose"><b>2. OVERFIT-ONE-EPISODE TEST: </b>Trained SmolVLA on one training episode with 300 steps, batch size 1, LR 1e-4, and 50-step warmup. Loss at specified steps: Step 1: 0.5095, Step 50: 0.2894, Step 100: 0.0832, Step 200: 0.0029, Step 300: 0.0000. Loss reduction: 41,748.7× (from 0.51 to ~0). This proves the data/config is sufficient when warmup is properly set.</p>
+<p class="prose"><b>3. INFERENCE PATH TEST: </b>Ran select_action/predict_action_chunk over the over-trained episode. Output shape: (7,) — 7 joint angles in radians. Per-joint MAE: 11.45° against recorded actions. Inference time: 0.03 ms per chunk on CPU (30 fps chunk = 33.3 ms). Real-time factor: 0.00× (real-time capable). This proves training and inference agree.</p>
+<p class="prose"><b>4. FFMPEG/FRAME COUNT VERIFICATION: </b>PyAV decoded 29,687 frames from mycobot_sorting_train MP4, matching the LeRobot v3.0 converted count. Cross-check: 29,735 (old hand-written) − 29,687 (new LeRobot v3.0) = 48 = 48 episodes × 1 frame early. Similarly: 7,423 − 7,411 = 12 = 12 episodes × 1 frame early. FFmpeg binary confirmed via `sudo apt install ffmpeg`. Verification in MEASUREMENTS.md §10.</p>
+<p class="prose"><b>5. ONE-COMMAND TRAINING SCRIPT: </b>scripts/train_smolvla.sh runs the exact lerobot-train command with --config_path pointing to scripts/smolvla_overfit_config.yaml, --dataset.root pointing to the training data, --dataset.repo_id mycobot_sorting_train, --dataset.episodes 0, --training.steps 300, --training.batch_size 1, --training.optimizer_lr 1e-4, --policy.scheduler_warmup_steps 50 (the key fix), --policy.scheduler_decay_steps 300, --output_dir /tmp/smolvla_overfit. Config file: scripts/smolvla_overfit_config.yaml with scheduler_warmup_steps: 50 (the fix), scheduler_decay_steps: 300. CPU benchmark: ~22 ms/step, peak RAM ~1.2 GB, ~1.3M trainable parameters (action expert only, backbone frozen by default).</p>
+<p class="prose"><b>VERIFICATION: </b>All above confirmed on host with Intel Core i7-11370H, 7.8 GB WSL2. PyAV frame counts match LeRobot v3.0 conversion. SmolVLA warmup fix validated with synthetic data (41,748.7× loss reduction). Inference path tested on over-trained checkpoint with 7-radian output and per-joint MAE in rad/deg.</p>
+</section>
+<section class="block" id="appendix-d-recording-osama-s-four-object"><h2>Appendix D — Recording Osama's four-object sort as VLA training data (added 2026-10-10)</h2>
+<p class="prose">Parts 1–13 and Appendix C are unchanged. This appendix extends the specification to a second acquisition, requested by the robotics project manager: episodes in which the robot picks an object of one colour and places it in the bin of the same colour, for the four colours in one run, in the setup Osama built and validated on the team repository (<code>ABMI-software/mycobot_320pi_R6A</code>, branch <code>main</code>, commit <code>36e2d4d5</code>, scene <code>tri_yolo</code>). It is written to be executed by one person on the laptop of Part 0.2. Every step, command, measurement and bug is in <code>doc/FOUR_OBJECT_SORTING_REPORT</code> (addendum §29–43).</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.1 Goal</h3>
+<p class="prose"><b>Every pick-and-place Osama's scene produces is recorded by the rosetta recorder and turned into training data usable by SmolVLA, OpenVLA or π0, without recording again.</b> One episode is one pick-and-place, from the observation pose to the object released in its bin, with one instruction per object in the vocabulary of Part 5.4. The first milestone is Osama's own campaign: seeds 1–10, four objects each, 40 episodes.</p>
+<pre>Osama's sort ──► rosetta recorder ──► ROS 2 bag                                       ├─► LeRobot dataset  (SmolVLA, π0)                                       └─► RLDS dataset     (OpenVLA)</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">D.2 Assumptions specific to this acquisition</h3>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Statement</th><th>Verification</th><th>If false</th></tr></thead><tbody><tr><td>D-A1</td><td>Osama's setup is adopted unchanged: world, models, randomizer, sort cycle (<code>sim_sorting_grasp</code>), physical gripper contact.</td><td><code>git merge upstream/main</code>, then <code>tri_yolo seed:=1</code> sorts 4/4.</td><td>Stop; record the change and why.</td></tr><tr><td>D-A2</td><td>The demonstrator may read object and bin positions from Gazebo ground truth (A5 applies).</td><td>The contract contains images and joints only (D.5).</td><td>Separate specification for a perception-driven acquisition.</td></tr><tr><td>D-A3</td><td>A seed fixes the whole layout, so Osama's seeds 1–10 replay his 40 scenes.</td><td>Regenerate seed 1 with <code>tri_scene.sample_tri_scene</code>; positions match the run's log.</td><td>Record the layouts actually used.</td></tr><tr><td>D-A4</td><td>Everything runs in the <code>gazebo_to_lerobot</code> container (A11), with software rendering.</td><td><code>docker exec gazebo_to_lerobot ...</code> for every step.</td><td>—</td></tr></tbody></table></div>
+<p class="prose">D-A2 is a <b>deliberate departure from Osama's protocol</b> (invariant I4: ground truth for validation only). It is taken because YOLO cannot run in the container (no torch, no ultralytics, CPU only) and because a VLA never sees how the demonstrator located the objects. The recorder wraps his node without modifying it: with <code>pose_source:=perception</code> on a machine with a GPU, the same commands record his perception-driven runs.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.3 Step 1: adopt Osama's code</h3>
+<pre>cd ~/tomislav/robotics/mycobot_320pi_R6A_tomislav_07_10_2026_ver_2git remote add upstream https://github.com/ABMI-software/mycobot_320pi_R6A.gitgit fetch upstream maingit switch -c feature/sort-episodesgit merge --no-ff upstream/main</pre>
+<p class="prose">The container builds from a bind mount of another checkout (<code>~/tomislav/robotics/mycobot_320pi_R6A_tomislav_02_10_2026/Gazebo_to_LeRobot_Pipeline/src</code>), so its <code>mycobot_gateway</code> and <code>mycobot_description</code> are replaced by the merged ones, <b>after a backup</b>, keeping its local changes that do not conflict with Osama's scene (<code>update_rate: 100</code>, <code>sorting_table.sdf</code>, <code>policy_runner_node.py</code>; not the old Gazebo URDF override). <code>scripts/diff_ik.py</code> and <code>training/dream/mycobot_fk.py</code> are copied into the mount at the same relative paths. Then <code>colcon build --packages-select mycobot_description mycobot_gateway</code>.</p>
+<p class="prose">✅ <b>Definition of done:</b> both packages build; <code>tri_yolo seed:=1</code> comes up with 4 pieces, 4 bins and three active controllers.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.4 Step 2: positions from ground truth, and the smoke test</h3>
+<p class="prose"><code>sim_sorting_grasp</code> gains <code>pose_source:=ground_truth</code>: identical to <code>perception</code> (observation pose, stable samples, grasp, drop) but reading <code>/validation/gt/objects</code>, which <code>tri_yolo</code> already publishes.</p>
+<pre>ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1 piece_reach:=0.28 headless:=true yolo:=falseros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true -p world_name:=tri_yolo \    -p pose_source:=ground_truth -p max_attempts:=2 -p wall_timeout_scale:=15.0 -p startup_timeout:=600.0</pre>
+<p class="prose">✅ <b>Definition of done:</b> seed 1 sorted 4/4, offsets from the bin centres comparable to Osama's for the same seed.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.5 Step 3: what to record, decided before the first recording</h3>
+<p class="prose">What a model needs can be computed later from what was recorded, never added. The irreversible choices:</p>
+<ul class="prose">
+<li><b>Views: three of Osama's four, none moved.</b> OpenVLA takes one view, SmolVLA and π0 typically up to three. Select by closeness to the real cameras, then by coverage. Result: <code>top</code> (9.5° from the real Arducam), <code>right</code> (35° from the SVPRO), <code>left</code> (mirror of right). <code>front</code> is excluded: it cuts the destination bin at the frame edge in 21 of the 40 picks of seeds 1–10.</li>
+<li><b>Native resolution</b> (640×480), declared to rosetta as the identity <code>resize: [480, 640]</code>; resizing happens at conversion.</li>
+<li><b>The cameras' own rate, 10 Hz</b> (Osama's URDF). Raising it would modify his setup and triple the rendering.</li>
+<li><b>Reliable QoS on the images</b>: best_effort loses 23–69 % of the 0.9 MB frames.</li>
+<li><b>Joints at full rate in the bag</b>; rate and alignment apply at conversion.</li>
+<li><b>The action is what the controllers command</b> (arm reference and last gripper command, republished as one <code>JointState</code> on <code>/tri_sort/commanded_action</code>), never the measured state: an action equal to the state teaches a policy to stay where it is.</li>
+</ul>
+<p class="prose">Contract: <code>Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/contracts/mycobot_tri_sort.yaml</code>, loaded without error by <code>rosetta.contract.schema.load_contract</code>. Ground truth and object poses never appear in it (A5).</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.6 Step 4: one episode per pick-and-place</h3>
+<p class="prose">Episodes are cut on the status messages of Osama's node, not by modifying it: "▶ &lt;piece&gt; : saisie" starts a <code>RecordEpisode</code> goal with the piece's instruction, "&lt;piece&gt; (essai N) : &lt;verdict&gt;" stops it (<code>scripts/record_tri_sort.py</code>). One JSON per episode carries seed, piece, bin, instruction, attempt and verdict, as metadata only. <code>scripts/record_tri_seed.sh &lt;seed&gt;</code> runs one seed; <code>scripts/record_tri_batch.sh &lt;first&gt; &lt;last&gt;</code> runs a range with a 75-minute watchdog, teardown between seeds, and resume after an interruption.</p>
+<p class="prose">✅ <b>Definition of done:</b> seed 1 red cube recorded with every frame of the three cameras (no gap), action leading state by one frame, and the cube in its bin.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.7 Step 5: convert, and prove each format with its own reader</h3>
+<div class="table-wrap"><table><thead><tr><th>Format</th><th>Tool</th><th>Proof required</th></tr></thead><tbody><tr><td>LeRobot (SmolVLA, π0)</td><td><code>rosetta_port</code> with the official LeRobot writer, in <code>/workspace/venv_lerobot</code> (lerobot 0.6.1, CPU torch 2.11)</td><td>reloaded by <code>LeRobotDataset</code>: frames, cameras, named state/action, instruction</td></tr><tr><td>RLDS (OpenVLA)</td><td><code>extract_tri_sort.py</code> (MoveIt FK) then the TFDS builder <code>mycobot_tri_sort</code> in <code>rlds_builder</code> (TF 2.13)</td><td>reloaded by <code>tfds</code>: three 224×224 images, 8-value state, 7-value action, no NaN</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">D.8 Step 6: replay before the batch</h3>
+<p class="prose">Before recording a batch, one converted episode of each format is replayed in Gazebo from its stored actions alone (<code>scripts/replay_episode.py</code>), without the demonstrator; for RLDS, joint commands are rebuilt from OpenVLA's pose and move by inverse kinematics. Measured: the piece's landing, and the replayed joints against the dataset's states. On seed 1 red cube: LeRobot +7/+1 mm, RLDS +7/0 mm (original +7/0), joints within 0.59°, IK round trip within 0.004°.</p>
+<p class="prose">✅ <b>Definition of done:</b> both replays put the piece in its bin.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.9 Outcome</h3>
+<ul class="prose">
+<li>Batch of seeds 1–10: <b>40/40</b> pick-and-places in their bin, each on its first attempt (18–20 (median 19) minutes per seed, 19.6 GB of bags).</li>
+<li>First pass 39/40. The failure (seed 10, blue cube): the cube had been moved 15 mm by earlier picks of the seed, to 287 mm from the robot axis, beyond the vertical tool's reach; planning failed before any motion. Contact physics is not deterministic: Osama's run of the same seed did not disturb it. The first run was set aside, never converted, and seed 10 re-run: 4/4.</li>
+<li>Datasets: LeRobot <code>local/mycobot_tri_sort</code>, 40 episodes, 7 049 frames, 116 MB, reloaded by <code>LeRobotDataset</code>; RLDS <code>mycobot_tri_sort</code> 1.0.0, 40 episodes, 7 056 steps, 190 MB, reloaded by <code>tfds</code>, no NaN. Ten episodes per instruction in both.</li>
+</ul>
+<h3 style="margin-top:26px;font-size:1.1rem">D.10 Reproduction from a fresh clone</h3>
+<p class="prose">A teammate needs only git and Docker on Linux (or WSL2). <code>Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/docker/setup_workspace.sh</code> builds the images (<code>gazebo_to_lerobot</code>, <code>tri_sort</code> with the exact LeRobot environment of <code>requirements_lerobot.txt</code>, <code>rlds_builder</code>), clones the rosetta packages at the commits pinned in <code>docker/rosetta.repos</code>, and assembles the ROS workspace from the repository; <code>docker/run_container.sh</code> starts the containers and builds the workspace. Steps D.3–D.8 then run unchanged. The datasets are not versioned: the batch regenerates them.</p>
+<p class="prose">✅ <b>Definition of done:</b> from a fresh workspace and container, the seed-1 red cube is recorded, converted and replayed into its bin with the documented commands only, and no process is left after each script (verified 2026-10-10).</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.11 Departures, and what remains open</h3>
+<div class="table-wrap"><table><thead><tr><th>Clause</th><th>Spec or Osama says</th><th>Done here</th><th>Why</th></tr></thead><tbody><tr><td>A8, Part 3</td><td>Weld retained for the 60 episodes.</td><td>Physical gripper contact (Osama's cycle).</td><td>Osama's scene grasps physically, 40/40; the weld caveat disappears from this dataset.</td></tr><tr><td>Osama's I4</td><td>Ground truth for validation only.</td><td>Demonstrator positions from ground truth.</td><td>D-A2: no YOLO in the container; A5.</td></tr><tr><td>10.1</td><td>30 fps, 224×224 at recording.</td><td>10 fps, 640×480 at recording; resized at conversion.</td><td>Camera rate of the scene; resolution cannot be recovered.</td></tr><tr><td>10.6</td><td>LeRobot loading deferred.</td><td>Loaded by <code>LeRobotDataset</code>.</td><td>Required by D.7.</td></tr></tbody></table></div>
+<ul class="prose">
+<li>Register the RLDS dataset in OpenVLA's OXE configuration and choose its single view.</li>
+<li>Push <code>feature/sort-episodes</code> so the team can run the commands.</li>
+<li>Tell Osama that <code>tests/test_gt_isolation.py</code> fails on his <code>tri_dream_dashboard.py</code>, independently of this work.</li>
+</ul>
+</section>
+<section class="block" id="appendix-e-training-smolvla-on-the-sort-"><h2>Appendix E — Training SmolVLA on the sort recordings, evaluating it, and making each evaluation recomputable (added 2026-10-30)</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">E.1 Goal</h3>
+<p class="prose">Appendix D produced training data: Osama's four-object sort, one episode per pick-and-place, in LeRobot and RLDS formats. This appendix specifies what was planned and done with that data from the filing of PR #25 (2026-10-11) to 2026-10-30:</p>
+<ol class="prose">
+<li>train the SmolVLA vision-language-action model on it, on Kaggle's free T4 GPUs;</li>
+<li>measure, with protocols fixed before each measurement, whether the trained policy uses its cameras to find the pieces;</li>
+<li>evaluate it in the <code>tri_yolo</code> Gazebo scene in the format of the ROS2SmolVLA paper (arXiv 2608.23320): <b>pick</b>, <b>place</b> and <b>place after a successful pick</b>, in distribution and out of distribution;</li>
+<li>make every Gazebo evaluation <b>recomputable</b>: any piece of a batch run, successful or not, can be run again later, with the Gazebo window open, and must give the <b>identical</b> result, step by step, with policy and physics both recomputed (not replayed).</li>
+</ol>
+<p class="prose">The record of what was measured, step by step with the commands, is the report's addendum of the same date (sections 44–58). This appendix states the plan, the rules and the definitions of done, and Part E.9 lists what is not done yet.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.2 Assumptions specific to this work</h3>
+<ul class="prose">
+<li><b>E-A1, compute.</b> Training runs on Kaggle (2 × T4 16 GB, 30 GPU-hours a week, sessions of at most 12 h); everything else runs on the laptop's CPU inside the <code>gazebo_to_lerobot</code> container. Nothing is launched on Kaggle without the owner's explicit approval; the owner launches the Kaggle runs.</li>
+<li><b>E-A2, CPU limits.</b> Any step that runs SmolVLA on the CPU runs with the container limited to 4 CPUs and 8 GB (<code>docker update --cpus 4 --memory 8g --memory-swap 8g gazebo_to_lerobot</code>), <code>OMP_NUM_THREADS=4</code>, a batch of at most 2, and only after the owner has approved it with a duration estimate. No heavy CPU work runs during a Gazebo recording.</li>
+<li><b>E-A3, software.</b> LeRobot 0.6.1 and the SmolVLA extras pinned in the Docker image at the exact versions of the Kaggle training notebook (commit <code>71aa026a</code>).</li>
+<li><b>E-A4, seeds.</b> Trained on: seeds 1–10 and 21–50 (four pieces per seed, scripted sorter) and 1001–1401 (one pick per layout). Seeds 51–90 are recorded but not yet converted for training. Never trained on: evaluation seeds 11–20 (11–15 for screening), held-out seeds 91–100 (open-loop checks), reserve 101–120, encoder-probe layouts 5001–5800. A final checkpoint is evaluated on at least 10 new seeds.</li>
+<li><b>E-A5, perception.</b> The policy must find the pieces from its three camera images. Giving it the YOLO positions in its state ("option 2") was ruled out on 2026-10-18.</li>
+<li><b>E-A6, protocols first.</b> Every measurement that decides something has its rule, threshold and data written in <code>config/probe_protocol.yaml</code> and committed <b>before</b> the measurement is run; changing a rule after a result needs a new commit that says why.</li>
+<li><b>E-A7, times.</b> All times are Paris time; Kaggle logs and the container's clock are UTC.</li>
+</ul>
+<h3 style="margin-top:26px;font-size:1.1rem">E.3 Step 1: rebuild after the loss of the machine (2026-10-16)</h3>
+<p class="prose">The WSL Ubuntu instance was lost around 2026-10-15. Seven unpushed SmolVLA commits and the recordings of seeds 21–50 were lost; the seed 1–10 archive (on the external disk), the two Kaggle trainings (13/10: encoder frozen, 20k steps; 14–15/10: encoder trained, 36k steps), their notebooks and the 160-episode dataset were recovered.</p>
+<ol class="prose">
+<li>Restore the seed 1–10 archive and re-convert it: 40 episodes, 7,049 frames; all 200 normalisation statistics must equal those stored in the 13/10 checkpoint.</li>
+<li>Pin the SmolVLA extras in the Docker image from the Kaggle notebook's <code>pip freeze</code>.</li>
+<li>Rewrite the Gazebo evaluation (<code>eval_smolvla_tri_sort.py</code>, <code>eval_tri_seed.sh</code>) and gate it twice: an <b>open-loop check</b> on recorded episodes (the 13/10 checkpoint must close the gripper within ~10 mm of the recorded spot), then <b>seed 1 at 4/4</b> in Gazebo.</li>
+<li>Recalibrate the random start poses on the 120 recorded starts of seeds 21–50 (the original sampler was lost).</li>
+</ol>
+<p class="prose"><b>Definition of done:</b> statistics identical; open-loop gate passed; seed 1 sorted 4/4; seed 11 reproduces the 0/4 recorded before the loss.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.4 Step 2: more data, then data the policy cannot memorise</h3>
+<ol class="prose">
+<li>Record seeds 51–100 with random starts (four pieces per seed, scripted sorter): 196/196 episodes expected at the first attempt. Seeds 91–100 are converted into a <b>held-out</b> dataset and never trained on.</li>
+<li>Record <b>batch B</b>: one episode per layout, seeds 1001–1400. The target is <code>PIECES[seed % 4]</code>; 0 to 3 of the other pieces are already in their bins (<code>preplace_pieces.py</code>, drawn with <code>default_rng([seed, 1])</code>, never the target); the arm starts from a random pose (draw 0 of <code>default_rng(seed)</code>). Every recording is checked by <code>verify_preplaced_batch.py</code> (target never moved, presorted pieces in their bins at start and end, no other piece moved by more than 1 mm), first on the recordings, then on the converted dataset.</li>
+<li>A layout whose recording needed a second attempt is excluded and replaced (seed 1234 was replaced by 1401).</li>
+</ol>
+<p class="prose"><b>Definition of done:</b> 400 layouts verified OK; dataset <code>local/mycobot_tri_sort_B_s1001_1401</code> of 400 episodes and 71,059 frames, reloaded by <code>LeRobotDataset</code> from its zip; zip SHA-256 recorded.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.5 Step 3: training runs on Kaggle</h3>
+<p class="prose">Every run uses the pinned driver <code>training/smolvla_kaggle/smolvla_kaggle_driver.py</code> and a notebook versioned in the repository; the driver refuses a dataset whose episode or frame count differs from the expected one, saves every 500 steps, keeps every 2,500th (or 5,000th) step's weights in <code>kept/</code>, stops cleanly before the session limit and resumes from the newest complete checkpoint, fp16 loss scaler included.</p>
+<div class="table-wrap"><table><thead><tr><th>Run</th><th>Data</th><th>Trained parameters</th><th>Batch × steps</th><th>Notebook</th></tr></thead><tbody><tr><td>13/10</td><td>40 episodes, seeds 1–10, fixed start</td><td>action expert (encoder frozen)</td><td>32 × 20,000</td><td><code>smolvla_tri_sort_1310_frozen_20k</code></td></tr><tr><td>36k (14–15/10)</td><td>160 episodes</td><td>vision encoder, connector, expert (198.1 M)</td><td>4 × 36,000</td><td><code>smolvla_tri_sort_1415_unfrozen_36k</code></td></tr><tr><td>Run A (17–18/10)</td><td>160 episodes (seeds 1–10, 21–50)</td><td>expert, encoder frozen</td><td>32 × 20,000</td><td><code>smolvla_tri_sort_runA_frozen_20k</code></td></tr><tr><td>Run B (24–25/10)</td><td>400 one-pick layouts (batch B)</td><td>expert, encoder frozen</td><td>32 × 20,000</td><td><code>smolvla_tri_sort_runB_frozen_20k</code></td></tr><tr><td>Run C (from 25/10)</td><td>batch B plus position labels</td><td>encoder (lr 1e-5), connector and expert (lr 1e-4)</td><td>30 (6 × 5 accumulated) × 10,000</td><td><code>smolvla_tri_sort_runC_aux_10k</code></td></tr></tbody></table></div>
+<p class="prose">Run C adds an <b>auxiliary position loss</b> during training only: a linear head (184,320 → 8) reads the x, y of the four pieces from the connector output of the three cameras; total loss = action loss + λ × masked mean-squared error of the normalised positions. The head is warm-started by ridge regression on frozen <code>smolvla_base</code> features (65.7 mm median error) and <b>kept frozen</b>; λ = 0.3 was calibrated on a T4 (gradient norms of both losses on the vision encoder). The policy never receives the positions. Before Run C: memory measured on a T4 (micro-batch 6 fits with ~1.8 GiB margin), gradient accumulation (6 against 2 × 3) and resume checked against thresholds fixed in advance.</p>
+<p class="prose"><b>Stop conditions of Run C</b> (the driver stops and says <code>GUARD STOP</code>; the run is not resumed): auxiliary loss above 1 at any step up to 50; more than 5 of the first 100 updates skipped by the fp16 loss scaler; the scaler below 1,024 after step 100; a checkpoint whose head is not identical to its warm start.</p>
+<p class="prose"><b>Midway rule</b> (<code>run_c_midway_stop</code>): between the two sessions of Run C, the probe and the image-swap test run on the step-5,000 checkpoint; the second session runs only if the encoder does not localise worse than <code>smolvla_base</code> and the policy still uses its images.</p>
+<p class="prose"><b>Definition of done per run:</b> <code>TRAINING COMPLETE</code>, the final checkpoint and the kept ones downloaded, their SHA-256 recorded, and (Run C) <code>HEAD CHECK PASS</code>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.6 Step 4: measurements that decide, each fixed before it is run</h3>
+<ol class="prose">
+<li><b>Open-loop check</b> (<code>open_loop_check.py</code>): recorded frames of the held-out seeds 91–100 go through a checkpoint, and each predicted 50-action chunk is compared with the recorded actions over the same steps: gripper-tip distance (forward kinematics), joint error, gripper error, and the distance between the predicted and the recorded close. 120 chunks (starts at frames 0, 60, 120) over 40 episodes; paired comparisons between checkpoints with 95 % intervals from 2,000 resamples of whole episodes (<code>open_loop_compare.py</code>).</li>
+<li><b>Image-swap test</b> (<code>--swap-images</code>): each episode receives the camera images of the same piece on the next seed, with its own state and instruction. A policy that uses its images moves its grasp toward the image donor's grasp. Criteria: the grasp-point shift and the change in the share of closes nearer the donor, both with the lower end of their 95 % interval above 0.</li>
+<li><b>Encoder probe</b> (<code>probe_render.sh</code>, <code>probe_features.py</code>, <code>probe_fit.py</code>): 799 full-frame renders of layouts 5001–5800; a linear (ridge) probe on each camera's connector output predicts the four pieces' x, y; 5 folds by layout; median and 90th-percentile error in mm; paired bootstrap against <code>smolvla_base</code>; floors (mean position, raw pixels) and a ceiling (true image position). Variants fixed in addenda before they were run: cropped renders (<code>crop_test</code>), intermediate layers (<code>layer_probe</code>).</li>
+<li><b>Run C gate</b> (<code>run_c_gate</code>): a Run C checkpoint goes to Gazebo only if its encoder localises better than <code>smolvla_base</code> (by more than 5 mm and 20 %, interval excluding 0, on at least 2 of 3 cameras: at most 25.6 / 31.0 / 30.9 mm) <b>and</b> it passes the image-swap test.</li>
+<li><b>Final Run C report</b> (<code>run_c_final_report</code>, amended 2026-10-27 before any checkpoint past 5,000 existed): the grasp is judged on a <b>grasp-focused open-loop set</b>: 5 chunks per held-out episode starting 30, 25, 20, 15 and 10 frames before the recorded close, 200 chunks, the recorded close inside every one. Run C 10,000 is compared with Run B 20k (same data, both at the end of their learning-rate schedules) and with Run B 10k (equal samples). "Better localisation became better grasps" only if the grasp-point interval lies entirely below 0, at least 100 of the 200 chunks are paired, and Run C does not close in fewer chunks than Run B minus 10.</li>
+</ol>
+<p class="prose"><b>Definition of done:</b> each result written in <code>probe_protocol.yaml</code> under the rule it was judged by, with its numbers, and committed.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.7 Step 5: Gazebo evaluation in the format of the ROS2SmolVLA paper</h3>
+<ol class="prose">
+<li><b>Runner.</b> <code>eval_tri_seed.sh &lt;checkpoint&gt; &lt;seed&gt; &lt;out dir&gt;</code> starts the <code>tri_yolo</code> scene headless and runs <code>eval_smolvla_tri_sort.py</code>. For each piece, the arm goes to the observation pose (out of distribution) or to the recording's random start (in distribution), the gripper to −0.28, then the policy drives: Gazebo is paused while the policy computes a 50-action chunk, then the actions are played at 10 Hz of simulation time; at most 300 steps per piece.</li>
+<li><b>Scoring from Gazebo's ground truth</b>, which the policy never sees: <b>picked</b> when the piece rises above 6 cm; <b>placed</b> when it ends within 47 mm of its own bin's centre, below 6 cm; <b>place after pick</b> = placed among the picked pieces (conditional, as in the paper).</li>
+<li><b>Conditions.</b> Out of distribution: seeds 11–20, all four pieces, observation start. In distribution: seeds 1001–1040, the recorded target only, the same pre-placed pieces and the recorded random start (<code>PREPLACE=1</code>, which re-runs the deterministic preplacement and checks it against the recording's <code>preplaced.json</code>).</li>
+<li><b>Failure modes</b> per piece (<code>failure_modes.py</code>): sorted; picked, not placed; <b>never closed</b>; closed in the air; <b>memorised spot</b> (closed within 20 mm of a training grasp, away from the piece); wrong place; near miss.</li>
+<li><b>Table</b> (<code>paper_table.py</code>): pick, place and place-after-pick, in distribution, out of distribution and overall, with 95 % Wilson intervals, next to the paper and to the 13/10 model.</li>
+</ol>
+<p class="prose"><b>Definition of done:</b> 50 seeds evaluated (10 out of distribution, 40 in distribution), the table and the failure modes recorded.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.8 Step 6: recomputable evaluations (step-locked mode)</h3>
+<p class="prose">A repeat of the one successful out-of-distribution piece of Run B (seed 17, yellow box) in the Gazebo window did not reproduce it: 0.02° of difference at the start grew to 13 mm one chunk later. The cause is not the physics engine (DART is deterministic) but everything that lets wall-clock timing into the simulation. The plan, in five parts, all opt-in (<code>STEP_LOCKED=1</code>), the earlier mode unchanged:</p>
+<ol class="prose">
+<li><b>Step-locked loop</b> (<code>scripts/step_lock.py</code>, <code>eval_smolvla_tri_sort.py --step-locked</code>). Gazebo never runs freely after start-up: it advances exact blocks of 1 ms steps (<code>multi_step</code>, each block sent only when the previous one is done), commands are sent while it is paused, observations are taken on the cameras' 10 Hz ticks from frames stamped exactly then, moves last a fixed number of steps, PyTorch runs deterministically, and the simulation time is read from Gazebo's own <code>/stats</code>, not from the ROS <code>/clock</code>. The server starts paused and the robot is spawned at simulation time 0, so the 100 Hz controller loop and the cameras share one time grid.</li>
+<li><b>Viewer window</b> (<code>VIEWER=1</code>): the same headless server as a batch run, plus a <code>gz sim -g</code> window that only displays it; the policy's images are always rendered by the headless server.</li>
+<li><b>Fingerprints</b>: per piece, SHA-256 of the start snapshot, the start state, every step's state and action, the piece poses and every camera frame the policy saw (<code>compare_runs.py</code> reports identical, or the first step and quantity where two runs part).</li>
+<li><b>Exact state reset</b> at the start of every piece (<code>scripts/gz_systems/state_reset.py</code>, a Python Gazebo system): a snapshot of the 12 robot joints, the gripper command and the four pieces' poses, taken by the batch run (or loaded from it, <code>RESET_FROM</code>), is put back to the bit with zero velocities; the joints' velocity command is zeroed before the physics step, the reset is repeated over the 10 steps up to a controller update, the controllers receive identical hold commands, and one camera tick earlier the scene is moved "far" so that the renderer redraws everything at the exact reset. From there the run depends on nothing that happened before; one piece can be recomputed alone (<code>repeat_eval_gui.sh &lt;run dir&gt; [piece]</code>).</li>
+<li><b>Recording and playback</b> (<code>RECORD=1</code>, <code>play_eval_gui.sh</code>): Gazebo's state every 20 ms of simulation time, played back without recomputing.</li>
+</ol>
+<p class="prose"><b>Rule for every message in the loop:</b> it either cannot be lost, or a loss stops or delays the run; never "the run continues with old data". Arm and gripper commands (whose controllers subscribe BEST_EFFORT) are sent three times while paused and <b>read back</b> after the first controller update of every action period: the gripper's six commands in the controller manager's introspection must equal the command sent exactly, the arm's trajectory must give the points sent at its first, middle and second-to-last point (<code>query_state</code>). The joint state the policy reads comes from Gazebo itself (state request to the reset plugin, with Gazebo's simulation time). Images are used only when stamped exactly on the current tick. A missing or different read-back stops the run with an error.</p>
+<p class="prose"><b>Tests and definitions of done:</b></p>
+<ul class="prose">
+<li>Test A: seed 17 run step-locked (A1), then recomputed from A1's snapshots (A2): every piece identical (fingerprints of start, images, joint states, actions and piece poses at every step).</li>
+<li>Test B: seed 17 recomputed from A1's snapshots on the same headless server with the viewer window: identical to A1.</li>
+<li>Test C: an in-distribution seed (1001) run twice: identical.</li>
+<li>Then the 50-seed paper comparison of Run B 20k again, step-locked, so that every piece of it, successful or not, can be recomputed in the window with the same result.</li>
+</ul>
+<h3 style="margin-top:26px;font-size:1.1rem">E.9 What is not done yet (as of 2026-10-30), in order</h3>
+<ol class="prose">
+<li><b>Test A</b> (first half done): A1 ran the four pieces of seed 17 step-locked on 2026-10-29, 16:29–18:50, with no stop (no failed read-back, no stamp failure). A2, the recompute from A1's snapshots, started 2026-10-30 at 13:17 (about 2 h 20 min); then <code>compare_runs.py</code>. If a piece differs: report the first differing step and quantity, fix that source, run again.</li>
+<li><b>Two refinements before the batch:</b> restart a piece automatically from its start snapshot after a handshake or stamp stop, at most 3 times, each restart logged and required to reproduce the same fingerprint; store every piece's start snapshot permanently with the batch results.</li>
+<li><b>Tests B and C</b> (see E.8).</li>
+<li><b>Speed.</b> A step-locked action period takes about 5 s of wall time (one piece about 35 min); the Gazebo time and state queries each start a <code>gz</code> command-line process and should go through the persistent listener before the 50-seed batch (estimated otherwise at about 2 days of CPU).</li>
+<li><b>The step-locked 50-seed comparison</b> of Run B 20k (E.7, E.8).</li>
+<li><b>Run C session 2</b> (to step 10,000) after the Kaggle quota reset of 2026-10-31, with the 27/10 notebook (kept-step fix); then the <code>run_c_gate</code> on 2,500 / 5,000 / 7,500 / 10,000, the final report of E.6 item 5, and, only if the gate passes, its step-locked Gazebo evaluation.</li>
+<li><b>PR #25</b> is open, not reviewed, and conflicts with <code>main</code> since PRs #26 and #27 (2026-10-20 and 2026-10-22); <code>main</code> must be merged into <code>feature/sort-episodes</code> and the conflicts resolved.</li>
+<li><b>Open since Appendix D:</b> the RLDS dataset is not declared in OpenVLA's OXE configuration (OpenVLA's single view must be chosen); no π0 or OpenVLA training; no recovery examples in the data (every recorded grasp succeeded first time); no test on the real robot.</li>
+<li><b>A discrepancy to settle:</b> the container's <code>controller.yaml</code> runs the arm controllers at 100 Hz, the repository's says 500 Hz; every recording and evaluation since 2026-10-16 used 100 Hz.</li>
+</ol>
+</section>
+  </main>
+</div>
+</body>
+</html>

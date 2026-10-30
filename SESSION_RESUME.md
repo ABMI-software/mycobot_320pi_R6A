@@ -1,5 +1,912 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Documentation du tri mise à jour ; test A2 en cours (30 octobre 2026, début d'après-midi)
+
+- Spécification : annexe E ajoutée (EN), **version française complète** (docx) et versions HTML
+  des deux, dans `Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/doc/`.
+- Rapports EN et FR (docx + HTML) : addendum §44–58 depuis le dépôt de la PR #25 (11/10), avec
+  les commandes pour tout refaire à la main, et la liste « pas encore fait » alignée sur E.9.
+- Test A2 relancé à 13:17 (Paris), Gazebo avance en mode verrouillé (temps simulé 46,8 s à
+  13:52) ; résultat attendu vers 15:40 dans `/workspace/eval/steplock_tests/A_compare.txt`.
+- Code du mode verrouillé (`step_lock.py`, `state_reset.py`, `eval_*`) **toujours non commité** :
+  il le sera avec les améliorations (relance automatique, instantanés conservés) après le test A.
+
+## Mode verrouillé : remise à zéro exacte par pièce, test A en cours (29 octobre 2026, après-midi)
+
+Objectif fixé par l'utilisateur : **recalculer** (politique + physique) dans la fenêtre Gazebo une
+pièce d'un lot avec le résultat identique, sans repli sur la relecture.
+
+- **Ajouté** : `scripts/gz_systems/state_reset.py` (système Gazebo en Python : remet les 12
+  articulations et les 4 pièces à un instantané, vitesses à 0, consigne de vitesse à 0 dans
+  l'`Update` avant la physique, répété sur les 10 pas jusqu'à la mise à jour des contrôleurs) ;
+  `StepLock.snapshot/start_from` (instantané en début de pièce, remise « loin » pour forcer le
+  redessin, consigne de maintien qui finit sur l'instantané, remise exacte) ;
+  `--reset-from` / `RESET_FROM` (recalcul depuis les instantanés d'un lot, une pièce seule possible) ;
+  démarrage en pause, robot au temps 0, pas-à-pas par blocs de 100 sans file d'attente.
+- **Contrôle sans politique, réussi** : second passage à l'historique volontairement différent,
+  remis à l'instantané du premier : états, poses des pièces et images des 3 caméras **identiques
+  au bit** sur 1 s de trajectoire.
+- **Sources trouvées et corrigées en route** : file d'attente de `multi_step` (le simulateur
+  avançait pendant les pauses) ; commande de vitesse périmée de gz_ros2_control au pas de la
+  remise ; freinage limité en effort (une remise ne suffit pas) ; requête de remise perdue
+  (renvoi jusqu'à accusé) ; requête de pas perdue (renvoi si l'horloge de Gazebo n'a pas bougé) ;
+  **commandes bras et pince en BEST_EFFORT** : une commande perdue sous charge donnait 1e-5 rad
+  au pas 14 / 5 alors que départ, images et actions du 1er segment étaient identiques ; désormais
+  envoyées 3 fois en pause.
+- **PC** : Windows en « Modern Standby » de 11:21 à 13:09 (écran éteint après 60 min) : WSL figé.
+  `powercfg /change monitor-timeout-ac 0` pour les longues séries ; batterie à 8 % sur secteur.
+- Test A relancé à 13:48 (Paris) : A1 puis A2 depuis les instantanés d'A1.
+
+## Test A du mode verrouillé : échec, cause trouvée, correctif partiel (29 octobre 2026, matin)
+
+- **Test A** (Run B 20k, graine 17, deux passages verrouillés et enregistrés, 04:24-06:10 Paris) :
+  mêmes issues (0/4, pavé jaune saisi non posé dans les deux), **pas identiques**. Départ identique
+  (pièces au bit, bras à 1e-15 rad, pince à 2e-8) mais **la première image diffère** sur les trois
+  caméras ; la politique part donc de 0,1-0,7° d'écart dès le pas 0, et les pièces 2-4 héritent de
+  l'écart de la pièce 1. `/workspace/eval/steplock_tests/`.
+- **Diagnostic sans politique** (deux passages, images enregistrées) : images **identiques pendant
+  et après tout mouvement verrouillé** ; seule la première, après le démarrage libre, diffère de
+  30-60 pixels isolés sur la surface du bras (≤ 15 niveaux). Interprétation : le moteur de rendu ne
+  redessine un maillon que si sa pose change au-delà d'un petit seuil ; après le démarrage libre le
+  bras reste dessiné à une pose qui diffère d'un passage à l'autre.
+- **Correctif partiel** (`StepLock.warm_up`, appelé après le verrouillage) : bras écarté puis
+  ramené et pince ouverte puis fermée, à l'identique : **1 pixel** d'écart sur deux caméras au lieu
+  de 30-60, tout le reste identique. Insuffisant pour l'identité au bit.
+- Correctif de fond proposé : plus aucune phase libre (verrouiller dès le temps 0, contrôleurs
+  activés pendant des blocs de pas, pose d'observation prise en mode verrouillé), pour que l'état
+  du bras soit identique au bit et non à 1e-15 près. En attente d'accord.
+
+## Évaluation reproductible au bit près : parties 1-5 construites (29 octobre 2026, nuit)
+
+Objectif : pouvoir rejouer dans la fenêtre Gazebo n'importe quelle pièce d'une évaluation, réussie
+ou non, **avec le même résultat**. Le 27/10, la reprise de la graine 17 (pavé jaune) a divergé :
+0,02° au départ → 2,3 mm à la fermeture → 13 mm un segment plus tard. Cause : la commande passe par
+le temps réel (arrivée des messages, pauses, image la plus récente), pas la physique elle-même.
+
+- **Partie 1, `--step-locked`** (`scripts/step_lock.py`, `eval_smolvla_tri_sort.py`,
+  `eval_tri_seed.sh STEP_LOCKED=1`) : Gazebo n'avance que par blocs exacts de pas de 1 ms
+  (`multi_step`), toute commande part pendant la pause, trajectoire datée du temps simulé,
+  observations sur les instants caméra (10 Hz) avec images datées exactement, mouvements de durée
+  fixe, PyTorch déterministe. Démarrage en pause : le robot naît au temps 0, si bien que la boucle
+  des contrôleurs (100 Hz) et les caméras partagent la même grille dans chaque passage.
+- **Partie 2, fenêtre en simple spectatrice** (`VIEWER=1`, `gui_client:=true`) : le même serveur
+  sans fenêtre que le lot, plus `gz sim -g` qui ne fait qu'afficher.
+- **Partie 3, empreinte par pièce** : sha256 de l'état de départ (pleine précision), de chaque pas
+  (état, action), des poses des pièces et de chaque image vue par la politique.
+- **Partie 4** : `compare_runs.py` (identique, ou premier écart : pas, grandeur) et
+  `repeat_eval_gui.sh` (rejoue une graine d'un lot avec `VIEWER=1`, compare, fenêtre ouverte).
+- **Partie 5** : `RECORD=1` (journal d'états Gazebo toutes les 20 ms, `<sortie>/gzlog`) et
+  `play_eval_gui.sh` (relecture sans rien recalculer).
+- **Contrôles faits (sans politique)** : blocs de 1/7/100/250 pas exacts ; deux passages de la
+  graine 17 → **images des trois caméras identiques au bit**, boucle de contrôle sur l'instant
+  caméra dans les deux ; état du bras différent de 4,4e-16 rad (reste du démarrage libre) ;
+  journal enregistré et relu (tous les modèles présents).
+- **Écart trouvé** : le `controller.yaml` du conteneur a `update_rate: 100`, celui du dépôt 500 ;
+  tous les enregistrements et évaluations depuis le 16/10 ont tourné à 100 Hz. Rien changé.
+
+Prochaine étape, **sur accord** (calcul CPU) : tests A (graine 17 deux fois, ~80 min), B (graine
+17 avec la fenêtre spectatrice, ~45-60 min), C (graine 1001 deux fois, ~25 min) ; puis le lot de
+50 graines en mode verrouillé (~15 h).
+
+## Run B 20k dans Gazebo, format de l'article ROS2SmolVLA (28 octobre 2026, matin)
+
+50 graines, 27/10 16:20 → 28/10 05:16 (Paris), toutes rc 0, aucune erreur, aucun OOM. Résultats :
+`/workspace/eval/runB_paper/` (`paper_table.json`), tableau par `scripts/paper_table.py`.
+« Placé après saisie » = placés / saisis, comme la colonne de l'article. Intervalles de Wilson à 95 %.
+
+| | Article | Modèle du 13/10 | Run B 20k |
+|---|---|---|---|
+| En distribution : saisie | 78,3 % | 28/40 = 70,0 % [54,6 ; 81,9] | 23/40 = 57,5 % [42,2 ; 71,5] |
+| En distribution : dépose | 72,5 % | 28/40 = 70,0 % [54,6 ; 81,9] | 22/40 = 55,0 % [39,8 ; 69,3] |
+| En distribution : dépose après saisie | 92,5 % | 28/28 = 100 % [87,9 ; 100] | 22/23 = 95,7 % [79,0 ; 99,2] |
+| Hors distribution : saisie | 76,6 % | 1/40 = 2,5 % [0,4 ; 12,9] | 2/40 = 5,0 % [1,4 ; 16,5] |
+| Hors distribution : dépose | 46,9 % | 0/40 = 0 % [0 ; 8,8] | 1/40 = 2,5 % [0,4 ; 12,9] |
+| Hors distribution : dépose après saisie | 61,2 % | 0/1 | 1/2 |
+| Ensemble : saisie | 77,7 % | 29/80 = 36,2 % [26,6 ; 47,2] | 25/80 = 31,2 % [22,2 ; 42,1] |
+| Ensemble : dépose | 63,6 % | 28/80 = 35,0 % [25,5 ; 45,9] | 23/80 = 28,8 % [20,0 ; 39,5] |
+| Ensemble : dépose après saisie | 81,7 % | 28/29 = 96,6 % [82,8 ; 99,4] | 23/25 = 92,0 % [75,0 ; 97,8] |
+
+- **Protocoles différents en distribution** : le 13/10 = tri complet des 4 pièces des graines 1-10
+  depuis la pose d'observation (ses fichiers par graine perdus le 16/10, chiffres du tableau de
+  l'époque) ; Run B = la cible enregistrée seule des graines 1001-1040, mêmes pièces pré-placées,
+  même départ aléatoire. Hors distribution : même protocole (graines 11-20, 4 pièces, pose
+  d'observation). L'article a son propre banc : comparaison d'ordre de grandeur seulement.
+- **Modes d'échec** : hors distribution 34/40 « memorised spot » (fermeture à moins de 20 mm d'une
+  saisie d'entraînement, loin de la pièce), 3 near miss, 1 wrong place, 1 saisi non posé, 1 trié ;
+  en distribution 22 triés, 12 near miss, 4 memorised spot, 1 wrong place, 1 saisi non posé.
+  **« never closed » : 0 sur 80.**
+- En distribution par pièce (triés / 10) : cube rouge 10, cube bleu 5, pavé jaune 4, cylindre
+  vert 3. Par nombre de pièces déjà dans les bacs (0/1/2/3) : 6/9, 4/8, 4/9, 8/14.
+- Le Run B 20k reproduit ce qu'il a vu et ne localise pas les pièces nouvelles : c'est la
+  motivation du Run C (encodeur entraîné, perte de position).
+
+## Run B 20k dans Gazebo contre l'article, lancé ; rapport final du Run C amendé (27 octobre 2026, soir)
+
+- **Évaluation Gazebo du Run B 20k lancée à 16:20 (Paris)**, accord donné. Conteneur 4 CPU / 8 Go,
+  OMP 4, lot 1, hors ligne, sous `reap_children.py` : `/workspace/eval/runB_paper/run.sh`, suivi
+  dans `/workspace/eval/runB_paper/progress.log`. Ordre : graine 1001 d'abord (essai en direct du
+  nouveau mode), puis **hors distribution 11-20** (quatre pièces, pose d'observation, ≤ 120 min par
+  graine), puis **en distribution 1002-1040** (la cible enregistrée seule, mêmes pièces
+  pré-placées, même départ aléatoire, ≤ 45 min). Estimation : ~10 h + ~11 h, fin vers le
+  28/10 en début d'après-midi. `failure_modes.py` après chaque graine ; « never closed » compté à
+  part. Ne pas lancer d'autre calcul lourd sur le PC pendant ce temps.
+- **`eval_tri_seed.sh PREPLACE=1`** : rejoue l'enregistrement (cible, 0-3 pièces dans leur bac,
+  vérifiées contre `preplaced.json`, départ = tirage 0 de `default_rng(graine)`, identique aux
+  `start_poses.jsonl` de 1001-1040). Graine 1001 : même placement à 0,0 mm.
+- **`open_loop_check.py --before-close`** et amendement de `run_c_final_report` : jeu centré sur
+  la saisie (5 départs, 30 à 10 images avant la fermeture enregistrée, 200 segments), décisif
+  pour le point de saisie ; Run C 10000 contre Run B 20k et contre Run B 10k (échantillons égaux) ;
+  note sur les points différents des calendriers de taux (Run C 5000 à 50 %, Run B 5k à 25 %).
+  Run B 10k copié dans le conteneur (`kept/010000`, sha256 `e417e00e…44a30272`).
+
+## Run C : échantillons égaux, correctif des points gardés, rapport final (27 octobre 2026, fin d'après-midi)
+
+- **Run C 5000 contre Run B 5k** (mêmes données, 150 000 contre 160 000 échantillons ; boucle
+  ouverte, images propres, graines 91-100) : Run C plus proche des enregistrements sur le bout
+  (−14,0 mm [−22,8 ; −3,0]), les articulations (−1,57° [−3,59 ; −0,72]) et la pince (−0,008
+  [−0,016 ; −0,003]) ; point de saisie −27,9 mm [−97,8 ; +3,6], l'intervalle contient encore 0.
+  Run A 5k en référence : pince 0,022 (Run C 0,021, Run B 5k 0,029).
+  `run_c_midway_checkpoint.follow_up_27_10.matched_samples_run_b_5k`.
+- **Pas de `kept/005000` en session 1 : expliqué et corrigé** dans le pilote et le carnet (le 10 000
+  aurait manqué aussi). Détail, effacements du pilote et sommes SHA-256 de
+  `run/checkpoints/005000` : passation ci-dessous, « Correctif du 27/10 ». **La session 2 doit
+  utiliser le carnet du 27/10** (`Downloads\smolvla_tri_sort_runC_aux_10k_27-10.ipynb`).
+- **Rapport final du Run C fixé d'avance** (`probe_protocol.yaml`, `run_c_final_report`) : Run C
+  10 000 contre Run B 20k en boucle ouverte (point de saisie, fermetures à moins de 20 mm) à côté
+  de la sonde et de la tête, avec une phrase unique sur « meilleure localisation → meilleures
+  saisies ».
+- Évaluation Gazebo du Run B 20k (tableau façon article) : **toujours en attente de ton accord**.
+
+## Run C : contrôle de mi-parcours, verdict « continuer » (27 octobre 2026, après-midi)
+
+Point de reprise `run/checkpoints/005000/pretrained_model` (pas de `kept/005000` dans la sortie),
+téléchargé par l'API Kaggle avec reprise par fichier et tailles vérifiées, dans
+`Downloads\runC_s1\`. Contrôle sur le CPU du portable, hors ligne, conteneur à 4 CPU / 8 Go,
+10:06-14:17 (heure de Paris).
+
+- **Sonde linéaire sur le connecteur** (médiane, mm, Run C 5 000 contre smolvla_base) : haut 20,7
+  contre 32,0, gauche 20,7 contre 38,8, droite 19,4 contre 38,6 ; intervalles à 95 % entièrement
+  sous 0 sur les trois caméras. Pire nulle part : premier critère d'arrêt non atteint.
+- **Échange d'images** (graines 91-100) : décalage du point de saisie +68,3 mm [+25,2 ; +109,0],
+  part « donneur » 42 % → 68 %, écart +26 % [+3 ; +49]. Les deux bornes basses sont au-dessus de
+  0 : second critère non atteint.
+- **Verdict : continuer.** La session 2 peut tourner après la remise à zéro du quota du 31/10.
+  Résultat : `probe_protocol.yaml`, `run_c_midway_checkpoint.result`.
+- `probe_fit.py` plantait après les ajustements (liste d'encodeurs du 18/10 en dur) : corrigé.
+  `probe_features.py --batch` (2 ici, pour la limite CPU).
+
+**Trois contrôles rapides** (après-midi ; `run_c_midway_checkpoint.follow_up_27_10`) :
+
+- **Saisies, images propres, graines 91-100** : pas encore d'amélioration mesurable. Point de
+  saisie, Run C 5000 contre Run A 15k −17 mm [−75 ; +26], contre Run A 20k −11 mm [−78 ; +35],
+  contre Run B 20k (mêmes données, encodeur figé) −27 mm [−55 ; +12] : tous les intervalles
+  contiennent 0. Erreur de pince plus grande sur les trois, et Run C ferme moins souvent (24
+  segments contre 29-31). Fermetures à moins de 20 mm : 1 à 2 sur 120 partout. Part « donneur »
+  avec ses propres images : 42 % contre 36 % (Run A 15k) et 41 % (Run B 20k), écarts non
+  significatifs.
+- **Tête figée sur les 799 dispositions de sonde** : médiane 19,8 mm (p90 43,0) avec l'encodeur du
+  Run C, 62,6 mm avec smolvla_base (≈ les 65,7 mm du démarrage à chaud).
+- **Règle de validité de la sonde** : l'encodeur du Run C bat le plancher pixels de 52 à 57 % sur
+  les trois caméras (il en faut 20 % sur 2) ; smolvla_base ne la passait que sur une.
+- Sommes SHA-256 des 8 fichiers du point de reprise consignées (il n'y a pas de `kept/005000`).
+
+Prochaine étape locale : évaluation Gazebo du Run B 20k pour le tableau façon article (19 graines,
+~12-19 h), **pas avant ton accord**.
+
+## Run C session 1 terminée (26 octobre 2026, matin)
+
+37 042 s, arrêt à la limite de temps au pas 5 249 ; point de reprise `run/checkpoints/005000`.
+Aucune condition d'arrêt (0 mise à jour sautée sur les pas 1-100, 4 sur la session, échelle fp16
+finale 16 384) ; tête identique au démarrage à chaud aux 10 points de reprise, HEAD CHECK PASS.
+Perte d'action 2,29 → 0,057, perte auxiliaire 0,138 → 0,002 (trames d'entraînement). 7,0 s/pas,
+13,5 Go. Prochaine étape : contrôle de mi-parcours sur `run/checkpoints/005000/pretrained_model`.
+Run B dans Gazebo, graine 11 seulement (PC en veille la nuit) : 15k 0/4, 20k 1/4.
+
+## Note (25 octobre 2026, soir) : perte auxiliaire ~0 aux pas 1-40 du Run C
+
+Réelle, pas un artefact : l'échantillonneur de LeRobot ne dépend que de (graine, époque), et le
+démarrage à chaud a été ajusté avec la graine 1000, celle de l'entraînement. Les 40 premières mises
+à jour (40 x 30 = 1 200 trames) sont exactement les trames de l'ajustement (vérifié :
+`scripts/sampler_order.py`). Effet négligeable (0,4 % des mises à jour, en montée du taux), Run C
+continue. Run D : tirer l'échantillon du démarrage à chaud avec une autre graine.
+`probe_protocol.yaml`, `run_c_warm_start_overlap`.
+
+## Passation : Run C session 2 (rédigée le 25 octobre 2026, soir)
+
+Session 2 reprend le Run C là où la session 1 s'est arrêtée et le mène au pas 10 000. Elle se
+lance **après la remise à zéro du quota Kaggle du 31/10** (minuit, heure de Kaggle), éventuellement
+par un collègue sur un **autre compte Kaggle**. Elle demande environ **10 h** de quota GPU (4 750 pas à
+7,0 s, mesuré en session 1, plus l'installation ; `SESSION_HOURS = 10.25` suffit).
+
+### Condition de départ (obligatoire)
+
+Ne lancer que si le résultat du contrôle de mi-parcours est écrit et commité dans
+`Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/config/probe_protocol.yaml`, section
+`run_c_midway_checkpoint`, champ `result`, avec le verdict **« continue »**. Ce verdict veut dire
+qu'aucun critère `stop_if` de `run_c_midway_stop` n'est atteint :
+- sonde linéaire sur le connecteur : l'erreur médiane n'est **pas** au-dessus de smolvla_base avec
+  l'intervalle à 95 % de la différence entièrement au-dessus de 0 sur au moins 2 des 3 caméras ;
+- échange d'images (graines 91-100) : la borne basse de l'intervalle à 95 % du décalage du point
+  de prise **et** celle de la variation de la part « donneur » sont **au-dessus de 0**.
+
+Le contrôle porte sur `kept/005000`, ou, si la session 1 s'est arrêtée avant 5 000, sur le point
+de reprise le plus récent de sa sortie (pas sur `kept/002500`). Champ `result` à « not yet run »
+ou verdict « stop » : **ne pas lancer**.
+
+### Ce qu'il faut
+
+1. **Le carnet** : `Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/training/smolvla_kaggle/smolvla_tri_sort_runC_aux_10k.ipynb`,
+   branche `feature/sort-episodes`, **la version du 27/10** (correctif des points gardés,
+   ci-dessous ; copie : `C:\Users\tomis\Downloads\smolvla_tri_sort_runC_aux_10k_27-10.ipynb`).
+   Sur Kaggle : ouvrir le carnet de la session 1 → *File* → *Import Notebook* → ce fichier, puis
+   vérifier que les deux entrées du point 4 sont toujours attachées. Seule la cellule du pilote
+   et le texte d'introduction changent par rapport à la session 1 ; dans la cellule 1 :
+   `SESSION_HOURS = 10.25`, `AUX_LAMBDA = 0.3`, `AUX_HEAD_FROZEN = True`, `TRAIN_STEPS = 10000`.
+   Ne rien modifier d'autre.
+2. **Le jeu de données Run C** :
+   - même compte : `mycobot-tri-sort-c-400` (déjà sur Kaggle) ;
+   - autre compte : soit le propriétaire le partage (page du jeu → *Settings* → *Sharing* →
+     ajouter le nom d'utilisateur du collègue), soit le collègue téléverse
+     `mycobot_tri_sort_C_s1001_1401.zip` (1 224 228 796 octets, sha256
+     `0032e46fbf6f447bef62139c1e0bb2fd1b0b96976ec7dc026139b1e05a17c05c`) sous le nom de son
+     choix. Le carnet vérifie `meta/SHA256SUMS` et le pilote exige 400 épisodes / 71 059 trames.
+3. **La sortie de la session 1** (version « Complete » du carnet de la session 1) :
+   - même compte : *Add Input* → *Your Work* → *Notebooks* → le carnet de la session 1 (sa
+     dernière version) ;
+   - autre compte : le propriétaire télécharge **toute la sortie** de la session 1 (onglet
+     *Output*, téléchargement complet en zip, 7-10 Go) et la donne au collègue, qui la téléverse
+     telle quelle comme nouveau jeu privé (ex. `runc-session1-output`). Il faut que s'y trouvent
+     `run/checkpoints/<pas>/pretrained_model/` **et** `run/checkpoints/<pas>/training_state/`
+     (les 5 fichiers de LeRobot, dont `optimizer_state.safetensors` et `scheduler_state.json`, plus
+     `grad_scaler.json`), plus
+     `kept/002500/`. La session 1 s'est arrêtée au pas 5 249 : le point de reprise est
+     `run/checkpoints/005000/` et il n'y a pas de `kept/005000/` (le pilote le crée à la reprise).
+
+### Correctif du 27/10 : points gardés (`kept/`)
+
+**Pourquoi la session 1 n'a pas de `kept/005000`.** Le pilote ne gardait les poids d'un pas
+multiple de 2 500 qu'au moment où il élaguait ce point de reprise, c'est-à-dire une fois le
+suivant enregistré (`prune_checkpoints`). Le 5 000 a été enregistré à 04:50 (Paris) le 26/10, la
+session s'est arrêtée au pas 5 249, avant l'enregistrement du 5 500 : le 5 000 est resté `last`,
+jamais élagué, donc jamais gardé. Il est intact dans `run/checkpoints/005000/`. À la reprise, le
+pilote l'aurait de toute façon copié dans `kept/005000` (cas « resumed from », déjà prévu). Le
+7 500 aurait été gardé à l'élagage, mais le **10 000**, dernier point du Run C, ne l'aurait
+jamais été : il serait resté seulement dans `run/checkpoints/010000/`.
+
+**Correctif** (`smolvla_kaggle_driver.py`, `prune_checkpoints`) : les poids d'un pas multiple de
+`KEEP_EVERY` sont **copiés** dans `kept/<pas>/pretrained_model` dès que ce pas devient `last`
+(enregistrement complet), en passant par un nom temporaire (`pretrained_model.partial`), si bien
+qu'une session tuée en pleine copie ne laisse pas de `kept/` partiel. Testé hors GPU sur des
+dossiers factices passés par les fonctions du pilote : la session 1 telle qu'elle s'est déroulée
+donne désormais `kept/002500` et `kept/005000` (l'ancien pilote : `kept/002500` seul) ; la session 2
+donne `kept/002500, 005000, 007500, 010000`, chacun avec les poids de son pas, et l'entrée reste
+intacte. Disque Kaggle au pire ~14 Go (4 × 1,8 Go gardés + 2 points de reprise de 3,4 Go).
+
+**Ce que le pilote efface, et rien d'autre** : `run/checkpoints/<pas>` plus anciens que `last`
+(après la copie ci-dessus) ; `run/checkpoints/<pas>` plus récents que `last` après l'arrêt (écrits
+à moitié) ; `run/` entier seulement pour un départ à zéro sans point de reprise attaché (d'où la
+ligne `resuming from step 5000` à vérifier) ; les dossiers temporaires des modes de contrôle. Jamais
+`kept/`, jamais l'entrée attachée (en lecture seule sur Kaggle de toute façon).
+
+**Sommes SHA-256 de `run/checkpoints/005000/pretrained_model`** (sortie de la session 1, copie
+`Downloads\runC_s1\` et copie du conteneur identiques fichier par fichier ; tailles vérifiées
+contre la liste de Kaggle) :
+
+| Fichier | SHA-256 |
+|---|---|
+| `model.safetensors` (1 800 257 992 o) | `342e480332bdeccecefc55dffb5f138e420ea4ebbc274380ed8eecc23bfb807a` |
+| `aux_head.safetensors` | `f788d7f6c764ce31f0702ad004582a9007a96772eff43769c961f0b8f4ea66c8` |
+| `config.json` | `647a1bbe2e54c72726a01a91aa9d09911f4688ee987e8eda43c66e0bc2ab961a` |
+| `train_config.json` | `e7ecd27b575112957b078ebbfcc0b4174bd168e82069d1edd1eba51e25d4dd83` |
+| `policy_preprocessor.json` | `7b404a7d24a5e7a040cd3634dcc553e936c2b6a8fae14fbf95cb5d1ee1c83494` |
+| `policy_postprocessor.json` | `3b51f092c70c710ce0213ee1b63bf51b4878ec67828dd2d67daf9ef51081a41a` |
+| `policy_preprocessor_step_5_normalizer_processor.safetensors` | `60751665be1537afcfa04120747864280f53898a85bd41e0269b564476c66aea` |
+| `policy_postprocessor_step_0_unnormalizer_processor.safetensors` | `60751665be1537afcfa04120747864280f53898a85bd41e0269b564476c66aea` |
+
+Le `kept/005000/pretrained_model` que la session 2 créera à la reprise est une copie de ce dossier :
+mêmes sommes attendues.
+     Sans `training_state` complet, le pilote repart de zéro.
+4. **Réglages de session** : *GPU T4 x2*, *Internet On*, **exactement deux entrées** : le jeu
+   Run C et la sortie de la session 1. Puis *Save Version* → **Save & Run All (Commit)**.
+
+### À vérifier dans le journal
+
+| Moment | Ligne attendue |
+|---|---|
+| ~15 s | `DATASET PASS` (sinon : mauvais jeu ou deux jeux Run C attachés) |
+| ~2 min | `400 episodes, 71059 frames` |
+| ~2 min | `carried kept weights of step 002500 forward`, puis `kept weights of step 005000 (resumed from)` |
+| ~2 min | **`resuming from step N`**, N = dernier point de reprise de la session 1 (pas `fresh run`) |
+| ~3 min | `aux head (8, 184320) from …/checkpoints/00N/pretrained_model/aux_head.safetensors, weight sum -0.0800367; … lambda 0.3, head frozen` |
+| ~3 min | deux groupes d'optimiseur (`connector, expert` et `vision … lr 1e-05`), **aucun** `aux head` ; `freeze=runC … total 198.1 M` |
+| ~3 min | `fp16 loss scaler restored: scale X`, avec X ≥ 1024 |
+| premiers pas | `step:N+10`, `N+20`… (pas `step:10`) ; `aux_loss` autour de 0,1-0,5 |
+| tous les 500 pas | `aux head frozen: identical to aux_head_init.safetensors True, weight sum -0.0800367` |
+| pas 7 500 | `kept weights of step 007500` (dès l'enregistrement du 7 500) |
+| pas 10 000 | `kept weights of step 010000` |
+| fin (~10 h) | `TRAINING COMPLETE`, puis `HEAD CHECK PASS` |
+
+`GUARD STOP` à un moment quelconque : ne pas relancer, envoyer la ligne et les 20 précédentes.
+Les traces `libtorchcodec` sont sans conséquence.
+
+### À récupérer à la fin
+
+`kept/002500/`, `kept/005000/`, `kept/007500/`, `kept/010000/` (`pretrained_model/` de chacun ;
+le 10 000 est aussi dans `run/checkpoints/010000/`, inutile de le prendre deux fois),
+`train_summary.json`, `runc_final_head.json`, `logs/`. Vérifier `kept/005000` contre les sommes
+ci-dessus. Ensuite : `run_c_gate` (sonde et échange d'images) sur ces points, avant tout passage
+dans Gazebo, et le rapport final (`probe_protocol.yaml`, `run_c_final_report`).
+
+## État actuel (25 octobre 2026 — midi, carnet Run C prêt)
+
+### Ce qui a été accompli
+- **Préparation Run C sur T4** : tout PASS, **λ = 0,3**. Mais la tête auxiliaire au taux 1e-3
+  explose au premier pas (perte 0,13 → 10 216, échelle fp16 → 2).
+- **Décision** : tête figée à son démarrage à chaud (65,7 mm). Taux ~1e-8 écarté (non testé) ;
+  traits normalisés = candidat Run D. Inscrit dans `probe_protocol.yaml` (`run_c_settings`).
+- **Conditions d'arrêt** dans le pilote et le protocole, plus contrôle final de la tête
+  (identique, somme −0,0800367). Testées hors GPU.
+- **Carnet `smolvla_tri_sort_runC_aux_10k.ipynb`** copié dans `C:\Users\tomis\Downloads`.
+
+### Prochaines actions
+1. [ROUGE] Lancer le Run C (l'utilisateur), jeu `mycobot-tri-sort-c-400` seul ; ~18,5 h de GPU
+   en deux sessions.
+2. [ROUGE] Entre les sessions : sonde et échange d'images sur `kept/005000` (`run_c_midway_stop`).
+3. [JAUNE] Évaluation Gazebo du Run B (15000 contre 020000) : accord et durée annoncée d'abord.
+
+## État actuel (25 octobre 2026 — matin, Run B terminé, préparation du Run C sur Kaggle)
+
+### Ce qui a été accompli
+- **Run B terminé** sur Kaggle : 20 000 pas, perte finale 0,036 (0,055 à la fin de la première
+  session), pic 12,4 Go ; deuxième session 24/10 19:33 → 25/10 02:04 (Paris). Sortie téléchargée
+  dans `C:\Users\tomis\Downloads\results (3)\` (`run/checkpoints/020000`, `kept/005000`,
+  `010000`, `015000`).
+- **Run C, démarrage à chaud** (CPU) : extraction des traits 06:29 → 07:41, ajustement ridge :
+  **65,7 mm** médiane (p90 122,5) contre **133,8 mm** pour la position moyenne ; pave_jaune
+  le plus faible (83,5 mm, p90 158,9 au-dessus de son plancher).
+- **Calibration de λ sur CPU interrompue** : lancée à 07:58 au lot de 6 sans limites, WSL a
+  redémarré à 08:13 (Paris) avant le premier lot. Aucun résultat ; les fichiers du conteneur ont
+  survécu. Nouvelle règle : tout calcul SmolVLA sur CPU sous `docker update --cpus 4 --memory 8g
+  --memory-swap 8g`, `OMP_NUM_THREADS=4`, lot ≤ 2, avec accord et durée annoncée ; de préférence
+  sur Kaggle. Limites posées sur `gazebo_to_lerobot` le 25/10.
+- **Carnet `smolvla_runC_prep_t4.ipynb`** et **zip `mycobot_tri_sort_C_s1001_1401.zip`**
+  (1 224 228 796 octets, sha256 `0032e46f…a17c05c`) dans `C:\Users\tomis\Downloads`.
+
+### Décisions prises
+- λ, le recouvrement, la reprise avec la tête et le chargement se vérifient sur un T4 (environ
+  50 min), pas en local.
+- Nouveau jeu Kaggle **`mycobot-tri-sort-c-400`** ; `mycobot-tri-sort-b-400` reste inchangé.
+- Seuil de recouvrement fixé avant l'exécution : ≤ 0,05 (≈ 1 trame sur 60 attendue par hasard).
+
+### Prochaines actions
+1. [ROUGE] Téléverser le zip comme `mycobot-tri-sort-c-400`, lancer le carnet de préparation
+   (l'utilisateur), rapporter `runc_prep_results.json`.
+2. [ROUGE] Inscrire λ, les 65,7 mm et le choix du lot de 6 dans `config/probe_protocol.yaml`
+   avant tout lancement du Run C ; construire le carnet du Run C.
+3. [JAUNE] Évaluation Gazebo du Run B (15000 contre 020000, graines 11-15) : SmolVLA sur CPU,
+   donc accord et durée annoncée d'abord.
+
+### Commande rapide de reprise
+```bash
+# Docker Desktop ouvert sous Windows
+docker start gazebo_to_lerobot
+docker update --cpus 4 --memory 8g --memory-swap 8g gazebo_to_lerobot
+```
+
+## État actuel (24 octobre 2026 — matin, lot B converti, carnet Run B prêt)
+
+### Ce qui a été accompli
+- **Lot 1051-1400 terminé** le 21/10 à 05:25 (Paris) : 348 / 350 du premier coup ; seuls 1098
+  et 1099 (incident mémoire du 19/10) en échec.
+- **1098 et 1099 réenregistrées** le 23/10 (14:19-14:35), OK ; les tentatives ratées sont de côté
+  en `seed_NNNN.incomplete_<heure>`.
+- **Graine 1234 écartée** : `verify_preplaced_batch` y trouvait 2 épisodes (première prise ratée,
+  reprise réussie). Réenregistrée : même échec, même reprise, même écart +6/+3 mm — la scène est
+  déterministe. Dossier renommé `seed_1234.excluded_retry_both_runs` ; **graine 1401** enregistrée
+  à sa place, OK.
+- Le portable s'est mis en veille ~10 h le 23/10 (14:46 → ~01:20) : la graine 1234 a repris à
+  la sortie de veille, sans dommage.
+- `verify_preplaced_batch` 1001-1401, enregistrements puis jeu converti : **400 OK** ; seul
+  signalement, 1234 « non enregistrée » (voulu). Pièces pré-triées 0/1/2/3 : 114/98/99/89 ;
+  cibles 101/99/100/100.
+- Conteneur redémarré (0 zombie), conversion `local/mycobot_tri_sort_B_s1001_1401` :
+  **400 épisodes, 71 059 trames**, 154-214 par épisode (médiane 176), 1,2 Go.
+- Zip `mycobot_tri_sort_B_s1001_1401.zip` (sha256 `1428ed00…46ae1`, 14 fichiers, CRC bon), rechargé
+  par LeRobot depuis le zip : 400 / 71 059, images des trois caméras décodées au début, au milieu
+  et à la fin. Copié dans `C:\Users\tomis\Downloads` avec le carnet.
+- **Carnet Run B** : mêmes arguments `lerobot-train` que Run A (comparés par programme), pilote du
+  dépôt avec garde sur le nombre d'épisodes et de trames.
+
+### Prochaines actions
+1. [ROUGE] Feu vert de l'utilisateur, puis : téléverser le zip comme `mycobot-tri-sort-b-400`,
+   lancer le carnet (session 1 ≈ 10,5 h jusqu'au pas ~13 000, session 2 ≈ 6,5 h).
+2. [JAUNE] Pendant Run B : préparation de Run C sur le jeu complet (étiquettes, démarrage à
+   chaud, λ, tests CPU restants) ; erreur du démarrage (mm) et λ dans le protocole.
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot /workspace/venv_lerobot/bin/python /workspace/src/scripts/verify_preplaced_batch.py /workspace/tri_sort_B 1001 1401 --dataset /workspace/tri_datasets/local/mycobot_tri_sort_B_s1001_1401
+```
+
+## État actuel (19 octobre 2026 — nuit, code de la tête auxiliaire de Run C ; tests en partie reportés)
+
+### Ce qui a été accompli
+- Note de conception D1-D6 approuvée, plus : démarrage à chaud de la tête par la ridge de la
+  sonde sur le connecteur de smolvla_base gelé, λ calibré après, erreur du démarrage (mm) et λ
+  consignés dans le protocole avant le lancement.
+- Code écrit (`build_aux_labels.py`, `aux_warm_start.py`, pilote). **Tests CPU passés** sur le lot
+  B 1001-1050 (taille de test, valeurs non retenues) :
+  - étiquettes : 0 écart avec les fichiers d'épisode ; 3970 / 3970 trames tenues masquées ;
+  - masquage de la perte : étiquette masquée changée → même perte, même gradient ;
+  - caractéristiques par le chemin d'entraînement (300 trames) ; ridge : 100 mm contre 143 mm pour
+    `floor_mean` (50 dispositions seulement) ; la tête reproduit la ridge à 6e-9 ;
+  - calibration : groupes d'optimiseur vision 1e-5 / base / tête 1e-3 ; λ = 0,3 (exact 0,27) sur
+    des trames non ajustées (part 0,0). **Défaut trouvé** : avec la même graine l'échantillonneur
+    rendait les trames du démarrage (perte aux. 0,0004, λ gonflé à 10) ; calibration désormais à
+    graine + 1 avec la part rapportée.
+- **Incident enregistrement** : le contrôle d'accumulation Run C sur CPU a saturé la mémoire
+  (4,4 Go d'échange) pendant l'enregistrement : graine 1098 en échec (vérification `gz topic`
+  hors délai) et 1099 bloquée (arrêtée à 21:55, sans COMPLETE). **À réenregistrer en fin de lot.**
+  Plus aucun test de la taille de Run C pendant l'enregistrement.
+
+### Décisions prises
+- Règle confirmée : aucun calcul lourd sur CPU pendant un enregistrement.
+- Ordre de mercredi, fixé par l'utilisateur :
+  1. réenregistrer 1098 et 1099 ; `verify_preplaced_batch` doit confirmer qu'aucune donnée
+     partielle des tentatives ratées ne reste ; redémarrer le conteneur ; convertir ;
+  2. écrire le carnet Run B et demander le feu vert pour le lancer sur Kaggle (quota de cette
+     semaine) ;
+  3. pendant que Run B s'entraîne : préparation de Run C sur le jeu complet (étiquettes,
+     démarrage à chaud, λ, tests CPU restants), erreur du démarrage (mm) et λ consignés dans le
+     protocole.
+
+### Prochaines actions
+1. [ROUGE] Mercredi, fin de l'enregistrement : retirer `seed_1098/COMPLETE` (1099 n'en a pas),
+   relancer `record_tri_batch.sh 1098 1099` sous `reap_children.py` (le script met les anciens
+   dossiers de côté en `seed_NNNN.incomplete_<heure>`, que `convert_tri_sort.sh` ignore : il ne
+   prend que `seed_` + 3 ou 4 chiffres) ; `verify_preplaced_batch.py ... 1001 1400` ; redémarrer
+   le conteneur ; convertir ; vérifier le jeu.
+2. [ROUGE] Carnet Run B, puis feu vert de l'utilisateur pour Kaggle.
+3. [ROUGE] Pendant Run B : préparation de Run C sur le jeu complet (voir décisions), tests CPU
+   restants (accumulation et reprise avec la tête, point de contrôle Run C chargé par l'outil
+   boucle ouverte), consignation dans le protocole, carnet Run C.
+
+## État actuel (19 octobre 2026 — soir, accumulation validée sur T4 : Run C prêt côté contrôles)
+
+### Ce qui a été accompli
+- **Accumulation, lot 6 contre 2 × 3 sur T4 : PASS** selon la règle engagée (le critère
+  d'amplification décidé avant n'a pas servi). Pas 2 et 4 sautés par le facteur d'échelle fp16
+  (débordement à 65536, divisé par 2), 4 pas jugés. Gradients 0,07-0,12 % (limite 1 %), mise à
+  jour 3,8 % au pas 1 puis 0,13-0,29 % (limite 5 %), norme ≤ 1,3e-4, perte ≤ 1,0e-4.
+  L'amplification mise à jour / gradient vaut ~30 au pas 1 (accumulé 32, plancher 35) et tombe à
+  ~4 puis ~1,4 : l'effet du premier pas d'Adam, comme prévu ; les 6,0 % du lot 8 en venaient.
+  Pic nvidia-smi 12 441 Mo.
+- **Les deux contrôles de Run C sont passés sur T4** : accumulation et reprise (facteur d'échelle
+  restauré). Résultats dans `config/probe_protocol.yaml` (`accumulation_check`).
+
+### Prochaines actions
+1. [ROUGE] Reste du code de Run C : LR de vision bas, tête auxiliaire de position, carnet
+   d'entraînement (lot 30 = 6 × 5, poids gardés tous les 2 500 pas).
+2. [JAUNE] Tableau mémoire 4 / 6 / 8 : facultatif désormais (micro-lot 6 mesuré à 13 285 Mo avec
+   l'état de l'optimiseur).
+3. [JAUNE] Fin de l'enregistrement 1051-1400 (mercredi) : vérifier, convertir ; puis Run B.
+
+## État actuel (19 octobre 2026 — fin d'après-midi, contrôles T4 de Run C ; enregistrement 1051-1400 lancé)
+
+### Ce qui a été accompli
+- **Enregistrement 1051-1400 lancé à 16:07** (Paris) sous `reap_children.py` ; graine 1051 OK en
+  6,8 min, 0 zombie. Fin attendue mercredi ~04:00-08:00.
+- **Premier passage T4 de `smolvla_runC_checks_t4.ipynb`** (~26 min) :
+  - **Reprise : PASS.** Coupée après 100, reprise du point 100 : pas final 200 / 200, calendrier
+    identique, aucun pas manquant, perte moyenne après reprise 0,4043 contre 0,4042 (marge
+    ±0,030). **Facteur d'échelle fp16 restauré** (compteur de croissance 200 des deux côtés ; 100
+    s'il ne l'avait pas été), aucune mise à jour sautée. Deux courses neuves de même graine
+    diffèrent déjà un peu (pas 97-100) : le GPU n'est pas déterministe.
+  - **Accumulation, lot 8 contre 2 × 4 : ÉCHEC selon la règle engagée**, un seul pas jugé avant
+    l'épuisement mémoire du pas 2 (l'état de l'optimiseur y apparaît). Pas 1 : perte 6,5e-5,
+    norme 7e-6, gradients 0,26 % (vision 0,41 %, connecteur 0,16 %, expert 0,08 %), tous sous
+    1 % ; mise à jour des poids 6,0 % (vision 8,0 %, connecteur 5,1 %) au-dessus de 5 %.
+    Explication probable : au premier pas d'Adam chaque poids bouge d'environ ± lr, les poids de
+    gradient quasi nul changent de sens sur l'arrondi fp16. **Elle ne sera acceptée que si le
+    plancher (le même lot entier deux fois) montre un écart comparable** ; consigné dans le
+    protocole dans les deux cas.
+  - **Mémoire** : pic nvidia-smi **13 285 Mo** au micro-lot 6 avec l'état de l'optimiseur, soit
+    ~2,0 Gio libres sur 15 360 Mio ; Run C (lot de 30 entier sur le GPU, +0,2 Go) ~1,8 Gio :
+    **micro-lot 6 retenu** (règle ≥ 1,5 Gio). Mon estimation précédente (« sous 1,5 ») était trop
+    pessimiste. 4,8 échantillons/s : 10 000 pas de 30 ≈ 17,5 h.
+- **Pilote corrigé** : l'état de l'optimiseur du contrôle d'accumulation allait dans la sortie
+  Kaggle (1,5 Go laissés par l'épuisement mémoire) ; il va dans /tmp et est effacé même en cas
+  d'échec ; le tableau affiche l'écart de mise à jour du plancher. Carnet par défaut :
+  `MODES = ["accumcheck"]`, lot 6 contre 2 × 3. Testé sur CPU.
+
+### Décisions prises
+- Accumulation relancée à 6 contre 2 × 3 (~10 min, approuvé). Critère de mise à jour accepté
+  seulement si le plancher montre un écart comparable. Contrôles futurs : juger la mise à jour
+  après plusieurs pas ou en excluant les poids de gradient quasi nul.
+- Run C : micro-lot 5 (× 6 = 30) sans autre discussion si le pic et le tableau 4 / 6 / 8
+  laissent moins de 1,5 Gio au micro-lot 6.
+
+### Prochaines actions
+1. [ROUGE] `accum_check.json` du passage à lot 8 (écart de mise à jour du plancher au pas 1).
+2. [ROUGE] Relance de l'accumulation (carnet réimporté), puis consigner le résultat dans le protocole.
+3. [ROUGE] Tableau mémoire 4 / 6 / 8.
+4. [JAUNE] Fin de l'enregistrement mercredi : vérifier, convertir, vérifier le jeu.
+
+## État actuel (19 octobre 2026 — après-midi, Run C : encodeur entier, accumulation et reprise testées sur CPU)
+
+### Ce qui a été accompli
+- **Sonde par couche de smolvla_base** (règle `layer_probe` engagée avant les mesures,
+  3640c357) : sonde linéaire, médiane mm haut / gauche / droite. Dernière couche (référence)
+  32,8 / 39,2 / 38,7 ; couche 4 27,6 / 35,7 / 36,7 ; **couche 6 (la meilleure) 25,1 / 32,7 /
+  32,9** ; couche 8 26,7 / 33,2 / 33,1 ; couche 12 avant normalisation 32,1 / 38,0 / 36,8.
+  La règle engagée : bornes **≤ 26,2 / 31,3 / 30,9 mm** (IC de la différence hors de 0) sur au
+  moins 2 caméras sur 3, jugée sur les couches 4 et 8. Couches 4 et 8 : aucune caméra sous sa
+  borne. Couche 6 (rapportée, non jugée) : sous la borne sur la caméra du haut seulement (1 sur
+  3). **Verdict : encodeur entier.** Les couches du milieu localisent un peu mieux que la
+  dernière (~6 mm, IC hors de 0), pas assez pour la règle.
+  *(Corrigé le 19/10 au soir : la première version de cette entrée présentait la couche 8 comme
+  la meilleure et la règle en pourcentage.)*
+- **Accumulation de gradient** dans le lanceur du pilote Kaggle (pilote restauré :
+  `training/smolvla_kaggle/smolvla_kaggle_driver.py`). Sur CPU, gel de Run C, fp32 :
+  gradients identiques au lot entier à 4e-7 près (groupes ~1,5e-6), avec des remplissages
+  inégaux ; les seuls écarts sont les biais `k_proj` de la vision, de gradient nul par
+  construction (bruit ~1e-8). Mode `accumcheck` de bout en bout (expert seul, la RAM du conteneur
+  ne tient pas le gel de Run C avec les copies) : PASS sur 3 pas.
+- **Reprise** (mode `resumecheck`, gel de Run C, 12 pas, coupée après le pas 5, reprise du 4) :
+  PASS — pas final 12 / 12, calendrier de LR identique, aucun pas manquant, perte moyenne après
+  reprise 1,08 contre 1,31 (écart dans 2 erreurs types, 0,57).
+  - **Défaut trouvé et corrigé** : une session coupée pendant une sauvegarde laissait un point
+    de contrôle partiel que la session suivante reprenait (plantage) ; il faut désormais les cinq
+    fichiers de `training_state`.
+  - **Tracé** : l'ordre des données après reprise est exact (mêmes trames aux pas 5-8) ; le bruit
+    et les temps du flow matching diffèrent (le nouveau chargeur tire une fois dans l'état
+    aléatoire restauré). Sans conséquence, d'où la comparaison des pertes en moyenne.
+  - LeRobot ne sauve pas le facteur d'échelle fp16 : il repartait à 65536 après reprise.
+    **Corrigé le soir** : le lanceur l'écrit dans `training_state/grad_scaler.json` et le restaure
+    (aller-retour testé sur CPU avec un vrai `GradScaler`) ; mises à jour sautées signalées.
+- Carnet **`smolvla_runC_checks_t4.ipynb`** (~40 min de T4) : lot 8 contre 2 × 4 (seuils fixés
+  avant : gradients et perte à 1 %, mise à jour à 5 %), puis reprise à 2 × 6 sur 200 pas.
+  **Pas lancé.**
+- Règle d'arrêt entre les deux sessions de Run C engagée (`run_c_midway_stop`).
+
+### Décisions prises
+- Run C sur Kaggle gratuit, **encodeur entier**, **lot 6 × 5 accumulés (effectif 30)**, sauf si
+  le tableau 4 / 6 / 8 donne moins de 1,5 Gio de marge au lot 6 ; ~19 h en deux sessions.
+- Poids gardés tous les **2 500 pas** (`KEEP_EVERY`), sauvegarde de reprise toutes les 500.
+- Entre les deux sessions : sonde + échange d'images sur le dernier point gardé ; arrêt si
+  l'encodeur localise moins bien que smolvla_base (IC au-dessus de 0 sur 2 caméras sur 3) ou si
+  l'un des deux critères d'échange échoue.
+- Ordre : enregistrement 1051-1400, puis Run B ; Run C la semaine suivante. Aucune course Kaggle
+  sans accord.
+
+### Prochaines actions
+1. [ROUGE] Tableau de mémoire 4 / 6 / 8 (en attente) → confirmer le lot 6.
+2. [ROUGE] Carnet `smolvla_runC_checks_t4.ipynb` sur T4 — sur accord.
+3. [ROUGE] Graines 1051-1400 — sur confirmation (portable sur secteur, sans veille), ~37 h,
+   fin mercredi acceptée. Conteneur nettoyé le 19/10 (redémarré : 1052 zombies) ; lancer sous
+   `reap_children.py` (commande ci-dessous).
+4. [JAUNE] Reste du code de Run C : LR de vision bas, tête auxiliaire de position (seulement
+   pendant l'entraînement), carnet d'entraînement (lot 30 = 6 × 5, `KEEP_EVERY` 2500).
+5. [JAUNE] Carnet Run B (réglages de Run A, ≥ 400 dispositions) après l'enregistrement.
+
+### Commande rapide de reprise
+```bash
+# Résultats de la sonde par couche
+docker exec gazebo_to_lerobot cat /workspace/probe/fit_layer.log
+# Enregistrement 1051-1400 (sur confirmation seulement), sous le récolteur de zombies
+docker exec -d gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_B RANDOM_START=1 PREPLACE=1 python3 /workspace/src/scripts/reap_children.py /workspace/src/scripts/record_tri_batch.sh 1051 1400'
+```
+
+## État actuel (19 octobre 2026 — matin, mesure mémoire Run C : lot 16 épuise la mémoire)
+
+### Ce qui a été accompli
+- **Mesure mémoire sur Kaggle (lots 16 / 20 / 24) : mémoire épuisée dès le lot 16**
+  (pic nvidia-smi 14 903 Mo). Bon gel vérifié sur T4 : 198,1 M entraînables, langage gelé.
+- **Erreur de l'estimation** : elle supposait que la course 36k entraînait les 450 M
+  paramètres. En fait la 36k avait **déjà le gel de Run C** (`TRAIN_VISION`, 198,1 M) et
+  culminait à 9,21 Gio au lot 4. Recalculé : ~4,7 Gio fixes + ~1,1 Gio par échantillon, donc
+  lot 6 ≈ 11,5 Gio, lot 8 ≈ 13,7 Gio (limite), lot 16 ≈ 22,7 Gio.
+- Carnet ramené aux lots 4 / 6 / 8, avec `expandable_segments` comme la 36k. **Pas relancé.**
+
+### Prochaines actions
+1. [ROUGE] Relancer la mesure (lots 4 / 6 / 8, ~15 min) — sur accord.
+2. [ROUGE] Graines 1051-1400 dès confirmation (portable sur secteur, sans veille).
+3. [JAUNE] Run C : lot effectif 32 = 8 × 4 ou 4 × 8 ; ~6,7 s par pas de 32 (36k : 4,8 échantillons/s),
+   10 000 pas ≈ 19 h, 15 000 ≈ 28 h.
+
+## État actuel (19 octobre 2026 — journée, mesure mémoire Run C prête, porte de Run C)
+
+### Ce qui a été accompli
+- Accord pour les graines 1051-1400 : **lancement quand le portable peut rester sur secteur
+  et éveillé** (confirmation attendue).
+- **Carnet de mesure mémoire T4** `training/smolvla_kaggle/smolvla_runC_memcheck_t4.ipynb` :
+  gel de Run C (198,1 M entraînables : vision 86,4, connecteur 11,8, expert 99,9 — vérifié sur
+  CPU), lots 16 / 20 / 24. Accord donné ; à lancer sur Kaggle.
+- **Porte de Run C** (addendum `run_c_gate` de `config/probe_protocol.yaml`) : sonde améliorée
+  **et** échange d'images qui déplace toujours la saisie. Recalculé sur les données du 19/10 :
+  Run A 15k passe (+81,6 mm [+32,8 ; +122,3] ; part donneur +46 % [+23 ; +67]), 36k@36k échoue
+  (+2,3 mm [−27,5 ; +12,2] ; +6 % [−4 ; +16]). La règle porte sur la variation de la part
+  donneur, pas sur la part seule : 36k est déjà à 64 % avec ses propres images.
+
+### Prochaines actions
+1. [ROUGE] Mesure mémoire sur Kaggle (lots 16 / 20 / 24), puis choix du lot et de l'accumulation.
+2. [ROUGE] Graines 1051-1400 dès confirmation (portable sur secteur, sans veille).
+3. [JAUNE] Code de Run C après la mesure.
+
+### Commande rapide de reprise
+```bash
+docker exec -d gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_B RANDOM_START=1 PREPLACE=1 /workspace/src/scripts/record_tri_batch.sh 1051 1400'
+```
+
+## État actuel (19 octobre 2026 — matin, lot B 1001-1050 vérifié et converti)
+
+### Ce qui a été accompli
+- **Lot 1002-1050 terminé à 05:04** (Paris), sans incident : 50 graines, 50 épisodes OK.
+  Médiane 6,2 min par disposition (5,4-6,9) hors concurrence CPU ; 24 Go de bags.
+- **`verify_preplaced_batch.py` 1001-1050 : 0 problème**, sur les enregistrements puis sur le
+  jeu converti. Pièces déjà triées 0/1/2/3 : 11/11/10/18 (compatible avec l'uniforme, khi² p ≈ 0,35).
+  Cibles : pavé jaune 13, cylindre vert 13, cube bleu 12, cube rouge 12. Aucune cible déplacée,
+  chaque pièce pré-triée dans son bac au début et à la fin, aucune autre pièce bougée de plus d'1 mm.
+- **Jeu `local/mycobot_tri_sort_B_s1001_1050`** : 50 épisodes, 8 954 images, 159-214 images par
+  épisode (médiane 178), pas de temps 0,1 s, la bonne consigne par épisode, 147 Mo.
+- Le contrôle `--dataset` demande pandas : il tourne dans `/workspace/venv_lerobot` (RUNNING.md corrigé).
+
+### Prochaines actions
+1. [ROUGE] Graines 1051-1400 (350 dispositions, ~37 h, ~170 Go de bags), sur accord.
+2. [JAUNE] Run C : taille de lot à confirmer sur Kaggle (lot 16 / 20 / 24), sur accord.
+
+### Commande rapide de reprise
+```bash
+docker exec -d gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_B RANDOM_START=1 PREPLACE=1 /workspace/src/scripts/record_tri_batch.sh 1051 1400'
+```
+
+## État actuel (19 octobre 2026 — nuit, test d'échange d'images, lot B 1001-1050 en cours)
+
+### Ce qui a été accompli
+- **Test d'échange d'images** (`open_loop_check.py --swap-images`, graines réservées 91-100,
+  120 tronçons, 40 épisodes) : chaque épisode reçoit les images de la même pièce sur la graine
+  suivante, avec son propre état et sa consigne. IC 95 % par bootstrap sur les épisodes.
+
+  | | pointe, échangé − propre | point de fermeture | fermetures plus près du donneur, propre → échangé |
+  |---|---|---|---|
+  | Run A 15k (encodeur gelé) | **+16,7 mm [+5,0 ; +31,0]** | **+81,6 mm [+32,8 ; +122,3]** | **35 % → 81 %** [68 ; 94] |
+  | 36k@36k (encodeur entraîné) | −1,7 mm [−6,1 ; +7,2] | +2,3 mm [−27,5 ; +12,2] | 64 % → 70 % |
+
+  - **Run A se sert des images pour décider où aller** : avec les images d'une autre
+    disposition, 26 fermetures sur 32 vont vers la saisie de cette autre disposition.
+  - **36k@36k ignore les images** : les échanger ne change rien.
+  - Réserve : l'image échangée montre aussi le bras dans une autre pose que l'état ; le
+    glissement des fermetures vers la saisie du donneur est, lui, propre à la disposition.
+- **Lot B, un épisode par disposition** (`PREPLACE=1`, graines 1001-1400, cible
+  `PIECES[graine % 4]`, 0 à 3 autres pièces posées dans leur bac, jamais la cible). Graine 1001
+  enregistrée de bout en bout, 0 problème, image vérifiée. Lot 1002-1050 lancé à 23:31.
+- Estimation T4, couches de langage gelées (vision + connecteur + expert entraînés) : voir
+  le message du 19/10 ; à confirmer par une courte mesure sur Kaggle, sur accord.
+
+### Prochaines actions
+1. [ROUGE] Fin du lot 1002-1050, conversion, `verify_preplaced_batch.py` avec `--dataset`.
+2. [JAUNE] Puis le reste, 1051-1400, sur accord après vérification.
+3. [JAUNE] Run C : taille de lot mesurée avant d'écrire l'accumulation de gradient.
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot bash -c 'tail -3 /workspace/tri_sort_B/batch.log; python3 /workspace/src/scripts/verify_preplaced_batch.py /workspace/tri_sort_B 1001 1050'
+```
+
+## État actuel (18 octobre 2026 — soir, Gazebo graine 11 et test de recadrage)
+
+### Ce qui a été accompli
+- **Gazebo, Run A 15k, graine nouvelle 11**, départ en pose d'observation (17:50-18:35,
+  `/workspace/eval/gate/runA_015000_s011_obs_c1`) : **0/4 trié**. `failure_modes.py` :
+  - cube rouge, pavé jaune, cylindre vert : **emplacement mémorisé** (fermeture à 163, 185 et
+    89 mm de la pièce, à 18, 7 et 7 mm d'un point de saisie d'une graine d'entraînement) ;
+  - **cube bleu : saisi, non déposé**. Première fermeture à 10,6 mm de la pièce, à hauteur de
+    saisie ; soulevé à ~115 mm trois fois puis reposé à 2-5 cm près, fin à 42 mm du départ ;
+    jamais transporté vers son bac (à ~17 cm). Première saisie sur une graine nouvelle.
+  - Pour mémoire, 13/10 sur la même graine : 0/4, rien saisi.
+- **Test de recadrage** (option 1, critère figé dans 67a3d4ac), smolvla_base, mêmes 799
+  dispositions, linéaire, médiane / p90 en mm :
+
+  | | dessus | gauche | droite |
+  |---|---|---|---|
+  | image entière, connecteur | 32,0 / 79 | 38,8 / 86 | 38,6 / 83 |
+  | **recadrée, connecteur** | **28,5 / 72** | **30,5 / 74** | **30,0 / 72** |
+  | recadrée, couche vision | 27,1 / 69 | 29,7 / 73 | 29,5 / 69 |
+  | plancher pixels recadré | 46,2 / 118 | 39,9 / 103 | 39,7 / 104 |
+
+  - **Échec** : dessus 28,5 mm > 20 mm, bien qu'il batte le plancher recadré de 38 %.
+  - Gain modeste : −11 % au-dessus (grossissement 2,35), −21 % sur les côtés (1,76).
+    Les pièces passent de ~1-2 à ~2-4 patchs, la localisation reste à ~30 mm.
+  - Recadrée, la base bat les pixels de ≥20 % sur les trois caméras (38 / 23 / 25 %).
+    Le critère de validité de la sonde serait donc rempli sur les recadrages, mais les
+    encodeurs 36k n'y ont pas été passés.
+
+### Décisions prises
+- Pas de course Kaggle préparée. L'option 2 (positions YOLO dans l'état) sera décidée à la
+  réunion du 19/10.
+
+### Prochaines actions
+1. [ROUGE] Réunion du 19/10 : choix parmi les options de perception (positions YOLO dans
+   l'état, caméra au poignet).
+2. [JAUNE] Ne pas construire le lot de 80 épisodes.
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot bash -c 'tail -25 /workspace/probe/fit_crop.log; cat /workspace/eval/gate/runA_015000_s011_obs_c1/failure_modes.json | head -40'
+```
+
+## État actuel (18 octobre 2026 — après-midi, Run A terminé, courbe 5k-20k)
+
+### Ce qui a été accompli
+- **Run A terminé** (code du 13/10, 160 épisodes, encodeur gelé, 20 000 pas) : session 1
+  jusqu'au pas 13 000 (17/10 17:56), session 2 reprise au pas 13 000, fin le 18/10 à 10:15
+  (perte finale 0,034, rc 0, 12,5 Go GPU). Session 2 à 3,34 s/pas contre 2,88. Les
+  « Traceback » du journal Kaggle sont TorchCodec qui ne se charge pas (`libnppicc.so.13`) ;
+  LeRobot retombe sur pyav, déjà configuré : sans effet.
+- Sorties copiées et vérifiées (CRC du zip, sha256 identiques dans le conteneur,
+  `/workspace/checkpoints/run_A_frozen_20k/{005000,010000,015000,020000}`) ; l'encodeur
+  vision + connecteur de Run A est identique à smolvla_base (198 tenseurs, écart 0).
+- **Boucle ouverte sur les graines réservées 91-100** (120 tronçons, 40 épisodes), comparaison
+  appariée par `scripts/open_loop_compare.py`, IC 95 % par bootstrap sur les épisodes :
+
+  | Point | pointe | articulations | pince | point de fermeture |
+  |---|---|---|---|---|
+  | 13/10 | 100,2 mm | 17,06° | 0,071 | 90,8 mm |
+  | 36k@36k | 65,0 mm | 10,13° | 0,018 | 108,2 mm |
+  | Run A 5k | 64,8 mm | 10,06° | 0,022 | 85,1 mm |
+  | Run A 10k | 56,0 mm | 9,32° | 0,018 | 61,6 mm |
+  | Run A 15k | 50,2 mm | 8,03° | 0,016 | 66,5 mm |
+  | Run A 20k | 53,4 mm | 8,75° | 0,013 | 66,6 mm |
+
+  - Run A 20k − 36k@36k : pointe −11,6 mm [−24,3 ; +3,1], articulations −1,39° [−3,39 ; +0,89],
+    pince −0,005 [−0,008 ; −0,001]. Seule la pince est significative.
+  - 5k → 15k : pointe −14,5 mm [−23,1 ; −1,3], articulations −2,04° [−3,90 ; −0,07] : progrès réel.
+  - 10k → 20k : pointe −2,6 mm [−10,7 ; +7,1] ; 15k → 20k : +3,2 mm [−4,9 ; +7,5]. La position
+    est **plate à partir de 10-15k** ; seule la pince progresse encore (10k → 20k −0,005
+    [−0,008 ; −0,002]).
+  - Fermeture à moins de 20 mm : 1 à 2 sur 22-24 à tous les points ; les pièces font 25-30 mm.
+- Gazebo 36k@36k, graine d'entraînement 21 : 0/4, fermetures à 5-26 cm des pièces, sur des
+  emplacements d'autres graines d'entraînement (sous-entraînement).
+- Sonde : rendu de 799 dispositions (graine 5515 impossible à échantillonner), après deux
+  corrections (images en retard d'une disposition ; bacs statiques absents de
+  `dynamic_pose/info`). Caractéristiques smolvla_base faites, 36k en cours.
+
+- **Sonde de l'encodeur** (799 dispositions, protocole figé `probe_protocol.yaml`) : erreur de
+  localisation par pièce, linéaire sur le connecteur, médiane / p90 en mm :
+
+  | | dessus | gauche | droite |
+  |---|---|---|---|
+  | plancher moyenne | 106 / 189 | 106 / 189 | 106 / 189 |
+  | plancher pixels 32×24 | 48 / 120 | 43 / 112 | 44 / 120 |
+  | **smolvla_base (= 13/10 = Run A)** | **32 / 79** | **39 / 86** | **39 / 83** |
+  | 36k@8k | 71 / 160 | 81 / 173 | 81 / 168 |
+  | 36k@36k | 80 / 179 | 80 / 177 | 74 / 174 |
+  | plafond (position image vraie, MLP) | 1,4 / 3,4 | 1,6 / 4,1 | 1,6 / 4,2 |
+
+  - **Sonde invalide selon sa propre règle** : smolvla_base ne bat les pixels bruts de 20 %
+    que sur la caméra du dessus (34 %), pas à gauche (9 %) ni à droite (12 %). Donc aucun
+    verdict « endommagé » n'est prononcé, conformément au protocole.
+  - À titre descriptif seulement : les encodeurs 36k sont environ deux fois moins bons que
+    la base sur les trois caméras, IC du bootstrap apparié loin de 0 (+33 à +55 mm) ; pas
+    d'artefact de valeurs aberrantes (aucune valeur non finie, variance non concentrée).
+  - La sonde MLP fait moins bien que la linéaire partout (51-58 mm pour la base) : recette
+    MLP faible à 640 exemples, pas une preuve d'absence d'information non linéaire.
+  - Les caractéristiques gelées ne localisent **pas** sous 25 mm (32-39 mm médian, p90
+    79-86 mm), avec 640 dispositions d'apprentissage ; la politique n'en a vu que 40.
+
+### Décisions prises
+- Pas de course à ~320 épisodes : la règle fixée le 18/10 la réservait au cas où les
+  caractéristiques gelées localisent nettement sous 25 mm. Place aux options de perception.
+- Plus de pas ne servira pas la position : la courbe est plate après 10-15k.
+- Proposé (en attente d'accord) : vérification 80 contre 160 épisodes avant de choisir entre
+  « plus de données » et « perception ».
+
+### Prochaines actions
+1. [ROUGE] Fin des caractéristiques 36k@8k et 36k@36k, puis `probe_fit.py` et verdict.
+2. [ROUGE] Gazebo, Run A 20k sur les graines nouvelles 11-20.
+3. [JAUNE] Si accord : vérification 80 contre 160 épisodes sur Kaggle.
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot bash -c 'cat /workspace/probe/features.log; cd /workspace/eval/open_loop_heldout && python3 /workspace/src/scripts/open_loop_compare.py run_1415_unfrozen_36k_036000.json run_A_frozen_20k_020000.json'
+```
+
+## État actuel (17 octobre 2026 — midi, lot 52-100 terminé, Run A en cours)
+
+### Ce qui a été accompli aujourd'hui
+- **Lot graines 52-100 terminé** (départs aléatoires), du 16/10 19:48 au
+  17/10 12:32 (Paris) : **196/196 épisodes réussis, tous au premier essai**,
+  196 tirages de départ tous atteints du premier coup, **0,0 mm** de
+  déplacement des pièces pendant la mise en pose. 19-23 min par graine
+  (légère dérive vers la fin), 91 Go de bags. Avec les graines 1-10 et 51 :
+  240 épisodes, écart médian au centre du bac 7,1 mm (max 21,5 mm),
+  156-215 trames par épisode.
+- **Run A lancé sur Kaggle** (par l'utilisateur) à ~07:24 (Paris), GPU T4 x2.
+  Contrôles : 155 tenseurs entraînables, `epch` 0,06 au pas 50 (= 28 359
+  trames), lr conforme à la montée, `grdn` fini dès le pas 100, 2,88 s/pas
+  comme le 13/10. Arrêt de la session 1 attendu vers 17:55 (Paris), ~pas 13 000.
+- Deuxième cycle graine 1 avec le 13/10 lancé à 12:44 (Paris).
+
+- **Graine 1 (2e cycle, 13/10) : 4/4** ; **graine 11 (13/10) : 0/4**, pièces
+  intactes, fermetures à 11-40 cm de la pièce et près de positions
+  d'entraînement (graine 2) : le 0/40 d'avant la perte est reproduit, la
+  nouvelle évaluation est validée.
+- **Boucle ouverte, 160 épisodes** (graines 1, 24, 37, 50) : le 36k progresse
+  de 8k à 36k (bout de pince 106 → 44 mm) mais manque la saisie de ~5 cm
+  sur ses propres graines d'entraînement : preuve de sous-entraînement.
+  ⚠ Les graines 24/37/50 sont d'entraînement pour le 36k et nouvelles pour
+  le 13/10 : les deux colonnes ne sont pas comparables.
+
+### Décisions prises
+- **Graines 91-100 réservées en permanence** (jamais entraînées) : contrôle
+  en boucle ouverte du 13/10, du 36k@36k puis de Run A sur ces graines, à la
+  place de la plupart des essais Gazebo. Gazebo : seul 36k@36k sur la
+  graine 21, avec grasp_spots.
+
+### Prochaines actions
+1. [ROUGE] Session 2 de Run A après l'arrêt de la session 1 (sortie de la
+   session 1 en entrée, `resuming from step ~13000`, lr ≈ 3e-05).
+2. [JAUNE] Étape 4 : comparaison des checkpoints 8k-36k (boucle ouverte, puis
+   Gazebo graines 11-15 + 3 et 21). Étape 5 : sonde de l'encodeur.
+3. [VERT] Exclure `seed_051.test1_robot_links_in_displacement` de tout jeu.
+
+## État actuel (16 octobre 2026 — soir, reconstruction après la perte de la machine)
+
+### Ce qui a été accompli aujourd'hui
+- **Machine reconstruite** après la perte de l'Ubuntu WSL (~15/10). Perdus : 7
+  commits SmolVLA jamais poussés (pilote Kaggle, évaluation Gazebo, départs
+  aléatoires, outils de trace), les enregistrements des graines 21-50.
+  Retrouvés : l'archive des graines 1-10 sur D: (20 Go, copiée et vérifiée
+  octet par octet sur le disque Linux), les deux entraînements Kaggle (13/10
+  gelé 20k ; 14-15/10 dégelé 36k, checkpoints 8k-36k), leurs notebooks, le jeu
+  de 160 épisodes (zip sha256 `0738a842…5c65`).
+- **Données vérifiées** : graines 1-10 reconverties = 40 épisodes / 7 049 trames,
+  200 statistiques de normalisation identiques au checkpoint 13/10 ; jeu de 160
+  épisodes = 28 359 trames, statistiques identiques au checkpoint 36k.
+- **Image Docker** : extras SmolVLA figés aux versions d'entraînement Kaggle
+  (71aa026a).
+- **Notebooks Kaggle** versionnés tels quels (27185865) ; **Run A** préparé
+  (17c6ce51) : code du 13/10, 160 épisodes, 20k pas, batch 32, encodeur gelé,
+  `SAVE_FREQ` 500, `KEEP_EVERY` 5000, arrêt à 10,5 h ; reprise testée sur CPU
+  (deux défauts corrigés).
+- **Évaluation réécrite** et validée : contrôle en boucle ouverte du 13/10,
+  fermeture de la pince à 0,7-9,8 mm du point enregistré (6270970c) ; Gazebo
+  graine 1, **4/4** (117ed0a1).
+- **Départs aléatoires** recalibrés sur les 120 poses des graines 21-50
+  (9ad81083, be38c15e) ; test graine 51 : 4/4, aucune pièce déplacée.
+- **Lot graines 52-100 lancé** à 19:48 (Paris), départs aléatoires.
+
+### Décisions prises
+- Run A = seul changement par rapport au 13/10 : les données (plus réglages de
+  sauvegarde/arrêt). Lancé par l'utilisateur sur Kaggle, samedi ~08:00 Paris
+  (quota remis à zéro samedi 04:00 Paris), en deux sessions.
+- Le résultat 36k n'est pas une preuve d'encodeur dégradé tant que la sonde ne
+  le montre pas : il était sous-entraîné (144k échantillons).
+- Graines d'évaluation fixées : 11-20 (criblage 11-15), réserve 101-120 ; jamais
+  enregistrées pour l'entraînement.
+- Échantillonneur des graines 51-100 ≠ celui des 21-50 (perdu) : un peu plus
+  étroit aux extrêmes, un peu moins de départs bas (`RUNNING.md`).
+- Pousser `feature/sort-episodes` après chaque contrôle réussi et en fin de
+  journée.
+
+### Prochaines actions
+1. [ROUGE] Samedi : Run A session 1 (~08:00 Paris), puis session 2 le soir
+   (liste de contrôle donnée le 16/10).
+2. [ROUGE] Fin du lot 52-100 (~samedi 13:00 Paris) : vérifier les verdicts,
+   les déplacements de pièces et les poses de départ.
+3. [JAUNE] Deuxième cycle graine 1 (13/10) ; comparaison des checkpoints 36k
+   (8k-36k) sur graines 11-15 + 3 et 21, boucle ouverte et points de saisie sur
+   le jeu de 160 épisodes.
+4. [VERT] Sonde de l'encodeur (protocole complet : 500-1 000 dispositions,
+   plancher/plafond, par caméra, seuil fixé d'avance).
+
+### Commande rapide de reprise
+```bash
+docker start gazebo_to_lerobot rlds_builder     # Docker Desktop doit tourner
+docker exec gazebo_to_lerobot tail -f /workspace/tri_sort/batch.log
+docker exec gazebo_to_lerobot /workspace/venv_lerobot/bin/python /workspace/src/scripts/summarise_eval.py /workspace/eval
+```
+
 ## État actuel (14 octobre 2026 — soir, DREAM sur le banc réel)
 
 ### Ce qui a été accompli aujourd'hui
@@ -34,6 +941,95 @@
 MYCOBOT_PI=10.10.0.223 /usr/bin/python3 scripts/lancer_tri_extrinseque_dream.py --dream
 # avec les ArUco : scripts/lancer_pick_dashboard_final.py --svpro-dream --dream
 ```
+
+## État actuel (10 octobre 2026 — soir, lot de 40 épisodes et documentation)
+
+### Ce qui a été accompli aujourd'hui
+1. Lot des graines 1 à 10 d'Osama : 39/40 au premier essai ; seul échec
+   graine 10, cube bleu (poussé hors de portée par les prises précédentes).
+2. Jeux LeRobot (39 épisodes, 6 874 images) et RLDS (39 épisodes,
+   6 881 pas), chacun rechargé par son lecteur officiel.
+3. Rejeux LeRobot et RLDS dans Gazebo : cube rouge dans son bac (+7/+1,
+   +7/0 mm). Vidéos faites par l'utilisateur.
+4. Documentation : rapport EN/FR §28–41, spécification annexe D, RUNNING.md.
+
+### Décisions prises
+- Positions par vérité terrain (option B) ; 3 caméras top/right/left,
+  640×480, 10 Hz, QoS reliable ; action = commande des contrôleurs.
+
+### Prochaines actions
+1. [FAIT] Graine 10 relancée : 4/4, lot 40/40, jeux de 40 épisodes (10 par instruction).
+2. [JAUNE] Choisir la vue unique d'OpenVLA ; enregistrer le jeu RLDS dans la configuration OXE.
+3. [VERT] Signaler à Osama l'échec de `tests/test_gt_isolation.py` sur `tri_dream_dashboard.py`.
+4. [FAIT] Reproduction depuis un clone (`docker/setup_workspace.sh`, `run_container.sh`), testée depuis zéro ; PR #17 intégrée ; PR ouverte.
+
+### Commande rapide de reprise
+```bash
+sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'; sleep 5; docker start gazebo_to_lerobot rlds_builder
+docker exec gazebo_to_lerobot python3 /workspace/src/scripts/summarise_tri_batch.py
+```
+
+---
+
+## État actuel (10 octobre 2026 — matin, premier épisode enregistré)
+
+### Ce qui a été accompli aujourd'hui
+1. Choix des 3 caméras : `top` + `right` + `left` (poses réelles, deux cycles
+   d'images, taille des objets sur 40 prises).
+2. Contrat `mycobot_tri_sort.yaml` validé par rosetta ; 10 Hz conservé.
+3. Pilote d'enregistrement + script par graine ; épisode cube rouge graine 1
+   complet après passage des images en `reliable`.
+
+### Décisions prises
+- 3 vues, 640×480 natif, 10 Hz (réglage d'Osama inchangé).
+- Un épisode = une prise-dépôt, du « ▶ » au verdict.
+
+### Mise à jour (10 octobre 2026 — fin de matinée, étape 3 terminée)
+- Action = commande des contrôleurs (relais `commanded_action_relay.py`) :
+  précède l'état d'une image.
+- Chaîne complète prouvée sur un épisode : bag → LeRobot (`rosetta_port`,
+  rechargé par `LeRobotDataset`, 172 images) et bag → RLDS (rechargé par
+  `tfds`, 173 pas).
+
+### Prochaines actions
+1. [ROUGE] Lot de 40 épisodes (graines 1-10), puis conversion des deux formats.
+2. [JAUNE] Enregistrer le jeu RLDS dans la configuration OXE d'OpenVLA.
+3. [VERT] Aligner LeRobot et RLDS sur le même nombre d'images (172 vs 173).
+
+### Commande rapide de reprise
+```bash
+docker exec gazebo_to_lerobot bash -c 'TRI_HOME=/workspace/tri_sort_test /workspace/src/scripts/record_tri_seed.sh 1 cube_rouge'
+```
+
+---
+
+## État actuel (9 octobre 2026 — après-midi, tri 4/4 sous Docker)
+
+### Ce qui a été accompli aujourd'hui
+1. Branche `feature/sort-episodes` : fusion d'`upstream/main` (ABMI-software,
+   scène `tri_yolo` d'Osama) dans la branche du fork `citdemond`.
+2. Paquets `mycobot_gateway` / `mycobot_description` du conteneur remplacés
+   par la version fusionnée (sauvegarde :
+   `Gazebo_to_LeRobot_Pipeline/backup_mycobot_pkgs_2026-10-09.tar.gz`) ;
+   `update_rate: 100`, `sorting_table.sdf`, `policy_runner_node.py` remis ;
+   `scripts/diff_ik.py` et `training/dream/mycobot_fk.py` ajoutés à côté.
+3. `pose_source:=ground_truth` ajouté à `sim_sorting_grasp` ; graine 1 : 4/4.
+
+### Décisions prises
+- Positions par vérité terrain Gazebo (option B), pas YOLO : même scène, même
+  pince physique, mêmes gestes qu'Osama.
+
+### Prochaines actions
+1. [ROUGE] Réduire les 4 caméras à 1-2 enregistrées : facteur temps réel ~0,04-0,1.
+2. [JAUNE] Brancher l'enregistreur rosetta sur le tri (4 sous-épisodes + 1 épisode complet par graine).
+3. [VERT] Vérifier qu'un épisode HTGSPP (ex. 16) passe toujours avec les paquets fusionnés.
+
+### Commande rapide de reprise
+```bash
+docker exec -it gazebo_to_lerobot /workspace/src/scripts/run_sort_gui.sh 1
+```
+
+---
 
 ## État actuel (7 octobre 2026 — après-midi, étape 10 validée en simulation)
 
@@ -431,6 +1427,163 @@ docker exec -it gazebo_to_lerobot bash
 # dans le conteneur :
 cd /workspace/htgspp && bash scripts/episode_gui.sh 16     # copie d'episode.sh, headless:=false
 cd /workspace/htgpp  && ros2 launch launch/pick_and_place_demo.launch.py
+```
+
+---
+
+## État actuel (5 octobre 2026)
+
+### Ce qui a été accompli aujourd'hui
+
+**Les jeux de données du tri se chargent dans le vrai LeRobot, et SmolVLA s'entraîne dessus.**
+La première conversion (écrite à la main) ne se chargeait pas et portait quatre
+défauts ; elle est remplacée par `scripts/port_bag.py` réécrit sur l'écrivain de
+LeRobot, dans un venv CPU sur l'hôte WSL2 (`~/venvs/lerobot044-cpu`).
+- `action[t] = état[t+1]` (aucun topic de commande enregistré ; dernière image
+  retirée) ; horodatage = indice / 30 ; appariement sur le temps d'en-tête ;
+  une seule clé `observation.images.top`.
+- Contrôles a–f réussis hors ligne : 48 / 12 épisodes, 29 687 / 7 411 images ;
+  l'image renvoyée par le chargeur est celle du MP4 au bon indice.
+- Test d'entraînement SmolVLA sur CPU (lot de 1, 10 pas) : perte finie,
+  ~4,1 s/pas, 3,5 Go, expert d'action seul entraîné (100 M / 450 M).
+- Rapport (EN/FR, HTML + Word) : nouvelle §28 ; spécification : annexe C ;
+  `datasets/README.md`, `MEASUREMENTS.md` §10, `RUNNING.md` à jour.
+- Références au partage Rôle A / Rôle B retirées de tous les documents du
+  projet ; procédure « entrer dans le conteneur » ajoutée à la documentation.
+
+### Décisions prises
+
+- lerobot **0.4.4**, épinglage **provisoire** (un seul endroit :
+  `scripts/requirements-lerobot.txt`) en attendant la version de l'équipe.
+- `distractors_moved` et la configuration caméra dans `meta/episodes_extra.jsonl`
+  (l'écrivain 0.4.4 n'accepte pas de champ par épisode personnalisé).
+- Les prochains lots enregistrent l'état désiré du contrôleur et la commande de
+  pince (canaux `adjunct` des contrats).
+
+### Prochaines actions
+1. [ROUGE] Confirmer la version de LeRobot de l'équipe ; reconvertir si elle diffère.
+2. [JAUNE] Fusionner la PR #16, puis la PR #17.
+3. [VERT] Évaluation en boucle fermée dans Gazebo via `policy_runner_node` (rosetta) ;
+   plus d'épisodes et plus de diversité de positions.
+
+### Commande rapide de reprise
+```bash
+# hôte WSL2
+~/venvs/lerobot044-cpu/bin/python -c "import lerobot, importlib.metadata as m; print(m.version('lerobot'))"
+cd Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo && cat datasets/README.md | head -40
+```
+
+---
+
+## État actuel (4 octobre 2026 — après-midi)
+
+### Ce qui a été accompli aujourd'hui
+
+**Le POC de tri quatre objets est terminé sur une seule machine** (le portable
+WSL2, conteneur `gazebo_to_lerobot`) : lot de 60 épisodes **60/60 PASS du
+premier coup** sous une seule version de code (`f977d7af65dc`), converti en
+`mycobot_sorting_train` (48) et `mycobot_sorting_heldout` (12), et deux launch
+files testés (GUI : reste ouvert, Ctrl+C propre ; headless : code de sortie
+0/1/2). Tout est dans
+`Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/MEASUREMENTS.md` §9–10.
+
+**Chemin parcouru, dans l'ordre :**
+- bacs de 100 mm qui s'interpénétraient → aucune disposition atteignable de
+  quatre bacs de 100 mm ; ouverture 70 mm → **échec à la sonde** (cubes calés
+  sur le rebord à 28°) ; ouverture 80 mm → échec au seuil de 5 mm de marge ;
+- cause trouvée : en se fermant, les mors mettent le cube d'équerre avec la
+  pince, donc **le cube atterrit au lacet de la pince à la dépose, modulo 90°**
+  (prédiction exacte sur les trois épisodes sondés). Avec un lacet libre, le
+  pire cas vaut 45° (70,7 mm pour un cube de 50) et **aucune géométrie de bac
+  ne pouvait convenir** ;
+- correctif : dépose d'équerre avec le bac, résolue sous contrainte de lacet
+  dans `precompute_ik.py` ; sonde sur six épisodes (rouge, bleu, jaune ×
+  variantes intérieure et extérieure) : tous passent, marge ≥ 11,4 mm.
+
+**Épisode 12** : le mors ouvert a poussé le cylindre vert de 22,9 mm en
+descendant vers la prise (vérifié image par image). Conservé et étiqueté :
+`distractors_moved` est reporté par `port_bag.py` dans `meta/episodes.jsonl`.
+
+### Décisions prises
+
+- **Un seuil fixé par l'utilisateur ne se relâche pas.** Un seuil de 5 mm a
+  été abaissé après coup et un lot lancé dessus ; arrêté après 2 épisodes,
+  archivé (`archive_2026-10-04_option2_stopped/`). Une marge porte sur les
+  épisodes non sondés, pas sur ceux qui l'ont été.
+- Bacs : 80 mm d'ouverture, parois 3 mm, bac bleu en (0,24, 0,01).
+- `BIN_CLEAR = 5 mm` est une valeur choisie, pas une marge dérivée.
+- Le lot du 03/10 (54/60) avait le chevauchement des bacs : il n'est pas une
+  référence.
+
+### Prochaines actions
+1. [ROUGE] Relire le commit et la PR préparés, puis commit/PR sur instruction.
+2. [JAUNE] Charger les jeux de données avec la vraie classe `LeRobotDataset`
+   sur une machine avec PyTorch (jamais fait).
+3. [VERT] Prochaine itération : maillages de collision → primitives (RTF),
+   obstruction en levée repliée (J2 ≤ 48°), caméra poignet
+   (`doc/LIMITATIONS.md`).
+
+### Commande rapide de reprise
+```bash
+# hôte WSL2
+sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'
+docker start gazebo_to_lerobot      # démarre le conteneur en arrière-plan, ne donne pas de shell
+docker exec -it gazebo_to_lerobot /workspace/htgspp/scripts/run_gui_demo.sh episode:=16   # démo GUI
+docker exec -it gazebo_to_lerobot bash                    # ou un shell dans le conteneur (ROS déjà chargé)
+```
+
+---
+
+## État actuel (3 octobre 2026 — matin)
+
+### Ce qui a été accompli aujourd'hui
+
+**La démo GUI du POC headless a enfin été regardée.** Le §15 du rapport avait
+livré `pick_and_place_demo.launch.py` sans vérification visuelle (pas d'écran).
+Les 02–03/10, elle a été exécutée et observée de bout en bout dans Gazebo sur
+le portable WSL2, en partant de rien : démon Docker arrêté, ni image ni
+conteneur `gazebo_to_lerobot`. Le bras saisit le cube rouge et le pose sur
+l'assiette, à ~3 mm du centre ; `RESULT: motions_ok=True placed_on_plate=True
+grasp_held=True`, sans interface comme avec.
+
+**Cinq obstacles, tous mesurés et documentés** dans l'addendum §16–30 du
+rapport (EN/FR, HTML + Word) :
+- démon Docker à lancer à la main (`sudo sh -c 'nohup dockerd …'`), pas de
+  systemd dans WSL ;
+- `moveit_py` absent de l'image (`ros-jazzy-moveit` ne l'inclut pas) —
+  `run_demo.py` le présente comme « no reachable elbow-up IK solution » ;
+- simulation figée : le `DISPLAY=172.24.112.1:0` de l'hôte, transmis par
+  `run.sh`, bloque le capteur caméra et donc le pas de simulation
+  (contrôleurs jamais actifs) ; `DISPLAY=:0` (WSLg) corrige ;
+- fenêtre Gazebo blanche : D3D12 n'offre qu'OpenGL 4.1 sans compute shaders,
+  `ogre` comme `ogre2` ; llvmpipe (OpenGL 4.5, logiciel) corrige ;
+- vue minuscule qui se dézoome seule : mode Follow sur `mycobot_320`
+  (décalage 3 m / 2 m) et boîte englobante incluant le support de caméras.
+
+**`scripts/run_gui_demo.sh`** regroupe les trois corrections d'affichage, place
+la caméra près du bras et nettoie `move_group`/Gazebo à la sortie. Vérifié :
+démarrage, cadrage, contrôleurs actifs en 20–22 s, arrêt sans processus
+résiduel ; la séquence complète avec la version précédente du script (seule la
+sortie diffère).
+
+### Décisions prises
+
+- `Dockerfile`, `run.sh` et `run_demo.py` **non modifiés** : les corrections
+  vivent dans le script et dans les commandes documentées ; les trois
+  corrections permanentes sont proposées dans le rapport.
+- `moveit_py` installé dans le **conteneur**, pas dans l'image : un
+  `docker rm` le perd.
+
+### Prochaines actions
+1. [ROUGE] Faire reproduire la démo par José sur son poste avec l'addendum §16–30.
+2. [JAUNE] Appliquer les trois corrections permanentes (Dockerfile, run.sh, run_demo.py).
+3. [VERT] Ajouter les branches `*_tomislav_branch` à la carte de `.claude/rules/git-branching.md`.
+
+### Commande rapide de reprise
+```bash
+sudo sh -c 'nohup dockerd > /tmp/dockerd.log 2>&1 &'
+docker start gazebo_to_lerobot
+docker exec -it gazebo_to_lerobot /workspace/htgpp/run_gui_demo.sh
 ```
 
 ---

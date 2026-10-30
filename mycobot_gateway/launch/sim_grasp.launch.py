@@ -18,6 +18,15 @@ Usage:
   ros2 launch mycobot_gateway sim_grasp.launch.py
   ros2 launch mycobot_gateway sim_grasp.launch.py headless:=true
   ros2 launch mycobot_gateway sim_grasp.launch.py robot_appearance:=realistic
+  ros2 launch mycobot_gateway sim_grasp.launch.py headless:=true gui_client:=true
+
+headless:=true gui_client:=true runs the same windowless server as headless:=true and attaches a
+Gazebo window to it as a separate viewer process: the cameras and the physics stay those of the
+headless server (an evaluation watched this way renders what a headless one does), the window only
+shows them. gz_extra_args is appended to the headless server's arguments (e.g. --record-path).
+headless:=true run_on_start:=false starts the server paused: the robot is then spawned at simulation
+time 0, which puts the controller loop (100 Hz) and the cameras (10 Hz) on the same time grid in
+every run; whoever launched it unpauses once the robot exists (eval_tri_seed.sh STEP_LOCKED=1).
 """
 
 import os
@@ -26,13 +35,14 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    ExecuteProcess,
     IncludeLaunchDescription,
     SetEnvironmentVariable,
     TimerAction,
 )
 from launch.conditions import IfCondition, LaunchConfigurationEquals, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -119,9 +129,18 @@ def generate_launch_description():
     gz_headless = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(gz_pkg, 'launch', 'gz_sim.launch.py')),
-        launch_arguments={'gz_args': ['-r -s --headless-rendering ', world_path],
+        launch_arguments={'gz_args': [PythonExpression(["'-r ' if '", LaunchConfiguration('run_on_start'),
+                                                        "' == 'true' else ''"]),
+                                     '-s --headless-rendering ', world_path, ' ',
+                                     LaunchConfiguration('gz_extra_args')],
                           'on_exit_shutdown': 'true'}.items(),
         condition=IfCondition(headless),
+    )
+    gz_viewer = ExecuteProcess(
+        cmd=['gz', 'sim', '-g', '--gui-config', LaunchConfiguration('gui_config')],
+        output='screen',
+        condition=IfCondition(PythonExpression(
+            ["'", headless, "' == 'true' and '", LaunchConfiguration('gui_client'), "' == 'true'"])),
     )
 
     spawn = Node(
@@ -181,6 +200,12 @@ def generate_launch_description():
         DeclareLaunchArgument('arm_control_mode', default_value='position', choices=['position', 'effort']),
         DeclareLaunchArgument('controller_config', default_value=os.path.join(desc_pkg, 'config', 'controller.yaml')),
         headless_arg,
+        DeclareLaunchArgument('gui_client', default_value='false', choices=['true', 'false'],
+                              description='with headless:=true, a Gazebo window as a viewer only'),
+        DeclareLaunchArgument('gz_extra_args', default_value='',
+                              description='appended to the headless server arguments'),
+        DeclareLaunchArgument('run_on_start', default_value='true', choices=['true', 'false'],
+                              description='false: the headless server starts paused'),
         cameras_arg,
         camera_layout_arg,
         gui_config_arg,
@@ -194,6 +219,7 @@ def generate_launch_description():
         rsp,
         gz_gui,
         gz_headless,
+        gz_viewer,
         spawn,
         gz_bridge,
         camera_bridge,

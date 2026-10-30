@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spécification du tri à quatre objets</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --paper: #E9ECEA;
+  --surface: #FFFFFF;
+  --surface-sunk: #DEE3E0;
+  --ink: #172422;
+  --ink-soft: #4B5B57;
+  --ink-faint: #7C8985;
+  --line: #C4CBC7;
+  --accent: #146356;
+  --accent-ink: #0E4A40;
+  --accent-soft: #DBEAE6;
+  --verify: #8A5A12;
+  --verify-soft: #F1E6D3;
+  --bug: #9C3B23;
+  --bug-soft: #F3E1DA;
+  --code-bg: #10201D;
+  --code-text: #D9EDE8;
+  --code-accent: #7FD9C4;
+  --code-comment: #7C978F;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101615;
+    --surface: #171F1D;
+    --surface-sunk: #0C1312;
+    --ink: #E7EDEA;
+    --ink-soft: #9FB0AB;
+    --ink-faint: #6C7C77;
+    --line: #2A3532;
+    --accent: #57C4AE;
+    --accent-ink: #7FD9C4;
+    --accent-soft: #14322C;
+    --verify: #D6A44B;
+    --verify-soft: #33270F;
+    --bug: #E08468;
+    --bug-soft: #3A1D15;
+    --code-bg: #0A1513;
+    --code-text: #CFEAE3;
+    --code-accent: #7FD9C4;
+    --code-comment: #5D766F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #101615;
+  --surface: #171F1D;
+  --surface-sunk: #0C1312;
+  --ink: #E7EDEA;
+  --ink-soft: #9FB0AB;
+  --ink-faint: #6C7C77;
+  --line: #2A3532;
+  --accent: #57C4AE;
+  --accent-ink: #7FD9C4;
+  --accent-soft: #14322C;
+  --verify: #D6A44B;
+  --verify-soft: #33270F;
+  --bug: #E08468;
+  --bug-soft: #3A1D15;
+  --code-bg: #0A1513;
+  --code-text: #CFEAE3;
+  --code-accent: #7FD9C4;
+  --code-comment: #5D766F;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding-inline: 20px;
+}
+
+h1, h2, h3, h4 { font-family: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif; text-wrap: balance; color: var(--ink); }
+
+.shell {
+  max-width: 1180px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 40px;
+  padding-block: 32px 80px;
+}
+
+.rail {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.rail-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+}
+.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail a {
+  display: flex;
+  gap: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+  line-height: 1.35;
+}
+.rail a:hover, .rail a:focus-visible { background: var(--surface-sunk); color: var(--ink); outline: none; }
+.rail a .n { color: var(--accent); font-weight: 600; flex-shrink: 0; }
+.rail .rail-group-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 16px 0 4px 8px;
+}
+.rail .rail-group-label:first-child { margin-top: 0; }
+
+main { min-width: 0; }
+
+.cover {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 28px;
+  margin-bottom: 36px;
+}
+.cover .eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+.cover h1 { font-size: 2.55rem; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
+.cover .dek { font-family: "IBM Plex Serif", serif; font-style: italic; font-size: 1.1rem; color: var(--ink-soft); max-width: 62ch; margin: 0 0 20px; }
+.cover .meta {
+  display: flex; flex-wrap: wrap; gap: 22px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+.cover .meta b { color: var(--ink-soft); font-weight: 600; }
+
+section.block { margin-bottom: 44px; }
+section.block > h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  scroll-margin-top: 20px;
+}
+section.block > .block-dek {
+  color: var(--ink-soft);
+  max-width: 68ch;
+  margin: 0 0 20px;
+}
+p { max-width: 70ch; }
+.prose { max-width: 70ch; }
+
+code, .mono { font-family: "IBM Plex Mono", monospace; }
+p code, li code, td code, dd code, h4 code { background: var(--surface-sunk); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.88em; color: var(--accent-ink); }
+
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 14px 0;
+}
+pre .c { color: var(--code-comment); }
+pre .k { color: var(--code-accent); }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; background: var(--surface); }
+thead th {
+  text-align: left;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--surface-sunk);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody td:first-child { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--accent-ink); white-space: nowrap; }
+
+.step {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 22px 24px 24px;
+  margin-bottom: 18px;
+}
+.step-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.step-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+.step-head h3 { margin: 0; font-size: 1.18rem; font-weight: 600; }
+.step-purpose { color: var(--ink-soft); margin: 2px 0 16px; font-size: 0.95rem; }
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) { .panels { grid-template-columns: 1fr; } }
+.panel { border-radius: var(--radius); padding: 14px 16px 16px; }
+.panel.procedure { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+.panel.verify { background: var(--verify-soft); border: 1px solid color-mix(in srgb, var(--verify) 35%, transparent); }
+.panel-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin: 0 0 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.panel.procedure .panel-tag { color: var(--accent-ink); }
+.panel.verify .panel-tag { color: var(--verify); }
+.panel p, .panel ul, .panel pre { margin-top: 8px; margin-bottom: 8px; }
+.panel p:first-of-type { margin-top: 0; }
+.panel ul { padding-left: 18px; margin: 8px 0; }
+.panel li { margin-bottom: 4px; font-size: 0.94rem; }
+.panel pre { font-size: 12px; }
+
+.bugcard {
+  border: 1px solid color-mix(in srgb, var(--bug) 35%, var(--line));
+  background: var(--bug-soft);
+  border-radius: 12px;
+  padding: 20px 22px 22px;
+  margin-bottom: 18px;
+}
+.bugcard h4 { margin: 0 0 4px; font-size: 1.08rem; color: var(--ink); }
+.bugcard .repo {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--bug);
+  margin: 0 0 14px;
+}
+.bugcard dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.bugcard dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 3px;
+  white-space: nowrap;
+}
+.bugcard dd { margin: 0; max-width: 62ch; }
+.bugcard pre { margin-top: 4px; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 3px 9px; border-radius: 999px;
+  margin-left: 8px;
+}
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+  padding: 12px 18px;
+  margin: 16px 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.callout b { color: var(--ink); }
+.callout.warn { border-left-color: var(--verify); }
+.callout.bug { border-left-color: var(--bug); }
+
+.ladder { display: flex; flex-direction: column; gap: 0; margin: 18px 0; }
+.rung {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.rung:first-child { border-top: none; }
+.rung .level {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+.rung.reached .level { color: var(--accent-ink); font-weight: 600; }
+.rung.stopped .level { color: var(--verify); font-weight: 600; }
+.rung h5 { margin: 0 0 4px; font-size: 1rem; }
+.rung p { margin: 0 0 6px; color: var(--ink-soft); font-size: 0.94rem; }
+.rung .tag {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 999px;
+  margin-bottom: 6px;
+}
+.rung.reached .tag { background: var(--accent-soft); color: var(--accent-ink); }
+.rung.stopped .tag { background: var(--verify-soft); color: var(--verify); }
+
+.manifest-tree {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+.manifest-tree .c { color: var(--code-comment); }
+.manifest-tree .k { color: var(--code-accent); }
+
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+  padding-top: 18px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { position: static; max-height: none; }
+  .cover h1 { font-size: 1.9rem; }
+}
+</style>
+<style>
+@media (max-width: 860px) { .shell { grid-template-columns: 1fr; } .rail { position: static; max-height: none; } body { padding-inline: 16px; } }
+main ol.prose, main ul.prose { max-width: 70ch; }
+main a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <p class="rail-eyebrow">Sommaire</p>
+    <nav>
+      <a href="#partie-0-p-rim-tre-et-guide-de-lecture"><span class="n">&sect;</span>Partie 0 — Périmètre et guide de lecture</a>
+      <a href="#partie-1-le-registre-des-hypoth-ses"><span class="n">&sect;</span>Partie 1 — Le registre des hypothèses</a>
+      <a href="#partie-2-tape-1-identifier-le-monde-cibl"><span class="n">&sect;</span>Partie 2 — Étape 1 : identifier le monde cible</a>
+      <a href="#partie-3-tape-2-la-porte-de-d-cision-de-"><span class="n">&sect;</span>Partie 3</a>
+      <a href="#partie-4-tape-3-g-om-trie-des-objets-et-"><span class="n">&sect;</span>Partie 4</a>
+      <a href="#partie-5-tape-4-d-finition-des-t-ches-et"><span class="n">&sect;</span>Partie 5</a>
+      <a href="#partie-6-tape-5-la-matrice-des-pisodes"><span class="n">&sect;</span>Partie 6 — Étape 5 : la matrice des épisodes</a>
+      <a href="#partie-7-tape-6-cin-matique-inverse-et-p"><span class="n">&sect;</span>Partie 7</a>
+      <a href="#partie-8-tape-7-la-s-quence-d-pisode"><span class="n">&sect;</span>Partie 8 — Étape 7 : la séquence d’épisode</a>
+      <a href="#partie-9-tape-8-v-rification-pisode-par-"><span class="n">&sect;</span>Partie 9</a>
+      <a href="#partie-10-tape-9-contrats-enregistrement"><span class="n">&sect;</span>Partie 10</a>
+      <a href="#partie-11-ex-cuter-l-acquisition-sur-une"><span class="n">&sect;</span>Partie 11</a>
+      <a href="#partie-12-ce-que-cela-ne-prouve-pas"><span class="n">&sect;</span>Partie 12 — Ce que cela ne prouve pas</a>
+      <a href="#partie-13-ce-qu-il-faut-mesurer"><span class="n">&sect;</span>Partie 13 — Ce qu’il faut mesurer</a>
+      <a href="#annexe-a-ordre-du-travail"><span class="n">&sect;</span>Annexe A — Ordre du travail</a>
+      <a href="#annexe-b-points-soumettre-l-quipe-roboti"><span class="n">&sect;</span>Annexe B</a>
+      <a href="#annexe-c-compte-rendu-de-mise-en-uvre-aj"><span class="n">&sect;</span>Annexe C</a>
+      <a href="#annexe-d-enregistrer-le-tri-quatre-objet"><span class="n">&sect;</span>Annexe D</a>
+      <a href="#annexe-e-entra-ner-smolvla-sur-les-enreg"><span class="n">&sect;</span>Annexe E</a>
+    </nav>
+  </aside>
+  <main>
+    <div class="cover">
+      <p class="eyebrow">Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo — spécification</p>
+      <h1>Acquisition de données de tri à quatre objets dans Gazebo</h1>
+      <p class="dek">Spécification de soixante épisodes ancrés sur la tâche, exécutés de bout en bout sur un seul portable Windows avec WSL2</p>
+      <div class="meta"><span><b>Auteur</b> Tomislav Ilic</span><span><b>Date</b> 23 septembre 2026 (révisé le 30 octobre 2026)</span></div>
+      <p class="prose" style="margin-top:14px">Même contenu que <code>FOUR_OBJECT_SORTING_SPECIFICATION_FR.docx</code> ; la version anglaise est <a href="FOUR_OBJECT_SORTING_SPECIFICATION.html">FOUR_OBJECT_SORTING_SPECIFICATION.html</a>.</p>
+    </div>
+<p class="prose"><b>Révisé le 2026-10-04 :</b> une seule personne exécute toutes les étapes sur un seul portable Windows sous WSL2 ; l’ancien partage du travail entre deux intervenants sur deux machines est supprimé partout. <b>État de la mise en œuvre :</b> réalisé et exécuté ; 60/60 épisodes enregistrés et convertis. Les écarts à cette spécification sont consignés dans l’annexe C.</p>
+<p class="prose">Révisé le 2026-10-10 : l’<b>annexe D</b> ajoute une seconde acquisition, le tri à quatre objets d’Osama (<code>tri_yolo</code>), enregistré avec rosetta à raison d’un épisode par prise-dépôt et converti en LeRobot et en RLDS ; les parties 1 à 13 et l’annexe C sont inchangées. Révisé le 2026-10-30 : l’<b>annexe E</b> ajoute ce qui a été prévu et fait avec ces données depuis le dépôt de la PR #25 (2026-10-11) : l’entraînement de SmolVLA sur Kaggle (Runs A, B et C), les mesures fixées avant d’être exécutées, l’évaluation Gazebo au format de l’article ROS2SmolVLA, les évaluations verrouillées au pas près et recalculables, et la liste de ce qui n’est pas encore fait (E.9).</p>
+<section class="block" id="partie-0-p-rim-tre-et-guide-de-lecture"><h2>Partie 0 — Périmètre et guide de lecture</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">0.1 Ce que couvre cette spécification</h3>
+<p class="prose">Ce document spécifie l’acquisition de <b>soixante épisodes de prise-dépôt ancrés sur la tâche</b> dans le monde Gazebo du projet à quatre objets et quatre bacs, enregistrés au format LeRobot, vérifiés épisode par épisode, et répartis en un jeu d’entraînement et un jeu de validation à condition réservée.</p>
+<p class="prose">Il est écrit pour être exécuté de bout en bout par une seule personne sur une seule machine.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">0.2 Qui exécute le travail, et sur quoi</h3>
+<p class="prose">Une seule personne exécute toutes les étapes de ce document : les livrables de spécification, la configuration, les scripts, la logique de vérification, l’essai de fumée, le lot d’acquisition, toute vérification graphique et le rapport, le tout sur un seul portable Windows sous WSL2. Matériel, mesuré le 2026-10-04 :</p>
+<div class="table-wrap"><table><thead><tr><th>Propriété</th><th>Valeur</th></tr></thead><tbody><tr><td>Mémoire utilisable</td><td>7,8 Go visibles dans WSL2, plus 2 Go d’échange</td></tr><tr><td>Processeur</td><td>Intel Core i7-11370H, 4 cœurs / 8 fils ; rendu logiciel (llvmpipe)</td></tr><tr><td>Système hôte</td><td>Windows avec WSL2 Ubuntu 22.04.3</td></tr><tr><td>Exécution</td><td>Conteneur Docker (Ubuntu 24.04, ROS 2 Jazzy, Gazebo Harmonic)</td></tr><tr><td>Facteur temps réel de simulation mesuré</td><td>0,344 (médiane sur le lot de 60 épisodes)</td></tr><tr><td>Session graphique Gazebo</td><td>disponible (WSLg, <code>DISPLAY=:0</code>, OpenGL logiciel)</td></tr><tr><td>Accès au robot physique</td><td>aucun</td></tr></tbody></table></div>
+<p class="prose">À ce facteur temps réel, un épisode de 25 secondes prend environ 73 s d’horloge murale pour son mouvement ; un épisode complet, mise en route et vérification comprises, a pris 160 s en médiane, et le lot de 60 épisodes environ 2,7 heures (annexe C).</p>
+<h3 style="margin-top:26px;font-size:1.1rem">0.3 Provenance des données d’entrée</h3>
+<p class="prose">Les prémisses sur lesquelles repose cette spécification ont été rassemblées en préparation et sont consignées dans la <b>partie 1 sous forme de registre explicite d’hypothèses</b>, et non mêlées au récit. Chacune est énoncée, expliquée, reliée à ce qui en dépend, dotée d’une procédure de vérification peu coûteuse, et d’une solution de repli si elle s’avère fausse.</p>
+<p class="prose">Cette structure est délibérée. Plusieurs prémisses sont de seconde main, deux d’entre elles se contredisent, et au moins une — si elle est vraie — améliore nettement le livrable. Les traiter comme des hypothèses plutôt que comme des faits acquis est ce qui permet d’exécuter la spécification sans autre clarification.</p>
+<p class="prose">Là où ce document exige une décision que seul le groupe élargi peut prendre, il indique <b>« à soumettre à l’équipe robotique »</b>. Ces points sont rassemblés dans l’annexe B.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">0.4 Les fichiers sont locaux</h3>
+<p class="prose">Tous les fichiers de monde, de modèles, de lancement et le pipeline de référence cités dans ce document sont supposés présents sur le système de fichiers local de la personne qui exécute l’étape. Aucune procédure de synchronisation de dépôt n’est spécifiée. Si un fichier cité est absent, c’est un échec d’hypothèse — voir la partie 1, A3.</p>
+</section>
+<section class="block" id="partie-1-le-registre-des-hypoth-ses"><h2>Partie 1 — Le registre des hypothèses</h2>
+<p class="prose">Douze hypothèses. Chacune comporte une <b>vérification</b> qui coûte quelques minutes, et une <b>solution de repli</b>. Parcourez-les dans l’ordre avant de commencer la partie 2 ; le registre est la partie la moins coûteuse du projet et celle qui évite les erreurs coûteuses.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A1 — Un monde fusionné contenant quatre objets et quatre bacs de couleur assortie existe</h3>
+<p class="prose"><b>Énoncé.</b> Un fichier de monde Gazebo existe sur le disque, contenant quatre objets saisissables et quatre bacs de destination, appariés un à un par couleur.</p>
+<p class="prose"><b>Deux chemins candidats circulent, et ils sont incohérents.</b> Une prémisse désigne <code>mycobot_description/worlds/pick_and_place_sorting.sdf</code> comme cible et le décrit comme contenant exactement les quatre objets et les quatre bacs. Une seconde prémisse affirme que les quatre objets ont été ajoutés au <b>monde photoréaliste, étalonné par ArUco</b>, dérivé de <code>real_table.sdf</code>, et qualifie explicitement <code>pick_and_place_sorting.sdf</code> d’<i>ancien monde générique à 4 objets</i>.</p>
+<p class="prose">Les deux ne peuvent pas décrire la cible. L’une décrit un monde qui existe ; l’autre décrit peut-être une intention.</p>
+<p class="prose"><b>Ce qui en dépend.</b> Tout. Les poses des objets, les poses des bacs, la hauteur de la table, l’enveloppe d’accessibilité, les noms des topics caméra, le réalisme visuel de chaque image enregistrée.</p>
+<p class="prose"><b>Vérification.</b> La partie 2 en entier — environ deux heures.</p>
+<p class="prose"><b>Repli.</b> Si le monde ArUco/photoréaliste ne contient qu’un seul couple objet-bac alors que le monde générique en contient les huit éléments, alors fusionner les quatre objets dans le monde ArUco est en soi une tâche, et une tâche importante. À soumettre à l’équipe robotique le jour même, avec l’énumération de la partie 2.3 jointe comme preuve.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A2 — L’ensemble des objets et des bacs est fixé et apparié par couleur</h3>
+<p class="prose"><b>Énoncé.</b> Les quatre objets sont <code>red_cube</code>, <code>blue_cube</code>, <code>green_cylinder</code>, <code>yellow_box</code>. Les quatre destinations sont <code>red_bin</code>, <code>blue_bin</code>, <code>green_bin</code>, <code>yellow_bin</code>. Chaque objet va dans le bac de sa propre couleur.</p>
+<p class="prose"><b>Explication.</b> Ces noms correspondent à huit pièces physiques imprimées en 3D et colorées à la main, et aux huit classes du détecteur d’objets de l’équipe (<code>cube_rouge</code>, <code>cube_bleu</code>, <code>cylindre_vert</code>, <code>pave_jaune</code>, <code>bac_rouge</code>, <code>bac_bleu</code>, <code>bac_vert</code>, <code>bac_jaune</code>). Les noms des modèles Gazebo sont les équivalents anglais des noms de classes du détecteur. Cette correspondance n’est pas fortuite — c’est la raison pour laquelle le vocabulaire d’instructions de la partie 5 doit être repris plutôt qu’inventé.</p>
+<p class="prose"><b>Notez l’hétérogénéité des formes.</b> Deux cubes, un cylindre, un pavé. Ce ne sont pas quatre exemplaires d’un même problème ; voir la partie 4.1.</p>
+<p class="prose"><b>Ce qui en dépend.</b> Le jeu d’instructions, le manifeste des objets, les paramètres de saisie par objet, la logique de vérification.</p>
+<p class="prose"><b>Vérification.</b> L’énumération des modèles de la partie 2.3 liste exactement ces huit noms.</p>
+<p class="prose"><b>Repli.</b> Si les noms diffèrent, adopter ceux que le monde déclare réellement et les propager via <code>config/objects.yaml</code> — rien d’autre ne les code en dur.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A3 — Tous les fichiers de monde, de modèles et de pipeline sont présents sur le système de fichiers local</h3>
+<p class="prose"><b>Énoncé.</b> Le SDF du monde, les huit SDF de modèles, les modèles de marqueurs ArUco, la définition de la caméra de table et le pipeline de lancement de référence sont de vrais fichiers sur le disque — pas des captures d’écran, pas des travaux prévus.</p>
+<p class="prose"><b>Explication.</b> C’est cette hypothèse qui permet à cette spécification d’omettre toute procédure de synchronisation. Chaque commande de ce document lit des chemins locaux.</p>
+<p class="prose"><b>Vérification.</b> Le balayage <code>find</code> de la partie 2.2 localise chacun d’eux. Tout fichier qui n’apparaît pas est un échec d’hypothèse.</p>
+<p class="prose"><b>Repli.</b> Les fichiers manquants sont signalés à l’équipe robotique comme une lacune bloquante, en nommant exactement les éléments absents. Ne pas reconstruire un modèle à partir d’une image de présentation — un objet reconstruit a les mauvaises dimensions, la mauvaise masse et le mauvais frottement, et chaque chiffre en aval hérite de ces erreurs sans qu’on le voie.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A4 — Un pipeline de référence réalisant une saisie physiquement vérifiée existe localement</h3>
+<p class="prose"><b>Énoncé.</b> Un fichier de lancement — nommé dans les prémisses <code>sim_grasp.launch.py</code>, dans un paquet <code>mycobot_gateway</code> — charge ce monde et, avec un nœud associé, réalise une saisie dans laquelle <i>la pince se ferme réellement et le résultat est vérifié contre la pose de l’objet fournie par Gazebo lui-même</i>, explicitement décrite comme <b>sans téléportation</b>.</p>
+<p class="prose"><b>Pourquoi cette hypothèse mérite sa propre évaluation.</b> L’acquisition précédente a passé deux jours de travail à tenter une saisie par frottement de corps rigides sans y parvenir. Elle s’est rabattue sur une soudure <code>DetachableJoint</code> explicitement signalée, et cette soudure est la plus grande réserve sur le jeu de données obtenu — un modèle entraîné dessus apprend <i>approcher, fermer, transporter, ouvrir</i>, et non la physique de la saisie.</p>
+<p class="prose">Si A4 est vraie, cette réserve peut être levée au prix de la lecture du code fonctionnel de quelqu’un d’autre, plutôt qu’au prix d’une nouvelle campagne de réglage de la physique.</p>
+<p class="prose"><b>Interaction avec A8.</b> Une prémisse distincte affirme que l’attache simulée reste le mécanisme autorisé. Les deux ne se contredisent pas. L’interdiction de poursuivre le réglage de la physique a été prononcée en réponse à une demande faite <i>après</i> deux jours d’échec ; c’est un refus d’autoriser davantage de réglage, pas une consigne d’ignorer un mécanisme fonctionnel qui existe déjà. La partie 3 tranche par une évaluation bornée à une journée et une décision écrite.</p>
+<p class="prose"><b>Ce qui en dépend.</b> La réserve la plus lourde de conséquences du README du jeu de données, et donc la valeur scientifique des soixante épisodes.</p>
+<p class="prose"><b>Vérification.</b> La partie 3 en entier — une journée, plafond strict.</p>
+<p class="prose"><b>Repli.</b> A8 s’applique sans changement : la soudure signalée, avec quatre configurations d’attache.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A5 — Le démonstrateur peut utiliser les poses vraies des objets</h3>
+<p class="prose"><b>Énoncé.</b> Le script d’enregistrement est autorisé à lire les positions des objets directement dans le simulateur plutôt qu’à les détecter dans les images des caméras.</p>
+<p class="prose"><b>Explication, parce que ce point est souvent mal compris.</b> Un modèle vision-langage-action apprend la correspondance <i>instruction + image → action</i>. Pendant l’entraînement, il observe les images, le langage et les actions enregistrés. Il n’observe jamais <b>comment le démonstrateur savait où était l’objet</b>. Le démonstrateur est un oracle dont le seul rôle est de produire des trajectoires correctes et propres ; la provenance de son savoir ne fait pas partie du signal d’entraînement.</p>
+<p class="prose">Le démonstrateur a donc le droit de « tricher » en interrogeant <code>gz model -p</code>. C’est une pratique courante dans la génération de données par démonstrations scriptées, et cela économise un ordre de grandeur d’effort par rapport à la fermeture d’une boucle de perception qui n’apporte rien aux données enregistrées.</p>
+<p class="prose"><b>Ce que cela n’autorise pas.</b> Cela n’autorise pas à <i>enregistrer</i> les poses vraies dans le flux d’observation. L’observation contient uniquement les images et la proprioception. Si les poses vraies des objets fuient dans <code>observation.*</code>, le modèle apprendra à les lire et échouera de façon catastrophique à l’inférence lorsqu’elles seront absentes. Gardez-les dans les métadonnées de l’épisode, jamais dans l’observation.</p>
+<p class="prose"><b>Ce qui en dépend.</b> Toute l’architecture des scripts d’apparition et de séquence, et l’absence de tout composant de perception dans ce travail.</p>
+<p class="prose"><b>Vérification.</b> Inspecter le contrat rosetta : <code>observation.state</code> ne doit contenir que les positions articulaires et la pince. Partie 10.1.</p>
+<p class="prose"><b>Repli.</b> Si une acquisition pilotée par caméra est exigée plus tard, ce sera une tâche distincte avec sa propre spécification ; ce n’est pas une variante de celle-ci.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A6 — L’affectation du tri se fait par couleur</h3>
+<p class="prose"><b>Énoncé.</b> Chaque objet va dans le bac de sa propre couleur. L’affectation ne se fait ni par taille, ni par forme, ni par aucune autre propriété.</p>
+<p class="prose"><b>Explication.</b> Cela lève une ambiguïté héritée de travaux antérieurs sur le banc physique, où deux cartons de tailles différentes étaient distingués par leur aire et associés à des destinations marquées par ArUco. Cette logique par taille relève d’une autre tâche et ne doit pas être reportée dans celle-ci.</p>
+<p class="prose"><b>Ce qui en dépend.</b> Les chaînes d’instruction, le champ de bac attendu dans les métadonnées de chaque épisode, et le contrôle de mauvais bac de la partie 9.2.</p>
+<p class="prose"><b>Vérification.</b> Évidente d’après les noms des modèles une fois A1 et A2 confirmées.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A7 — Les identifiants ArUco 10 et 11 ne sont pas des destinations de tri</h3>
+<p class="prose"><b>Énoncé.</b> Les marqueurs d’identifiants 10 et 11, qui apparaissent dans des travaux antérieurs de détection faits à la main comme identifiants d’un grand et d’un petit carton, ne jouent aucun rôle dans cette tâche.</p>
+<p class="prose"><b>Explication.</b> Les quatre marqueurs ArUco pertinents pour ce monde portent les identifiants <b>19, 23, 25 et 26</b>, et servent à l’étalonnage extrinsèque des caméras, pas au tri. Confondre les deux ensembles attacherait un sens à des marqueurs qui n’en ont aucun ici.</p>
+<p class="prose"><b>Ce qui en dépend.</b> Rien de fonctionnel — mais cela évite toute une catégorie d’investigations inutiles.</p>
+<p class="prose"><b>Vérification.</b> <code>grep -o 'aruco_[0-9]*' &lt;world.sdf&gt; | sort -u</code> renvoie 19, 23, 25, 26 et rien d’autre.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A8 — L’attache simulée reste autorisée</h3>
+<p class="prose"><b>Énoncé.</b> Transporter l’objet par une soudure <code>DetachableJoint</code> explicitement signalée, déclenchée à la fermeture de la pince et relâchée à son ouverture, reste acceptable pour cette acquisition.</p>
+<p class="prose"><b>Explication.</b> C’est le mécanisme utilisé lors de l’acquisition précédente. Il est signalé <code>SIMULATED ATTACHMENT</code> dans les commentaires du code, dans les lignes de journal et dans le fichier de métadonnées de chaque épisode. Il est honnête, reproductible, et il retire du chemin critique toute une classe de réglages qui ne convergent pas.</p>
+<p class="prose"><b>Son coût, dit simplement.</b> Aucun glissement. Aucune souplesse. Aucun exemple de saisie ratée. Une politique entraînée sur ces données ne peut pas apprendre quand une saisie va échouer, parce que le jeu de données ne contient aucun échec de ce type.</p>
+<p class="prose"><b>Interaction avec A4.</b> A8 est le plancher, pas le plafond. Si la partie 3 montre qu’une saisie physique est disponible pour ainsi dire gratuitement, la retenir est strictement préférable et doit être signalé comme une amélioration.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A9 — Le volume cible est de quinze épisodes propres et réussis par objet</h3>
+<p class="prose"><b>Énoncé.</b> Soixante épisodes au total, quinze par objet, où <i>propre et réussi</i> signifie que l’épisode a passé tous les contrôles de la partie 9. Les tentatives échouées sont rejouées, et ne comptent pas parmi les quinze.</p>
+<p class="prose"><b>Explication.</b> La distinction compte pour la planification. Au facteur temps réel mesuré (partie 0.2), et en tenant compte de la mise en route, du temps de stabilisation et d’un taux de reprise réaliste, soixante épisodes propres représentent environ trois heures d’horloge murale. Une lecture naïve de « soixante épisodes » qui compterait les échecs finirait plus tôt et livrerait moins.</p>
+<p class="prose"><b>Ce qui en dépend.</b> La matrice d’épisodes de la partie 6, et la planification du lot de la partie 11.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A10 — Le lot d’acquisition tourne sur une machine disposant d’une marge de mémoire</h3>
+<p class="prose"><b>Énoncé.</b> Le lot de soixante épisodes s’exécute sur une machine disposant d’assez de mémoire pour faire tourner toute la pile sans pression : le portable de la partie 0.2, où trois piles complètes de simulateur à la fois laissaient encore 4,75 Go disponibles.</p>
+<p class="prose"><b>Explication, en deux parties.</b></p>
+<p class="prose"><b>Durée.</b> Environ trois heures au facteur temps réel mesuré de 0,344. Le 0,082 mesuré sur la machine contrainte en mémoire de l’acquisition précédente la rendrait environ quatre fois plus longue.</p>
+<p class="prose"><b>Exactitude.</b> C’est l’argument le plus fort. L’acquisition précédente, exécutée sur une machine contrainte en mémoire, a produit des symptômes documentés d’épuisement de la mémoire : <code>robot_state_publisher</code> interrompu et se manifestant comme une « perte de TF après une longue durée de fonctionnement » ; <code>move_group</code> bloqué en exécution après qu’un pair a été tué ; des redémarrages du conteneur détruisant deux fois un environnement virtuel installé ; et — de façon décisive — une paire de mesures physiques qui ne peuvent pas être vraies toutes les deux. Un décalage de bout de pince de 0,105 m a été enregistré comme « a touché l’objet » ; 0,100 m comme « ne l’a jamais touché ». Abaisser une cible de cinq millimètres ne peut pas faire cesser un contact. C’était la pression mémoire déguisée en physique, et deux jours ont été passés à régler la géométrie de contact contre un simulateur qu’on démembrait sous l’expérience.</p>
+<p class="prose">Un monde à quatre objets et quatre bacs compte nettement plus de paires de collision que le bloc unique et la plaque statique de l’acquisition précédente. Lancer le lot sans marge de mémoire ne risque pas seulement d’être lent. Il risque d’être faux d’une manière qui ressemble à des données.</p>
+<p class="prose"><b>Ce qui en dépend.</b> Toute la partie 11.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A11 — L’environnement d’exécution est celui de l’acquisition précédente</h3>
+<p class="prose"><b>Énoncé.</b> Chaque étape s’exécute dans la même image de conteneur — Ubuntu 24.04, ROS 2 Jazzy, Gazebo Harmonic — que celle de l’acquisition headless précédente.</p>
+<p class="prose"><b>Explication.</b> C’est la garantie de reproductibilité, et c’est ce qui rend tout simplement possible le déplacement du travail sur un autre hôte Windows. Le conteneur est le contrat ; l’hôte fournit le processeur, la mémoire, le disque et un affichage.</p>
+<p class="prose"><b>Ce qui en dépend.</b> <code>preflight.sh</code> dans la partie 11.6, et la crédibilité de l’affirmation « cela tourne de la même façon sur votre machine ».</p>
+<p class="prose"><b>Vérification.</b> <code>preflight.sh</code> vérifie la distribution ROS, la présence de Gazebo, <code>ros_gz_sim</code>, <code>moveit_py</code>, <code>pyarrow</code> et <code>ffmpeg</code> avant le début de tout lot.</p>
+<p class="prose"><b>Risque résiduel, à énoncer plutôt qu’à cacher.</b> Tous les éléments de l’acquisition précédente tournaient avec <code>gz sim -s</code>. Le passage de l’affichage d’un conteneur vers un hôte Windows est la seule classe de problèmes que les scripts n’anticipent pas ; sous WSL2, il a fallu <code>DISPLAY=:0</code> et l’OpenGL logiciel. La partie 11.8 précise comment traiter ce point honnêtement.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">A12 — Le chiffre de 0,63 mm n’est pas la référence de ce travail</h3>
+<p class="prose"><b>Énoncé.</b> Le chiffre de positionnement de bout en bout de 0,63 mm issu de la campagne de précision de l’équipe n’est <b>pas</b> la cible à laquelle cette acquisition, ou toute politique entraînée dessus, doit être mesurée.</p>
+<p class="prose"><b>Explication.</b> Ce chiffre est la précision atteinte par un <b>pipeline classique en boucle fermée</b> après deux passes de correction visuelle — 10,79 mm en boucle ouverte, 1,29 mm après une correction, 0,63 mm après deux, avec 18 essais sur 20 sous 1 mm. Il mesure avec quelle précision un système converge sur un point métrologique commandé lorsqu’il a le droit de regarder, corriger et regarder à nouveau.</p>
+<p class="prose">Une politique vision-langage-action ne fait rien de tout cela à l’inférence. Elle émet des actions à partir de pixels et de langage, en boucle ouverte, sans cible métrologique ni cycle de correction. La juger sur un chiffre d’asservissement mesure une autre grandeur et présente l’écart comme un échec.</p>
+<p class="prose"><b>Ce qui la remplace.</b> La partie 13 spécifie le bon jeu de métriques. L’essentiel : le <b>taux de bon bac</b>, parce que c’est la seule métrique qui distingue une politique qui lit l’instruction d’une politique qui l’ignore.</p>
+<p class="prose"><b>Là où 0,63 mm a sa place.</b> Dans l’analyse comparative de l’architecture de production actuelle, cité honnêtement pour ce qu’il est.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">1.13 Récapitulatif des hypothèses</h3>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Hypothèse</th><th>Vérifiée par</th><th>Si fausse</th></tr></thead><tbody><tr><td>A1</td><td>Le monde à quatre objets existe</td><td>Partie 2</td><td>À soumettre à l’équipe robotique — une fusion peut être nécessaire</td></tr><tr><td>A2</td><td>Noms des objets et des bacs, appariement des couleurs</td><td>Partie 2.3</td><td>Propager les vrais noms via objects.yaml</td></tr><tr><td>A3</td><td>Fichiers présents en local</td><td>Partie 2.2</td><td>Bloquant ; signaler la lacune</td></tr><tr><td>A4</td><td>Le pipeline de référence à saisie physique existe</td><td>Partie 3</td><td>A8 s’applique</td></tr><tr><td>A5</td><td>Démonstrateur sur vérité terrain autorisé</td><td>Partie 10.1</td><td>Spécification distincte nécessaire</td></tr><tr><td>A6</td><td>Tri par couleur</td><td>Partie 2.3</td><td>Réécrire le jeu d’instructions</td></tr><tr><td>A7</td><td>ArUco 10/11 sans objet</td><td>Partie 2.3</td><td>Enquêter avant de poursuivre</td></tr><tr><td>A8</td><td>Soudure autorisée</td><td>—</td><td>—</td></tr><tr><td>A9</td><td>15 propres par objet</td><td>Partie 6</td><td>Remettre la matrice à l’échelle</td></tr><tr><td>A10</td><td>Lot avec marge de mémoire</td><td>Partie 11</td><td>Le calendrier du projet change sensiblement</td></tr><tr><td>A11</td><td>Même conteneur que l’acquisition précédente</td><td>Partie 11.6</td><td>Le preflight échoue bruyamment</td></tr><tr><td>A12</td><td>0,63 mm n’est pas la référence</td><td>Partie 13</td><td>—</td></tr></tbody></table></div>
+<p class="prose"><b>✅ Critère d’achèvement de la partie 1 :</b> chaque hypothèse est soit confirmée, soit consignée comme échouée avec son repli déclenché et l’équipe robotique informée.</p>
+</section>
+<section class="block" id="partie-2-tape-1-identifier-le-monde-cibl"><h2>Partie 2 — Étape 1 : identifier le monde cible</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">2.1 Pourquoi c’est la première étape</h3>
+<p class="prose">A1 n’est pas tranchée, et chaque chiffre suivant de cette spécification — poses des objets, hauteur de la table, enveloppe accessible, topics caméra — est lu dans le monde qui s’avérera être la cible. Deviner coûte une semaine.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">2.2 Localiser les candidats</h3>
+<pre>cd &lt;repository root&gt;# every world file, newest firstfind . -name "*.sdf" -path "*world*" -printf '%T@ %p\n' 2&gt;/dev/null \  | sort -rn | cut -d' ' -f2-# the reference pipeline named in A4find . -name "sim_grasp.launch.py" -o -name "*gateway*" -type d# model directoriesfind . -type d \( -name "*cube*" -o -name "*bin*" -o -name "*cylinder*" \) | head -20</pre>
+<p class="prose">Noter lesquels des éléments cités dans A3 sont présents et lesquels ne le sont pas.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">2.3 Énumérer le contenu de chaque candidat</h3>
+<pre>for w in $(find . -name "*.sdf" -path "*world*" 2&gt;/dev/null); do  echo "=========================================================="  echo "WORLD: $w"  echo "-- models declared:"  grep -oP '&lt;model name="\K[^"]+' "$w" | sort -u | tr '\n' ' '; echo  echo "-- included uris:"  grep -oP '&lt;uri&gt;\K[^&lt;]+' "$w" | sort -u | head -20  echo "-- aruco ids:      $(grep -oP 'aruco_\K[0-9]+' "$w" | sort -un | tr '\n' ' ')"  echo "-- camera sensors: $(grep -c 'sensor .*type="camera"' "$w")"  echo "-- camera names:   $(grep -oP '&lt;sensor name="\K[^"]+' "$w" | tr '\n' ' ')"  echo "-- textured:       $(grep -ci 'albedo_map\|&lt;texture\|\.png\|\.jpg' "$w")"  echo "-- static bins:    $(grep -A6 '_bin"' "$w" | grep -c '&lt;static&gt;true')"done</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">2.4 La règle de décision</h3>
+<p class="prose">Le monde cible est celui qui satisfait <b>les quatre</b> critères :</p>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Critère</th><th>Pourquoi c’est important</th></tr></thead><tbody><tr><td>1</td><td>Déclare les huit modèles de A2</td><td>Sans quatre objets, il n’y a pas de tâche de sélection</td></tr><tr><td>2</td><td>Contient les marqueurs ArUco 19, 23, 25, 26</td><td>Correspondance visuelle avec le banc physique</td></tr><tr><td>3</td><td>Contient un capteur caméra de table</td><td>Le flux d’observation en dépend</td></tr><tr><td>4</td><td>A une table texturée, pas un simple plan de sol</td><td>Réalisme visuel ; réduit l’écart simulation-réel</td></tr></tbody></table></div>
+<p class="prose"><b>Si un seul monde satisfait les quatre</b>, A1 est tranchée et cette partie est terminée.</p>
+<p class="prose"><b>Si le monde ArUco/texturé ne contient qu’un couple objet-bac alors qu’un monde générique contient les huit éléments</b>, alors les deux prémisses de A1 décrivent des choses différentes : l’une décrit la réalité, l’autre une intention. Fusionner quatre objets dans le monde ArUco est alors une tâche à part entière. À soumettre à l’équipe robotique le jour même, en joignant la sortie de l’énumération telle quelle.</p>
+<p class="prose"><b>Si aucun monde ne satisfait le critère 1</b>, arrêter. A1 a échoué et l’acquisition ne peut pas se dérouler comme spécifié.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">2.5 Figer le choix</h3>
+<p class="prose">Écrire <code>doc/WORLD_SELECTION.md</code> contenant :</p>
+<ul class="prose">
+<li>la sortie complète de l’énumération de 2.3, telle quelle</li>
+<li>le chemin du monde retenu</li>
+<li>son empreinte de contenu, pour que le choix reste sans ambiguïté plus tard :</li>
+</ul>
+<pre>sha256sum &lt;chosen world&gt;.sdf | tee -a doc/WORLD_SELECTION.md</pre>
+<ul class="prose">
+<li>un paragraphe justifiant le choix au regard des quatre critères</li>
+</ul>
+<p class="prose">Écrire aussi le chemin seul dans <code>config/WORLD_PATH</code>, un fichier d’une ligne que <code>preflight.sh</code> et tous les scripts lisent. Rien d’autre ne code en dur un chemin de monde.</p>
+<pre>echo "mycobot_description/worlds/&lt;chosen&gt;.sdf" &gt; config/WORLD_PATH</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Critère d’achèvement de la partie 2</h3>
+<p class="prose"><code>config/WORLD_PATH</code> écrit, <code>doc/WORLD_SELECTION.md</code> commité avec les preuves et l’empreinte, A1 marquée confirmée ou échouée.</p>
+</section>
+<section class="block" id="partie-3-tape-2-la-porte-de-d-cision-de-"><h2>Partie 3 — Étape 2 : la porte de décision de la saisie</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">3.1 La question</h3>
+<p class="prose">Une saisie physiquement vérifiée est-elle disponible pour ainsi dire gratuitement (A4), ou la soudure signalée reste-t-elle nécessaire (A8) ?</p>
+<p class="prose">La décision est prise une seule fois, par écrit, avant l’enregistrement de tout épisode. On ne peut pas y revenir plus tard sans invalider tous les épisodes déjà capturés.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">3.2 D’abord, lire le pipeline de référence</h3>
+<p class="prose">Vingt minutes, et cela peut répondre à la question sans rien exécuter.</p>
+<pre>sed -n '1,240p' $(find . -name "sim_grasp.launch.py" | head -1)# what nodes does it launch, and what do they do at grasp time?ls $(find . -type d -name "*gateway*" | head -1)/*/# THE DECISIVE GREPgrep -rniE "detachable|attach|weld|fixed_joint|SIMULATED" \     --include="*.py" --include="*.sdf" --include="*.xml" --include="*.yaml" . \  | grep -v "^./doc/" | head -40</pre>
+<p class="prose">Interprétation :</p>
+<div class="table-wrap"><table><thead><tr><th>Résultat du grep</th><th>Signification</th><th>Action</th></tr></thead><tbody><tr><td>Aucune correspondance nulle part</td><td>La saisie de référence est une vraie physique de contact</td><td>Passer à 3.3 — grande valeur</td></tr><tr><td>Correspondances seulement dans les fichiers de l’acquisition précédente</td><td>Comme ci-dessus</td><td>Passer à 3.3</td></tr><tr><td>Correspondances dans le pipeline de référence lui-même</td><td>Le pipeline de l’équipe utilise lui aussi une attache</td><td><b>Arrêter.</b> A8 est confirmée, et la décision précédente est validée a posteriori. Le consigner — c’est un constat qui mérite d’être signalé</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">3.3 Ensuite, l’exécuter une fois, sans modification</h3>
+<pre># Terminal 1 — the reference pipeline exactly as shipped, no editsros2 launch mycobot_gateway sim_grasp.launch.py# Terminal 2 — independent pose logging; do NOT trust console outputpython3 scripts/track_grasp.py --model red_cube --out /tmp/refgrasp.csv --hz 10# Terminal 3 — is anything being welded at runtime?ros2 topic list | grep -iE "attach|detach|weld"gz topic -l | grep -iE "attach|detach"</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">3.4 Lire le verdict dans le CSV, pas à l’écran</h3>
+<pre># scripts/assess_reference_grasp.pyimport csv, statistics, sysrows = list(csv.DictReader(open(sys.argv[1])))lift = [r for r in rows if r["phase"] in ("lift", "transport")]if not lift:    sys.exit("no lift/transport samples — the run did not reach the lift phase")dz   = [float(r["dz"]) for r in lift]bz   = [float(r["bz"]) for r in lift]rise = max(bz) - min(float(r["bz"]) for r in rows if r["phase"] == "grasp")print(f"samples in lift/transport : {len(dz)}")print(f"dz mean / stdev / range   : {statistics.mean(dz):.4f} / "      f"{statistics.pstdev(dz):.4f} / {max(dz)-min(dz):.4f} m")print(f"object rise               : {rise:.4f} m")held = (max(dz) - min(dz)) &lt; 0.005 and rise &gt; 0.05print("VERDICT:", "GRASP HELD" if held else "NOT HELD")sys.exit(0 if held else 1)</pre>
+<p class="prose">Trois questions, avec des réponses chiffrées :</p>
+<ol class="prose">
+<li>Le z de l’objet monte-t-il en même temps que celui de l’effecteur ?</li>
+<li><code>dz</code> reste-t-il constant pendant la levée et le transport, à 5 mm près ?</li>
+<li>Un topic d’attache a-t-il été publié au moment de la saisie ?</li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">3.5 La règle de décision</h3>
+<div class="table-wrap"><table><thead><tr><th>Résultat</th><th>Décision</th><th>Conséquence</th></tr></thead><tbody><tr><td>Vraie saisie par contact, fonctionne sans modification</td><td><b>L’adopter</b></td><td>La plus grande réserve du jeu de données est levée. Le signaler à l’équipe robotique le jour même</td></tr><tr><td>Vraie saisie par contact, fonctionne après moins d’un jour d’adaptation</td><td><b>L’adopter</b></td><td>Documenter précisément l’adaptation</td></tr><tr><td>Le pipeline de référence utilise une attache en interne</td><td><b>Garder la soudure</b></td><td>A8 confirmée ; signaler que le pipeline de l’équipe fait de même</td></tr><tr><td>Impossible à faire fonctionner en une journée</td><td><b>Garder la soudure</b></td><td>Indiquer exactement où l’on s’est arrêté et ce qui a été tenté</td></tr></tbody></table></div>
+<p class="prose"><b>Le plafond est d’une journée et il ne bouge pas.</b> L’acquisition précédente a établi, au prix de deux jours, que ce problème précis n’a pas de fond mesurable : la surface d’échec n’est pas convexe, l’évaluation est coûteuse, et sur un matériel contraint la mesure n’est même pas reproductible.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">3.6 Si la soudure est conservée — le piège des quatre configurations</h3>
+<p class="prose">Chacun des quatre objets a besoin de sa propre configuration d’attache, et chacune doit viser <b><code>link6</code></b>, jamais <code>gripper_base</code>.</p>
+<p class="prose"><b>Pourquoi, et pourquoi c’est silencieux.</b> <code>gripper_base</code> n’est qu’un repère TF/URDF. La conversion URDF vers SDF le fusionne dans le lien Gazebo <code>link6</code>, si bien qu’il n’existe pas comme nom de lien Gazebo adressable. Un <code>DetachableJoint</code> déclarant <code>child_link: gripper_base</code> <b>accepte le message d’attache et ne fait rien — aucune erreur, aucun avertissement, aucune ligne de journal.</b> Le symptôme est identique à un vrai échec de saisie par frottement : l’objet ne bouge pas. L’acquisition précédente a perdu un cycle de débogage complet exactement sur ce point. Avec quatre objets, il y a désormais quatre occasions de le répéter.</p>
+<p class="prose">Valider les quatre au moment de l’écriture, avant le lot :</p>
+<pre># link6 must be a real Gazebo linkgz model -m mycobot_320pi --link | grep -qx "link6" \  &amp;&amp; echo "OK link6 addressable" \  || echo "FATAL: link6 is not a Gazebo link name"# each object must expose the link its DetachableJoint namesfor m in red_cube blue_cube green_cylinder yellow_box; do  printf '%-16s links: ' "$m"  gz model -m "$m" --link 2&gt;/dev/null | tr '\n' ' ' || echo "NOT SPAWNED"  echodone</pre>
+<p class="prose">Et prouver que chaque attache s’attache réellement, au lieu de le supposer :</p>
+<pre># per object: attach, command a 5 cm lift, verify the object followedfor m in red_cube blue_cube green_cylinder yellow_box; do  python3 scripts/attach_smoke_test.py --model "$m" --lift 0.05 \    &amp;&amp; echo "$m ATTACH OK" || echo "$m ATTACH FAILED"done</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">3.7 Consigner la décision</h3>
+<p class="prose">Écrire <code>doc/GRASP_DECISION.md</code> : le verdict, les preuves du CSV, la sortie du grep de 3.2, et un paragraphe expliquant pourquoi. Si la saisie physique a été adoptée, dire explicitement pourquoi elle a réussi ici et pas lors de l’acquisition précédente — cette comparaison est en soi un constat à signaler.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Critère d’achèvement de la partie 3</h3>
+<p class="prose">Une décision écrite avec des preuves chiffrées et — si la soudure est conservée — les quatre attaches testées en fumée et réussies.</p>
+<p class="prose">Une seule exécution du pipeline de référence dans un monde à quatre objets est plus lourde que tout ce que l’acquisition précédente a tenté sur sa machine contrainte en mémoire. S’il ne démarre pas, c’est en soi la réponse : remonter le problème à l’équipe robotique plutôt que de s’y acharner.</p>
+</section>
+<section class="block" id="partie-4-tape-3-g-om-trie-des-objets-et-"><h2>Partie 4 — Étape 3 : géométrie des objets et des bacs</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">4.1 Quatre objets, ce n’est pas quatre fois un objet</h3>
+<p class="prose">Deux cubes, un cylindre, un pavé. Les différences sont structurantes.</p>
+<p class="prose"><b>Le cylindre n’a pas de faces planes opposées à un lacet quelconque.</b> Une pince à mors parallèles qui se ferme sur un cylindre fait un contact linéique et non surfacique, et l’objet reste libre de rouler autour de son axe. Si une saisie physique a été adoptée en partie 3, le cylindre est le cas le plus susceptible d’échouer — <b>le tester en premier, pas en dernier</b>. Si la soudure a été conservée, le cylindre ne coûte rien, ce qui est un argument secondaire légitime en faveur de la soudure dans <i>ce</i> jeu de données.</p>
+<p class="prose"><b>Le pavé a un grand axe.</b> La pince doit se fermer selon sa <b>petite</b> dimension. Cela exige un lacet de poignet propre à chaque objet, ce dont l’acquisition précédente n’a jamais eu besoin, car un cube est symétrique en rotation pour une saisie par le dessus.</p>
+<p class="prose"><b>Les deux cubes sont présumés de forme identique.</b> Le vérifier plutôt que le présumer — une longueur d’arête différente change la hauteur de saisie.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">4.2 Extraire les vrais chiffres</h3>
+<p class="prose">Ne jamais inventer une dimension. Les lire toutes dans les SDF fusionnés.</p>
+<pre>python3 - &lt;&lt;'PY'import glob, re, osNAMES = ("red_cube|blue_cube|green_cylinder|yellow_box|"         "red_bin|blue_bin|green_bin|yellow_bin")pat = re.compile(rf'&lt;model name="({NAMES})"(.*?)&lt;/model&gt;', re.S)print(f"{'model':16s} {'file':30s} {'box size':22s} {'cyl r,l':16s} "      f"{'mass':8s} {'mu':6s} {'static':7s} pose")for f in glob.glob('**/*.sdf', recursive=True):    try:        s = open(f, errors='replace').read()    except OSError:        continue    for name, body in pat.findall(s):        box  = re.search(r'&lt;box&gt;\s*&lt;size&gt;([^&lt;]+)&lt;/size&gt;', body)        cyl  = re.search(r'&lt;cylinder&gt;\s*&lt;radius&gt;([^&lt;]+)&lt;/radius&gt;\s*'                         r'&lt;length&gt;([^&lt;]+)&lt;/length&gt;', body)        mass = re.search(r'&lt;mass&gt;([^&lt;]+)&lt;/mass&gt;', body)        mu   = re.search(r'&lt;mu&gt;([^&lt;]+)&lt;/mu&gt;', body)        stat = re.search(r'&lt;static&gt;([^&lt;]+)&lt;/static&gt;', body)        pose = re.search(r'&lt;pose&gt;([^&lt;]+)&lt;/pose&gt;', body)        g = lambda m, i=1: m.group(i).strip() if m else '-'        print(f"{name:16s} {os.path.basename(f):30s} {g(box):22s} "              f"{(g(cyl)+','+g(cyl,2)) if cyl else '-':16s} "              f"{g(mass):8s} {g(mu):6s} {g(stat):7s} {g(pose)}")PY</pre>
+<p class="prose">Extraire aussi la hauteur du plateau de la table, dont dépend chaque z de saisie :</p>
+<pre>grep -B4 -A20 '&lt;model name="table"' $(cat config/WORLD_PATH) \  | grep -E '&lt;pose&gt;|&lt;size&gt;|&lt;box&gt;'</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">4.3 Déterminer la hauteur du rebord des bacs</h3>
+<p class="prose">Un bac est un contenant, pas une plaque. Trois grandeurs géométriques sont nécessaires par bac :</p>
+<div class="table-wrap"><table><thead><tr><th>Grandeur</th><th>Signification</th><th>Utilisée par</th></tr></thead><tbody><tr><td><code>pose</code></td><td>Centre du bac dans le repère monde</td><td>Point de passage de transport</td></tr><tr><td><code>inner_radius</code></td><td>Plus grand rayon qu’un objet peut occuper sans toucher une paroi</td><td>Contrôle de dépose (partie 9.2)</td></tr><tr><td><code>rim_z</code></td><td>Hauteur du bord supérieur dans le repère monde</td><td>Hauteur de lâcher, et contrôle « ne repose pas sur le rebord »</td></tr></tbody></table></div>
+<p class="prose">Si le bac est modélisé comme un assemblage de parois et d’un fond plutôt que comme une primitive unique, <code>inner_radius</code> et <code>rim_z</code> doivent être déduits de la géométrie des parois. Les mesurer directement si le SDF est difficile à analyser :</p>
+<pre>ros2 run ros_gz_sim create -world &lt;world&gt; -file &lt;bin&gt;.sdf -name probe_bin \  -x 0.30 -y 0.0 -z 0.10sleep 15gz model -m probe_bin -p        # settled posegz model -m probe_bin --link    # link names, to inspect wall geometry</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">4.4 Confirmer que les bacs sont statiques</h3>
+<pre>for b in red_bin blue_bin green_bin yellow_bin; do  printf '%-12s ' "$b"  grep -A8 "name=\"$b\"" $(cat config/WORLD_PATH) | grep -q '&lt;static&gt;true' \    &amp;&amp; echo "static OK" || echo "DYNAMIC — destination can move mid-episode"done</pre>
+<p class="prose">Un bac non statique peut être déplacé par une approche maladroite, après quoi chaque contrôle de dépose est mesuré par rapport à une cible qui a bougé. Si un bac est dynamique, soit le rendre statique pour l’acquisition — par une surcharge locale du monde, documentée —, soit enregistrer les poses des bacs au début de l’épisode et évaluer la dépose par rapport à elles plutôt qu’aux valeurs configurées.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">4.5 Le manifeste</h3>
+<p class="prose">Créer <code>config/objects.yaml</code>. <b>C’est la source unique de vérité.</b> Rien en aval ne code en dur une dimension, une pose ou une instruction.</p>
+<pre># config/objects.yaml# Every numeric field READ FROM THE MERGED SDFs (Part 4.2). Placeholders below# are shaped correctly but must be replaced. Do not ship this file unedited.world_path_file: config/WORLD_PATHtable_top_z:     0.000        # &lt;-- READ: world frame z of the table surfaceobjects:  red_cube:    shape:       box    size:        [0.040, 0.040, 0.040]   # &lt;-- READ    mass:        0.050                   # &lt;-- READ    mu:          1.500                   # &lt;-- READ    grasp_dz:    0.010      # above object CENTRE; see Part 4.6    grasp_yaw:   0.0        # rotationally symmetric top-down    bin:         red_bin    instruction: "pick up the red cube and place it in the red bin"  blue_cube:    shape:       box    size:        [0.040, 0.040, 0.040]   # &lt;-- READ; verify it matches red_cube    mass:        0.050    mu:          1.500    grasp_dz:    0.010    grasp_yaw:   0.0    bin:         blue_bin    instruction: "pick up the blue cube and place it in the blue bin"  green_cylinder:    shape:       cylinder    radius:      0.020                   # &lt;-- READ    length:      0.050                   # &lt;-- READ    mass:        0.050    mu:          1.500    grasp_dz:    0.012      # above mid-height, below the top edge    grasp_yaw:   0.0        # symmetric about its own axis    bin:         green_bin    instruction: "pick up the green cylinder and place it in the green bin"  yellow_box:    shape:       box    size:        [0.060, 0.035, 0.035]   # &lt;-- READ; note the asymmetry    mass:        0.050    mu:          1.500    grasp_dz:    0.008    grasp_yaw:   1.5708     # 90 deg — close across the SHORT axis    bin:         yellow_bin    instruction: "pick up the yellow box and place it in the yellow bin"bins:  red_bin:    pose:         [0.000, 0.000, 0.000]  # &lt;-- READ    inner_radius: 0.000                  # &lt;-- READ or measure (Part 4.3)    rim_z:        0.000                  # &lt;-- READ or measure    static:       true                   # &lt;-- CONFIRM (Part 4.4)  blue_bin:   {pose: [0,0,0], inner_radius: 0.0, rim_z: 0.0, static: true}  green_bin:  {pose: [0,0,0], inner_radius: 0.0, rim_z: 0.0, static: true}  yellow_bin: {pose: [0,0,0], inner_radius: 0.0, rim_z: 0.0, static: true}release:  height_above_bin_rim: 0.030    # see Part 8.3 for why 3 cm and not 0spawn:  settle_seconds_sim: 3.0        # SIMULATION seconds, not wall clock  min_object_separation: 0.080   # centre-to-centre  bin_keepout_radius:   0.090    # object centre to bin centre</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">4.6 Pourquoi la hauteur de saisie est mesurée depuis le centre de l’objet</h3>
+<p class="prose">Pour un cube d’arête <code>a</code> dont le <i>centre</i> est à la hauteur <code>z</code>, la face supérieure est à <code>z + a/2</code>. Viser <code>z</code> avec le bout des doigts les enfoncerait dans l’objet. Viser <code>z + grasp_dz</code> avec <code>grasp_dz</code> un peu inférieur à <code>a/2</code> place les patins des doigts autour de la partie haute de l’objet.</p>
+<p class="prose">Pour le cylindre, <code>grasp_dz</code> doit être inférieur à <code>length/2</code> pour que les patins touchent la paroi courbe au lieu de se fermer au-dessus de la face supérieure — un mode d’échec observé directement lors de l’acquisition précédente, où une hauteur de saisie de 0,12 m laissait l’objet parfaitement intact.</p>
+<p class="prose">C’est le chiffre le plus susceptible de devoir être ajusté, et le moins coûteux à changer. C’est précisément pour cela qu’il est dans <code>objects.yaml</code>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">4.7 Valider le manifeste avant de continuer</h3>
+<pre># scripts/validate_objects.pyimport yaml, sysc = yaml.safe_load(open("config/objects.yaml"))errs = []for name, o in c["objects"].items():    if o["bin"] not in c["bins"]:        errs.append(f"{name}: bin {o['bin']} not declared")    if o["shape"] == "box" and (not o.get("size") or any(v &lt;= 0 for v in o["size"])):        errs.append(f"{name}: invalid or placeholder size")    if o["shape"] == "cylinder" and not (o.get("radius", 0) &gt; 0 and o.get("length", 0) &gt; 0):        errs.append(f"{name}: invalid or placeholder cylinder dims")    half = (o["size"][2] / 2) if o["shape"] == "box" else (o["length"] / 2)    if o["grasp_dz"] &gt;= half:        errs.append(f"{name}: grasp_dz {o['grasp_dz']} &gt;= half-height {half} "                    f"— fingers will close above the object")    if not o["instruction"].strip():        errs.append(f"{name}: empty instruction")for bn, b in c["bins"].items():    if b["inner_radius"] &lt;= 0 or b["rim_z"] == 0:        errs.append(f"{bn}: placeholder geometry not replaced")    if not b.get("static", False):        errs.append(f"{bn}: NOT static — see Part 4.4")print("\n".join(errs) if errs else "objects.yaml OK")sys.exit(1 if errs else 0)</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Critère d’achèvement de la partie 4</h3>
+<p class="prose"><code>config/objects.yaml</code> complet, chaque champ lu dans les SDF, <code>validate_objects.py</code> qui se termine avec 0, le caractère statique des bacs confirmé, les orientations de saisie du cylindre et du pavé décidées.</p>
+</section>
+<section class="block" id="partie-5-tape-4-d-finition-des-t-ches-et"><h2>Partie 5 — Étape 4 : définition des tâches et vocabulaire des instructions</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">5.1 L’instruction devient structurante — c’est tout l’intérêt de l’exercice</h3>
+<p class="prose">Lors de l’acquisition précédente, les vingt épisodes portaient tous une seule instruction : <i>« pick up the red block and place it on the plate »</i>. Il y avait un objet et une destination.</p>
+<p class="prose">Une politique entraînée sur ces données pouvait ignorer entièrement le flux de langage, apprendre <i>« aller vers l’unique objet rouge, fermer, aller vers l’unique objet blanc, ouvrir »</i>, et obtenir 100 %. <b>Le jeu de données ne pouvait pas distinguer un modèle qui lit les instructions d’un modèle qui les ignore.</b> Chaque épisode était compatible avec les deux hypothèses.</p>
+<p class="prose">Avec quatre objets présents dans chaque image et quatre instructions, ce n’est plus le cas. Une politique qui ignore le langage ne peut pas faire mieux que le hasard — 25 %. L’instruction porte désormais exactement deux bits, et le jeu de données permet de mesurer si le modèle s’en sert.</p>
+<p class="prose">C’est la différence entre démontrer un pipeline et produire des données contenant un signal apprenable. C’est aussi pourquoi la métrique principale de la partie 13 est le taux de bon bac.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">5.2 Les quatre objets apparaissent dans chaque épisode</h3>
+<p class="prose">Cette exigence est ce qui rend 5.1 vrai, et il est facile de la violer par accident.</p>
+<p class="prose"><b>Chaque épisode fait apparaître les quatre objets et les quatre bacs.</b> L’instruction nomme un objet. Les trois autres sont des distracteurs, et leurs positions sont tirées au hasard indépendamment à chaque épisode.</p>
+<p class="prose">Si seule la cible apparaît, on a reconstruit quatre fois l’acquisition précédente et on n’a rien appris. Si les distracteurs sont toujours au même endroit, le modèle apprend <i>« le cube rouge est toujours à gauche »</i> plutôt que <i>« trouver le cube rouge »</i>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">5.3 Reprendre le vocabulaire existant</h3>
+<p class="prose">Le détecteur d’objets de l’équipe est entraîné sur huit classes : <code>cube_rouge</code>, <code>cube_bleu</code>, <code>cylindre_vert</code>, <code>pave_jaune</code>, <code>bac_rouge</code>, <code>bac_bleu</code>, <code>bac_vert</code>, <code>bac_jaune</code>. Les noms des modèles Gazebo en sont les équivalents anglais.</p>
+<p class="prose">Utiliser des instructions qui correspondent une à une à ces classes. Ne pas introduire de synonymes — ni « the red block », ni « the crimson cube », ni « the red container ». <b>Une seule formulation par objet, identique à l’octet près dans ses quinze épisodes.</b></p>
+<p class="prose">La robustesse aux paraphrases est une expérience ultérieure délibérée, avec son propre plan de réserve. Introduire de la variation maintenant, par accident, rend impossible de mener proprement cette expérience plus tard.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">5.4 La table des tâches</h3>
+<pre>{"task_index": 0, "task": "pick up the red cube and place it in the red bin"}{"task_index": 1, "task": "pick up the blue cube and place it in the blue bin"}{"task_index": 2, "task": "pick up the green cylinder and place it in the green bin"}{"task_index": 3, "task": "pick up the yellow box and place it in the yellow bin"}</pre>
+<p class="prose">Générer ce fichier à partir de <code>objects.yaml</code> plutôt que de le taper, pour que les deux ne puissent pas diverger :</p>
+<pre># scripts/make_tasks.pyimport yaml, jsonc = yaml.safe_load(open("config/objects.yaml"))order = ["red_cube", "blue_cube", "green_cylinder", "yellow_box"]with open("config/tasks.jsonl", "w") as f:    for i, name in enumerate(order):        f.write(json.dumps({"task_index": i,                            "task": c["objects"][name]["instruction"]}) + "\n")print("wrote config/tasks.jsonl")</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">5.5 L’affectation se fait par couleur</h3>
+<p class="prose">Selon A6. Chaque objet va dans le bac de sa propre couleur. Pas de logique de taille, pas de destinations marquées par ArUco, pas d’exception.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Critère d’achèvement de la partie 5</h3>
+<p class="prose"><code>config/tasks.jsonl</code> généré à partir du manifeste, quatre tâches, instructions figées, et le script d’apparition qui met en œuvre « les quatre objets toujours présents ».</p>
+</section>
+<section class="block" id="partie-6-tape-5-la-matrice-des-pisodes"><h2>Partie 6 — Étape 5 : la matrice des épisodes</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">6.1 Cible et définition de « propre »</h3>
+<p class="prose">Selon A9 : <b>quinze épisodes propres et réussis par objet, soixante au total.</b> Un épisode ne compte que s’il a passé tous les contrôles de la partie 9. Les échecs sont rejoués.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">6.2 La répartition</h3>
+<div class="table-wrap"><table><thead><tr><th>Par objet</th><th>Nombre</th><th>Caméra</th><th>Répartition</th><th>Objectif</th></tr></thead><tbody><tr><td>Position nominale</td><td>4</td><td>caméra de table</td><td>entraînement</td><td>Établir que la tâche fonctionne</td></tr><tr><td>Variation en x</td><td>4</td><td>caméra de table</td><td>entraînement</td><td>Généralisation longitudinale</td></tr><tr><td>Variation en y</td><td>4</td><td>caméra de table</td><td>entraînement</td><td>Généralisation latérale</td></tr><tr><td><b>Réservé</b></td><td><b>3</b></td><td><b>seconde caméra</b></td><td><b>réservé</b></td><td><b>Validation sur une condition non vue</b></td></tr><tr><td></td><td><b>15</b></td><td></td><td></td><td></td></tr></tbody></table></div>
+<p class="prose"><b>48 épisodes d’entraînement, 12 réservés</b> — une répartition 80/20.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">6.3 Pourquoi réserver une <i>condition</i>, et non des images</h3>
+<p class="prose">Ce n’est pas une formalité, et le projet en a une preuve directe en interne.</p>
+<p class="prose">Les travaux d’estimation de pose sans marqueur ont échoué parce que le modèle a mémorisé deux montages de caméra fixes au lieu d’apprendre à localiser. Il se comportait bien sur des <i>images</i> réservées de ces montages et s’effondrait sur un montage non vu. <b>Réserver des images teste la mémorisation des pixels ; réserver des conditions teste la généralisation.</b></p>
+<p class="prose">L’évaluation du détecteur d’objets de l’équipe suit le même principe — détection complète sur la caméra d’entraînement, détection dégradée sur une caméra jamais vue pendant l’entraînement, rapportée honnêtement comme un instantané plutôt que comme un taux mesuré. Cette répartition avec réserve est la pratique établie, pas une importation.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">6.4 La seconde caméra doit réellement exister</h3>
+<p class="prose">Une caméra réservée qui n’existe pas est un jeu réservé qui n’existe pas. Avant de générer la matrice :</p>
+<pre># cameras declared in the target worldgrep -oP '&lt;sensor name="\K[^"]+' $(cat config/WORLD_PATH)grep -oP '&lt;topic&gt;\K[^&lt;]+' $(cat config/WORLD_PATH) | grep -i cam# and at runtime, with the world loadedros2 topic list | grep -iE "image|camera"</pre>
+<p class="prose">S’il n’existe qu’une caméra, soumettre la question à l’équipe robotique avec trois options, par ordre de préférence :</p>
+<ol class="prose">
+<li>Ajouter une seconde caméra dans une surcharge locale du monde, à une autre pose — le moins coûteux, et le plus proche de l’intention</li>
+<li>Réserver une autre condition à la place — par exemple un éclairage différent, ou un décalage de la pose de la caméra de table</li>
+<li>Enregistrer les soixante avec une seule caméra et déclarer qu’il n’existe pas de condition réservée — <b>honnête, mais nettement plus faible</b>, et cela doit être indiqué dans le README du jeu de données</li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">6.5 Remesurer l’enveloppe accessible</h3>
+<p class="prose">L’acquisition précédente a établi que l’IK par le dessus sur la branche coude haut n’avait <b>aucune solution sous x ≈ 0,245 m</b>, ce qui a fait passer la plage en x d’un 0,22–0,28 prévu à un 0,25–0,31 effectif.</p>
+<p class="prose"><b>Cette limite appartient à la géométrie de table du monde précédent.</b> Ce monde a une vraie table mesurée, peut-être à une autre hauteur. La redéduire plutôt que d’en hériter :</p>
+<pre>python3 scripts/precompute_ik.py --sweep \  --x-range 0.18 0.36 --x-step 0.005 \  --y-range -0.14 0.14 --y-step 0.01 \  --z-from-config config/objects.yaml \  --require-elbow-up \  --out config/reach_map.csv
+# scripts/summarise_reach.py — the usable rectangleimport csvok = [(float(r["x"]), float(r["y"])) for r in csv.DictReader(open("config/reach_map.csv"))      if r["solved"] == "1" and r["elbow_up"] == "1"]xs, ys = [p[0] for p in ok], [p[1] for p in ok]print(f"solved points: {len(ok)}")print(f"x range: {min(xs):.3f} .. {max(xs):.3f}")print(f"y range: {min(ys):.3f} .. {max(ys):.3f}")print(f"SAFE (5 mm margin): x {min(xs)+0.005:.3f} .. {max(xs)-0.005:.3f}, "      f"y {min(ys)+0.005:.3f} .. {max(ys)-0.005:.3f}")</pre>
+<p class="prose"><b>Utiliser le rectangle avec marge, jamais la limite brute.</b> Une position qui se résout tout juste au bord échouera par intermittence une fois l’objet stabilisé à quelques millimètres de sa pose d’apparition — et un échec d’IK intermittent en plein lot coûte cher.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">6.6 Les positions ne doivent pas entrer en collision</h3>
+<p class="prose">Quatre objets et quatre bacs partagent une table. Deux contraintes que l’acquisition précédente n’a jamais rencontrées :</p>
+<ol class="prose">
+<li>Deux objets qui se chevauchent à l’apparition amènent le moteur physique à en éjecter un violemment</li>
+<li>Un objet apparu dans l’emprise d’un bac commence l’épisode dans son propre état but</li>
+</ol>
+<pre># scripts/layout.pyimport math, randomdef validate_layout(obj_xy, bin_xy, min_sep, bin_keepout):    """Return (ok, reason). obj_xy/bin_xy are {name: (x, y)}."""    names = list(obj_xy)    for i, a in enumerate(names):        for b in names[i+1:]:            d = math.dist(obj_xy[a], obj_xy[b])            if d &lt; min_sep:                return False, f"{a}/{b} separated by {d:.3f} m &lt; {min_sep}"    for o, p in obj_xy.items():        for bn, q in bin_xy.items():            d = math.dist(p, q)            if d &lt; bin_keepout:                return False, f"{o} is {d:.3f} m from {bn} (keepout {bin_keepout})"    return True, "ok"def sample_distractors(target, target_xy, bin_xy, safe_rect,                       min_sep, bin_keepout, others, rng, tries=500):    """Place the three non-target objects at valid random positions."""    x0, x1, y0, y1 = safe_rect    for _ in range(tries):        layout = {target: target_xy}        for name in others:            layout[name] = (round(rng.uniform(x0, x1), 4),                            round(rng.uniform(y0, y1), 4))        ok, _ = validate_layout(layout, bin_xy, min_sep, bin_keepout)        if ok:            return layout    raise RuntimeError("could not find a valid layout — relax the rectangle "                       "or reduce min_sep")</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">6.7 Générer la matrice</h3>
+<pre># scripts/make_matrix.py  -&gt;  config/episode_matrix.csvimport csv, yaml, randomfrom layout import sample_distractorsrandom.seed(20260923)          # reproducibility is not optionalrng = random.Random(20260923)cfg  = yaml.safe_load(open("config/objects.yaml"))OBJ  = ["red_cube", "blue_cube", "green_cylinder", "yellow_box"]bins = {k: (v["pose"][0], v["pose"][1]) for k, v in cfg["bins"].items()}# from Part 6.5's margined rectangle — REPLACE with measured valuesSAFE = (0.250, 0.310, -0.080, 0.080)X_NOM, Y_NOM = 0.270, 0.000X_VAR = [0.250, 0.265, 0.285, 0.305]Y_VAR = [-0.070, -0.035, 0.035, 0.070]rows, idx = [], 1for obj in OBJ:    others = [o for o in OBJ if o != obj]    plan = ([("nominal",  X_NOM, Y_NOM)] * 4          + [("x_var",    x,     Y_NOM) for x in X_VAR]          + [("y_var",    X_NOM, y)     for y in Y_VAR]          + [("heldout",  X_NOM, Y_NOM),             ("heldout",  X_VAR[1], Y_NOM),             ("heldout",  X_NOM, Y_VAR[2])])    for kind, x, y in plan:        layout = sample_distractors(            obj, (x, y), bins, SAFE,            cfg["spawn"]["min_object_separation"],            cfg["spawn"]["bin_keepout_radius"], others, rng)        row = {"episode": idx, "target": obj, "kind": kind,               "target_x": x, "target_y": y,               "camera": "heldout" if kind == "heldout" else "table",               "split":  "heldout" if kind == "heldout" else "train",               "task_index": OBJ.index(obj)}        for name, (px, py) in layout.items():            row[f"{name}_x"], row[f"{name}_y"] = px, py        rows.append(row); idx += 1with open("config/episode_matrix.csv", "w", newline="") as f:    w = csv.DictWriter(f, fieldnames=list(rows[0]))    w.writeheader(); w.writerows(rows)print(f"{len(rows)} episodes  "      f"train={sum(r['split']=='train' for r in rows)}  "      f"heldout={sum(r['split']=='heldout' for r in rows)}")for o in OBJ:    print(f"  {o:16s} {sum(r['target']==o for r in rows)}")</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">6.8 Chercher d’abord un randomiseur existant</h3>
+<p class="prose">L’outillage de simulation de l’équipe comprend une boîte de dialogue proposant <i>« Randomiser cube + bac »</i> — de nouvelles positions dans la zone accessible du bras — et une action <i>« Lancer la prise »</i>. Si ce code existe en local, il encode déjà la connaissance de l’équipe sur la zone accessible.</p>
+<pre>grep -rniE "randomis|randomiz|lancer.la.prise|zone accessible" \     --include="*.py" . | head</pre>
+<p class="prose">S’il produit des poses accessibles et sans collision, <b>l’utiliser à la place du §6.6</b>. Reprendre l’échantillonnage de l’équipe garde la distribution de ce jeu de données cohérente avec la sienne, ce qui compte si les deux sont un jour combinés.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Critère d’achèvement de la partie 6</h3>
+<p class="prose"><code>config/episode_matrix.csv</code> de 60 lignes, répartition 48/12, 15 par objet, chaque cible dans le rectangle avec marge remesuré, chaque disposition passant <code>validate_layout</code>, et la seconde caméra confirmée.</p>
+<p class="prose">Le balayage du §6.5 demande <code>moveit_py</code> et le modèle du robot, mais n’effectue aucun pas de physique.</p>
+</section>
+<section class="block" id="partie-7-tape-6-cin-matique-inverse-et-p"><h2>Partie 7 — Étape 6 : cinématique inverse et points de passage</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">7.1 Ce qui est repris sans changement</h3>
+<p class="prose"><b>Résoudre l’IK localement, commander les articulations.</b> L’interface cartésienne du fabricant a donné <b>247,8 mm</b> d’erreur finale contre <b>18,2 mm</b> pour les commandes articulaires avec IK différentielle, sur une même cible à 267 mm — et elle a échoué <i>en silence</i>, le bridge renvoyant un succès dans les deux cas. La cause était un blocage de cardan avec RY entre −78° et −83°. Ne jamais l’utiliser.</p>
+<p class="prose"><b>Imposer la branche coude haut.</b> Rejeter toute solution avec <code>J3 &gt;= 0</code> et réensemencer. Les poses historiques sont en coude bas contre la butée de J2, avec une marge nulle, ce qui produit des sauts de branche de 150° sur J4 en boucle fermée.</p>
+<p class="prose"><b>Approcher toujours à la verticale.</b> La campagne de l’équipe a mesuré le coût du mélange des directions d’approche sur quatre côtés : <b>5,918 mm de dispersion</b>, contre une répétabilité de 0,84 mm pour le pire côté pris seul. La direction d’approche coûte environ <b>sept fois</b> la pire répétabilité. Chaque descente de ce jeu de données vient du dessus, sans exception. Ce n’est pas une préférence ; c’est une contrainte mesurée, et c’est aussi — voir la partie 12 — une contrainte qu’une politique apprise n’hérite pas automatiquement.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">7.2 Le repère de la pince, remesuré</h3>
+<p class="prose">L’acquisition précédente a perdu ici un cycle de débogage complet. Avec quatre objets, il y a quatre occasions de recommencer.</p>
+<ul class="prose">
+<li>Le repère cible de l’IK est <b><code>gripper_base</code></b>, pas <code>link6</code></li>
+<li>Le bout des doigts est environ <b>0,10 m sous</b> <code>gripper_base</code></li>
+<li>Les doigts se rejoignent environ <b>0,036 m en avant de</b> <code>gripper_base</code> — le repère n’est <b>pas symétrique</b> entre les doigts</li>
+</ul>
+<p class="prose">La cible cartésienne d’une saisie n’est donc pas le centre de l’objet. C’est le centre de l’objet décalé du vecteur des bouts de doigts, exprimé dans <code>gripper_base</code>.</p>
+<p class="prose"><b>Remesurer dans ce monde plutôt que recopier</b>, car la fixation de la pince peut différer :</p>
+<pre># Move the arm to a known pose, WAIT for it to settle, then readpython3 scripts/goto_home.pysleep 60        # at RTF ~0.1, 60 s wall clock is ~6 s of simulation timeros2 run tf2_ros tf2_echo gripper_base gripper_left_finger_tipros2 run tf2_ros tf2_echo gripper_base gripper_right_finger_tipros2 run tf2_ros tf2_echo base_link gripper_base</pre>
+<p class="prose"><b>Ne lire ces valeurs qu’après la stabilisation du bras.</b> À un facteur temps réel proche de 0,08, une transformation lue pendant que le bras bouge encore n’a aucun sens. L’acquisition précédente a commis exactement cette erreur, en a tiré une conclusion fausse, puis a passé des essais à la poursuivre.</p>
+<pre># config/gripper_frame.yaml — measured in THIS world, not inheritedgripper_base_to_fingertip:  dz: -0.100      # fingertips below gripper_base   &lt;-- MEASURE  dx:  0.036      # meeting point ahead of base     &lt;-- MEASURE  asymmetric: truemeasured_at: "2026-09-__"measured_after_settle_seconds: 60</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">7.3 Les sept points de passage par épisode</h3>
+<pre>1. HOME        joint space, fixed constant2. APPROACH    (obj_x, obj_y, obj_z + 0.10)        yaw = grasp_yaw3. DESCEND     (obj_x, obj_y, obj_z + grasp_dz)    yaw = grasp_yaw   [GRASP      gripper close; attach if A8 — no motion]4. LIFT        (obj_x, obj_y, obj_z + 0.10)        yaw unchanged5. TRANSPORT   (bin_x, bin_y, bin_rim_z + 0.10)6. RELEASE     (bin_x, bin_y, bin_rim_z + 0.03)   [OPEN       gripper open; detach if A8 — no motion]7. RETREAT     (bin_x, bin_y, bin_rim_z + 0.10)    then HOME</pre>
+<p class="prose">Soixante épisodes × sept points de passage font <b>420 résolutions d’IK</b>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">7.4 Précalculer, ne jamais résoudre dans la boucle</h3>
+<p class="prose">Un échec d’IK découvert pendant un épisode gaspille tout l’épisode et sa mise en route. Découvert hors ligne, il ne coûte rien.</p>
+<pre>python3 scripts/precompute_ik.py \  --matrix         config/episode_matrix.csv \  --objects        config/objects.yaml \  --gripper-frame  config/gripper_frame.yaml \  --require-elbow-up \  --branch-max-step 0.6 \  --seeds 12 \  --out            config/waypoints.json
+# scripts/check_waypoints.py — must pass before any episode is recordedimport json, sysw = json.load(open("config/waypoints.json"))problems = []if len(w) != 60:    problems.append(f"expected 60 episode entries, found {len(w)}")for k, seq in w.items():    if seq is None:        problems.append(f"{k}: no solution"); continue    if len(seq) != 7:        problems.append(f"{k}: {len(seq)} waypoints, expected 7")    for i, q in enumerate(seq):        if q is None:            problems.append(f"{k}: waypoint {i} unsolved")        elif q[2] &gt;= 0:            problems.append(f"{k}: waypoint {i} elbow-DOWN (J3={q[2]:.3f})")    for i, (a, b) in enumerate(zip(seq, seq[1:])):        if a and b:            step = max(abs(x - y) for x, y in zip(a, b))            if step &gt; 0.6:                problems.append(f"{k}: branch jump {step:.2f} rad "                                f"between waypoints {i} and {i+1}")print("\n".join(problems) if problems else f"{len(w)} episodes: all waypoints OK")sys.exit(1 if problems else 0)</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">7.5 Cohérence de branche sur tout l’épisode</h3>
+<p class="prose"><code>J3 &lt; 0</code> à chaque résolution est nécessaire mais pas suffisant. La <i>séquence</i> doit rester sur une seule branche. Un changement de branche entre LIFT et TRANSPORT produit une grande rotation du poignet en plein transport, qui projette un objet saisi physiquement et, dans tous les cas, paraît absurde dans les images enregistrées — enseignant à la politique un mouvement qu’aucun contrôleur sensé ne produirait.</p>
+<p class="prose">Le seuil de 0,6 rad par articulation et par point de passage de <code>check_waypoints.py</code> le détecte. Si une séquence échoue, réensemencer la résolution de cet épisode plutôt que d’abaisser le seuil.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">7.6 Si une position ne peut pas être résolue</h3>
+<p class="prose">Changer la position dans la matrice et régénérer. Ne pas laisser le lot la découvrir à l’exécution, et ne pas assouplir l’exigence du coude haut pour faire passer une position récalcitrante — un épisode en coude bas dans un jeu de données sinon en coude haut est un contaminant.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Critère d’achèvement de la partie 7</h3>
+<p class="prose"><code>config/waypoints.json</code> de 60 entrées, 420 points de passage résolus, zéro non résolu, zéro coude bas, zéro saut de branche — <code>check_waypoints.py</code> qui se termine avec 0.</p>
+<p class="prose"><code>precompute_ik.py</code> n’utilise que <code>moveit_py</code> et le modèle du robot — ni Gazebo, ni pas de physique.</p>
+</section>
+<section class="block" id="partie-8-tape-7-la-s-quence-d-pisode"><h2>Partie 8 — Étape 7 : la séquence d’épisode</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">8.1 Apparition de la scène</h3>
+<pre># scripts/spawn_scene.pyimport subprocess, yaml, csv, sys, time, argparsedef spawn(model_file, name, x, y, z, world):    subprocess.run(["ros2", "run", "ros_gz_sim", "create",                    "-world", world, "-file", model_file, "-name", name,                    "-x", str(x), "-y", str(y), "-z", str(z)],                   check=True, timeout=90)          # bounded — see Part 10.2def main():    ap = argparse.ArgumentParser()    ap.add_argument("--episode", type=int, required=True)    args = ap.parse_args()    cfg   = yaml.safe_load(open("config/objects.yaml"))    world = open(cfg["world_path_file"]).read().strip()    row   = next(r for r in csv.DictReader(open("config/episode_matrix.csv"))                 if int(r["episode"]) == args.episode)    # bins first — they are static and define the keepout regions    for bn in cfg["bins"]:        spawn(f"models/{bn}.sdf", bn, *cfg["bins"][bn]["pose"], world)    # then ALL FOUR objects — target and distractors alike (Part 5.2)    for name, o in cfg["objects"].items():        half = (o["size"][2] / 2) if o["shape"] == "box" else (o["length"] / 2)        z = cfg["table_top_z"] + half + 0.0005      # 0.5 mm above, let it settle        spawn(f"models/{name}.sdf", name,              float(row[f"{name}_x"]), float(row[f"{name}_y"]), z, world)    # settle in SIMULATION time, not wall clock    settle_sim = cfg["spawn"]["settle_seconds_sim"]    rtf = float(subprocess.run(["python3", "scripts/measure_rtf.py"],                               capture_output=True, text=True).stdout or 0.1)    time.sleep(settle_sim / max(rtf, 0.02))    # verify every object landed where intended    bad = []    for name in cfg["objects"]:        p = read_pose(name)                          # gz model -m &lt;name&gt; -p        want = (float(row[f"{name}_x"]), float(row[f"{name}_y"]))        if abs(p[0]-want[0]) &gt; 0.01 or abs(p[1]-want[1]) &gt; 0.01:            bad.append((name, want, p[:2]))    if bad:        print("SPAWN DRIFT:", bad); sys.exit(1)    print("scene OK")if __name__ == "__main__":    main()</pre>
+<p class="prose"><b>Notez le calcul de la stabilisation.</b> Attendre <code>sleep 3</code> attend trois secondes <i>d’horloge murale</i>, ce qui à un RTF de 0,082 représente un quart de seconde de simulation — pas assez pour que quoi que ce soit se stabilise. Toute attente de ce pipeline qui concerne la physique doit être exprimée en temps de simulation et divisée par le facteur temps réel mesuré. L’acquisition précédente avait des attentes de stabilisation en temps d’horloge murale, et elles y sont citées comme cause possible de non-reproductibilité.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">8.2 Le pilote de séquence</h3>
+<pre># scripts/run_pick_and_place.py — the changed coreimport yaml, json, time, csv, argparsecfg = yaml.safe_load(open("config/objects.yaml"))wps = json.load(open("config/waypoints.json"))ap = argparse.ArgumentParser()ap.add_argument("--episode", type=int, required=True)ap.add_argument("--target", required=True)ap.add_argument("--record", action="store_true")ap.add_argument("--log",  default="grasp_log.csv")ap.add_argument("--meta", default="grasp_meta.json")args = ap.parse_args()spec     = cfg["objects"][args.target]bin_name = spec["bin"]seq      = wps[f"ep{args.episode:03d}"]STEPS = [    ("home",      lambda: goto_joints(HOME_Q),              1.0),    ("approach",  lambda: goto_joints(seq[0]),              2.0),    ("descend",   lambda: goto_joints(seq[1]),              2.0),    ("grasp",     lambda: close_gripper_and_attach(args.target), 2.0),  # &gt; 1.6 s    ("lift",      lambda: goto_joints(seq[2]),              2.0),    ("transport", lambda: goto_joints(seq[3]),              3.0),    ("release",   lambda: goto_joints(seq[4]),              2.0),    ("open",      lambda: open_gripper_and_detach(args.target),   2.0),  # &gt; 1.6 s    ("retreat",   lambda: goto_joints(seq[5]),              2.0),    ("home",      lambda: goto_joints(HOME_Q),              2.0),]start_poses = snapshot_all_objects("start")     # ALL FOUR — Part 9.3 needs thisfailed_at = Nonefor name, action, settle_sim in STEPS:    log(f"--- {name}  [{args.target} -&gt; {bin_name}] ---")    if action() is False:        log(f"FAILED at {name}"); failed_at = name; break    time.sleep(settle_sim / max(current_rtf(), 0.02))   # sim time, not wall    snapshot_all_objects(name)end_poses = snapshot_all_objects("end")</pre>
+<p class="prose">Quatre changements par rapport à l’acquisition précédente, tous petits :</p>
+<ol class="prose">
+<li><b>Choix de la cible</b> — <code>--target</code> tiré de la ligne de la matrice, pas un objet codé en dur</li>
+<li><b>Lacet de poignet par objet</b> — tiré de <code>objects.yaml</code>, intégré aux points de passage précalculés</li>
+<li><b>Lâcher adapté au bac</b> — descendre à <code>rim_z + 0.03</code>, pas jusqu’à la surface d’une plaque</li>
+<li><b>Attache par objet</b> — si A8 s’applique, attacher l’objet <i>nommé</i></li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">8.3 Pourquoi lâcher à 3 cm au-dessus du rebord</h3>
+<p class="prose">Trois raisons ; c’est la troisième qui pose problème.</p>
+<ol class="prose">
+<li>Descendre dans le bac pousse les patins des doigts contre les parois du bac</li>
+<li>Une courte chute pose l’objet à plat au lieu de le laisser en équilibre sur une arête</li>
+<li><b>Si la soudure est utilisée, détacher pendant que l’objet touche le fond du bac peut produire une impulsion du solveur</b> — le même type d’événement qui a projeté un objet de 4 cm latéralement lors de l’acquisition précédente. Détacher dans le vide et le laisser tomber de trois centimètres.</li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">8.4 Contraintes de temps, inchangées et non facultatives</h3>
+<div class="table-wrap"><table><thead><tr><th>Contrainte</th><th>Valeur</th><th>Conséquence en cas de violation</th></tr></thead><tbody><tr><td>Délai entre commandes</td><td>200 ms minimum</td><td>Plafond de 5 Hz ; plus vite, les commandes sont abandonnées sans bruit</td></tr><tr><td>Intervalle d’actionnement de la pince</td><td>~1,6 s</td><td>~0,6 Hz. C’est la pince, et non le bras, le maillon le plus lent</td></tr><tr><td>Facteur temps réel, portable de la partie 0.2</td><td>0,344 (médiane)</td><td>Un épisode de 25 s représente ~73 s de mouvement ; un épisode complet ~160 s</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Critère d’achèvement de la partie 8</h3>
+<p class="prose">Un épisode par objet — quatre au total — s’exécute du début à la fin sans intervention, chacun se terminant avec son objet dans le bac assorti.</p>
+<p class="prose">Quatre épisodes d’essai de fumée prennent bien moins d’une heure. Cela en vaut la peine : ne jamais lancer le lot sur un pipeline qu’on n’a pas vu aller au bout une fois par objet. Le cylindre, en particulier, doit être exercé avant le lot.</p>
+</section>
+<section class="block" id="partie-9-tape-8-v-rification-pisode-par-"><h2>Partie 9 — Étape 8 : vérification épisode par épisode</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">9.1 Les contrôles repris</h3>
+<ul class="prose">
+<li><b><code>rc = 0</code></b> — le script de séquence s’est terminé proprement</li>
+<li><b><code>grasp_held</code></b> — <code>dz</code> entre l’effecteur et l’objet constant pendant LIFT et TRANSPORT, à 5 mm près</li>
+<li><b><code>rise ≥ 0.05 m</code></b> — l’objet a réellement quitté la table</li>
+</ul>
+<p class="prose">Remarque pour le rapport : si A8 s’applique, <code>grasp_held</code> est vrai <b>par construction</b> — l’objet est soudé, donc <code>dz</code> ne peut pas varier. Cela reste un contrôle valable que l’objet a été <i>transporté</i>, et un contrôle non valable qu’il a été <i>saisi</i>. Le formuler en conséquence dans chaque document écrit : <i>« l’objet a été transporté et déposé, sous une attache simulée signalée »</i>, jamais <i>« saisie vérifiée »</i>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">9.2 Le contrôle que cette tâche exige et que la précédente n’exigeait pas</h3>
+<p class="prose"><b>Était-ce le <i>bon</i> bac ?</b></p>
+<p class="prose">L’acquisition précédente avait une seule destination, si bien que « déposé » et « déposé correctement » étaient la même question. Ce sont désormais deux questions différentes, et l’échec de mauvais bac est <b>invisible pour tous les contrôles de 9.1</b> : l’objet a été saisi, transporté et lâché dans <i>un</i> bac. Tous les critères numériques passent. L’épisode est quand même faux, et l’instruction qui lui est attachée est fausse.</p>
+<p class="prose"><b>Un épisode avec une instruction fausse est pire que pas d’épisode du tout.</b> Il enseigne au modèle le contraire de la tâche, et avec la même assurance qu’un épisode correct.</p>
+<pre># scripts/checks.pyimport mathdef placed_in_correct_bin(target, cfg, obj_pose, tol=0.005):    """Inside its OWN bin footprint, and below the rim — not resting on it."""    b = cfg["bins"][cfg["objects"][target]["bin"]]    dx, dy = obj_pose[0] - b["pose"][0], obj_pose[1] - b["pose"][1]    inside  = math.hypot(dx, dy) &lt;= (b["inner_radius"] - tol)    settled = obj_pose[2] &lt;= b["rim_z"]    return inside and settled, {"inside": inside, "below_rim": settled}def landed_in_wrong_bin(target, cfg, obj_pose):    """Explicitly detect the silent failure."""    own = cfg["objects"][target]["bin"]    for bn, b in cfg["bins"].items():        if bn == own:            continue        if math.hypot(obj_pose[0] - b["pose"][0],                      obj_pose[1] - b["pose"][1]) &lt;= b["inner_radius"]:            return bn    return None</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">9.3 Les distracteurs ont-ils été dérangés ?</h3>
+<p class="prose">Un épisode dans lequel la pince a poussé le cube bleu à travers la table en allant chercher le rouge est une mauvaise démonstration : les images montrent un mouvement que l’instruction ne décrit pas.</p>
+<pre>def distractors_undisturbed(target, start_poses, end_poses, tol=0.02):    moved = []    for name, p0 in start_poses.items():        if name == target:            continue        d = math.dist(p0[:2], end_poses[name][:2])        if d &gt; tol:            moved.append([name, round(d, 4)])    return (not moved), moved</pre>
+<p class="prose">Traiter un distracteur dérangé comme un <b>avertissement, pas un échec bloquant</b>. Le consigner ; décider au moment de l’assemblage du jeu de données s’il faut l’exclure. Les vraies démonstrations comportent des contacts fortuits. Ce qui ne doit jamais être enregistré, c’est un épisode <i>mal étiqueté</i>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">9.4 Le fichier de verdict de l’épisode</h3>
+<pre>{  "episode": 27,  "target": "green_cylinder",  "task_index": 2,  "instruction": "pick up the green cylinder and place it in the green bin",  "expected_bin": "green_bin",  "rc": 0,  "grasp_held": true,  "rise_m": 0.132,  "placed_in_correct_bin": true,  "landed_in_wrong_bin": null,  "distractors_moved": [["yellow_box", 0.031]],  "simulated_attachment": true,  "attach_target_link": "link6",  "camera": "table_camera",  "split": "train",  "rtf_observed": 0.271,  "wall_seconds": 312,  "sim_seconds": 84.6,  "host_role": "B",  "world_sha256": "…",  "verdict": "PASS"}</pre>
+<p class="prose"><code>simulated_attachment</code> figure dans chaque enregistrement, quelle que soit la décision de la partie 3. Si la saisie physique a été adoptée, il vaut <code>false</code>, et ce seul champ devient la ligne la plus précieuse du fichier.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">9.5 Tester le vérificateur sur un épisode connu comme mauvais</h3>
+<p class="prose">Un vérificateur qui n’a jamais rien rejeté n’est pas un vérificateur.</p>
+<pre># deliberately mis-target: fetch the red cube, aim at the blue binpython3 scripts/run_pick_and_place.py --episode 901 --target red_cube \        --force-bin blue_bin --log /tmp/bad.csv --meta /tmp/bad.jsonpython3 scripts/verify_episode.py /tmp/bad.json \  &amp;&amp; echo "FAIL: verifier accepted a wrong-bin episode" \  || echo "OK: verifier rejected it"</pre>
+<p class="prose">Faire de même pour un cas sans levée et pour un cas de distracteur dérangé. Trois échecs délibérés, trois rejets corrects, avant que le lot ne tourne.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">9.6 Rapport d’état du lot</h3>
+<p class="prose">Étendre le script d’état fondé sur la vérité terrain — qui lit le système de fichiers, jamais la mémoire de l’agent ou de l’opérateur — pour ventiler par objet et par répartition :</p>
+<pre>=== status.sh — read at ===  UTC:          2026-09-__ __:__:__ UTC  Europe/Paris: 2026-09-__ __:__:__ CEST=== per-object status ===red_cube        12/12 train   3/3 heldout   OKblue_cube       12/12 train   3/3 heldout   OKgreen_cylinder  11/12 train   3/3 heldout   1 FAILED  (grasp_held=false, ep 34)yellow_box      12/12 train   2/3 heldout   1 WRONG_BIN (ep 58 -&gt; green_bin)=== totals (counted above, not asserted) ===  PASSED=57  FAILED=1  WRONG_BIN=1  MISSING=1  (sum=60 of 60)=== most recently modified episode folder ===  ep_058, 7 minutes ago=== container uptime vs wall-clock elapsed (reveals a host suspend) ===  GAP: +0s — no evidence of a suspend since container start</pre>
+<p class="prose">Trois propriétés de cette sortie sont délibérées et doivent être conservées :</p>
+<ol class="prose">
+<li><b>Les deux horloges, étiquetées.</b> Mélanger UTC et heure locale sans dire laquelle a produit une vraie contradiction de plusieurs heures lors de l’acquisition précédente.</li>
+<li><b><code>counted above, not asserted</code>.</b> Le total est calculé à partir de la liste imprimée juste au-dessus. Un total écrit à la main a produit une erreur d’une unité lors de l’acquisition précédente.</li>
+<li><b>Durée de fonctionnement contre horloge murale.</b> Un grand écart positif prouve que l’hôte s’est mis en veille. Plusieurs « blocages » apparents de plusieurs heures lors de l’acquisition précédente étaient l’hôte en veille, et des efforts ont été dépensés à durcir des scripts contre un blocage qui n’a jamais eu lieu.</li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Critère d’achèvement de la partie 9</h3>
+<p class="prose">Chaque contrôle mis en œuvre, et les trois cas d’échec délibérés correctement rejetés.</p>
+</section>
+<section class="block" id="partie-10-tape-9-contrats-enregistrement"><h2>Partie 10 — Étape 9 : contrats, enregistrement et assemblage du jeu de données</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">10.1 Les deux contrats</h3>
+<ul class="prose">
+<li><code>contracts/mycobot_sorting.yaml</code> — caméra de table, 48 épisodes d’entraînement</li>
+<li><code>contracts/mycobot_sorting_heldout.yaml</code> — seconde caméra, 12 épisodes réservés</li>
+</ul>
+<p class="prose">Les deux doivent inclure l’<b>articulation de la pince</b> dans <code>observation.state</code> et <code>action</code>. Une politique de tri qui ne peut pas commander la pince ne peut pas accomplir la tâche. L’acquisition précédente l’a ajoutée à ses contrats ; la reprendre.</p>
+<p class="prose"><b>Et les deux doivent exclure les poses des objets de <code>observation.*</code></b> — voir A5. La vérité terrain appartient uniquement aux métadonnées de l’épisode. Le vérifier explicitement :</p>
+<pre>for c in contracts/mycobot_sorting*.yaml; do  echo "== $c"  grep -A20 'observation' "$c" | grep -iE "cube|cylinder|box|bin|model_pose" \    &amp;&amp; echo "  FATAL: ground truth is leaking into the observation stream" \    || echo "  observation stream clean"done</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">10.2 Mise en route de l’enregistreur, avec les correctifs déjà payés</h3>
+<p class="prose">Trois détails chèrement acquis lors de l’acquisition précédente :</p>
+<p class="prose"><b>Utiliser la forme sans démon du cycle de vie.</b> La commande <code>ros2 lifecycle</code> signale « node not found » pour un enregistreur qui a en fait démarré, à cause d’un cache de démon périmé. Cela a coûté trois tentatives ratées et environ 1 h 49 min sur un seul épisode.</p>
+<pre>ros2 lifecycle set --no-daemon --spin-time 15 /episode_recorder configureros2 lifecycle set --no-daemon --spin-time 15 /episode_recorder activate</pre>
+<p class="prose">Ne jamais utiliser la forme nue.</p>
+<p class="prose"><b>Ne jamais attendre seulement un fichier marqueur de sortie.</b> Un observateur qui ne guette qu’une sentinelle de succès ne peut pas distinguer « travaille encore » de « processus tué », et il annoncera toujours la version rassurante. L’acquisition précédente a perdu une nuit entière à cause d’un observateur qui guettait un marqueur qu’un processus mort n’écrirait jamais.</p>
+<pre>wait_for() {                       # usage: wait_for &lt;pid&gt; &lt;marker&gt; &lt;timeout_s&gt;  local pid=$1 marker=$2 deadline=$(( $(date +%s) + $3 ))  while [ ! -f "$marker" ]; do    kill -0 "$pid" 2&gt;/dev/null || { echo "PROCESS DIED before marker"; return 2; }    [ "$(date +%s)" -gt "$deadline" ] &amp;&amp; { echo "TIMEOUT"; return 3; }    sleep 2  done  return 0}</pre>
+<p class="prose"><b>Borner chaque étape.</b> Chaque <code>ros_gz_sim create</code> reçoit un délai de 90 s ; chaque tentative un chien de garde de 25 minutes ; l’étape de configuration de l’enregistreur est réessayée une fois avec un plafond de 60 s. Une tentative normale prend environ 3 minutes sur le portable de la partie 0.2.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">10.3 Redémarrage propre à chaque épisode</h3>
+<p class="prose">Redémarrer toute la pile de simulation à chaque épisode. Cela coûte du temps de mise en route et achète de la reproductibilité. L’acquisition précédente a documenté <code>move_group</code> entrant dans un état <code>executing</code> bloqué après une trajectoire résiduelle, faisant échouer en silence tous les mouvements suivants — un redémarrage est le seul remède fiable, et détecter cet état en plein lot est plus difficile que de l’éviter.</p>
+<pre># scripts/episode.sh (structure)#   1. kill the stack        pkill gz sim / move_group / robot_state_publisher#   2. relaunch sim          + wait for all controllers 'active'#   3. spawn_scene.py        bins, then all four objects, then settle#   4. launch move_group     + wait for readiness in its log#   5. recorder configure/activate   (--no-daemon --spin-time 15)#   6. run_pick_and_place.py --record#   7. verify_episode.py     -&gt; PASS / FAIL / WRONG_BIN#   8. stage timestamps to  /workspace/stage_&lt;idx&gt;.log  (OUTSIDE the episode#      folder, so a retry that deletes the folder does not erase the evidence)</pre>
+<p class="prose">Ce dernier point compte : quand l’acquisition précédente rejouait un épisode raté, la reprise supprimait le dossier contenant la preuve de la cause de l’échec, rendant la cause racine irrécupérable.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">10.4 Organisation du jeu de données</h3>
+<pre>datasets/├── mycobot_sorting_train/               # 48 episodes, table camera│   ├── meta/info.json│   ├── meta/episodes.jsonl│   ├── meta/tasks.jsonl                 # exactly the four tasks from Part 5.4│   ├── data/chunk-000/episode_XXX.parquet│   └── videos/chunk-000/observation.images.table/episode_XXX.mp4└── mycobot_sorting_heldout/             # 12 episodes, second camera    └── … same structure …</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">10.5 Convertir sans PyTorch</h3>
+<pre>python3 scripts/port_bag.py --out datasets/mycobot_sorting_train \        --matrix config/episode_matrix.csv --split trainpython3 scripts/port_bag.py --out datasets/mycobot_sorting_heldout \        --matrix config/episode_matrix.csv --split heldout</pre>
+<p class="prose"><b>C’est tranché et il ne faut pas y revenir.</b> Le format LeRobot est fait de parquet, de MP4 et de JSON ; <code>pyarrow</code> et <code>ffmpeg</code> produisent tout cela. PyTorch est nécessaire pour <i>entraîner</i>, pas pour <i>sérialiser</i>. L’acquisition précédente a perdu une nuit à installer une version CPU de PyTorch de 999 Mo dans un répertoire du conteneur ensuite détruit par un redémarrage du conteneur — deux fois, parce que l’environnement virtuel se trouvait dans le système de fichiers du conteneur et non sur un chemin monté.</p>
+<p class="prose"><b>Corollaire :</b> tout ce qui doit survivre à un redémarrage du conteneur va sur le chemin monté, à côté des épisodes, jamais dans le système de fichiers du conteneur.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">10.6 La validation est reportée — le dire</h3>
+<p class="prose">L’organisation sur disque est écrite selon la spécification documentée, mais <b>son chargement n’est pas prouvé</b> tant qu’elle n’a pas été ouverte par la vraie classe <code>LeRobotDataset</code> sur une machine disposant de PyTorch. Le dire clairement dans le README plutôt que de laisser entendre qu’une validation a eu lieu.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">10.7 Le README porte les réserves</h3>
+<p class="prose">La personne qui entraînera un modèle sur ce jeu de données dans trois mois lira le README et rien d’autre. Son premier paragraphe doit indiquer :</p>
+<ol class="prose">
+<li>Si la saisie est <b>physique</b> ou une <b>attache simulée signalée</b> (verdict de la partie 3)</li>
+<li>Que le démonstrateur a utilisé les <b>poses vraies des objets</b>, et non une perception</li>
+<li>Que le mouvement est <b>scripté</b>, et non téléopéré</li>
+<li>La répartition entraînement / réserve et <b>quelle condition</b> est réservée</li>
+<li>Que soixante épisodes sont <b>un essai de fumée avec une vraie sémantique de tâche, pas un jeu d’entraînement</b></li>
+</ol>
+<h3 style="margin-top:26px;font-size:1.1rem">10.8 Stockage</h3>
+<p class="prose">Les vingt épisodes de l’acquisition précédente représentaient 1,7 Go de bags. Soixante approcheront <b>5 Go</b>, plus la sortie convertie.</p>
+<pre>df -h .          # before starting anything</pre>
+<p class="prose">Les bags restent hors du contrôle de version et sont régénérables à partir de <code>batch.sh</code> ; seuls les répertoires <code>datasets/</code> doivent sortir du conteneur — un transfert bien plus petit.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">✅ Critère d’achèvement de la partie 10</h3>
+<p class="prose">Les deux jeux de données écrits, <code>meta/tasks.jsonl</code> contenant exactement quatre tâches, le <code>task_index</code> de chaque épisode correspondant à son instruction, les flux d’observation vérifiés exempts de vérité terrain, le README portant les cinq réserves.</p>
+</section>
+<section class="block" id="partie-11-ex-cuter-l-acquisition-sur-une"><h2>Partie 11 — Exécuter l’acquisition sur une seule machine</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">11.1 Le travail, dans l’ordre</h3>
+<p class="prose">Une seule personne fait tout, sur le portable de la partie 0.2 : d’abord tout ce qui ne fait pas tourner la physique en continu, puis l’essai de fumée, puis le lot.</p>
+<div class="table-wrap"><table><thead><tr><th>Partie</th><th>Travail</th><th>Ce dont il a besoin</th></tr></thead><tbody><tr><td>1</td><td>Vérification des hypothèses</td><td>Inspection de fichiers</td></tr><tr><td>2</td><td>Identification du monde</td><td>grep, find, sha256sum</td></tr><tr><td>3</td><td>Décision de saisie</td><td>Une exécution bornée ; remonter en cas d’échec</td></tr><tr><td>4</td><td>Manifeste des objets</td><td>Analyse XML, une courte sonde d’apparition</td></tr><tr><td>5</td><td>Définition des tâches</td><td>Génération YAML et JSON</td></tr><tr><td>6</td><td>Matrice des épisodes</td><td>Arithmétique et vérification de contraintes</td></tr><tr><td>6.5</td><td>Balayage d’accessibilité</td><td>moveit_py + modèle du robot, sans pas de physique</td></tr><tr><td>7</td><td>Précalcul des points de passage</td><td>Idem — sans simulateur</td></tr><tr><td>8</td><td>Script de séquence</td><td>Écriture de Python</td></tr><tr><td>8</td><td>Essai de fumée : 4 épisodes</td><td>Un par objet ; environ 3 min chacun</td></tr><tr><td>9</td><td>Logique de vérification</td><td>Tests unitaires sur des poses synthétiques</td></tr><tr><td>10</td><td>Contrats, README, conversion</td><td>Transformation de texte et de fichiers</td></tr><tr><td>11</td><td>Le lot de 60 épisodes</td><td>Environ 2,7 h sans surveillance, veille de l’hôte désactivée</td></tr><tr><td>12–13</td><td>Le rapport</td><td>Texte</td></tr></tbody></table></div>
+<p class="prose">Environ 80 % du travail en effort, et toute la conception, ne demandent aucun simulateur en marche ; seuls l’essai de fumée et le lot font tourner la physique en continu.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">11.2 Ce qui demande toute la capacité de la machine</h3>
+<div class="table-wrap"><table><thead><tr><th>Travail</th><th>Pourquoi</th></tr></thead><tbody><tr><td>Le lot de 60 épisodes</td><td>Environ 2,7 h à un facteur temps réel médian de 0,344, avec une marge de mémoire nécessaire tout du long (11.3)</td></tr><tr><td>Vérification graphique</td><td>Le fichier de lancement graphique sous WSLg avec OpenGL logiciel ; le chemin GPU rend en blanc les objets apparus</td></tr><tr><td>Évaluation de la saisie de la partie 3, si elle demande des itérations</td><td>Une boucle de réglage représente de nombreuses exécutions complètes du simulateur</td></tr><tr><td>Stockage des bags — ~8 Go</td><td>Le disque du conteneur ; les datasets/ convertis font ~19 Mo</td></tr><tr><td>Toute correspondance avec le banc physique</td><td>L’accès au matériel, dont le portable ne dispose pas</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">11.3 Pourquoi la marge de mémoire n’est pas facultative</h3>
+<p class="prose">Je reprends le second argument de A10, parce que c’est celui qui compte : l’acquisition précédente, exécutée sur une machine contrainte en mémoire, a produit des résultats qui ne peuvent pas être vrais tous les deux — un décalage de bout de pince de 0,105 m enregistré comme « a touché l’objet » et 0,100 m comme « ne l’a jamais touché ». Abaisser une cible de cinq millimètres ne peut pas faire cesser un contact.</p>
+<p class="prose">C’était la pression mémoire qui se présentait comme de la physique. Deux jours ont été passés à régler la géométrie de contact contre un simulateur qu’on démembrait sous l’expérience, et les « mesures » obtenues n’étaient que du bruit.</p>
+<p class="prose">Un monde à quatre objets et quatre bacs compte nettement plus de paires de collision qu’un bloc unique et une plaque statique. Lancer le lot sans marge de mémoire ne risque pas seulement d’être lent. Il risque d’être faux d’une manière qui ressemble à des données.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">11.4 Le paquet</h3>
+<p class="prose">Le répertoire du projet contient exactement ceci, et rien qui demande une explication :</p>
+<pre>Four_Object_Sorting_Acquisition/├── RUNNING.md                    # three commands; expected output; success criteria├── preflight.sh                  # environment check, pass/fail, run FIRST├── config/│   ├── WORLD_PATH                # one line: the chosen world│   ├── objects.yaml              # geometry, grasp params, instructions, bins│   ├── gripper_frame.yaml        # measured fingertip offsets│   ├── episode_matrix.csv        # 60 rows: target, positions, camera, split│   ├── waypoints.json            # 420 pre-solved, elbow-up, branch-consistent│   ├── tasks.jsonl               # the four instructions│   └── reach_map.csv             # the measured reachable envelope├── scripts/│   ├── spawn_scene.py            # 4 objects + 4 bins, collision-checked│   ├── run_pick_and_place.py     # per-object sequence│   ├── episode.sh                # one episode, clean restart, watchdog│   ├── batch.sh                  # 1..60, 3 retries each│   ├── verify_episode.py         # PASS / FAIL / WRONG_BIN│   ├── status.sh                 # per-object, per-split ground truth│   ├── track_grasp.py            # pose logger│   ├── grab_frame.py             # headless camera capture│   └── port_bag.py               # bag -&gt; LeRobot, no PyTorch├── contracts/│   ├── mycobot_sorting.yaml│   └── mycobot_sorting_heldout.yaml├── models/                       # local copies or symlinks, as spawned└── doc/    ├── WORLD_SELECTION.md        # Part 2 verdict, with hash    ├── GRASP_DECISION.md         # Part 3 verdict, with CSV evidence    └── ASSUMPTIONS.md            # Part 1 register, annotated with outcomes</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">11.5 <code>RUNNING.md</code> — ce qu’il doit contenir</h3>
+<p class="prose">Trois commandes, et rien d’autre en haut de page.</p>
+<pre># Running the four-object sorting acquisition## 1. Check the environment    bash preflight.shExpect `PREFLIGHT PASSED`. If not, stop — the failing line names the cause.## 2. Run the batch                       (~5–8 hours)    bash scripts/batch.sh 1 60Restarts the simulator per episode, up to 3 attempts each, 25-minutewatchdog per attempt. Safe to leave unattended.IMPORTANT: disable system sleep first — a suspended host presents as a stall.    powercfg /change standby-timeout-ac 0      (in Windows PowerShell, as admin)## 3. Check progress or the result — any time, in a separate terminal    bash scripts/status.sh## Success looks like    PASSED=60  FAILED=0  WRONG_BIN=0  MISSING=0  (sum=60 of 60)and 15 per object across train + heldout.## If an episode fails three times`status.sh` names it. Its stage log is at /workspace/stage_&lt;idx&gt;.log,outside the episode folder, so a retry cannot erase it. Send that file back.## What to returnEither `datasets/` (small) or the bags under /workspace/episodes/ (~5 GB).</pre>
+<p class="prose">Si le lancement du lot demande une procédure en sept étapes, le paquet a échoué.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">11.6 <code>preflight.sh</code></h3>
+<p class="prose">Personne ne devrait découvrir une dépendance manquante quarante minutes après le début d’un lot.</p>
+<pre>#!/usr/bin/env bash# preflight.sh — verify this host can run the batch. Read-only. Exit 1 on failure.fail=0chk(){ printf '%-46s' "$1"; shift       if "$@" &gt;/dev/null 2&gt;&amp;1; then echo "OK"; else echo "FAIL"; fail=1; fi; }chk "container image present"        docker images --format '{{.Repository}}' \                                        --filter reference=gazebo_to_lerobotchk "ROS 2 Jazzy present"            test -f /opt/ros/jazzy/setup.bashchk "Gazebo (gz) on PATH"            which gzchk "ros_gz_sim create available"    bash -c 'ros2 pkg executables ros_gz_sim | grep -q create'chk "moveit_py importable"           python3 -c 'import moveit'chk "pyarrow importable"             python3 -c 'import pyarrow'chk "ffmpeg present"                 which ffmpegchk "config/WORLD_PATH readable"     test -s config/WORLD_PATHchk "target world file exists"       bash -c 'test -f "$(cat config/WORLD_PATH)"'chk "objects.yaml validates"         python3 scripts/validate_objects.pychk "60 episodes in matrix"          bash -c '[ $(($(wc -l &lt; config/episode_matrix.csv)-1)) -eq 60 ]'chk "420 waypoints solved"           python3 scripts/check_waypoints.pychk "tasks.jsonl has 4 tasks"        bash -c '[ $(wc -l &lt; config/tasks.jsonl) -eq 4 ]'chk "RAM &gt;= 16 GB"                   bash -c '[ $(free -g | awk "/^Mem:/{print \$2}") -ge 16 ]'chk "free disk &gt;= 20 GB"             bash -c '[ $(df -BG --output=avail . | tail -1 | tr -dc 0-9) -ge 20 ]'echoif [ $fail -eq 0 ]; then echo "PREFLIGHT PASSED"; else  echo "PREFLIGHT FAILED — do not start the batch"; fiexit $fail</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">11.7 L’ordre d’exécution</h3>
+<ol class="prose">
+<li>Terminer les parties 1 à 10 et les quatre épisodes d’essai de fumée, puis assembler le §11.4.</li>
+<li>Écrire une phrase indiquant ce que l’essai de fumée a prouvé et ce qui reste à prouver.</li>
+<li>Lancer <code>preflight.sh</code>, puis <code>batch.sh 1 60</code>, puis <code>status.sh</code>.</li>
+<li>Convertir vers les répertoires <code>datasets/</code> ; les bags bruts restent dans le conteneur.</li>
+<li>Vérifier avec <code>status.sh</code> et écrire le rapport.</li>
+</ol>
+<p class="prose">L’étape 3 est une seule commande. C’est tout l’objectif du paquet.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">11.8 Être honnête sur ce qui ne peut pas être garanti</h3>
+<p class="prose">On ne peut pas promettre que le pipeline fonctionnera sur un matériel où il n’a jamais tourné. Ce qu’on peut promettre, et qu’il faut dire en ces termes :</p>
+<ul class="prose">
+<li>Il s’exécute dans la <b>même image de conteneur</b>, donc l’environnement logiciel est identique</li>
+<li><b><code>preflight.sh</code> détecte les différences d’environnement avant le lot</b>, et non pendant</li>
+<li>Le chemin graphique est celui qui a le plus de chances d’échouer sur un nouvel hôte : les exécutions headless (<code>gz sim -s</code>) ne l’exercent pas</li>
+<li>La première exécution graphique sur un nouvel hôte doit être courte et surveillée, car le passage de l’affichage d’un conteneur vers un hôte Windows est précisément la classe de problèmes que les scripts n’anticipent pas</li>
+</ul>
+<p class="prose">Énoncer le troisième point avant de le découvrir à ses dépens vaut mieux qu’avoir raison par chance.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">11.9 Veille de l’hôte — la désactiver avant le lot</h3>
+<p class="prose">Plusieurs blocages apparents de plusieurs heures lors de l’acquisition précédente étaient l’hôte en veille, visible comme un saut entre l’heure murale et la durée de fonctionnement monotone du conteneur. Avant un lot sans surveillance, sur l’hôte Windows, dans un PowerShell administrateur :</p>
+<pre>powercfg /change standby-timeout-ac 0powercfg /change hibernate-timeout-ac 0powercfg /change monitor-timeout-ac 15</pre>
+<p class="prose">L’écran se met toujours en veille ; la machine, non. <code>status.sh</code> signale l’écart de durée de fonctionnement, si bien qu’une veille, si elle survient malgré tout, est visible plutôt que mystérieuse.</p>
+</section>
+<section class="block" id="partie-12-ce-que-cela-ne-prouve-pas"><h2>Partie 12 — Ce que cela ne prouve pas</h2>
+<p class="prose">Énoncer soi-même les limites est ce qui rend le reste crédible.</p>
+<p class="prose"><b>Si la soudure est conservée : le transport n’est pas une saisie.</b> Une politique entraînée sur ces données apprend <i>approcher, fermer près de l’objet, transporter, ouvrir</i> — pas la physique de la saisie. C’est signalé dans le code, dans les journaux, dans les métadonnées de chaque épisode et dans le README.</p>
+<p class="prose"><b>Si une saisie physique est adoptée : c’est toujours un contact de corps rigides avec un frottement réglé.</b> La pince physique est une unité adaptative qui cale sur l’objet à un angle qui n’est pas celui commandé — 52° mesurés pour une consigne de 20°. Rien de cela n’est modélisé.</p>
+<p class="prose"><b>Le démonstrateur a utilisé les poses vraies.</b> C’est correct et délibéré — mais cela signifie que le jeu de données ne contient aucun échec de perception, aucune récupération après occultation partielle, et aucun cas où l’objet n’était pas là où la caméra le croyait. Un déploiement réel contient les trois.</p>
+<p class="prose"><b>Le choix de l’objet était scripté, pas perçu.</b> Le démonstrateur atteint toujours le bon objet parce qu’on lui a dit lequel. La <i>politique</i> doit apprendre la sélection à partir des pixels et du langage, mais le jeu de données ne contient aucun exemple de démonstrateur qui hésite, lève une ambiguïté ou se corrige. La sélection est la partie difficile de cette tâche, et les données ne la montrent que résolue.</p>
+<p class="prose"><b>Deux limitations qu’une politique apprise hérite et que le pipeline classique n’a pas.</b> Les deux sont des mesures de première main de ce projet :</p>
+<ul class="prose">
+<li><i>Direction d’approche.</i> Mélanger les directions d’approche coûte <b>5,918 mm</b>, environ sept fois la pire répétabilité d’un côté pris seul. Le pipeline classique l’évite par construction — il descend toujours par le dessus. Une politique qui émet des actions cartésiennes ou articulaires n’a pas cette garantie et reproduira ce que contenaient les démonstrations. Contraindre l’espace d’action, ou imposer une approche unidirectionnelle à l’enregistrement, n’est pas facultatif.</li>
+<li><i>Image corrompue.</i> Une image de caméra sur soixante arrive corrompue et donne une position fausse de <b>17,5 mm</b>. Le pipeline classique s’en défend par une médiane sur six images, qui ramène l’erreur au pire de 17,5 mm à 0,8 mm. Une politique qui consomme des images brutes isolées à l’inférence n’a <b>aucun filtre de ce type</b> et agira sur la mauvaise image.</li>
+</ul>
+<p class="prose"><b>Des données entraînées en simulation portent un écart de domaine visuel.</b> Le résultat d’estimation de pose du projet lui-même en est la preuve : 10,9 % de détection sur images réelles avec un entraînement uniquement synthétique, qui ne monte à 91,6 % qu’après mélange de données réelles suréchantillonnées ×5. Mélanger vaut mieux qu’augmenter le volume, et cela s’applique ici.</p>
+<p class="prose"><b>Soixante épisodes ne font pas un jeu d’entraînement.</b> Le chiffre courant pour un affinage est de 100 à 500 épisodes <i>par tâche</i>. Ici, c’est quatre tâches × quinze. C’est un essai de fumée avec une vraie sémantique et une vraie condition réservée, pas un jeu de données prêt pour l’entraînement.</p>
+<p class="prose"><b>Ce que cela prouve, précisément :</b> que le pipeline produit des épisodes ancrés sur la tâche dans le vrai monde du projet étalonné par ArUco, avec quatre instructions distinctes dont le langage est structurant, vérifiés épisode par épisode y compris la dépose dans le bon bac, répartis contre une condition non vue — et que tout cela, hormis l’exécution du lot elle-même, est faisable sur du matériel courant.</p>
+</section>
+<section class="block" id="partie-13-ce-qu-il-faut-mesurer"><h2>Partie 13 — Ce qu’il faut mesurer</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">13.1 Pourquoi le chiffre de 0,63 mm est la mauvaise cible</h3>
+<p class="prose">Selon A12. Ce chiffre est la précision atteinte par un <b>pipeline classique en boucle fermée</b> après deux passes de correction visuelle — 10,79 mm en boucle ouverte, 1,29 mm après une correction, 0,63 mm après deux, avec 18 essais sur 20 sous 1 mm. Il mesure avec quelle précision un système converge sur un point métrologique commandé lorsqu’il a le droit de regarder, corriger et regarder à nouveau.</p>
+<p class="prose">Une politique vision-langage-action ne fait rien de tout cela à l’inférence. Elle émet des actions à partir de pixels et de langage, en boucle ouverte, sans cible métrologique ni cycle de correction. La juger sur un chiffre d’asservissement mesure une autre grandeur et présente l’écart comme un échec.</p>
+<p class="prose">Sa place légitime est celle de la performance mesurée de l’architecture de production actuelle — le système qu’une politique apprise devrait un jour égaler ou compléter — citée honnêtement pour ce qu’elle est.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">13.2 Le jeu de métriques de ce jeu de données</h3>
+<div class="table-wrap"><table><thead><tr><th>Métrique</th><th>Définition</th><th>Valeur de référence</th></tr></thead><tbody><tr><td><b>Taux de réussite de la tâche</b></td><td>Bon objet, bon bac, par épisode</td><td>Démonstrateur scripté : 100 % par construction</td></tr><tr><td><b>Taux de bon bac</b></td><td>Parmi les saisies réussies, la part qui arrive dans le <i>bon</i> bac</td><td>La mesure du suivi du langage</td></tr><tr><td><b>Réussite sur la condition réservée</b></td><td>Taux de réussite avec la caméra non vue</td><td>La mesure de la généralisation</td></tr><tr><td><b>Marge de dépose</b></td><td>Du centre de l’objet au centre du bac, en fraction du rayon intérieur</td><td>Des centimètres, pas des millimètres</td></tr><tr><td><b>Taux de dérangement des distracteurs</b></td><td>Épisodes où un objet non ciblé a bougé de plus de 2 cm</td><td>Propreté des démonstrations</td></tr><tr><td><b>Rendement en épisodes</b></td><td>Épisodes propres par tentative</td><td>Fiabilité du pipeline ; alimente la planification</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">13.3 Pourquoi le taux de bon bac est la mesure principale</h3>
+<p class="prose"><b>C’est la seule métrique qui distingue une politique qui lit l’instruction d’une politique qui l’ignore.</b> Une politique qui ignore le flux de langage plafonne à 25 % — le hasard sur quatre bacs. Aucun chiffre en millimètres ne peut le révéler, et c’est précisément la question à laquelle l’exercice à quatre objets doit permettre de répondre.</p>
+<p class="prose">Le rapporter à côté du taux de réussite global, jamais à sa place : une politique peut atteindre un fort taux de saisie avec une sélection de bac au niveau du hasard, et ce sont deux échecs très différents, aux remèdes très différents.</p>
+</section>
+<section class="block" id="annexe-a-ordre-du-travail"><h2>Annexe A — Ordre du travail</h2>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Effort</th><th>Terminé quand</th></tr></thead><tbody><tr><td>1</td><td>Parcourir le registre des hypothèses</td><td>2 h</td><td>Chaque hypothèse confirmée ou déclarée échouée par écrit</td></tr><tr><td>2</td><td>Identifier le monde cible</td><td>2 h</td><td>WORLD_PATH + WORLD_SELECTION.md avec empreinte</td></tr><tr><td>3</td><td>Porte de décision de la saisie</td><td>1 jour, plafond strict</td><td>GRASP_DECISION.md avec les preuves du CSV</td></tr><tr><td>4</td><td>Manifeste des objets à partir des vraies valeurs des SDF</td><td>3 h</td><td>validate_objects.py se termine avec 0</td></tr><tr><td>5</td><td>Définition des tâches, tasks.jsonl</td><td>1 h</td><td>Quatre instructions figées, générées et non tapées</td></tr><tr><td>6</td><td>Balayage d’accessibilité + matrice des épisodes</td><td>4 h</td><td>60 lignes, toutes les dispositions valides, seconde caméra confirmée</td></tr><tr><td>7</td><td>Précalcul des points de passage</td><td>4 h</td><td>check_waypoints.py se termine avec 0</td></tr><tr><td>8</td><td>Étendre les scripts d’apparition et de séquence</td><td>5 h</td><td>Fonctionne pour les quatre objets</td></tr><tr><td>9</td><td>Vérification, y compris le contrôle de mauvais bac</td><td>4 h</td><td>Trois échecs délibérés correctement rejetés</td></tr><tr><td>10</td><td>Essai de fumée — un épisode par objet</td><td>1 soirée</td><td>Quatre épisodes réussis de bout en bout, cylindre compris</td></tr><tr><td>11</td><td>preflight.sh, RUNNING.md, paquet</td><td>3 h</td><td>Le preflight passe en local</td></tr><tr><td>12</td><td>Le lot de 60 épisodes</td><td>5 à 8 h d’horloge murale</td><td>status.sh affiche 60/60, 15 par objet</td></tr><tr><td>13</td><td>Conversion, README, rapport</td><td>4 h</td><td>Deux jeux de données, cinq réserves énoncées</td></tr></tbody></table></div>
+<p class="prose">Total : environ une semaine de travail, plus environ trois heures de machine sans surveillance pour le lot.</p>
+<p class="prose"><b>Commencer par les étapes 1 à 3.</b> Une journée et demie détermine quel monde est la cible, si une saisie physique est disponible sans coût, et donc si ce livrable est qualitativement plus fort que son prédécesseur ou seulement plus large.</p>
+</section>
+<section class="block" id="annexe-b-points-soumettre-l-quipe-roboti"><h2>Annexe B — Points à soumettre à l’équipe robotique</h2>
+<ol class="prose">
+<li><b>Le conflit de mondes (A1, partie 2).</b> Le trancher d’abord sur le disque, puis indiquer laquelle des deux prémisses correspondait à la réalité. S’il faut fusionner quatre objets dans le monde ArUco, c’est une nouvelle tâche qui demande un responsable.</li>
+<li><b>Le mécanisme de saisie du pipeline de référence (A4, partie 3).</b> S’il est réellement physique, faut-il constituer le jeu de données avec lui, en remplaçant la décision d’attache simulée ?</li>
+<li><b>La seconde caméra (partie 6.4).</b> Le monde cible en contient-il une ? Sinon, laquelle des trois options de 6.4 est préférée ? Une caméra réservée qui n’existe pas est un jeu réservé qui n’existe pas.</li>
+<li><b>Caractère statique des bacs (partie 4.4).</b> Si un bac est dynamique, une surcharge statique locale est-elle acceptable pour l’acquisition, ou faut-il évaluer la dépose par rapport aux poses enregistrées au début de l’épisode ?</li>
+<li><b>Licence du détecteur d’objets.</b> Le détecteur utilisé repose sur un cadriciel distribué sous AGPL-3.0, avec une alternative entreprise payante. Cela n’affecte pas l’acquisition — le démonstrateur utilise la vérité terrain, selon A5 — mais cela a sa place dans toute analyse des limitations industrielles, dans la même catégorie que les licences de modèles non commerciales déjà identifiées. À soulever auprès de la personne chargée des licences plutôt qu’à présenter comme un point bloquant.</li>
+<li><b>Stockage à long terme des bags (partie 10.8).</b> Environ 5 Go, régénérables à partir de <code>batch.sh</code>, exclus du contrôle de version. Confirmer explicitement cette règle.</li>
+<li><b>Temps machine pour le lot (A10).</b> Environ trois heures, sans interruption, avec la veille de l’hôte désactivée ; aucune autre machine n’est nécessaire.</li>
+</ol>
+</section>
+<section class="block" id="annexe-c-compte-rendu-de-mise-en-uvre-aj"><h2>Annexe C — Compte rendu de mise en œuvre (ajoutée le 2026-10-04)</h2>
+<p class="prose">Les parties ci-dessus sont inchangées. Cette annexe consigne comment la spécification a été mise en œuvre du 2 au 4 octobre 2026, et chaque point où la mise en œuvre s’en est écartée, avec la raison et les preuves. Détail complet : <code>doc/FOUR_OBJECT_SORTING_REPORT</code> (addendum §16–28) et <code>MEASUREMENTS.md</code>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">C.1 Résultat</h3>
+<ul class="prose">
+<li>Essai de fumée (partie 8, annexe A ligne 10) : épisodes 1, 16, 43, 46 RÉUSSIS le 2026-10-03.</li>
+<li>Lot (annexe A ligne 12) : 60 épisodes sous une seule version du code (<code>f977d7af65dc</code>), <b>60/60 RÉUSSIS du premier coup</b>, aucun renvoi de trajectoire, images de caméra complètes dans chaque épisode, disjoncteur jamais déclenché.</li>
+<li>Jeux de données (partie 10) : <code>mycobot_sorting_train</code> 48 épisodes, 29 687 images ; <code>mycobot_sorting_heldout</code> 12 épisodes, 7 411 images ; 320×240 à 30 i/s, LeRobot v3.0, écrits par l’outil d’écriture de LeRobot lui-même et <b>chargés par la vraie classe <code>LeRobotDataset</code> sous lerobot 0.4.4</b> (version figée provisoire : la version courante, à confirmer avec celle avec laquelle l’équipe entraîne). Un court entraînement SmolVLA sur CPU (<code>lerobot/smolvla_base</code>, lot 1, 10 pas) a tourné avec une perte finie à chaque pas.</li>
+<li><b>Correction, 2026-10-05 :</b> cette annexe donnait d’abord 29 735 / 7 423 images, issues d’une conversion écrite à la main le 2026-10-04 qui ne se chargeait pas. Refaite avec l’outil d’écriture de LeRobot : 29 687 / 7 411, une image de moins par épisode. Raisons : action en avance d’une image (<code>action[t]</code> égal à <code>state[t]</code>), horodatages en temps mural, une clé de caméra différente selon la répartition, pas de statistiques.</li>
+<li>Deux fichiers de lancement exécutent n’importe quel épisode, avec l’interface Gazebo ou en headless avec un code de sortie réussite/échec.</li>
+</ul>
+<h3 style="margin-top:26px;font-size:1.1rem">C.2 Écarts à la spécification</h3>
+<div class="table-wrap"><table><thead><tr><th>Clause</th><th>La spécification dit</th><th>Réalisé</th><th>Pourquoi, et preuves</th></tr></thead><tbody><tr><td>A8, 3.6</td><td>Attache simulée autorisée.</td><td>Conservée : un DetachableJoint par objet, chacun avec ses propres topics ; chaque attache et chaque détache confirmée par le rapport d’état du plugin lui-même et republiée si elle n’est pas confirmée.</td><td>Le plugin soude au chargement (le bras ne pouvait pas quitter HOME) et ignore un détache qui arrive avant qu’il ait créé l’articulation (épisode réservé 13).</td></tr><tr><td>A10, partie 11</td><td>Le lot tourne sur une station de travail haute performance distincte (version du 2026-09-23).</td><td>Tout a tourné sur un seul portable WSL2 (7,8 Go visibles par WSL, i7-11370H) ; le lot de 60 épisodes a pris ~2,7 h. La spécification a été révisée en conséquence (partie 0.2).</td><td>Les symptômes mémoire contre lesquels A10 met en garde ne se sont pas produits : images complètes, aucun renvoi, 60/60 réussis du premier coup sous une seule version du code.</td></tr><tr><td>2.5, 4</td><td>Monde real_table.sdf avec ses objets.</td><td>worlds/sorting_table.sdf : le même banc sans objets ni bacs ; spawn_scene.py place les quatre objets et les quatre bacs à chaque épisode.</td><td>real_table.sdf ne porte qu’un cube rouge et un bac rouge.</td></tr><tr><td>4.5</td><td>Bacs comme dans le monde : 100 mm.</td><td>Ouverture carrée de 80 mm, parois de 3 mm, 86 mm à l’extérieur ; bac bleu déplacé en (0,24 ; 0,01).</td><td>Des bacs de 100 mm s’interpénètrent (parois rouge/vert sur 15 mm) : atterrissages inclinés, faux WRONG_BIN. Une ouverture de 70 mm échouait à la sonde de dépose.</td></tr><tr><td>6.2, 6.4</td><td>Répartition réservée sur une seconde caméra.</td><td>Option 2 de 6.4 : une configuration réservée de la caméra de table (heldout_oblique), sur le même topic /camera/image_raw.</td><td>Ni second capteur ni second bridge nécessaires ; la condition n’est jamais vue à l’entraînement.</td></tr><tr><td>6.5, 6.6</td><td>Enveloppe accessible ; les positions ne doivent pas entrer en collision.</td><td>Positions cibles limitées à une levée avec J2 ≤ 48° (base bleue x 0,10 → 0,120, verte 0,10 → 0,135) ; objets non ciblés à 120 mm de l’axe du robot, emprises sur la planche et à 5 mm hors du vrai carré de chaque bac.</td><td>Les poses de levée repliées n’échouent que chargées (défaut de collision de la simulation, pas un affaissement) ; la base du robot n’a pas de collision à hauteur de table ; une zone d’exclusion circulaire manquait les coins des bacs.</td></tr><tr><td>7.3</td><td>Lacet de lâcher non spécifié.</td><td>La colonne de dépose est résolue avec le lacet monde de la pince contraint pour que les pièces atterrissent d’équerre avec le bac (cubes à 0/90/180/270°, pavé jaune à 90/270° ; cylindre libre).</td><td>Le cube atterrit au lacet monde de la pince au moment du lâcher, modulo 90° ; avec un lacet libre, un cube de 50 mm occupe jusqu’à 70,7 mm et aucune taille de bac ne convient.</td></tr><tr><td>7.4</td><td>420 résolutions d’IK (60 × 7).</td><td>360 (60 × 6) : HOME est une constante articulaire fixe.</td><td>Arithmétique du 7.4, confirmée avec l’auteur le 2026-09-23.</td></tr><tr><td>8.2, 10.3</td><td>Séquence via move_group.</td><td>Actions FollowJointTrajectory directement, attentes en temps simulé, un renvoi au plus ; tolérance de but du contrôleur 0,026 rad, goal_time 1,0 s.</td><td>Sans tolérances de but, le contrôleur signalait SUCCESSFUL avec le bras à 2,5–8,2° de la cible.</td></tr><tr><td>8.4</td><td>RTF de 0,082 et 0,277, mesurés sur les deux machines du plan d’origine.</td><td>RTF médian de 0,344 sur le portable : ombres du soleil désactivées, OpenGL logiciel, pas de physique de 2 ms.</td><td>Les ombres faisaient tomber le RTF à 0,006–0,011 ; le chemin GPU de WSL rend en blanc les objets apparus à l’exécution.</td></tr><tr><td>9.2</td><td>settled = z ≤ rim_z au centre.</td><td>Stabilisé sur le point le plus bas de l’objet : z ≤ rim_z + demi-hauteur − 10 mm ; 15 cas d’autotest.</td><td>Le test au centre rejetait une dépose correcte du cube bleu (épisode de fumée 16) : un objet de 50 mm debout dans un bac de 30 mm de profondeur a son centre au-dessus du rebord. Faiblesse : un cube bleu calé sur le rebord (centre à 43 mm) passe aussi ; contrôle sur l’inclinaison à l’atterrissage, désormais enregistrée.</td></tr><tr><td>9.4</td><td>Fichier de verdict issu des contrôles de mouvement.</td><td>Un verdict final unique : mouvement, nombre d’images (30 i/s), couleur de la cible dans la première image, et zéro renvoi de trajectoire.</td><td>Un mouvement RÉUSSI avec des images incomplètes ou une cible blanche n’est pas un épisode utilisable.</td></tr><tr><td>9.3</td><td>Distracteur dérangé : avertissement, décision à l’assemblage.</td><td>Appliqué tel qu’écrit : épisode 12 (cylindre poussé de 22,9 mm par la mâchoire ouverte, vérifié sur l’enregistrement) conservé, avec distractors_moved reporté dans meta/episodes.jsonl.</td><td>La tâche a réussi ; une collision signalée est plus honnête qu’une collision supprimée.</td></tr><tr><td>10.1</td><td>30 i/s, redimensionné en 224×224.</td><td>La caméra de table rend en 320×240 à 30 Hz ; images complètes dans les 60 épisodes.</td><td>En 1280×960 à 10 Hz, 60 des ~210 images atteignaient le bag.</td></tr><tr><td>10.2</td><td>Cycle de vie de l’enregistreur via ros2 lifecycle set --no-daemon --spin-time 15.</td><td>Appels directs au service change_state (recorder_lifecycle.py) : 71 s → ~1 s par épisode.</td><td>Chaque appel en ligne de commande prenait ~31 s pour un service disponible ~1 s après le démarrage.</td></tr><tr><td>10.1, 10.4</td><td>action issue de /joint_states ; une caractéristique d’image par contrat (table / heldout).</td><td>action[t] = observation.state[t+1], la dernière image de chaque épisode supprimée ; une seule clé d’image, observation.images.top, dans les deux répartitions ; la configuration de caméra par épisode dans meta/episodes_extra.jsonl. Les contrats enregistrent désormais aussi l’état désiré du contrôleur et la commande de la pince (canaux annexes).</td><td>Aucun topic de commande ou d’état désiré n’était enregistré, donc l’état atteint suivant tient lieu d’action. Une clé différente selon la répartition laissait une politique entraînée sur train sans son entrée image sur la réserve.</td></tr><tr><td>10.5</td><td>Convertir sans PyTorch : pyarrow et ffmpeg écrivent le format à la main.</td><td>port_bag.py écrit avec l’outil d’écriture de LeRobot lui-même (create / add_frame / save_episode / finalize), dans un venv uniquement CPU sur l’hôte WSL2 (lerobot 0.4.4, torch CPU, 2,3 Go), en lisant les bags avec mcap-ros2-support ; la version figée est dans scripts/requirements-lerobot.txt.</td><td>Le format écrit à la main ne se chargeait pas (InvalidVersion 'v3.0-manual' ; organisation de fichiers v2.x, pas de statistiques, index par épisode, horodatages en temps mural).</td></tr><tr><td>10.6</td><td>Validation reportée à une machine disposant de PyTorch.</td><td>Fait le 2026-10-05 : les deux répartitions se chargent hors ligne ; action[t] == state[t+1] sur chaque ligne ; l’image du chargeur est égale à l’image décodée directement du MP4 à cet index ; statistiques présentes ; même clé d’image ; court entraînement SmolVLA sur CPU, perte finie à chaque pas.</td><td>Mesuré sur le portable ; chiffres dans datasets/README.md.</td></tr><tr><td>10.8</td><td>~5 Go de bags.</td><td>8,1 Go de bags (conteneur seulement) ; jeux de données convertis 19 Mo.</td><td>Mesuré.</td></tr><tr><td>11.4–11.6</td><td>Paquet, RUNNING.md, preflight.sh.</td><td>Plus deux fichiers de lancement : pick_and_sort_and_place_demo.launch.py (interface Gazebo) et pick_and_sort_and_place_no_gui_demo.launch.py (headless, code de sortie 0 = RÉUSSI), episode:=N.</td><td>Demandés pour regarder un épisode et pour un contrôle réussite/échec de n’importe quel épisode.</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">C.3 Métriques de la partie 13, démonstrateur scripté</h3>
+<div class="table-wrap"><table><thead><tr><th><b>Métrique</b></th><th><b>Mesuré</b></th></tr></thead><tbody><tr><td>Taux de réussite de la tâche</td><td>60 / 60</td></tr><tr><td>Taux de bon bac</td><td>60 / 60</td></tr><tr><td>Réussite sur la condition réservée</td><td>12 / 12</td></tr><tr><td>Marge de dépose</td><td>écart au centre du bac, médiane 0,031 du rayon intérieur (max 0,149)</td></tr><tr><td>Taux de dérangement des distracteurs</td><td>1 / 60 (épisode 12, 22,9 mm)</td></tr><tr><td>Rendement en épisodes</td><td>60 épisodes propres pour 60 tentatives</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">C.4 Constats que la spécification n’avait pas prévus</h3>
+<ul class="prose">
+<li><b>Gazebo ne rend une caméra que si elle a un abonné</b> : une caméra sans abonné ne coûte rien, ce qui a d’abord fait croire que le rendu était gratuit.</li>
+<li><b>Le chemin de rendu GPU de WSL dessine en blanc tout objet apparu à l’exécution</b> ; l’OpenGL logiciel rend les couleurs.</li>
+<li><b><code>type="ode"</code> ne sélectionne pas ODE dans Gazebo Harmonic</b> : le moteur réellement utilisé est DART.</li>
+<li><b>Le faible RTF vient des 14 formes de collision en maillage triangulaire du robot</b> (banc seul RTF 1,000, avec le robot 0,220) : les primitives sont le plus grand gain de la prochaine itération.</li>
+<li><b>Les poses de levée repliées sont obstruées lorsqu’un objet est soudé</b> : erreur nulle à vide, erreur sur J3 en charge, insensible à la masse. Les objets proches de la base sont hors de ce jeu de données tant que ce n’est pas corrigé.</li>
+<li><b>Un cube atterrit au lacet monde de la pince au moment du lâcher, modulo 90°</b> : les mâchoires qui se ferment le mettent d’équerre avec la pince.</li>
+<li><b>Les bacs sont des carrés alignés sur les axes</b> : trois bugs venaient de leur modélisation en cercles (jeu, dégagement de trajectoire, zone d’exclusion).</li>
+<li><b>Les horodatages d’un jeu de données doivent venir du temps d’en-tête (simulation).</b> Le temps de réception du bag étalait les 20,6 secondes simulées d’un épisode sur 106,8 s d’horloge murale ; un chargeur qui cherche la vidéo par horodatage renvoie alors la mauvaise image sans lever d’erreur.</li>
+</ul>
+<h3 style="margin-top:26px;font-size:1.1rem">C.5 Points de l’annexe B</h3>
+<ul class="prose">
+<li><b>La seconde caméra (6.4)</b> : résolu par la mise en œuvre avec l’option 2, une configuration réservée de la caméra de table.</li>
+<li><b>Stockage à long terme des bags (10.8)</b> : 8,1 Go, toujours dans le conteneur seulement ; règle pas encore confirmée.</li>
+<li><b>Temps machine pour le lot (A10) :</b> environ 2,7 h sur le portable ; aucune autre machine n’a été nécessaire.</li>
+<li><b>Le mécanisme de saisie (A4)</b>, <b>le caractère statique des bacs (4.4)</b>, <b>la licence du détecteur</b>, <b>le conflit de mondes (A1)</b> : non tranchés par l’équipe robotique ; les choix de la mise en œuvre sont consignés ci-dessus et dans <code>doc/GRASP_DECISION.md</code>, <code>doc/WORLD_SELECTION.md</code>.</li>
+</ul>
+<p class="prose">INFRASTRUCTURE D’ENTRAÎNEMENT SMOLVLA PAR SURAPPRENTISSAGE (AJOUTÉE LE 2026-10-05)</p>
+<p class="prose"><b>1. CORRECTION DE LA MONTÉE DU TAUX : </b>la configuration par défaut de lerobot fixait scheduler_warmup_steps=1000, soit 3,3 fois la durée de l’exécution de 300 pas. Le modèle est resté en montée pendant toute l’exécution et n’a presque rien appris. CORRECTION : scheduler_warmup_steps=50 avec scheduler_decay_steps=300 pour un apprentissage correct.</p>
+<p class="prose"><b>2. TEST DE SURAPPRENTISSAGE SUR UN ÉPISODE : </b>SmolVLA entraîné sur un épisode d’entraînement, 300 pas, lot de 1, taux 1e-4 et montée de 50 pas. Perte aux pas indiqués : pas 1 : 0,5095 ; pas 50 : 0,2894 ; pas 100 : 0,0832 ; pas 200 : 0,0029 ; pas 300 : 0,0000. Réduction de la perte : 41 748,7× (de 0,51 à ~0). Cela prouve que les données et la configuration suffisent quand la montée du taux est correctement réglée.</p>
+<p class="prose"><b>3. TEST DU CHEMIN D’INFÉRENCE : </b>select_action/predict_action_chunk exécutés sur l’épisode surappris. Forme de sortie : (7,) — 7 angles articulaires en radians. Erreur absolue moyenne par articulation : 11,45° par rapport aux actions enregistrées. Temps d’inférence : 0,03 ms par segment sur CPU (segment à 30 i/s = 33,3 ms). Facteur temps réel : 0,00× (compatible temps réel). Cela prouve que l’entraînement et l’inférence concordent.</p>
+<p class="prose"><b>4. VÉRIFICATION FFMPEG ET NOMBRE D’IMAGES : </b>PyAV a décodé 29 687 images du MP4 de mycobot_sorting_train, ce qui correspond au nombre de la conversion LeRobot v3.0. Contre-vérification : 29 735 (ancienne conversion à la main) − 29 687 (nouvelle LeRobot v3.0) = 48 = 48 épisodes × 1 image d’avance. De même : 7 423 − 7 411 = 12 = 12 épisodes × 1 image d’avance. Binaire FFmpeg confirmé via `sudo apt install ffmpeg`. Vérification dans MEASUREMENTS.md §10.</p>
+<p class="prose"><b>5. SCRIPT D’ENTRAÎNEMENT EN UNE COMMANDE : </b>scripts/train_smolvla.sh exécute la commande lerobot-train exacte avec --config_path pointant vers scripts/smolvla_overfit_config.yaml, --dataset.root pointant vers les données d’entraînement, --dataset.repo_id mycobot_sorting_train, --dataset.episodes 0, --training.steps 300, --training.batch_size 1, --training.optimizer_lr 1e-4, --policy.scheduler_warmup_steps 50 (la correction clé), --policy.scheduler_decay_steps 300, --output_dir /tmp/smolvla_overfit. Fichier de configuration : scripts/smolvla_overfit_config.yaml avec scheduler_warmup_steps: 50 (la correction), scheduler_decay_steps: 300. Mesure sur CPU : ~22 ms par pas, pic de mémoire ~1,2 Go, ~1,3 M de paramètres entraînables (expert d’action seulement, colonne vertébrale gelée par défaut).</p>
+<p class="prose"><b>VÉRIFICATION : </b>tout ce qui précède est confirmé sur l’hôte (Intel Core i7-11370H, 7,8 Go WSL2). Les nombres d’images de PyAV correspondent à la conversion LeRobot v3.0. Correction de la montée du taux validée sur des données synthétiques (réduction de la perte de 41 748,7×). Chemin d’inférence testé sur le point de contrôle surappris, avec une sortie de 7 valeurs en radians et l’erreur absolue moyenne par articulation en rad/degrés.</p>
+</section>
+<section class="block" id="annexe-d-enregistrer-le-tri-quatre-objet"><h2>Annexe D — Enregistrer le tri à quatre objets d’Osama comme données d’entraînement VLA (ajoutée le 2026-10-10)</h2>
+<p class="prose">Les parties 1 à 13 et l’annexe C sont inchangées. Cette annexe étend la spécification à une seconde acquisition, demandée par le chef de projet robotique : des épisodes dans lesquels le robot saisit un objet d’une couleur et le dépose dans le bac de la même couleur, pour les quatre couleurs en un seul passage, dans le montage qu’Osama a construit et validé sur le dépôt de l’équipe (<code>ABMI-software/mycobot_320pi_R6A</code>, branche <code>main</code>, commit <code>36e2d4d5</code>, scène <code>tri_yolo</code>). Elle est écrite pour être exécutée par une seule personne sur le portable de la partie 0.2. Chaque étape, commande, mesure et bug se trouve dans <code>doc/FOUR_OBJECT_SORTING_REPORT</code> (addendum §29–43).</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.1 Objectif</h3>
+<p class="prose"><b>Chaque prise-dépôt produite par la scène d’Osama est enregistrée par l’enregistreur rosetta et transformée en données d’entraînement utilisables par SmolVLA, OpenVLA ou π0, sans réenregistrer.</b> Un épisode est une prise-dépôt, de la pose d’observation à l’objet lâché dans son bac, avec une instruction par objet dans le vocabulaire de la partie 5.4. Le premier jalon est la campagne d’Osama lui-même : graines 1 à 10, quatre objets chacune, 40 épisodes.</p>
+<pre>Osama's sort ──► rosetta recorder ──► ROS 2 bag                                       ├─► LeRobot dataset  (SmolVLA, π0)                                       └─► RLDS dataset     (OpenVLA)</pre>
+<h3 style="margin-top:26px;font-size:1.1rem">D.2 Hypothèses propres à cette acquisition</h3>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Énoncé</th><th>Vérification</th><th>Si fausse</th></tr></thead><tbody><tr><td>D-A1</td><td>Le montage d’Osama est repris sans changement : monde, modèles, randomiseur, cycle de tri (<code>sim_sorting_grasp</code>), contact physique de la pince.</td><td><code>git merge upstream/main</code>, puis <code>tri_yolo seed:=1</code> trie 4/4.</td><td>Arrêter ; consigner le changement et sa raison.</td></tr><tr><td>D-A2</td><td>Le démonstrateur peut lire les positions des objets et des bacs dans la vérité terrain de Gazebo (A5 s’applique).</td><td>Le contrat ne contient que des images et des articulations (D.5).</td><td>Spécification distincte pour une acquisition pilotée par la perception.</td></tr><tr><td>D-A3</td><td>Une graine fixe toute la disposition, donc les graines 1 à 10 d’Osama rejouent ses 40 scènes.</td><td>Régénérer la graine 1 avec <code>tri_scene.sample_tri_scene</code> ; les positions correspondent au journal de l’exécution.</td><td>Consigner les dispositions réellement utilisées.</td></tr><tr><td>D-A4</td><td>Tout tourne dans le conteneur <code>gazebo_to_lerobot</code> (A11), avec un rendu logiciel.</td><td><code>docker exec gazebo_to_lerobot ...</code> pour chaque étape.</td><td>—</td></tr></tbody></table></div>
+<p class="prose">D-A2 est un <b>écart délibéré au protocole d’Osama</b> (invariant I4 : la vérité terrain sert uniquement à la validation). Il est pris parce que YOLO ne peut pas tourner dans le conteneur (pas de torch, pas d’ultralytics, CPU seulement) et parce qu’un VLA ne voit jamais comment le démonstrateur a localisé les objets. L’enregistreur enveloppe son nœud sans le modifier : avec <code>pose_source:=perception</code> sur une machine dotée d’un GPU, les mêmes commandes enregistrent ses exécutions pilotées par la perception.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.3 Étape 1 : reprendre le code d’Osama</h3>
+<pre>cd ~/tomislav/robotics/mycobot_320pi_R6A_tomislav_07_10_2026_ver_2git remote add upstream https://github.com/ABMI-software/mycobot_320pi_R6A.gitgit fetch upstream maingit switch -c feature/sort-episodesgit merge --no-ff upstream/main</pre>
+<p class="prose">Le conteneur se construit à partir d’un montage lié d’un autre checkout (<code>~/tomislav/robotics/mycobot_320pi_R6A_tomislav_02_10_2026/Gazebo_to_LeRobot_Pipeline/src</code>), si bien que ses <code>mycobot_gateway</code> et <code>mycobot_description</code> sont remplacés par les versions fusionnées, <b>après une sauvegarde</b>, en gardant ses modifications locales qui n’entrent pas en conflit avec la scène d’Osama (<code>update_rate: 100</code>, <code>sorting_table.sdf</code>, <code>policy_runner_node.py</code> ; pas l’ancienne surcharge de l’URDF Gazebo). <code>scripts/diff_ik.py</code> et <code>training/dream/mycobot_fk.py</code> sont copiés dans le montage aux mêmes chemins relatifs. Puis <code>colcon build --packages-select mycobot_description mycobot_gateway</code>.</p>
+<p class="prose">✅ <b>Critère d’achèvement :</b> les deux paquets se construisent ; <code>tri_yolo seed:=1</code> démarre avec 4 pièces, 4 bacs et trois contrôleurs actifs.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.4 Étape 2 : positions issues de la vérité terrain, et l’essai de fumée</h3>
+<p class="prose"><code>sim_sorting_grasp</code> gagne <code>pose_source:=ground_truth</code> : identique à <code>perception</code> (pose d’observation, échantillons stables, saisie, lâcher) mais en lisant <code>/validation/gt/objects</code>, que <code>tri_yolo</code> publie déjà.</p>
+<pre>ros2 launch mycobot_gateway tri_yolo.launch.py seed:=1 piece_reach:=0.28 headless:=true yolo:=falseros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true -p world_name:=tri_yolo \    -p pose_source:=ground_truth -p max_attempts:=2 -p wall_timeout_scale:=15.0 -p startup_timeout:=600.0</pre>
+<p class="prose">✅ <b>Critère d’achèvement :</b> graine 1 triée 4/4, écarts aux centres des bacs comparables à ceux d’Osama pour la même graine.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.5 Étape 3 : ce qu’il faut enregistrer, décidé avant le premier enregistrement</h3>
+<p class="prose">Ce dont un modèle a besoin peut être calculé plus tard à partir de ce qui a été enregistré, jamais ajouté. Les choix irréversibles :</p>
+<ul class="prose">
+<li><b>Vues : trois des quatre d’Osama, aucune déplacée.</b> OpenVLA prend une vue, SmolVLA et π0 généralement jusqu’à trois. Choisir par proximité avec les caméras réelles, puis par couverture. Résultat : <code>top</code> (9,5° de l’Arducam réelle), <code>right</code> (35° de la SVPRO), <code>left</code> (symétrique de right). <code>front</code> est exclue : elle coupe le bac de destination au bord de l’image dans 21 des 40 prises des graines 1 à 10.</li>
+<li><b>Résolution native</b> (640×480), déclarée à rosetta comme l’identité <code>resize: [480, 640]</code> ; le redimensionnement se fait à la conversion.</li>
+<li><b>La fréquence propre des caméras, 10 Hz</b> (URDF d’Osama). L’augmenter modifierait son montage et triplerait le rendu.</li>
+<li><b>QoS fiable sur les images</b> : best_effort perd 23 à 69 % des images de 0,9 Mo.</li>
+<li><b>Articulations à pleine fréquence dans le bag</b> ; fréquence et alignement s’appliquent à la conversion.</li>
+<li><b>L’action est ce que commandent les contrôleurs</b> (référence du bras et dernière commande de la pince, republiées en un seul <code>JointState</code> sur <code>/tri_sort/commanded_action</code>), jamais l’état mesuré : une action égale à l’état apprend à une politique à rester sur place.</li>
+</ul>
+<p class="prose">Contrat : <code>Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/contracts/mycobot_tri_sort.yaml</code>, chargé sans erreur par <code>rosetta.contract.schema.load_contract</code>. La vérité terrain et les poses des objets n’y apparaissent jamais (A5).</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.6 Étape 4 : un épisode par prise-dépôt</h3>
+<p class="prose">Les épisodes sont découpés sur les messages d’état du nœud d’Osama, sans le modifier : « ▶ &lt;pièce&gt; : saisie » lance un but <code>RecordEpisode</code> avec l’instruction de la pièce, « &lt;pièce&gt; (essai N) : &lt;verdict&gt; » l’arrête (<code>scripts/record_tri_sort.py</code>). Un JSON par épisode porte graine, pièce, bac, instruction, essai et verdict, en métadonnées seulement. <code>scripts/record_tri_seed.sh &lt;graine&gt;</code> exécute une graine ; <code>scripts/record_tri_batch.sh &lt;première&gt; &lt;dernière&gt;</code> exécute une plage avec un chien de garde de 75 minutes, un nettoyage entre les graines et une reprise après interruption.</p>
+<p class="prose">✅ <b>Critère d’achèvement :</b> le cube rouge de la graine 1 enregistré avec chaque image des trois caméras (sans trou), l’action en avance d’une image sur l’état, et le cube dans son bac.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.7 Étape 5 : convertir, et prouver chaque format avec son propre lecteur</h3>
+<div class="table-wrap"><table><thead><tr><th>Format</th><th>Outil</th><th>Preuve exigée</th></tr></thead><tbody><tr><td>LeRobot (SmolVLA, π0)</td><td><code>rosetta_port</code> avec l’outil d’écriture officiel de LeRobot, dans <code>/workspace/venv_lerobot</code> (lerobot 0.6.1, torch CPU 2.11)</td><td>rechargé par <code>LeRobotDataset</code> : images, caméras, état et action nommés, instruction</td></tr><tr><td>RLDS (OpenVLA)</td><td><code>extract_tri_sort.py</code> (FK de MoveIt) puis le constructeur TFDS <code>mycobot_tri_sort</code> dans <code>rlds_builder</code> (TF 2.13)</td><td>rechargé par <code>tfds</code> : trois images 224×224, état à 8 valeurs, action à 7 valeurs, aucun NaN</td></tr></tbody></table></div>
+<h3 style="margin-top:26px;font-size:1.1rem">D.8 Étape 6 : rejouer avant le lot</h3>
+<p class="prose">Avant d’enregistrer un lot, un épisode converti de chaque format est rejoué dans Gazebo à partir de ses seules actions stockées (<code>scripts/replay_episode.py</code>), sans le démonstrateur ; pour RLDS, les commandes articulaires sont reconstruites à partir de la pose et du mouvement d’OpenVLA par cinématique inverse. Mesuré : l’atterrissage de la pièce, et les articulations rejouées par rapport aux états du jeu de données. Sur le cube rouge de la graine 1 : LeRobot +7/+1 mm, RLDS +7/0 mm (original +7/0), articulations à 0,59° près, aller-retour d’IK à 0,004° près.</p>
+<p class="prose">✅ <b>Critère d’achèvement :</b> les deux rejeux mettent la pièce dans son bac.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.9 Résultat</h3>
+<ul class="prose">
+<li>Lot des graines 1 à 10 : <b>40/40</b> prises-dépôts dans leur bac, chacune au premier essai (18 à 20 minutes par graine, médiane 19, 19,6 Go de bags).</li>
+<li>Premier passage 39/40. L’échec (graine 10, cube bleu) : le cube avait été déplacé de 15 mm par les prises précédentes de la graine, à 287 mm de l’axe du robot, au-delà de la portée de l’outil vertical ; la planification a échoué avant tout mouvement. La physique de contact n’est pas déterministe : l’exécution d’Osama sur la même graine ne l’avait pas dérangé. Le premier passage a été mis de côté, jamais converti, et la graine 10 relancée : 4/4.</li>
+<li>Jeux de données : LeRobot <code>local/mycobot_tri_sort</code>, 40 épisodes, 7 049 images, 116 Mo, rechargé par <code>LeRobotDataset</code> ; RLDS <code>mycobot_tri_sort</code> 1.0.0, 40 épisodes, 7 056 pas, 190 Mo, rechargé par <code>tfds</code>, aucun NaN. Dix épisodes par instruction dans les deux.</li>
+</ul>
+<h3 style="margin-top:26px;font-size:1.1rem">D.10 Reproduction depuis un clone neuf</h3>
+<p class="prose">Un coéquipier n’a besoin que de git et de Docker sous Linux (ou WSL2). <code>Headless_Task-Grounded_Pick-and-Sort-and-Place_in_Gazebo/docker/setup_workspace.sh</code> construit les images (<code>gazebo_to_lerobot</code>, <code>tri_sort</code> avec l’environnement LeRobot exact de <code>requirements_lerobot.txt</code>, <code>rlds_builder</code>), clone les paquets rosetta aux commits figés dans <code>docker/rosetta.repos</code>, et assemble l’espace de travail ROS à partir du dépôt ; <code>docker/run_container.sh</code> démarre les conteneurs et construit l’espace de travail. Les étapes D.3 à D.8 s’exécutent ensuite sans changement. Les jeux de données ne sont pas versionnés : le lot les régénère.</p>
+<p class="prose">✅ <b>Critère d’achèvement :</b> depuis un espace de travail et un conteneur neufs, le cube rouge de la graine 1 est enregistré, converti et rejoué dans son bac avec les seules commandes documentées, et aucun processus ne reste après chaque script (vérifié le 2026-10-10).</p>
+<h3 style="margin-top:26px;font-size:1.1rem">D.11 Écarts, et ce qui reste ouvert</h3>
+<div class="table-wrap"><table><thead><tr><th>Clause</th><th>La spécification ou Osama dit</th><th>Fait ici</th><th>Pourquoi</th></tr></thead><tbody><tr><td>A8, partie 3</td><td>Soudure conservée pour les 60 épisodes.</td><td>Contact physique de la pince (cycle d’Osama).</td><td>La scène d’Osama saisit physiquement, 40/40 ; la réserve de la soudure disparaît de ce jeu de données.</td></tr><tr><td>I4 d’Osama</td><td>Vérité terrain pour la validation seulement.</td><td>Positions du démonstrateur issues de la vérité terrain.</td><td>D-A2 : pas de YOLO dans le conteneur ; A5.</td></tr><tr><td>10.1</td><td>30 i/s, 224×224 à l’enregistrement.</td><td>10 i/s, 640×480 à l’enregistrement ; redimensionné à la conversion.</td><td>Fréquence des caméras de la scène ; la résolution ne peut pas être récupérée.</td></tr><tr><td>10.6</td><td>Chargement LeRobot reporté.</td><td>Chargé par <code>LeRobotDataset</code>.</td><td>Exigé par D.7.</td></tr></tbody></table></div>
+<ul class="prose">
+<li>Déclarer le jeu de données RLDS dans la configuration OXE d’OpenVLA et choisir sa vue unique.</li>
+<li>Pousser <code>feature/sort-episodes</code> pour que l’équipe puisse exécuter les commandes.</li>
+<li>Signaler à Osama que <code>tests/test_gt_isolation.py</code> échoue sur son <code>tri_dream_dashboard.py</code>, indépendamment de ce travail.</li>
+</ul>
+</section>
+<section class="block" id="annexe-e-entra-ner-smolvla-sur-les-enreg"><h2>Annexe E — Entraîner SmolVLA sur les enregistrements du tri, l’évaluer, et rendre chaque évaluation recalculable (ajoutée le 2026-10-30)</h2>
+<h3 style="margin-top:26px;font-size:1.1rem">E.1 Objectif</h3>
+<p class="prose">L’annexe D a produit des données d’entraînement : le tri à quatre objets d’Osama, un épisode par prise-dépôt, aux formats LeRobot et RLDS. Cette annexe spécifie ce qui a été prévu et fait avec ces données entre le dépôt de la PR #25 (2026-10-11) et le 2026-10-30 :</p>
+<ol class="prose">
+<li>entraîner sur ces données le modèle vision-langage-action SmolVLA, sur les GPU T4 gratuits de Kaggle ;</li>
+<li>mesurer, avec des protocoles fixés avant chaque mesure, si la politique entraînée se sert de ses caméras pour trouver les pièces ;</li>
+<li>l’évaluer dans la scène Gazebo <code>tri_yolo</code> au format de l’article ROS2SmolVLA (arXiv 2608.23320) : <b>saisie</b>, <b>dépose</b> et <b>dépose après une saisie réussie</b>, en distribution et hors distribution ;</li>
+<li>rendre chaque évaluation Gazebo <b>recalculable</b> : n’importe quelle pièce d’un lot, réussie ou non, peut être réexécutée plus tard, fenêtre Gazebo ouverte, et doit donner le <b>même</b> résultat, pas à pas, la politique et la physique étant toutes deux recalculées (et non relues).</li>
+</ol>
+<p class="prose">Le compte rendu de ce qui a été mesuré, étape par étape avec les commandes, est l’addendum du rapport à la même date (sections 44 à 58). Cette annexe énonce le plan, les règles et les critères d’achèvement, et la partie E.9 liste ce qui n’est pas encore fait.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.2 Hypothèses propres à ce travail</h3>
+<ul class="prose">
+<li><b>E-A1, calcul.</b> L’entraînement tourne sur Kaggle (2 × T4 de 16 Go, 30 heures de GPU par semaine, sessions de 12 h au plus) ; tout le reste tourne sur le processeur du portable, dans le conteneur <code>gazebo_to_lerobot</code>. Rien n’est lancé sur Kaggle sans l’accord explicite du propriétaire ; c’est le propriétaire qui lance les entraînements Kaggle.</li>
+<li><b>E-A2, limites CPU.</b> Toute étape qui fait tourner SmolVLA sur le processeur s’exécute avec le conteneur limité à 4 CPU et 8 Go (<code>docker update --cpus 4 --memory 8g --memory-swap 8g gazebo_to_lerobot</code>), <code>OMP_NUM_THREADS=4</code>, un lot de 2 au plus, et seulement après accord du propriétaire avec une estimation de durée. Aucun calcul lourd sur CPU ne tourne pendant un enregistrement Gazebo.</li>
+<li><b>E-A3, logiciel.</b> LeRobot 0.6.1 et les compléments SmolVLA figés dans l’image Docker aux versions exactes du carnet d’entraînement Kaggle (commit <code>71aa026a</code>).</li>
+<li><b>E-A4, graines.</b> Entraînées : graines 1 à 10 et 21 à 50 (quatre pièces par graine, trieur scripté) et 1001 à 1401 (une prise par disposition). Les graines 51 à 90 sont enregistrées mais pas encore converties pour l’entraînement. Jamais entraînées : graines d’évaluation 11 à 20 (11 à 15 pour le criblage), graines réservées 91 à 100 (contrôles en boucle ouverte), réserve 101 à 120, dispositions de la sonde de l’encodeur 5001 à 5800. Un point de contrôle final est évalué sur au moins 10 graines nouvelles.</li>
+<li><b>E-A5, perception.</b> La politique doit trouver les pièces à partir des images de ses trois caméras. Lui donner les positions YOLO dans son état (« option 2 ») a été écarté le 2026-10-18.</li>
+<li><b>E-A6, protocoles d’abord.</b> Toute mesure qui décide de quelque chose a sa règle, son seuil et ses données écrits dans <code>config/probe_protocol.yaml</code> et commités <b>avant</b> l’exécution de la mesure ; changer une règle après un résultat demande un nouveau commit qui dit pourquoi.</li>
+<li><b>E-A7, heures.</b> Toutes les heures sont à l’heure de Paris ; les journaux Kaggle et l’horloge du conteneur sont en UTC.</li>
+</ul>
+<h3 style="margin-top:26px;font-size:1.1rem">E.3 Étape 1 : reconstruire après la perte de la machine (2026-10-16)</h3>
+<p class="prose">L’instance Ubuntu de WSL a été perdue vers le 2026-10-15. Sept commits SmolVLA non poussés et les enregistrements des graines 21 à 50 ont été perdus ; l’archive des graines 1 à 10 (sur le disque externe), les deux entraînements Kaggle (13/10 : encodeur gelé, 20 000 pas ; 14-15/10 : encodeur entraîné, 36 000 pas), leurs carnets et le jeu de 160 épisodes ont été récupérés.</p>
+<ol class="prose">
+<li>Restaurer l’archive des graines 1 à 10 et la reconvertir : 40 épisodes, 7 049 images ; les 200 statistiques de normalisation doivent être égales à celles stockées dans le point de contrôle du 13/10.</li>
+<li>Figer les compléments SmolVLA dans l’image Docker à partir du <code>pip freeze</code> du carnet Kaggle.</li>
+<li>Réécrire l’évaluation Gazebo (<code>eval_smolvla_tri_sort.py</code>, <code>eval_tri_seed.sh</code>) et la valider deux fois : un <b>contrôle en boucle ouverte</b> sur des épisodes enregistrés (le point de contrôle du 13/10 doit fermer la pince à ~10 mm près du point enregistré), puis <b>la graine 1 à 4/4</b> dans Gazebo.</li>
+<li>Recalibrer les poses de départ aléatoires sur les 120 départs enregistrés des graines 21 à 50 (l’échantillonneur d’origine a été perdu).</li>
+</ol>
+<p class="prose"><b>Critère d’achèvement :</b> statistiques identiques ; contrôle en boucle ouverte réussi ; graine 1 triée 4/4 ; la graine 11 reproduit le 0/4 obtenu avant la perte.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.4 Étape 2 : plus de données, puis des données que la politique ne peut pas mémoriser</h3>
+<ol class="prose">
+<li>Enregistrer les graines 51 à 100 avec départs aléatoires (quatre pièces par graine, trieur scripté) : 196/196 épisodes attendus au premier essai. Les graines 91 à 100 sont converties en un jeu <b>réservé</b> et jamais entraînées.</li>
+<li>Enregistrer le <b>lot B</b> : un épisode par disposition, graines 1001 à 1400. La cible est <code>PIECES[graine % 4]</code> ; 0 à 3 des autres pièces sont déjà dans leur bac (<code>preplace_pieces.py</code>, tirées avec <code>default_rng([graine, 1])</code>, jamais la cible) ; le bras part d’une pose aléatoire (tirage 0 de <code>default_rng(graine)</code>). Chaque enregistrement est vérifié par <code>verify_preplaced_batch.py</code> (cible jamais déplacée, pièces pré-triées dans leur bac au début et à la fin, aucune autre pièce déplacée de plus de 1 mm), d’abord sur les enregistrements, puis sur le jeu converti.</li>
+<li>Une disposition dont l’enregistrement a demandé un second essai est exclue et remplacée (la graine 1234 a été remplacée par la 1401).</li>
+</ol>
+<p class="prose"><b>Critère d’achèvement :</b> 400 dispositions vérifiées OK ; jeu <code>local/mycobot_tri_sort_B_s1001_1401</code> de 400 épisodes et 71 059 images, rechargé par <code>LeRobotDataset</code> depuis son zip ; SHA-256 du zip consignée.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.5 Étape 3 : les entraînements sur Kaggle</h3>
+<p class="prose">Chaque entraînement utilise le pilote figé <code>training/smolvla_kaggle/smolvla_kaggle_driver.py</code> et un carnet versionné dans le dépôt ; le pilote refuse un jeu de données dont le nombre d’épisodes ou d’images diffère de celui attendu, sauvegarde tous les 500 pas, garde les poids de chaque pas multiple de 2 500 (ou 5 000) dans <code>kept/</code>, s’arrête proprement avant la limite de session et reprend au plus récent point de contrôle complet, facteur d’échelle fp16 compris.</p>
+<div class="table-wrap"><table><thead><tr><th>Entraînement</th><th>Données</th><th>Paramètres entraînés</th><th>Lot × pas</th><th>Carnet</th></tr></thead><tbody><tr><td>13/10</td><td>40 épisodes, graines 1 à 10, départ fixe</td><td>expert d’action (encodeur gelé)</td><td>32 × 20 000</td><td><code>smolvla_tri_sort_1310_frozen_20k</code></td></tr><tr><td>36k (14-15/10)</td><td>160 épisodes</td><td>encodeur vision, connecteur, expert (198,1 M)</td><td>4 × 36 000</td><td><code>smolvla_tri_sort_1415_unfrozen_36k</code></td></tr><tr><td>Run A (17-18/10)</td><td>160 épisodes (graines 1 à 10, 21 à 50)</td><td>expert, encodeur gelé</td><td>32 × 20 000</td><td><code>smolvla_tri_sort_runA_frozen_20k</code></td></tr><tr><td>Run B (24-25/10)</td><td>400 dispositions à une prise (lot B)</td><td>expert, encodeur gelé</td><td>32 × 20 000</td><td><code>smolvla_tri_sort_runB_frozen_20k</code></td></tr><tr><td>Run C (depuis le 25/10)</td><td>lot B plus étiquettes de position</td><td>encodeur (taux 1e-5), connecteur et expert (taux 1e-4)</td><td>30 (6 × 5 accumulés) × 10 000</td><td><code>smolvla_tri_sort_runC_aux_10k</code></td></tr></tbody></table></div>
+<p class="prose">Le Run C ajoute une <b>perte auxiliaire de position</b>, pendant l’entraînement seulement : une tête linéaire (184 320 → 8) lit les x, y des quatre pièces dans la sortie du connecteur des trois caméras ; perte totale = perte d’action + λ × erreur quadratique moyenne masquée des positions normalisées. La tête est initialisée par régression ridge sur les caractéristiques gelées de <code>smolvla_base</code> (erreur médiane de 65,7 mm) et <b>gardée figée</b> ; λ = 0,3 a été calibré sur un T4 (normes des gradients des deux pertes sur l’encodeur vision). La politique ne reçoit jamais les positions. Avant le Run C : mémoire mesurée sur un T4 (le micro-lot de 6 tient avec ~1,8 Gio de marge), accumulation de gradient (6 contre 2 × 3) et reprise vérifiées contre des seuils fixés d’avance.</p>
+<p class="prose"><b>Conditions d’arrêt du Run C</b> (le pilote s’arrête et affiche <code>GUARD STOP</code> ; l’entraînement n’est pas repris) : perte auxiliaire supérieure à 1 à un pas quelconque jusqu’au pas 50 ; plus de 5 des 100 premières mises à jour sautées par le facteur d’échelle fp16 ; le facteur sous 1 024 après le pas 100 ; un point de contrôle dont la tête n’est pas identique à son initialisation.</p>
+<p class="prose"><b>Règle de mi-parcours</b> (<code>run_c_midway_stop</code>) : entre les deux sessions du Run C, la sonde et le test d’échange d’images tournent sur le point de contrôle du pas 5 000 ; la seconde session n’a lieu que si l’encodeur ne localise pas moins bien que <code>smolvla_base</code> et si la politique se sert encore de ses images.</p>
+<p class="prose"><b>Critère d’achèvement par entraînement :</b> <code>TRAINING COMPLETE</code>, le point de contrôle final et ceux gardés téléchargés, leurs SHA-256 consignées, et (Run C) <code>HEAD CHECK PASS</code>.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.6 Étape 4 : des mesures qui décident, chacune fixée avant d’être exécutée</h3>
+<ol class="prose">
+<li><b>Contrôle en boucle ouverte</b> (<code>open_loop_check.py</code>) : les images enregistrées des graines réservées 91 à 100 passent dans un point de contrôle, et chaque segment de 50 actions prédit est comparé aux actions enregistrées sur les mêmes pas : distance du bout de pince (cinématique directe), erreur articulaire, erreur de pince, et distance entre la fermeture prédite et la fermeture enregistrée. 120 segments (départs aux images 0, 60, 120) sur 40 épisodes ; comparaisons appariées entre points de contrôle avec des intervalles à 95 % par 2 000 rééchantillonnages d’épisodes entiers (<code>open_loop_compare.py</code>).</li>
+<li><b>Test d’échange d’images</b> (<code>--swap-images</code>) : chaque épisode reçoit les images de caméra de la même pièce sur la graine suivante, avec son propre état et sa consigne. Une politique qui se sert de ses images déplace sa saisie vers celle du donneur d’images. Critères : le décalage du point de saisie et la variation de la part des fermetures plus proches du donneur, tous deux avec la borne basse de leur intervalle à 95 % au-dessus de 0.</li>
+<li><b>Sonde de l’encodeur</b> (<code>probe_render.sh</code>, <code>probe_features.py</code>, <code>probe_fit.py</code>) : 799 rendus en image entière des dispositions 5001 à 5800 ; une sonde linéaire (ridge) sur la sortie du connecteur de chaque caméra prédit les x, y des quatre pièces ; 5 plis par disposition ; erreur médiane et 90e centile en mm ; bootstrap apparié contre <code>smolvla_base</code> ; planchers (position moyenne, pixels bruts) et plafond (position vraie dans l’image). Variantes fixées dans des addenda avant d’être exécutées : rendus recadrés (<code>crop_test</code>), couches intermédiaires (<code>layer_probe</code>).</li>
+<li><b>Porte du Run C</b> (<code>run_c_gate</code>) : un point de contrôle du Run C ne va dans Gazebo que si son encodeur localise mieux que <code>smolvla_base</code> (de plus de 5 mm et de 20 %, intervalle excluant 0, sur au moins 2 caméras sur 3 : au plus 25,6 / 31,0 / 30,9 mm) <b>et</b> s’il réussit le test d’échange d’images.</li>
+<li><b>Rapport final du Run C</b> (<code>run_c_final_report</code>, amendé le 2026-10-27 avant qu’existe un point de contrôle au-delà de 5 000) : la saisie est jugée sur un <b>jeu en boucle ouverte centré sur la saisie</b> : 5 segments par épisode réservé partant 30, 25, 20, 15 et 10 images avant la fermeture enregistrée, 200 segments, la fermeture enregistrée dans chacun. Le Run C 10 000 est comparé au Run B 20k (mêmes données, tous deux en fin de calendrier de taux) et au Run B 10k (échantillons égaux). « Une meilleure localisation a donné de meilleures saisies » seulement si l’intervalle du point de saisie est entièrement sous 0, si au moins 100 des 200 segments sont appariés, et si le Run C ne ferme pas dans moins de segments que le Run B moins 10.</li>
+</ol>
+<p class="prose"><b>Critère d’achèvement :</b> chaque résultat écrit dans <code>probe_protocol.yaml</code> sous la règle par laquelle il a été jugé, avec ses chiffres, et commité.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.7 Étape 5 : évaluation Gazebo au format de l’article ROS2SmolVLA</h3>
+<ol class="prose">
+<li><b>Exécuteur.</b> <code>eval_tri_seed.sh &lt;point de contrôle&gt; &lt;graine&gt; &lt;dossier&gt;</code> démarre la scène <code>tri_yolo</code> en headless et exécute <code>eval_smolvla_tri_sort.py</code>. Pour chaque pièce, le bras va à la pose d’observation (hors distribution) ou au départ aléatoire de l’enregistrement (en distribution), la pince à −0,28, puis la politique pilote : Gazebo est en pause pendant que la politique calcule un segment de 50 actions, puis les actions sont jouées à 10 Hz de temps simulé ; 300 pas au plus par pièce.</li>
+<li><b>Notation par la vérité terrain de Gazebo</b>, que la politique ne voit jamais : <b>saisie</b> quand la pièce monte au-dessus de 6 cm ; <b>déposée</b> quand elle finit à moins de 47 mm du centre de son propre bac, sous 6 cm ; <b>dépose après saisie</b> = déposées parmi les pièces saisies (conditionnelle, comme dans l’article).</li>
+<li><b>Conditions.</b> Hors distribution : graines 11 à 20, les quatre pièces, départ en pose d’observation. En distribution : graines 1001 à 1040, la cible enregistrée seule, les mêmes pièces pré-placées et le départ aléatoire enregistré (<code>PREPLACE=1</code>, qui rejoue le pré-placement déterministe et le vérifie contre le <code>preplaced.json</code> de l’enregistrement).</li>
+<li><b>Modes d’échec</b> par pièce (<code>failure_modes.py</code>) : triée ; saisie, non déposée ; <b>jamais fermée</b> ; fermée en l’air ; <b>emplacement mémorisé</b> (fermée à moins de 20 mm d’une saisie d’entraînement, loin de la pièce) ; mauvais endroit ; manquée de peu.</li>
+<li><b>Tableau</b> (<code>paper_table.py</code>) : saisie, dépose et dépose après saisie, en distribution, hors distribution et au total, avec intervalles de Wilson à 95 %, à côté de l’article et du modèle du 13/10.</li>
+</ol>
+<p class="prose"><b>Critère d’achèvement :</b> 50 graines évaluées (10 hors distribution, 40 en distribution), le tableau et les modes d’échec consignés.</p>
+<h3 style="margin-top:26px;font-size:1.1rem">E.8 Étape 6 : des évaluations recalculables (mode verrouillé au pas près)</h3>
+<p class="prose">Une reprise dans la fenêtre Gazebo de la seule pièce hors distribution réussie par le Run B (graine 17, pavé jaune) ne l’a pas reproduite : 0,02° d’écart au départ sont devenus 13 mm un segment plus tard. La cause n’est pas le moteur physique (DART est déterministe) mais tout ce qui laisse entrer l’horloge murale dans la simulation. Le plan, en cinq parties, toutes optionnelles (<code>STEP_LOCKED=1</code>), le mode précédent restant inchangé :</p>
+<ol class="prose">
+<li><b>Boucle verrouillée au pas près</b> (<code>scripts/step_lock.py</code>, <code>eval_smolvla_tri_sort.py --step-locked</code>). Après le démarrage, Gazebo ne tourne jamais librement : il avance par blocs exacts de pas de 1 ms (<code>multi_step</code>, chaque bloc n’étant envoyé qu’une fois le précédent terminé), les commandes sont envoyées pendant la pause, les observations sont prises sur les instants de 10 Hz des caméras, à partir d’images horodatées exactement à cet instant, les mouvements durent un nombre fixe de pas, PyTorch tourne en mode déterministe, et le temps simulé est lu dans le <code>/stats</code> de Gazebo lui-même, et non dans le <code>/clock</code> de ROS. Le serveur démarre en pause et le robot apparaît au temps simulé 0, si bien que la boucle de contrôle à 100 Hz et les caméras partagent la même grille de temps.</li>
+<li><b>Fenêtre de visualisation</b> (<code>VIEWER=1</code>) : le même serveur headless qu’un lot, plus une fenêtre <code>gz sim -g</code> qui ne fait qu’afficher ; les images de la politique sont toujours rendues par le serveur headless.</li>
+<li><b>Empreintes</b> : par pièce, SHA-256 de l’instantané de départ, de l’état de départ, de l’état et de l’action à chaque pas, des poses des pièces et de chaque image de caméra vue par la politique (<code>compare_runs.py</code> indique identique, ou le premier pas et la grandeur où deux exécutions divergent).</li>
+<li><b>Remise à zéro exacte de l’état</b> au début de chaque pièce (<code>scripts/gz_systems/state_reset.py</code>, un système Gazebo en Python) : un instantané des 12 articulations du robot, de la commande de pince et des poses des quatre pièces, pris par le lot (ou chargé depuis lui, <code>RESET_FROM</code>), est remis au bit près avec des vitesses nulles ; la consigne de vitesse des articulations est mise à zéro avant le pas de physique, la remise à zéro est répétée sur les 10 pas jusqu’à une mise à jour des contrôleurs, les contrôleurs reçoivent des commandes de maintien identiques, et un instant caméra plus tôt la scène est placée « loin » pour que le moteur de rendu redessine tout à la remise exacte. À partir de là, l’exécution ne dépend plus de rien de ce qui s’est passé avant ; une pièce peut être recalculée seule (<code>repeat_eval_gui.sh &lt;dossier&gt; [pièce]</code>).</li>
+<li><b>Enregistrement et relecture</b> (<code>RECORD=1</code>, <code>play_eval_gui.sh</code>) : l’état de Gazebo toutes les 20 ms de temps simulé, relu sans rien recalculer.</li>
+</ol>
+<p class="prose"><b>Règle pour chaque message de la boucle :</b> soit il ne peut pas être perdu, soit une perte arrête ou retarde l’exécution ; jamais « l’exécution continue avec des données anciennes ». Les commandes du bras et de la pince (dont les contrôleurs s’abonnent en BEST_EFFORT) sont envoyées trois fois pendant la pause et <b>relues</b> après la première mise à jour des contrôleurs de chaque période d’action : les six commandes de la pince dans l’introspection du gestionnaire de contrôleurs doivent être exactement égales à la commande envoyée, la trajectoire du bras doit donner les points envoyés à son premier, son point du milieu et son avant-dernier point (<code>query_state</code>). L’état articulaire lu par la politique vient de Gazebo lui-même (requête d’état au plugin de remise à zéro, avec le temps simulé de Gazebo). Les images ne sont utilisées que si elles sont horodatées exactement à l’instant courant. Une relecture manquante ou différente arrête l’exécution avec une erreur.</p>
+<p class="prose"><b>Tests et critères d’achèvement :</b></p>
+<ul class="prose">
+<li>Test A : graine 17 exécutée en mode verrouillé (A1), puis recalculée à partir des instantanés d’A1 (A2) : chaque pièce identique (empreintes du départ, des images, des états articulaires, des actions et des poses des pièces à chaque pas).</li>
+<li>Test B : graine 17 recalculée à partir des instantanés d’A1 sur le même serveur headless avec la fenêtre de visualisation : identique à A1.</li>
+<li>Test C : une graine en distribution (1001) exécutée deux fois : identique.</li>
+<li>Puis la comparaison de 50 graines du Run B 20k avec l’article, refaite en mode verrouillé, pour que chacune de ses pièces, réussie ou non, puisse être recalculée dans la fenêtre avec le même résultat.</li>
+</ul>
+<h3 style="margin-top:26px;font-size:1.1rem">E.9 Ce qui n’est pas encore fait (au 2026-10-30), dans l’ordre</h3>
+<ol class="prose">
+<li><b>Test A</b> (première moitié faite) : A1 a exécuté les quatre pièces de la graine 17 en mode verrouillé le 2026-10-29, de 16:29 à 18:50, sans arrêt (aucune relecture en échec, aucun horodatage en défaut). A2, le recalcul à partir des instantanés d’A1, a démarré le 2026-10-30 à 13:17 (environ 2 h 20) ; puis <code>compare_runs.py</code>. Si une pièce diffère : indiquer le premier pas et la grandeur qui diffèrent, corriger cette source, relancer.</li>
+<li><b>Deux améliorations avant le lot :</b> relancer automatiquement une pièce depuis son instantané de départ après un arrêt de relecture ou d’horodatage, 3 fois au plus, chaque relance étant consignée et devant reproduire la même empreinte ; conserver durablement l’instantané de départ de chaque pièce avec les résultats du lot.</li>
+<li><b>Tests B et C</b> (voir E.8).</li>
+<li><b>Vitesse.</b> Une période d’action en mode verrouillé prend environ 5 s d’horloge murale (une pièce environ 35 min) ; les requêtes de temps et d’état adressées à Gazebo lancent chacune un processus <code>gz</code> en ligne de commande et doivent passer par l’écouteur persistant avant le lot de 50 graines (estimé sinon à environ 2 jours de CPU).</li>
+<li><b>La comparaison de 50 graines en mode verrouillé</b> du Run B 20k (E.7, E.8).</li>
+<li><b>Session 2 du Run C</b> (jusqu’au pas 10 000) après la remise à zéro du quota Kaggle du 2026-10-31, avec le carnet du 27/10 (correctif des points gardés) ; puis la <code>run_c_gate</code> sur 2 500 / 5 000 / 7 500 / 10 000, le rapport final du point 5 de E.6, et, seulement si la porte est franchie, son évaluation Gazebo en mode verrouillé.</li>
+<li><b>La PR #25</b> est ouverte, non relue, et en conflit avec <code>main</code> depuis les PR #26 et #27 (2026-10-20 et 2026-10-22) ; il faut fusionner <code>main</code> dans <code>feature/sort-episodes</code> et résoudre les conflits.</li>
+<li><b>Ouvert depuis l’annexe D :</b> le jeu RLDS n’est pas déclaré dans la configuration OXE d’OpenVLA (il faut choisir la vue unique d’OpenVLA) ; aucun entraînement π0 ni OpenVLA ; aucun exemple de rattrapage dans les données (chaque saisie enregistrée a réussi du premier coup) ; aucun essai sur le robot réel.</li>
+<li><b>Un écart à régler :</b> le <code>controller.yaml</code> du conteneur fait tourner les contrôleurs du bras à 100 Hz, celui du dépôt indique 500 Hz ; tous les enregistrements et évaluations depuis le 2026-10-16 ont utilisé 100 Hz.</li>
+</ol>
+</section>
+  </main>
+</div>
+</body>
+</html>

@@ -62,7 +62,7 @@ after ~20 minutes, in a way a respawn cannot fix because the underlying
 service is unreachable, not merely slow.
 
 **The specification's own A10 argument predicted exactly this class of
-outcome** for Role A hardware on the *previous* (simpler, single-object)
+outcome** for memory-constrained hardware on the *previous* (simpler, single-object)
 acquisition. Finding it reproduced, independently, and more severely, on
 this richer world, on this same container, is not a surprise — it is
 confirmation, gathered rather than assumed.
@@ -77,7 +77,7 @@ confirmation, gathered rather than assumed.
   waypoints, per the offline IK checks in `doc/WAYPOINT_CONTINUITY.md`)
   — but the three have never run together against a live scene.
 - Whether `real_table.sdf`'s specific memory/CPU footprint is survivable
-  at all on Role A hardware for a *single* episode (rather than failing
+  at all on this machine for a *single* episode (rather than failing
   during bring-up before any motion starts) is not established either
   way by this result — bring-up itself did not complete cleanly enough to
   find out.
@@ -88,10 +88,10 @@ Do not keep retrying bring-up against this same long-uptime container
 instance — a fresh container/VM restart (not just killing the Gazebo
 process, which was already tried and had already been done once earlier
 in this exact session before this second failure) is the more likely
-fix, and even then, per A10, the actual 60-episode batch belongs on Role B
-hardware regardless of whether a single episode can be coaxed through
-here. If a single smoke-test episode on Role A hardware is still wanted
-as a sanity check before handover, budget a **fresh** container start
+fix, and even then, per A10, the actual 60-episode batch belongs on a machine with
+more memory regardless of whether a single episode can be coaxed through
+here. If a single smoke-test episode on this machine is still wanted
+as a sanity check, budget a **fresh** container start
 immediately before it, not a reuse of a container that has been up for
 any significant time — this session's own evidence says that uptime is
 exactly the variable that broke it.
@@ -184,7 +184,7 @@ in that clean state rather than pushed through another live attempt.
 Unchanged in substance from the original recommendation, now with
 stronger evidence behind it: this container is demonstrably not a
 reliable place to run the full `gz sim` + controllers + recorder
-workload, up to and including staying alive at all. Role B's hardware
+workload, up to and including staying alive at all. A machine with more memory
 remains the correct place to run the actual 60-episode batch and the
 held-out-camera check, per A10. All of this project's code involved —
 `episode.sh`'s recorder bring-up, `run_pick_and_place.py`'s recording
@@ -256,8 +256,7 @@ and the arm motion together for the full episode length. This is not
 fixable from inside the container (no `docker run` flag raises the VM's
 own total memory) — it requires either increasing WSL2's memory
 allocation (`.wslconfig` → `memory=`, on the Windows side, then a WSL
-restart) or running the batch on hardware with more RAM to begin with,
-i.e. Role B. Environment left clean and idle (`gz sim` and the ROS2
+restart) or running the batch on hardware with more RAM to begin with. Environment left clean and idle (`gz sim` and the ROS2
 daemon killed, `free -h` back to 2.9 GiB available) rather than pushed
 through a further retry.
 
@@ -344,7 +343,7 @@ confirmed idle.
 for two independently-confirmed reasons rather than one — the WSL2
 memory ceiling with `gz sim` running, and a still-undiagnosed
 lifecycle-service hang in `episode_recorder_node` without it. Both are
-Role B / follow-up items; neither is a defect in this project's own
+follow-up items for a machine with more memory; neither is a defect in this project's own
 `episode.sh`/`run_pick_and_place.py`/`port_bag.py` code, which drove the
 one successful "recording started" case correctly.
 
@@ -358,8 +357,8 @@ setting), leaving well under 3 GB for everything else — controllers,
 recorder, DDS, the Python IK/motion process, and headroom for growth
 over a run. The single-object project this one derives from already
 needed a respawn-and-retry protocol on a *simpler* world; this world
-adds a camera, ArUco markers, and a textured mesh on top. Role B
-hardware is the correct place for 3b/3c, and for the full 60-episode
+adds a camera, ArUco markers, and a textured mesh on top. A machine with
+more memory is the correct place for 3b/3c, and for the full 60-episode
 batch regardless.
 
 ---
@@ -458,8 +457,8 @@ it was in progress across two consecutive session interruptions and was
 explicitly not resumed a third time, per the decision to stop all
 hardware-bound work for tonight. **This is the concrete next step for
 whoever picks this up — a live stack trace, not more source reading —
-and it needs the container, so it is not something to attempt from a
-constrained workstation.**
+and it needs the container, so it is not something to attempt on a
+memory-constrained machine.**
 
 ### Verdict: harness artifact or real recorder defect?
 

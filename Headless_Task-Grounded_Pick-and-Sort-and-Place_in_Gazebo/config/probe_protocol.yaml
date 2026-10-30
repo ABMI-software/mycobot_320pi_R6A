@@ -1,0 +1,512 @@
+# Encoder probe: does a SmolVLA image encoder still tell where the pieces are?
+# Fixed and committed BEFORE any probe is fitted (17/10/2026). Changing a number
+# below after results exist needs a new commit that says why.
+
+question: >
+  Did training the vision encoder and connector in the 36k run (batch 4, lr 1e-4)
+  damage what they encode about piece positions, compared with smolvla_base?
+
+layouts:
+  generator: tri_scene.sample_tri_scene, piece_reach 0.28, numpy default_rng(seed)
+  seeds: [5001, 5800]          # 800 layouts, disjoint from every recorded or evaluated seed
+  arm: observation pose (0, 60, -70, 0, 0, 0) deg, gripper at -0.28, as in every first frame
+  render: one Gazebo session, the 8 models moved with /world/tri_yolo/set_pose_vector,
+    0.3 s of sim time to settle, then the first frames that show the new layout; the renderer
+    picks a pose change up 0.1-1.1 s of sim time late (measured 17/10, before any probe result;
+    the 5-layout test had every image one layout behind), so a frame counts only once the top
+    camera shows each piece's colour at its projected centre, the side cameras from that stamp on.
+    A layout not seen within 5 s is dropped and counted (stale.jsonl).
+  targets: x, y of the 4 pieces as Gazebo reports them after settling (8 values, metres)
+  rejected: a layout whose piece moved more than 5 mm while settling is dropped and counted
+
+encoders:
+  smolvla_base: lerobot/smolvla_base, snapshot 5e8d12a6e2975b0e5e5fce7c8caf47c371d257b6
+  36k_008000: run_1415_unfrozen_36k kept/008000
+  36k_036000: run_1415_unfrozen_36k checkpoints/036000
+  control: >
+    13/10 (run_1310_frozen_20k 020000) vision + connector = smolvla_base value for value
+    (198 tensors, 98.2 M parameters, max difference 0, checked 17/10), so it is not probed.
+
+features:
+  # One camera at a time; each image through the policy's own preprocessing (resize with
+  # padding to 512x512), as the action expert receives it.
+  connector: the 64 connector tokens x 960, flattened (what the action expert attends to)
+  vision: last vision-tower hidden state, 32x32 patches x 768 average-pooled to 8x8, flattened
+  cameras: [top, left, right]
+
+probes:
+  linear: ridge regression, features standardised on the training folds, alpha chosen by
+    inner 5-fold CV over 10^-2 .. 10^5 (15 values)
+  mlp: PCA to 256 on the training folds, one hidden layer of 512 ReLU, Adam lr 1e-3,
+    weight decay 1e-4, 10 % of the training folds for early stopping (patience 50 epochs),
+    seed 0
+  split: 5-fold cross-validation by layout (one layout = one sample), same folds for every
+    encoder, camera and probe (numpy default_rng(0) permutation)
+
+metric:
+  error: per piece, Euclidean distance (mm) between predicted and true x, y on held-out folds
+  report: median and 90th percentile over the 800 x 4 piece predictions, per encoder,
+    camera, layer and probe
+  uncertainty: 95 % bootstrap interval (2000 resamples of layouts) of the paired
+    difference in median error, encoder minus smolvla_base
+
+baselines:
+  floor_mean: predict the training-fold mean position of each piece (no image)
+  floor_pixels: ridge on the raw image resized to 32x24 RGB
+  ceiling_pixel_position: ridge and MLP on each piece's true image position (its Gazebo
+    pose projected through that camera's model, tri_scene.box_centre) -- what the probe
+    can reach when the piece is located perfectly in the image. Colour masks were set
+    aside; each piece shares its colour with its bin.
+
+decision:
+  # Applied to the linear probe on the connector layer; the other cells are reported, not judged.
+  damaged: >
+    median error of the encoder exceeds smolvla_base by more than 5 mm AND by more than 20 %,
+    AND the 95 % bootstrap interval of the difference excludes 0, on at least 2 of the 3 cameras
+  improved: the same three conditions in the other direction
+  otherwise: no measurable difference
+  validity: >
+    the comparison is only judged if smolvla_base beats floor_pixels by at least 20 % on at
+    least 2 cameras; if not, the probe cannot see positions in any encoder and says nothing
+    about damage
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 18/10/2026, committed before any cropped feature was computed.
+crop_test:
+  question: >
+    Are the pieces too small in the model input for the frozen encoder to localise them? Same
+    799 renders, same folds and probes, smolvla_base only, each camera cropped to the table first.
+  crop: >
+    fixed per camera from geometry only: the table top (real_table.sdf) from z = 0 up to the
+    tallest item (0.05 m), projected through the camera model, clipped to the frame, plus 4 px.
+    Every item corner of the 799 layouts falls inside (right camera 99.8 %: the rest is already
+    outside the frame). u0, v0, u1, v1 in the 640 x 480 render:
+    top: [183, 0, 438, 272]
+    left: [279, 247, 640, 394]
+    right: [0, 252, 363, 409]
+  piece_size_in_patches: >
+    median projected box over the 799 layouts, in 16 px SigLIP patches after resize-with-pad to
+    512 x 512: full frame 0.91-1.95 patches per side (top 0.91-1.60, left 1.40-1.84,
+    right 1.39-1.95); cropped 2.15-3.77 (top 2.15-3.77, left 2.49-3.27, right 2.44-3.43).
+    Scale gain 2.35 (top), 1.77 (left), 1.76 (right).
+  floor: floor_pixels recomputed on the crops (each crop box-averaged to 32 x 24 RGB, ridge)
+  pass: >
+    top camera, linear probe on the connector: median <= 20 mm AND at least 20 % below the
+    cropped floor_pixels median. Left and right are reported, not judged.
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 19/10/2026, committed before any Run C code or run exists.
+run_c_gate:
+  question: >
+    Run C trains the vision encoder (low learning rate), the connector and the action expert,
+    with an auxiliary piece-position loss during training only. Before any Run C checkpoint
+    goes to Gazebo, does its encoder localise the pieces better than smolvla_base (which is
+    Run A's frozen encoder), AND does the policy still use the images to choose where to grasp?
+    A checkpoint goes to Gazebo only if it passes BOTH parts below. Failing either is reported
+    with its numbers, and that checkpoint is not run in Gazebo.
+  checkpoints: every Run C checkpoint proposed for Gazebo; the probe is also reported for each kept one
+  part_1_probe:
+    data: the same 799 full-frame renders of layouts 5001-5800, same 5 folds, same linear
+      probe on the connector, same metric and bootstrap as above (full frame, because that is
+      what the policy sees)
+    pass: >
+      the "improved" rule above against smolvla_base: median error lower by more than 5 mm AND
+      by more than 20 %, AND the 95 % bootstrap interval of the paired difference excludes 0, on
+      at least 2 of the 3 cameras. With smolvla_base at 32.0 / 38.8 / 38.6 mm (top / left /
+      right) this means at most 25.6 / 31.0 / 30.9 mm. Those values are also at least 20 % below
+      the full-frame floor_pixels (48 / 43 / 44 mm), so an encoder that passes also passes the
+      validity rule the base failed.
+    reported_not_judged: the vision layer, the MLP probe, and the cropped renders (crop_test)
+  part_2_image_swap:
+    data: open_loop_check.py --swap-images on the reserved seeds 91-100 (120 chunks, 40
+      episodes), donor = the same piece on the next seed (cyclic), same frame index, as run on
+      19/10 for Run A 15k and 36k@36k
+    metrics: >
+      both from open_loop_compare.py <own .json> <swap .json> (own images as the reference).
+      Grasp-point shift = its grasp_point_mm difference: median over chunks of the distance
+      between the predicted close and the recorded close in the same chunk, swapped images
+      minus own images, on the chunks where both close (difference of medians). Donor share =
+      the fraction of predicted closes nearer the donor's grasp than the episode's own grasp,
+      over the chunks that start with the gripper open; its change = swapped minus own images,
+      both computed on the same bootstrap draw of episodes. 95 % intervals from 2000 bootstrap
+      resamples of whole episodes.
+    pass: >
+      grasp-point shift: lower end of its 95 % interval above 0 mm; AND donor-share change:
+      lower end of its 95 % interval above 0. (The change, not the swapped share alone: the
+      36k checkpoint already closes nearer the donor 64 % of the time with its own images, so
+      a swapped share above 50 % says nothing by itself.)
+      For reference, 19/10: Run A 15k passes (shift +81.6 mm [+32.8, +122.3]; donor share
+      36 % -> 81 %, change +46 % [+23, +67]); 36k@36k fails both (shift +2.3 mm [-27.5, +12.2];
+      64 % -> 70 %, change +6 % [-4, +16]).
+  auxiliary_head:
+    report: >
+      median and 90th percentile (mm) of the auxiliary head's x, y error over the 799 x 4
+      pieces of layouts 5001-5800 (never trained on, so no folds), from the three cameras
+      together as the policy sees them, next to the linear probe of the same checkpoint's
+      encoder (per camera). Reported, not judged.
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 19/10/2026, committed before any intermediate-layer feature was computed.
+layer_probe:
+  question: >
+    Run C can train the whole vision encoder (12 layers) or only its last 4. Training only the
+    last 4 makes sense if the frozen smolvla_base encoder still holds piece positions part-way
+    through and its last layers lose them; if no intermediate layer localises better than the
+    last, the first layers have to be trained too.
+  data: the same 799 full-frame renders of layouts 5001-5800, same 5 folds, probes, metric and
+    bootstrap as above; smolvla_base only
+  features: >
+    the output of vision encoder layers 4, 6, 8 and 12 (12 before post_layernorm), each
+    32 x 32 patches x 768 average-pooled to 8 x 8 and flattened exactly as the 'vision' layer.
+    Layer 8 is the input of the last 4 layers (9-12), layer 6 the input of the last 6.
+  reference: >
+    the 'vision' layer above (layer 12 after post_layernorm, what the connector receives),
+    linear probe: 32.8 / 39.2 / 38.7 mm (top / left / right), from probe_result.json of 18/10
+  judged: layers 4 and 8, linear probe
+  clearly_better: >
+    the "improved" rule against the reference: median error lower by more than 5 mm AND by more
+    than 20 %, AND the 95 % bootstrap interval of the paired difference (layer minus reference,
+    same layout resamples) excludes 0, on at least 2 of the 3 cameras. That is at most
+    26.2 / 31.3 / 30.9 mm.
+  decision: >
+    layer 8 clearly better -> propose training the last 4 layers in Run C. Neither layer 4 nor
+    layer 8 clearly better -> the whole encoder. Layer 4 clearly better but not layer 8 -> the
+    positions are already gone by layer 8, which is what the last 4 layers would start from, so
+    the whole encoder (reported as such, with the numbers).
+  reported_not_judged: layers 6 and 12, the MLP probe
+  result: >
+    Recorded 19/10/2026 after the measurement; the rule above is unchanged. Linear probe, median
+    mm top / left / right: reference 32.8 / 39.2 / 38.7; layer 4 27.6 / 35.7 / 36.7; layer 6
+    25.1 / 32.7 / 32.9 (the best layer); layer 8 26.7 / 33.2 / 33.1; layer 12 32.1 / 38.0 / 36.8.
+    Against the bounds 26.2 / 31.3 / 30.9 mm (interval of the difference excluding 0) on at least
+    2 of 3 cameras: layers 4 and 8, judged, meet none; layer 6, reported, meets the top camera
+    only (1 of 3). Decision: the whole encoder. probe_layer_result.json, fit_layer.log in
+    /workspace/probe (gazebo_to_lerobot).
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 19/10/2026, committed before any Run C code was run on a GPU.
+run_c_midway_stop:
+  question: >
+    Run C (whole vision encoder, batch 6 x 5 accumulated, two Kaggle sessions) keeps weights every
+    2 500 steps. Between the two sessions, is the recipe already failing, so the second session's
+    ~10 h of quota can be saved?
+  checkpoint: the newest kept checkpoint of the first session
+  tests: >
+    the run_c_gate probe (part 1 data, probe and metric) and the image-swap test (part 2 data and
+    metrics), as written above
+  stop_if: >
+    EITHER the encoder localises worse than smolvla_base: linear probe on the connector, median
+    error above smolvla_base's with the 95 % bootstrap interval of the paired difference entirely
+    above 0, on at least 2 of the 3 cameras (no size threshold: mid-run, any reliable loss of
+    localisation counts);
+    OR the policy no longer uses the images: either part-2 criterion fails (lower end of the 95 %
+    interval of the grasp-point shift, or of the donor-share change, at or below 0).
+  otherwise: run the second session; the full run_c_gate applies to its checkpoints.
+
+# ---------------------------------------------------------------------------------------------
+# Record, 19/10/2026: Run C's gradient-accumulation check (smolvla_kaggle_driver.py, accumcheck).
+accumulation_check:
+  rule: >
+    fixed before the first GPU run (driver CHECK_LIMITS, commit f68b04cb): on every step not
+    skipped by the fp16 loss scaler, at least 3 of them, accumulated against whole batch from the
+    same state, batch, noise and times: loss, pre-clip gradient norm and gradients (overall and
+    per group) within 1 %, weight update (overall and per group) within 5 %
+  acceptance_of_the_update_limit: >
+    agreed 19/10: a weight-update difference above 5 % is accepted as Adam's first steps
+    amplifying rounding (each weight moves by about +/- lr whatever its gradient) only if the floor
+    (the same whole batch run twice) shows a comparable difference. Future checks judge the update
+    after several steps, or leave out weights whose gradient is near zero.
+  t4_batch_8_vs_2x4: >
+    one step judged, out of memory at step 2 (the optimizer state appears there): FAIL as written.
+    Step 1, relative difference, floor / accumulated: loss 0 / 6.5e-5; gradients 0.038 % / 0.26 %
+    (vision 0.062 / 0.41, connector 0.0002 / 0.16, expert 0.0002 / 0.08); weight update 1.4 % /
+    6.0 % (vision 2.1 / 8.0, connector ~1e-4 / 5.1, expert ~1e-4 / 3.5). Gradients pass by 4x.
+    The update difference is ~20-45 x the gradient difference in both (the step-1 amplification
+    shows in the floor: 0.062 % -> 2.1 % in the vision encoder, the only non-deterministic part),
+    but the floor's update difference is ~4 x smaller than the accumulated one, so "comparable" is
+    not met on this step and the update limit is not accepted on it.
+  t4_batch_6_vs_2x3: >
+    19/10/2026, 6 steps: PASS under the rule as committed (decision_amplification not needed).
+    Steps 2 and 4 skipped by the fp16 loss scaler (overflow at the initial scale 65536, halved
+    each time); 4 steps judged. Relative difference, accumulated (floor): step 1 gradients 0.12 %
+    (0.040 %), update 3.8 % (1.4 %), vision 4.3 % (2.1 %); step 3 gradients 0.069 % (0.031 %),
+    update 0.29 % (0.20 %); step 5 0.10 % (0.011 %), 0.14 % (0.063 %); step 6 0.097 % (0.013 %),
+    0.13 % (0.063 %). Gradient norm within 1.3e-4, loss within 1.0e-4 on every step. The
+    update/gradient amplification is ~30 x at step 1 (accumulated 32, floor 35: 0.9 x) and falls
+    to ~4 x at step 3 and ~1.4 x at steps 5-6, as Adam's first-step effect predicts; the 6.0 %
+    at batch 8 step 1 was that effect on a larger gradient difference. Peak nvidia-smi 12441 MB.
+    Verdict: the gradient accumulation is correct on the T4 path Run C uses.
+  decision_amplification: >
+    Decided by the project owner on 19/10/2026, before the batch-6 rerun: if loss, gradient norm
+    and gradients pass their limits (1 %) but the weight update still exceeds 5 %, the
+    accumulation is accepted as correct when the amplification factor (weight-update difference
+    divided by gradient difference) of the accumulated pass is of the same order as the floor's.
+    Reason: a scaling or stepping bug in the accumulation would show as a large difference in
+    the pre-clip gradient norm, which at batch 8 was 7.2e-6.
+    Made concrete here, before any batch-6 result: "same order" means the accumulated factor is
+    between 0.1 x and 10 x the floor's, on every judged step (at least 3), overall and in every
+    group where the floor's gradient difference is measurable (at least 1e-4 relative; below
+    that the floor's gradients are identical to float32 rounding and have no factor: at batch 8
+    the connector and the expert, 1.5e-6). Loss, gradient-norm and gradient limits and the
+    3-step minimum are unchanged.
+    Batch-8 step 1, for reference (not judged by this decision, one step only): overall floor
+    1.38e-2 / 3.81e-4 = 36, accumulated 5.97e-2 / 2.62e-3 = 23 (0.63 x); vision floor
+    2.09e-2 / 6.21e-4 = 34, accumulated 7.99e-2 / 4.14e-3 = 19 (0.57 x); connector and expert
+    without a floor factor.
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 25/10/2026, committed before any Run C training run.
+run_c_settings:
+  warm_start: >
+    ridge fit of the auxiliary head (Linear 184 320 -> 8) on frozen smolvla_base connector
+    features of 1 200 Run B training frames from 381 episodes (scripts/aux_warm_start.py, CPU,
+    25/10): median error by held-out episode 65.7 mm (p90 122.5), against 133.8 mm for each
+    piece's training mean position. Per piece: cube_rouge 62.7, pave_jaune 83.5 (p90 158.9, above
+    its mean-position floor of 134.4), cylindre_vert 56.9, cube_bleu 63.7 mm. Ridge alpha at the
+    bottom of its grid (0.01) for pave_jaune and cylindre_vert.
+  lambda: >
+    0.3 (exact 0.272), design note D4 rule: at the starting weights with the warm-started head,
+    10 batches of 6 drawn with seed 1001, lambda = 0.5 x median vision-encoder gradient norm of
+    the action loss / that of the auxiliary loss, rounded to {1, 3} x 10^n. 2 of the 60
+    calibration frames were in the warm-start sample (0.033, limit 0.05 set before the run).
+    Kaggle T4, smolvla_runC_prep_t4.ipynb, 25/10/2026 09:49-10:15 (Paris), all checks PASS.
+  batch: 30 = 6 x 5 accumulated (accumulation_check above, batch 6 on the T4)
+  dataset: mycobot-tri-sort-c-400 = Run B's 400 episodes / 71 059 frames byte for byte, plus
+    the Run C files in meta/ (SHA256SUMS)
+  learning_rates: vision encoder 1e-5, connector and action expert 1e-4 (LeRobot's), language
+    layers frozen
+  aux_head: >
+    FROZEN at its warm start (no gradient, no optimizer group); the auxiliary loss trains the
+    vision encoder and connector through it. Decided by the project owner on 25/10/2026 after the
+    prep run: at the head's learning rate of 1e-3, Adam's first step moved its output by ~100
+    normalised units (inputs sum to ~640 000 in absolute value: 1 200 saved frames, mean 3.5 per
+    feature), the auxiliary loss went from 0.13 to 10 216 at step 3, 15 of the first 17 updates were
+    skipped and the fp16 loss scaler fell from 65 536 to 2 and stayed there.
+    Not chosen: a head learning rate of about 1e-8 (keeps one Adam step under ~0.01 normalised
+    unit), because it is derived from that estimate and untested. Candidate for Run D: normalised
+    features before the head (needs a new ridge fit and a new lambda calibration).
+  stop_conditions: >
+    the driver stops training (as a session time limit does) and the run is not resumed, if
+    ANY of: (1) the auxiliary loss logged on a step up to 50 is above 1 (0.13 at the warm start;
+    10 216 in the prep run); (2) more than 5 of the first 100 updates are skipped by the fp16 loss
+    scaler; (3) after step 100, the fp16 loss scaler is below 1024; (4) at any checkpoint, the
+    saved head is not identical to aux_head_init.safetensors. Steps are logged every 10.
+  final_head_check: >
+    the head in the final checkpoint must be identical, tensor for tensor, to
+    aux_head_init.safetensors, weight sum -0.0800367; otherwise the run is reported as failed.
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 25/10/2026, committed before Run C session 1 is launched.
+run_c_midway_checkpoint:
+  context: >
+    Session 1 runs SESSION_HOURS = 10.25 (the Kaggle quota left on 25/10 was 11 h 29; the next
+    reset is 31/10). At ~6.5 s per update it ends near step 5 600; on a T4 16 % slower, near 4 900.
+  rule: >
+    The run_c_midway_stop tests use kept/005000 if session 1 wrote it. If session 1 ended before
+    step 5 000, they use the newest complete checkpoint in session 1's output
+    (run/checkpoints/<step>/pretrained_model, e.g. 004500), NOT kept/002500. The tests, metrics and
+    stop_if criteria of run_c_midway_stop are unchanged.
+  session_2: >
+    starts only after the midway result is recorded below and committed, with the verdict
+    "continue" (neither stop_if criterion met).
+  result:
+    run: 27/10/2026, 10:06-14:17 Paris, laptop CPU (container limited to 4 CPUs / 8 GB, OMP 4, offline)
+    checkpoint: >
+      run/checkpoints/005000/pretrained_model (session 1 stopped at step 5 249 and wrote no
+      kept/005000; its output holds kept/002500 and this checkpoint only). model.safetensors
+      size checked against Kaggle's listing; aux head identical to its init. sha256 (the
+      Downloads copy and the container copy agree file for file):
+    probe: >
+      linear probe on the connector, median error (mm), Run C 5 000 minus smolvla_base, 95 %
+      bootstrap interval: top 20.67 vs 32.01, -11.34 [-12.47, -10.26]; left 20.68 vs 38.79,
+      -18.11 [-19.14, -16.63]; right 19.39 vs 38.59, -19.20 [-20.39, -18.12]. smolvla_base
+      reproduced to the 0.01 mm (32.0 / 38.8 / 38.6). Worse on 0 cameras: stop_if not met.
+      (Features at batch 2 instead of 8, for the CPU limit; batch size changes only float rounding, far below the
+      float16 storage.) Reported, not judged here: better than smolvla_base by the "improved" rule on
+      all 3 cameras, and under run_c_gate part 1's limits (25.6 / 31.0 / 30.9); the protocol's
+      validity check still fails because smolvla_base beats floor_pixels by 20 % on the top
+      camera only, as on 18/10.
+    image_swap: >
+      seeds 91-100, 120 chunks, 40 episodes, open_loop_compare.py own vs swapped images:
+      grasp-point shift +68.3 mm [+25.2, +109.0] (122.8 vs 54.5, 19 chunks); donor share
+      42 % -> 68 %, change +26 % [+3, +49]. Both lower ends above 0: stop_if not met. Also:
+      tip error +18.3 mm [+6.6, +33.4], joint error +2.94 deg [+1.17, +4.62]. Next to 19/10:
+      Run A 15k +81.6 mm, +46 %; 36k@36k +2.3 mm, +6 % (failed).
+    verdict: continue (neither stop_if criterion met); session 2 may run.
+    note: >
+      probe_fit.py's verdict loop listed the 18/10 encoders instead of --encoders and crashed on
+      KeyError after the fits; fixed and rerun, same fits.
+    sha256:
+      model.safetensors: 342e480332bdeccecefc55dffb5f138e420ea4ebbc274380ed8eecc23bfb807a
+      aux_head.safetensors: f788d7f6c764ce31f0702ad004582a9007a96772eff43769c961f0b8f4ea66c8
+      config.json: 647a1bbe2e54c72726a01a91aa9d09911f4688ee987e8eda43c66e0bc2ab961a
+      train_config.json: e7ecd27b575112957b078ebbfcc0b4174bd168e82069d1edd1eba51e25d4dd83
+      policy_preprocessor.json: 7b404a7d24a5e7a040cd3634dcc553e936c2b6a8fae14fbf95cb5d1ee1c83494
+      policy_postprocessor.json: 3b51f092c70c710ce0213ee1b63bf51b4878ec67828dd2d67daf9ef51081a41a
+      policy_preprocessor_step_5_normalizer_processor.safetensors: 60751665be1537afcfa04120747864280f53898a85bd41e0269b564476c66aea
+      policy_postprocessor_step_0_unnormalizer_processor.safetensors: 60751665be1537afcfa04120747864280f53898a85bd41e0269b564476c66aea
+  follow_up_27_10:
+    # Reported, not judged: none of these is a stop or gate criterion.
+    open_loop_own_images: >
+      seeds 91-100, the same 120 chunks / 40 episodes, own images; open_loop_compare.py (difference
+      of medians, Run C 5000 minus the other, 95 % interval from 2000 episode resamples) and
+      scripts/open_loop_within20.py (share of the 120 chunks whose predicted close is within 20 mm
+      of the recorded close). Medians, Run C 5000 / Run A 15k / Run A 20k / Run B 20k: tip 52.0 /
+      50.2 / 53.4 / 48.4 mm; joint 9.15 / 8.03 / 8.75 / 8.43 deg; gripper 0.021 / 0.016 / 0.013 /
+      0.013. Run C minus Run A 15k: tip +1.7 [-12.1, +13.5], joint +1.13 [-1.76, +2.31], gripper
+      +0.005 [+0.002, +0.009], grasp point -17.3 mm [-74.6, +25.7] (52.6 vs 69.8, 18 chunks),
+      within 20 mm 1 vs 2 of 120, -0.008 [-0.025, 0]. Minus Run A 20k: tip -1.5 [-13.2, +10.4],
+      joint +0.41 [-1.70, +2.14], gripper +0.008 [+0.005, +0.011], grasp point -11.3 [-78.4,
+      +35.3] (17 chunks), within 20 mm 1 vs 1. Minus Run B 20k (same training data, encoder frozen):
+      tip +3.6 [-6.9, +13.6], joint +0.73 [-0.98, +2.40], gripper +0.008 [+0.004, +0.012], grasp
+      point -26.7 [-54.8, +12.0] (54.5 vs 81.2, 19 chunks), within 20 mm 1 vs 2. Own-image donor
+      share (closes from an open gripper nearer the next seed's grasp than the episode's own):
+      Run C 10/24 = 42 %, Run A 15k 11/31 = 36 % (change +6 % [-14, +28]), Run B 20k 12/29 = 41 %
+      (change 0 % [-14, +16]). Reading: no measurable improvement in the grasps yet; every
+      grasp-point interval contains 0, the gripper error is larger on all three pairings, and
+      Run C closes from an open gripper less often (24 chunks vs 29-31). Run B 20k own-image run
+      27/10 14:39-15:04 Paris, same CPU limits; Run A 15k's 18/10 own-image runs in two folders are
+      identical chunk for chunk (open_loop_check is deterministic).
+    aux_head_on_probe_layouts: >
+      scripts/aux_head_probe.py: the frozen head (identical to aux_head_init.safetensors) on the
+      799 x 4 pieces of layouts 5001-5800, input as in training (the three cameras' connector
+      output, camera1-3 = top, right, left). Run C 5000 encoder: median 19.8 mm, p90 43.0 (cube
+      rouge 18.0, pave jaune 29.1, cylindre vert 18.6, cube bleu 16.7). smolvla_base encoder: 62.6 /
+      127.8 (the warm start's cross-validated 65.7 mm, so the input path matches training). The
+      labels' mean with no image: 121.7 / 201.2. Run C's linear probes per camera on the same
+      layouts: 20.7 / 20.7 / 19.4 mm.
+    probe_validity_run_c: >
+      the decision.validity rule applied to Run C 5000's connector (linear) against floor_pixels:
+      top 20.67 vs 48.39 (57 % lower), left 20.68 vs 42.84 (52 %), right 19.39 vs 43.98 (56 %);
+      the rule needs 20 % on 2 cameras: met on 3. smolvla_base meets it on the top camera only.
+    matched_samples_run_b_5k: >
+      Run B 5 000 (batch 32: 160 000 samples, Run B session 1's kept/005000, model.safetensors
+      sha256 69b1cecde5863536bf2ed7053bc78817d3b84e6cdbab9be644f10dcb62a1fad2; train_config equal to
+      Run B 20k's but for the resume fields) against Run C 5 000 (batch 30: 150 000 samples): same
+      training data, so the differences are mainly the encoder training and the position loss
+      (also batch 30 vs 32 and Run C's 500-step warmup against Run B's 1 000). Own-image open loop,
+      the same 120 chunks, 27/10 15:26-15:51 Paris, CPU limits. Run C 5000 minus Run B 5k: tip
+      -14.0 mm [-22.8, -3.0] (52.0 vs 65.9), joint -1.57 deg [-3.59, -0.72] (9.15 vs 10.72),
+      gripper -0.008 [-0.016, -0.003] (0.021 vs 0.029), grasp point -27.9 mm [-97.8, +3.6] (56.8 vs
+      84.7, 18 chunks), within 20 mm 1 vs 1 of 120; closes from an open gripper 24 vs 35; own-image
+      donor share 42 % vs 60 %, change -18 % [-38, +2]. Run A 5k (also batch 32) for reference, Run C
+      minus Run A 5k: tip -12.8 [-22.3, -2.0] (64.8), joint -0.92 [-3.79, 0.00] (10.07), gripper
+      -0.001 [-0.005, +0.002] (0.022), grasp point -36.2 [-58.2, +11.2] (93.0, 18 chunks), within
+      20 mm 1 vs 2. Reading: at matched samples Run C is closer to the recordings on tip, joint and
+      gripper (intervals exclude 0); its grasp point is lower too but the interval still contains
+      0. Its gripper error 0.021 is Run A 5k's 0.022 and below Run B 5k's 0.029; the frozen-encoder
+      runs reach 0.013 only at 20 000 steps (640 000 samples). Not equal annealing: Run C 5 000 is at
+      50 % of its cosine schedule (lr 5.1e-5), Run B 5k at 25 % of its (8.6e-5); see
+      run_c_final_report.amendment_27_10.schedule_note.
+
+# ---------------------------------------------------------------------------------------------
+# Record, 25/10/2026 evening, during Run C session 1 (after its step 120; nothing changed in the run).
+run_c_warm_start_overlap:
+  observation: >
+    The auxiliary loss logged by Run C session 1 was 0.000 / 0.001 / 0.002 / 0.004 over steps
+    1-10 / 11-20 / 21-30 / 31-40, then 0.138 over steps 41-50 and 0.097-0.138 after (the warm
+    start's level: 0.08-0.22 in the lambda calibration).
+  cause: >
+    Real, not a logging artifact: the first 40 updates trained on exactly the frames the ridge
+    warm start was fitted on. LeRobot 0.6.1 draws training frames with EpisodeAwareSampler, whose
+    order is a pure function of (seed, epoch): it does not depend on the batch size or on any other
+    random draw. The warm-start features (auxfeatures mode) were extracted with seed 1000, Run C
+    trains with seed 1000, so the first 1 200 frames of Run C's epoch 0 are the 1 200 warm-start
+    frames, in the same order: 1 200 / 30 = updates 1-40. On those frames the ridge head is
+    nearly exact (alpha at the bottom of its grid for two pieces), so the auxiliary loss and its
+    gradient into the encoder were close to 0; the slow rise 0.000 -> 0.004 is the encoder moving
+    away from the features the head was fitted on. Same bug class as the lambda calibration
+    overlap, which was avoided there with seed + 1.
+  evidence: >
+    EpisodeAwareSampler rebuilt from the dataset's episode boundaries with LeRobot's own class
+    (no model loaded), scripts/sampler_order.py: seed 1000, first 1 200 frames ==
+    aux_features.npz index, same order (1 200 / 1 200); updates 1 and 40: 30 / 30 warm-start frames;
+    update 41: 0 / 30; frames 1 201-2 400: 0 shared. Check of the reconstruction: seed 1001, first
+    60 frames, 2 shared, as the Kaggle calibration reported (0.033).
+  impact: >
+    (1) The position term was almost absent for updates 1-40 of 10 000 (0.4 %), all inside the
+    500-step warmup (learning rate at most 7.3e-6, vision 7.3e-7): negligible for the run. In
+    later epochs the 1 200 frames come back scattered (1.7 % of the 71 059), where the term is again
+    near 0 for them: a 1.7 % dilution of the position term, also negligible. (2) Stop condition 1
+    (auxiliary loss above 1 up to step 50) watched those fitted frames for steps 1-40; a damaged
+    head (10 216 in the prep run) would still have shown on them, so it kept its purpose. (3) Not
+    affected: lambda (calibrated on seed 1001, 2 / 60 shared), the 65.7 mm warm-start error
+    (cross-validated by held-out episode), the run_c_gate and midway probes and the head report
+    (layouts 5001-5800, never trained on).
+  decision: >
+    Run C continues unchanged. For any later warm start (Run D): draw the warm-start sample with a
+    seed different from the training seed and check its share of the first training updates
+    (target ~0), as for the calibration.
+
+# ---------------------------------------------------------------------------------------------
+# Addendum, 27/10/2026, committed before session 2 runs (no Run C checkpoint past 5 000 exists).
+run_c_final_report:
+  question: >
+    Run C 5 000 localises the pieces far better than smolvla_base (connector probe ~20 mm against
+    32-39; frozen head 19.8 mm on the probe layouts) but its open-loop grasps are not measurably
+    better than the frozen-encoder runs (run_c_midway_checkpoint.follow_up_27_10). At 10 000, did
+    the better localisation become better grasps?
+  must_contain: >
+    side by side, for Run C 10 000 (and 5 000, 7 500 for the trend): (a) the connector linear probe
+    per camera against smolvla_base, with its 95 % paired bootstrap interval (run_c_gate part 1);
+    (b) the frozen head's median and p90 on the 799 probe layouts (scripts/aux_head_probe.py);
+    (c) the image-swap test (run_c_gate part 2); (d) the own-image open loop on seeds 91-100, the
+    same 120 chunks, Run C minus Run B 20k (same training data, encoder frozen): grasp-point error
+    (open_loop_compare.py, difference of medians on the chunks where both close, 95 % interval from
+    2000 episode resamples, with the number of chunks) and the share of chunks closing within
+    20 mm of the recorded close (scripts/open_loop_within20.py, same bootstrap), plus tip, joint,
+    gripper error and the number of chunks that close from an open gripper; also Run C 5 000 minus
+    Run B 5 000 (matched samples seen: 150 000 against 160 000).
+  grasp_statement: >
+    superseded on 27/10 by amendment_27_10 below (decided on the grasp-focused set, not on the
+    ~18 paired chunks of the 120-chunk set).
+  amendment_27_10:
+    # Committed 27/10/2026, before session 2: no Run C checkpoint past 5 000 exists.
+    why: >
+      on the 120-chunk set (starts at frames 0, 60, 120) the recorded close falls inside a chunk
+      only near the episode start, and both models close in it on only 17-19 chunks: too few to
+      decide a grasp-point difference (Run C 5000 minus Run B 5k: -27.9 mm [-97.8, +3.6]).
+    grasp_set: >
+      open_loop_check.py --per-piece 10 --before-close 30 25 20 15 10 on the same seeds 91-100
+      (mycobot_tri_sort_heldout_s091_100, 40 episodes): in each episode, 5 chunks starting 30, 25,
+      20, 15 and 10 frames (3.0 to 1.0 s at 10 fps) before the recorded close, i.e. the first frame
+      whose recorded gripper action is within 0.05 of the episode's most closed value. 200 chunks;
+      the recorded close is inside every chunk (step 10-30 of 50), so a model that closes within
+      20 steps of the recording is paired. The recorded closes lie at frames 33-60 (median 47), so
+      every start exists. Fixed now: number of starts 5, window 30 to 10 frames before the close,
+      step 5. Checked 27/10 with a stand-in that returns the recorded actions: 200 chunks, all
+      with a close, 0 mm, lag 0.
+    decisive_comparison: >
+      grasp-point error on the grasp set (open_loop_compare.py: difference of medians on the chunks
+      where both models close, 95 % interval from 2000 resamples of whole episodes), Run C 10 000
+      minus Run B 20k (same data, both at the end of their cosine schedules, lr 2.5e-6) AND Run C
+      10 000 minus Run B 10k (equal samples: 300 000 against 320 000; Run B 10k is half-way through
+      its schedule, lr 5.1e-5). Also reported on the grasp set, same bootstrap: the within-20 mm
+      share (scripts/open_loop_within20.py), the number of chunks each model closes in (a chunk
+      with no predicted close is "never closed in the chunk", counted per model), tip, joint and
+      gripper error; and the same for Run C 5 000 and 7 500 against Run B 5k and 20k for the trend.
+    statement_rule: >
+      against Run B 20k, the decisive pairing: "better localisation became better grasps" only if
+      the upper end of the grasp-point interval is below 0 AND Run C closes in at least as many
+      chunks as Run B 20k minus 10 (a model that stops closing must not win on fewer, easier
+      pairs) AND at least 100 of the 200 chunks are paired; "not shown" if the interval contains 0
+      or fewer than 100 chunks are paired; "worse grasps" if its lower end is above 0. The Run B
+      10k pairing is reported with the same three words and the same rule, as the equal-samples
+      reading; when the two disagree, the report says so and gives both. The statement, its
+      numbers and the chunk counts go in the report and in SESSION_RESUME.md's handover.
+    schedule_note: >
+      every Run C / Run B pairing compares different points of their learning-rate schedules,
+      both cosine with warmup in LeRobot 0.6.1 (lr = peak x ((1 - 0.025) x 0.5 (1 + cos(pi step /
+      decay_steps)) + 0.025), peak 1e-4, Run C's vision group 1e-5 on the same factor): Run C 5 000
+      is at 50 % of its 10 000-step schedule (factor 0.51, lr 5.1e-5), Run B 5k at 25 % of its
+      20 000 (factor 0.86, lr 8.6e-5); Run C 10 000 and Run B 20k are both at the end (2.5e-6);
+      Run B 10k at 50 % (5.1e-5). Equal samples therefore do not mean equal annealing; the report
+      states this next to the 5 000 and 10k pairings.
+    checkpoints: >
+      Run B 5k: Run B session 1's kept/005000, model.safetensors sha256 69b1cecd...a1fad2; Run B
+      10k: Run B's kept/010000, sha256 e417e00e8abf393e774eb5356ddab77767dc2b1f90d62ec55e9881ab44a30272
+      (Downloads/results (3), copied to /workspace/checkpoints/run_B_frozen_20k/010000, hash
+      checked).
+  not_judged_here: >
+    Gazebo success; this report says only whether the open-loop grasps moved with the encoder.
+    run_c_gate still decides which checkpoint goes to Gazebo.

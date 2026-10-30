@@ -18,8 +18,9 @@ current status, not restated as if still open when it isn't.
    attempts on this constrained container both failed to complete a grasp
    for a diagnosed timing reason (wall-clock settle logic vs. this
    container's RTF≈0.14), not a mechanism failure. **Ask**: re-run the
-   same bounded test (`doc/GRASP_DECISION.md` §3.3) on Role B's faster
-   hardware (RTF≈0.277 per the specification's own baseline) before
+   same bounded test (`doc/GRASP_DECISION.md` §3.3) on faster
+   hardware (RTF≈0.277 per the specification's own baseline; the WSL2
+   laptop used since 2026-10-02 runs at ≈0.34) before
    treating A8's simulated-attachment floor as final for the whole
    dataset — if it succeeds there, it retires the dataset's largest
    caveat at the cost of nothing but confirming it.
@@ -55,7 +56,7 @@ current status, not restated as if still open when it isn't.
    `datasets/README.md`; ask the team to confirm this is acceptable if
    there's a retention policy this session doesn't know about.
 
-8. **Scheduling of Role B machine time (A10).** Not scheduled this
-   session — this is an organisational decision, not a technical one.
+8. **Machine time for the batch (A10).** Resolved on 2026-10-04: the
+   batch ran on the WSL2 laptop in ~2.7 h; no other machine was needed.
    Five to eight hours of dedicated, uninterrupted machine time, host
    sleep disabled (`RUNNING.md` §2). Confirm when.
