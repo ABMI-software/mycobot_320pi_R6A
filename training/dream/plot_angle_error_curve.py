@@ -23,17 +23,19 @@ import csv
 import sys
 from pathlib import Path
 
+import cv2
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import yaml
 from PIL import Image
 
 sys.path.insert(0, "/tmp/DREAM")   # lib DREAM vendored (comme evaluate_dream.py)
 import dream
 from estimate_angles_from_keypoints import (
-    deproject_to_base, estimate_angles_3d, load_extrinsic)
+    deproject_to_base, estimate_angles, estimate_angles_3d, load_extrinsic)
 
 N_KP = 7
 
@@ -62,19 +64,41 @@ def main():
     ap.add_argument("--weights", required=True)
     ap.add_argument("--extrinsic", required=True)
     ap.add_argument("--intrinsics-npz", required=True)
+    ap.add_argument("--mode", choices=["3d", "2d"], default="3d",
+                    help="3d = astra RGB-D (depth) ; 2d = arducam mono (reprojection)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--max-rms-mm", type=float, default=25.0,
-                    help="rejette les solves 3D dont le résidu dépasse ce seuil")
+                    help="mode 3d : rejette les solves dont le résidu 3D dépasse ce seuil (mm)")
+    ap.add_argument("--max-rms-px", type=float, default=8.0,
+                    help="mode 2d : rejette les solves dont le résidu de reprojection dépasse ce seuil (px)")
+    ap.add_argument("--camera", default="arducam",
+                    help="filtre la colonne 'camera' de labels.csv (format 3-cam)")
+    ap.add_argument("--keypoints", default="base,link1,link2,link3,link4",
+                    help="keypoints fournis au solveur ; les link5/6 bruités corrompent "
+                         "j1-j4 s'ils sont inclus (couplage) — exclus par défaut")
     args = ap.parse_args()
 
+    _KP = ["base", "link1", "link2", "link3", "link4", "link5", "link6"]
+    kp_keep = {_KP.index(n.strip()) for n in args.keypoints.split(",") if n.strip()}
+
     ds = Path(args.dataset)
-    K = np.load(args.intrinsics_npz)["mtx"].astype(np.float64)
-    T_world_cam = load_extrinsic(args.extrinsic)
+    npz = np.load(args.intrinsics_npz)
+    K = npz["mtx"].astype(np.float64)
     net = dream.create_network_from_config_file(
         str(Path(args.weights).with_suffix(".yaml")), args.weights)
 
+    if args.mode == "2d":
+        dist = npz["dist"].astype(np.float64)
+        ext = yaml.safe_load(Path(args.extrinsic).read_text())
+        T_cam_world = np.array(ext["T_cam_world"], dtype=np.float64)
+        rvec, _ = cv2.Rodrigues(T_cam_world[:3, :3])
+        tvec = T_cam_world[:3, 3].reshape(3, 1)
+    else:
+        T_world_cam = load_extrinsic(args.extrinsic)
+
     rows = list(csv.DictReader(open(ds / "labels.csv")))
-    print(f"{len(rows)} poses | K fx={K[0,0]:.1f} | extrinsèque {Path(args.extrinsic).name}")
+    rows = [r for r in rows if r.get("camera", args.camera) == args.camera]
+    print(f"{len(rows)} poses ({args.camera}) | mode {args.mode} | K fx={K[0,0]:.1f} | extrinsèque {Path(args.extrinsic).name}")
 
     errors = []      # (6,) écart signé par pose retenue
     enc_all = []     # encodeur j1 (pour trier la courbe façon "balayage")
@@ -82,18 +106,31 @@ def main():
     for r in rows:
         idx = int(r["index"])
         enc = np.array([float(r[f"j{j}_deg"]) for j in range(1, 7)])
-        cpath = ds / "images" / f"{idx:06d}.color.png"
-        dpath = ds / "images" / f"{idx:06d}.depth.npy"
-        if not (cpath.exists() and dpath.exists()):
+        cpath = ds / r["image_path"] if r.get("image_path") else \
+            ds / "images" / f"{idx:06d}.color.png"
+        if not cpath.exists():
             continue
         kps = dream_keypoints(net, Image.open(cpath).convert("RGB"))
-        depth = np.load(dpath).astype(np.float64)
-        base_pts = deproject_to_base(kps, depth, K, T_world_cam)
-        if (~np.isnan(base_pts).any(axis=1)).sum() < 3:
+        for k in range(len(kps)):                 # n'utilise que les keypoints fiables
+            if k not in kp_keep:
+                kps[k] = np.nan
+        if np.isnan(kps).all(axis=1).sum() > 4:   # <3 keypoints visibles
             rejected += 1; continue
-        q_est, rms_mm, _ = estimate_angles_3d(base_pts)
-        if rms_mm > args.max_rms_mm:
-            rejected += 1; continue
+        if args.mode == "2d":
+            try:
+                q_est, rms_px, _ = estimate_angles(kps, K, dist, rvec, tvec, n_restarts=8)
+            except ValueError:
+                rejected += 1; continue
+            if rms_px > args.max_rms_px:
+                rejected += 1; continue
+        else:
+            depth = np.load(ds / "images" / f"{idx:06d}.depth.npy").astype(np.float64)
+            base_pts = deproject_to_base(kps, depth, K, T_world_cam)
+            if (~np.isnan(base_pts).any(axis=1)).sum() < 3:
+                rejected += 1; continue
+            q_est, rms_mm, _ = estimate_angles_3d(base_pts)
+            if rms_mm > args.max_rms_mm:
+                rejected += 1; continue
         errors.append(wrap_deg(np.degrees(q_est) - enc))
         enc_all.append(enc[0])
         kept += 1

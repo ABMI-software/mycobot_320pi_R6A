@@ -291,7 +291,12 @@ def main():
     if z is None:
         service.ferme()
         raise SystemExit('pas de hauteur triangulee (une seule vue) — RIEN ENVOYE')
+    # On vise 1 mm AU-DESSUS du milieu de la piece : meme marge que le tableau
+    # de bord (`yolo26_dashboard.MARGE_HAUTEUR_PRISE_MM`), demandee le 22/09
+    # apres un calage descendu a 8,7 mm pour un plancher a 13,9. Sans effet sur
+    # la prise d'un cube de 40 a 50 mm, et les doigts s'eloignent du bois.
     xy = y._centre_base(visions[camera], boite, z)
+    z += y.MARGE_HAUTEUR_PRISE_MM
     portee = float(np.hypot(*xy))
     print(f'{objet} : {camera} conf {conf:.2f}, milieu X {xy[0]:.1f} Y {xy[1]:.1f} '
           f'Z {z:.1f} mm, portee {portee:.0f} mm')

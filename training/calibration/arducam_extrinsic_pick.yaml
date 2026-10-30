@@ -1,10 +1,10 @@
 source: 'calibration_extrinseque_auto.py, 16 coins des 4 marqueurs, 5 trames, exposition
-  75 gain 0, 15/09/2026 15:03. Reference : planche_actuelle.yaml (positions reelles
+  75 gain 0, 15/10/2026 16:03. Reference : planche_actuelle.yaml (positions reelles
   de la planche).'
 camera_index: 2
 intrinsics_stem: cam_3
-reprojection_rms_px: 0.5264
-marker_size_mesure_mm: 48.319
+reprojection_rms_px: 0.5736
+marker_size_mesure_mm: 48.543
 marker_size_yaml_mm: 50.0
 markers_used:
 - 19
@@ -16,25 +16,25 @@ resolution:
 - 640
 - 480
 T_cam_world:
-- - 0.21059223745025357
-  - -0.9773530610413651
-  - 0.020782290508260637
-  - -0.20687606594926655
-- - -0.9593491082666036
-  - -0.2107053188044844
-  - -0.18775664327946706
-  - 0.13635127257473037
-- - 0.18788346918706925
-  - 0.019602619737534785
-  - -0.9819956921013744
-  - 1.0416069699892334
+- - 0.10985206873772924
+  - -0.9939274077382384
+  - 0.006389924943744366
+  - -0.23757239852911036
+- - -0.977475580297187
+  - -0.1091948594673896
+  - -0.18060446447575587
+  - 0.18500287524357031
+- - 0.18020547415858013
+  - 0.013593778453489552
+  - -0.9835350508602319
+  - 1.0320136623871663
 - - 0.0
   - 0.0
   - 0.0
   - 1.0
 camera: arducam
-deplacement_constate: position precedente (-17.3, -203.1, 1054.5) mm ; nouvelle (-21.3,
-  -193.9, 1052.8) mm ; deplacement 10.2 mm.
+deplacement_constate: position precedente (22.8, -225.6, 1051.7) mm ; nouvelle (21.0,
+  -230.0, 1050.0) mm ; deplacement 5.1 mm.
 exposition: 'expo 45, gain 60. ATTENTION : apres un rebranchement USB, la valeur d
   exposition ne rend PLUS la meme luminance et le GAIN est remis a 0 par les anciens
   scripts, ce qui noircit l image. Regler expo ET gain, et verifier la luminance (~85).'
@@ -52,8 +52,8 @@ taille_marqueur_NE_PAS_CORRIGER: 'Le champ marker_size_mesure_mm ci-dessous vaut
   : 50,65 mm. Preuve independante : les distances entre centres (383-580 mm) sont
   justes a -0,044 %, contre -2,6 % sur les cotes. Les marqueurs font 50 mm.'
 validation_leave_one_out_mm:
-  19: 1.21
-  23: 0.99
-  25: 0.47
-  26: 0.69
-sauvegarde: arducam_extrinsic_pick.avant_1509_1503.yaml
+  19: 4.29
+  23: 0.71
+  25: 3.8
+  26: 1.52
+sauvegarde: arducam_extrinsic_pick.avant_1510_1603.yaml

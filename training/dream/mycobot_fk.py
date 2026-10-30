@@ -221,15 +221,18 @@ GAZEBO_CAMERAS = {
         "rpy": (0.0, 0.3, 1.5708),
     },
     "top": {
-        "xyz": (0.0, 0.0, 1.2),
+        # No-gripper URDF lowered the overhead camera 1.35 -> 0.95 m so the arm
+        # fills the frame at real scale; must match or top-cam keypoints project wrong.
+        "xyz": (0.0, 0.0, 0.95),
         "rpy": (0.0, 1.5708, 0.0),
     },
 }
 
 # Gazebo camera intrinsics (all cameras identical):
-# horizontal_fov=1.047 rad, image 640×480
+# horizontal_fov=1.15 rad, image 640×480 (no-gripper URDF renders at 1.15;
+# 1.047 was the old with-gripper value and gave the wrong focal -> fx≈495 now).
 # fx = fy = (width/2) / tan(hfov/2)
-_HFOV = 1.047
+_HFOV = 1.15
 _W, _H = 640, 480
 _FX = (_W / 2.0) / math.tan(_HFOV / 2.0)
 _FY = _FX  # square pixels

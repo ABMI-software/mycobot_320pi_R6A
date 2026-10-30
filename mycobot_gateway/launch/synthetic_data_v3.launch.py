@@ -33,10 +33,14 @@ def generate_launch_description():
     desc_pkg = get_package_share_directory('mycobot_description')
     gz_pkg = get_package_share_directory('ros_gz_sim')
 
+    # No-gripper variant: gripper links/joints removed so joint 6 / the flange
+    # is fully visible, and the 4 cameras are pulled back + widened so the whole
+    # arm stays in frame. To restore the gripper, swap back to
+    # 'mycobot_pro_320_pi_gazebo.urdf'.
     urdf_path = os.path.join(
-        desc_pkg, 'urdf', '320_pi', 'mycobot_pro_320_pi_gazebo.urdf',
+        desc_pkg, 'urdf', '320_pi', 'mycobot_pro_320_pi_gazebo_nogripper.urdf',
     )
-    world_path = os.path.join(desc_pkg, 'worlds', 'randomized_v2.sdf')
+    world_path = os.path.join(desc_pkg, 'worlds', 'randomized.sdf')
 
     # Gazebo needs to resolve package:// URIs for meshes
     # The share parent dir contains 'mycobot_description/' subfolder
@@ -69,8 +73,13 @@ def generate_launch_description():
         description='Randomize lighting per sample',
     )
     noise_arg = DeclareLaunchArgument(
-        'noise_stddev', default_value='5.0',
-        description='Max Gaussian pixel noise sigma (0 = disabled)',
+        'noise_stddev', default_value='0.0',
+        description='Max Gaussian pixel noise sigma (0 = disabled, clean images)',
+    )
+    grasp_fraction_arg = DeclareLaunchArgument(
+        'grasp_fraction', default_value='0.0',
+        description='Fraction of grasp-approach poses (0.0 = pure uniform angle '
+                    'distribution, no spikes; 0.5 = half grasp poses for pick-and-place)',
     )
 
     # ---------- robot_state_publisher ----------
@@ -107,35 +116,41 @@ def generate_launch_description():
         ],
     )
 
-    # ---------- ros_gz_bridge (joints) ----------
-    joint_names = [
-        'joint2_to_joint1',
-        'joint3_to_joint2',
-        'joint4_to_joint3',
-        'joint5_to_joint4',
-        'joint6_to_joint5',
-        'joint6output_to_joint6',
-    ]
-
-    bridge_args = [
-        '/world/randomized_v2/model/mycobot_320/joint_state'
-        '@sensor_msgs/msg/JointState[gz.msgs.Model',
-    ]
-    for jn in joint_names:
-        bridge_args.append(
-            f'/model/mycobot_320/joint/{jn}/cmd_pos'
-            f'@std_msgs/msg/Float64]gz.msgs.Double'
-        )
-
+    # ---------- ros_gz_bridge (/clock + gz joint_state) ----------
+    # /clock is CRITICAL: gz_ros2_control runs with use_sim_time and will not
+    # tick its controllers without it (this was the missing piece — the robot
+    # never moved). The gz-side joint_state is mapped to /gz/joint_states to
+    # avoid colliding with the joint_state_broadcaster's /joint_states.
     gz_bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
         name='gz_bridge',
         output='screen',
-        arguments=bridge_args,
-        remappings=[
-            ('/world/randomized_v2/model/mycobot_320/joint_state', '/joint_states'),
+        arguments=[
+            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+            '/world/randomized/model/mycobot_320/joint_state'
+            '@sensor_msgs/msg/JointState[gz.msgs.Model',
         ],
+        remappings=[
+            ('/world/randomized/model/mycobot_320/joint_state', '/gz/joint_states'),
+        ],
+    )
+
+    # ---------- ros2_control controller spawners ----------
+    # The robot is actuated by a JointTrajectoryController ('mycobot_controller')
+    # commanded on /mycobot_controller/joint_trajectory. These MUST be spawned
+    # or the joints stay frozen at 0.
+    controller_cfg = os.path.join(desc_pkg, 'config', 'controller.yaml')
+    joint_state_broadcaster = Node(
+        package='controller_manager', executable='spawner',
+        arguments=['joint_state_broadcaster', '--controller-manager', '/controller_manager'],
+        output='screen',
+    )
+    mycobot_controller_spawner = Node(
+        package='controller_manager', executable='spawner',
+        arguments=['mycobot_controller', '--controller-manager', '/controller_manager',
+                   '--param-file', controller_cfg],
+        output='screen',
     )
 
     # ---------- ros_gz_image bridges (all 4 cameras) ----------
@@ -160,8 +175,8 @@ def generate_launch_description():
         actions=[
             Node(
                 package='mycobot_gateway',
-                executable='synthetic_data_collector_v2',
-                name='synthetic_data_collector_v2',
+                executable='synthetic_data_collector_v3',
+                name='synthetic_data_collector_v3',
                 output='screen',
                 parameters=[{
                     'num_samples': LaunchConfiguration('num_samples'),
@@ -170,7 +185,8 @@ def generate_launch_description():
                     'multi_view': LaunchConfiguration('multi_view'),
                     'domain_randomize': LaunchConfiguration('domain_randomize'),
                     'noise_stddev': LaunchConfiguration('noise_stddev'),
-                    'world_name': 'randomized_v2',
+                    'grasp_fraction': LaunchConfiguration('grasp_fraction'),
+                    'world_name': 'randomized',
                 }],
             ),
         ],
@@ -186,11 +202,15 @@ def generate_launch_description():
         multi_view_arg,
         domain_rand_arg,
         noise_arg,
+        grasp_fraction_arg,
         # Core
         rsp,
         gz_sim,
         spawn,
         gz_bridge,
         gz_image_bridge,
+        # Controllers come up after Gazebo has spawned the robot
+        TimerAction(period=4.0, actions=[joint_state_broadcaster]),
+        TimerAction(period=5.0, actions=[mycobot_controller_spawner]),
         collector,
     ])

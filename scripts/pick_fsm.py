@@ -150,10 +150,17 @@ def charge_deport():
 TOOL = charge_deport()
 DEPORT_MESURE = not isinstance(TOOL, _DeportInconnu)
 
-# Pose de prise validee le 20/08 : elle fixe l'orientation de reference et son
-# azimut. Toute cible reprend cette orientation, tournee de l'ecart d'azimut.
-Q_REFERENCE = np.array([45.43, -86.57, -96.76, 135.52, 1.84, -43.33])
-AZIMUT_REFERENCE = 7.2
+# Pince sur support, DANS L'AXE DE J6, depuis le 30/09/2026. Pince vers le bas =
+# axe Z bride vertical (J5 ~ 90) : l'orientation de reference n'est plus lue sur
+# une pose apprise, elle est posee. L'ancienne reference (prise du 20/08,
+# [45.43, -86.57, -96.76, 135.52, 1.84, -43.33], azimut 7,2) valait pour la pince
+# montee sur le cote de la bride ; avec le support elle la tiendrait a
+# l'horizontale. Voir docs/PINCE_SUPPORT_AXE_J6.md.
+#
+# Q_REFERENCE reste la pose de prise reellement executee (cube rouge du 30/09) :
+# elle sert d'amorce d'IK et d'autotest, pas d'orientation.
+Q_REFERENCE = np.array([41.92, -21.79, -93.42, 22.5, 89.73, -48.16])
+AZIMUT_REFERENCE = 0.0
 
 # --------------------------------------------------------------------------- #
 #  Recalage du deport d'outil, 08/09/2026 — TOUTES les hauteurs de ce fichier
@@ -353,7 +360,11 @@ DERIVE_DESCENTE_MAX = 25.0
 # la pince arrive au contact, et une approche lente laisse le temps de couper.
 VITESSE_DESCENTE = 15
 Z_SURVOL = 126.9        # au-dessus du sommet de la balle (~71 mm)
-Z_TRANSFERT = 186.9
+# Pince sur support (30/09) : le transfert se fait a la hauteur du survol. Les
+# 186,9 mm franchissaient les cartons (rebord 83 mm) ; les bacs ont 30 mm de
+# rebord, et avec la pince dans l'axe de J6, exiger 187 mm refusait la pince
+# verticale des 220 mm d'allonge (mesure), la ou elle saisit a 271 mm.
+Z_TRANSFERT = 126.9
 Z_LARGAGE = 116.9       # plancher, quand la hauteur du rebord n'est pas mesuree
 GARDE_LARGAGE = 41.9    # mm au-dessus du rebord MESURE, quand on le connait
 # Affaissement de la pointe en pose de largage, mesure le 27/08 (voir
@@ -405,7 +416,9 @@ PORTEE_MIN = 170.0
 # d'etre sur un objet pose a plat. En ne demandant que le survol et la prise, la
 # limite ne bouge pas d'un millimetre — 350 mm passe, 360 non, dans les deux cas.
 # C'est bien une limite mecanique. Ne pas re-tenter.
-PORTEE_VERTICALE_MAX = 355.0
+# Pince sur support (30/09), balayage du modele a -20 et 45 deg d'azimut :
+# verticale jusqu'a 260 mm, refusee a 270. Ancienne valeur (pince de cote) : 355.
+PORTEE_VERTICALE_MAX = 260.0
 # L'outil fait 110 mm : couche, la bride n'a plus besoin d'aller aussi loin que
 # la pointe. Mesure du 24/08, survol 110 ET prise resolus par la meme
 # orientation : 360 mm a -15 deg, 380 et 400 a -30, 420 a -30, 440 a -45.
@@ -445,8 +458,9 @@ INCLINAISONS = [0.0, -15.0, -30.0, -45.0]
 #
 # 320 est donc la derniere valeur VERIFIEE, et l'outil couche resout tout le
 # reste avec le roulis nominal.
-INCLINAISONS_PAR_PORTEE = ((320.0, 0.0), (370.0, -15.0), (425.0, -30.0),
-                           (1e9, -45.0))
+# Pince sur support (30/09), meme balayage : 0 jusqu'a 260, -15 de 270 a 330,
+# -30 seul a 350. Ancien : ((320, 0), (370, -15), (425, -30), (1e9, -45)).
+INCLINAISONS_PAR_PORTEE = ((260.0, 0.0), (335.0, -15.0), (1e9, -30.0))
 # Incline, la pointe vise le CENTRE de la balle et non le ras de la table : les
 # doigts l'abordent de biais, descendre au ras la pousserait.
 Z_PRISE_INCLINE = 41.9
@@ -473,8 +487,11 @@ Z_PRISE_INCLINE = 41.9
 PORTEE_CARTON_MAX = 460.0
 INCLINAISONS_CARTON = [0.0, -15.0, -30.0, -45.0, -60.0, -75.0]
 # (allonge maximale, inclinaison minimale exigee)
-INCLINAISONS_CARTON_PAR_PORTEE = ((355.0, 0.0), (365.0, -15.0), (410.0, -30.0),
-                                  (450.0, -45.0), (1e9, -60.0))
+# Pince sur support (30/09) : transfert (126,9) ET lacher au rebord d'un bac
+# (71,9) resolus par la meme orientation — -15 a 360 mm, -30 de 380 a 420, -45 a
+# 440. Ancien (pince de cote) : ((355, 0), (365, -15), (410, -30), (450, -45), (1e9, -60)).
+INCLINAISONS_CARTON_PAR_PORTEE = ((260.0, 0.0), (370.0, -15.0), (430.0, -30.0),
+                                  (1e9, -45.0))
 ESSAIS_CARTON = 2       # tours de balayage avant de renoncer, objet en main
 MARGE_LARGAGE = 38.0    # mm — recul des parois : la balle a 32,1 mm de rayon (mesure)
 MARGE_LARGAGE_MIN = 15.0  # plancher quand l'ouverture ne peut pas offrir mieux
@@ -522,7 +539,10 @@ SEUIL_DEPLACEMENT = 8.0   # mm — au-dela, la balle a bouge : on refait la cibl
 # pas seulement sa pointe.
 RAYON_MASQUAGE = 150.0
 
-POSE_OBSERVATION = np.array([-27.50, -61.61, -41.30, 89.56, 0.43, -79.62])
+# Pince sur support (30/09) : bras dresse, J1 tourne vers le cote gauche du banc.
+# Verifiee a l'arducam : la planche, les pieces et les bacs sont degages. Avant :
+# [-27.50, -61.61, -41.30, 89.56, 0.43, -79.62], faite pour la pince de cote.
+POSE_OBSERVATION = np.array([164.53, 19.24, -32.95, 10.63, 2.37, -38.93])
 
 # Le bras s'ecarte en tournant sur J1 jusqu'a ce que la camera revoie la balle.
 # La pose d'observation d'abord, puis de plus en plus loin, des deux cotes.
@@ -743,7 +763,8 @@ def _rz(degres):
                      [0.0, 0.0, 1.0]])
 
 
-_, R_REFERENCE = pose_bride(Q_REFERENCE)
+# Colonnes : X bride = X monde, Y bride = -Y monde, Z bride = vers le bas.
+R_REFERENCE = np.array([[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]])
 
 
 def orientation(p_xy, roulis=0.0):
@@ -755,18 +776,25 @@ def orientation(p_xy, roulis=0.0):
 # Enchainer les amorces produit des faux "hors d'atteinte" en cascade ; un
 # eventail purement synthetique rate le bon bassin et declare inatteignable un
 # point que le robot a physiquement atteint. Les deux erreurs ont ete commises.
+# Poses executees le 30/09 avec la pince sur support : les quatre prises, deux
+# survols et trois largages inclines au-dessus des bacs.
 _AMORCES_MESUREES = [
     Q_REFERENCE,
-    np.array([1.04, -70.77, -23.42, 86.76, 10.61, -83.82]),
-    np.array([1.04, -80.13, -27.88, 100.58, 10.61, -83.83]),
-    np.array([45.42, -13.24, -112.27, 77.93, 1.84, -43.56]),
-    POSE_OBSERVATION,
+    np.array([31.81, -22.14, -93.07, 22.41, 89.64, -58.27]),
+    np.array([10.37, -5.62, -111.09, 24.16, 89.64, -79.62]),
+    np.array([54.58, -35.06, -70.48, 12.74, 89.73, -35.68]),
+    np.array([31.99, -20.12, -54.84, -17.66, 89.64, -58.27]),
+    np.array([54.58, -42.62, -19.33, -31.2, 89.73, -35.85]),
+    np.array([27.59, -57.56, -4.21, -16.96, 86.13, 116.36]),
+    np.array([-5.18, -64.77, -12.04, -0.87, 86.57, 114.25]),
+    np.array([46.31, -66.79, -28.12, 29.53, 80.41, -165.49]),
 ]
 _AMORCES_SYNTHETIQUES = [np.array(a, float) for a in (
-    (0, -90, -60, 120, 0, 0), (0, -60, -40, 90, 0, 0), (0, -110, -80, 150, 0, 0),
-    (0, -75, -100, 130, 0, 0), (0, -45, -20, 60, 0, 0), (0, -95, -30, 100, 0, 0),
-    (0, -120, -50, 140, 0, 0), (0, -30, -70, 80, 0, 0), (0, -85, -25, 95, 0, 0),
-    (0, -70, -110, 140, 0, 0), (0, -100, -95, 145, 0, 0), (0, -55, -85, 110, 0, 0),
+    (0, -20, -90, 20, 90, 0), (0, -40, -20, -30, 90, 0), (0, -10, -110, 30, 90, 0),
+    (0, -60, -10, -10, 85, 0), (0, -65, -30, 10, 80, 0), (0, -30, -60, 0, 90, 0),
+    (0, -50, -40, 0, 90, 0), (0, -5, -75, -10, 90, 0),
+    (0, -90, -60, 120, 0, 0), (0, -60, -40, 90, 0, 0), (0, -45, -20, 60, 0, 0),
+    (0, -55, -85, 110, 0, 0),
 )]
 
 
@@ -2212,7 +2240,11 @@ TOLERANCE_Z_PRISE = 2.0
 # palier, et la consigne est libre de passer sous la garde. Mesures du 07/09 sur
 # le rouleau : pointe a -4,7 mm elle racle la planche, a -3,1 elle tient sans
 # racler, a -2,4 elle ferme a vide.
-PLANCHER_POINTE = 13.9
+# Pince sur support (30/09) : la « pointe » est desormais le CENTRE DE PRISE
+# (voir tool_offset.json), pas le bout des doigts, qui descend ~20 mm plus bas.
+# 20 mm est la hauteur de prise la plus basse executee (cube rouge et pave jaune,
+# doigts ouverts au ras de la planche, sans contact). Ancienne valeur : 13,9.
+PLANCHER_POINTE = 20.0
 COURSE_CALAGE_MAX = 12.0   # mm sous la hauteur voulue — l'affaissement mesure
                            # plafonne a 8 mm, au-dela c'est un emballement
 

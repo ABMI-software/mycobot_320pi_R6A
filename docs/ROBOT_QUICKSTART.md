@@ -6,7 +6,7 @@
 
 ```bash
 # SSH vers la Pi
-ssh er@10.10.0.221
+ssh er@10.10.0.224
 
 # Lancer le bridge
 cd ~/colcon_ws/src/mycobot_ros2/mycobot_320/mycobot_320pi/mycobot_gateway
@@ -26,7 +26,7 @@ source install/setup.bash
 ros2 run mycobot_gateway bridge_tour
 ```
 
-**Attendez** : `[INFO] ✅ Connecté à la Pi (10.10.0.221)`
+**Attendez** : `[INFO] ✅ Connecté à la Pi (10.10.0.224)`
 
 ---
 

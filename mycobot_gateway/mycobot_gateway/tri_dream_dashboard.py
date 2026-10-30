@@ -25,6 +25,10 @@ With log_dir, the per-grasp table is also written to <log_dir>/dream_vs_yolo.csv
 and the full comparison to <log_dir>/tri_resultats.csv (date, run, object, bin,
 YOLO detection, positions and XY errors DREAM / YOLO / Gazebo / encoders), both
 rewritten whenever a row changes: DREAM poses arrive ~1 s after their image.
+When tri_scene_panel starts a trial it publishes its folder on /tri_scene/essai
+(empty when it ends): scene.csv, trajectoire.csv and resultat.csv go there
+(tri_essai), the curves redrawable from them alone. Gazebo positions are object
+centres (bbox centre of /validation/gt/objects), as YOLO's.
 """
 
 from collections import deque
@@ -55,6 +59,7 @@ from vision_msgs.msg import Detection3DArray
 from .dream_fk_compare import PREFIXES
 from .joint_history import JointHistory
 from .sim_sorting_grasp import tool_tip
+from .tri_essai import EssaiLog
 from .vision import tri_scene
 from .vision.sim_multicam_geometry import load_cameras
 
@@ -79,6 +84,8 @@ GAZEBO_CLASS = '"gz-sim-gui" "Gazebo GUI"'
 SAISIE = re.compile(r'^▶ (\S+) : saisie en \(([-+\d.]+), ([-+\d.]+)\)')
 VERDICT = re.compile(r'^(\S+) \(essai \d+\) : (.*)$')
 CURVE_PERIOD_S = 0.1
+# trajectoire.csv is rewritten this often, so a crash loses little.
+ESSAI_FLUSH_S = 5.0
 # Log axis: a distance of 0 would not plot.
 MIN_PLOT_MM = 0.1
 # One colour per object, shared with its gripper path drawn in Gazebo.
@@ -177,6 +184,7 @@ class DashboardNode(Node):
         self.gt = {}
         # Per object: the three distance curves of its approach, and its time window.
         self.curves = {}
+        self.essai = None
         log_dir = self.declare_parameter('log_dir', '').value
         self.grasp_csv = Path(log_dir) / 'dream_vs_yolo.csv' if log_dir else None
         self.result_csv = Path(log_dir) / 'tri_resultats.csv' if log_dir else None
@@ -185,6 +193,8 @@ class DashboardNode(Node):
         self.written_results = None
         self.create_subscription(Detection3DArray, '/validation/gt/objects', self.on_gt, 10)
         self.create_timer(CURVE_PERIOD_S, self.sample_curves)
+        self.create_timer(ESSAI_FLUSH_S, self.flush_essai)
+        self.create_subscription(String, '/tri_scene/essai', self.on_essai, 10)
         self.create_subscription(JointState, '/joint_states', self.joints.add, 50)
         self.create_subscription(String, '/pickplace/status', self.on_status, 50)
         self.create_subscription(Detection3DArray, '/yolo/objects_3d',
@@ -216,8 +226,31 @@ class DashboardNode(Node):
 
     def on_gt(self, msg):
         for d in msg.detections:
-            c = d.results[0].pose.pose.position
+            c = d.bbox.center.position
             self.gt[d.results[0].hypothesis.class_id] = np.array([c.x, c.y, c.z])
+
+    def on_essai(self, msg):
+        if msg.data:
+            self.essai = EssaiLog(msg.data, self.now_s(), len(self.grasps))
+            yolo = {}
+            for d in (self.yolo.detections if self.yolo is not None else []):
+                c = d.results[0].pose.pose.position
+                yolo[d.results[0].hypothesis.class_id] = (np.array([c.x, c.y, c.z]),
+                                                          d.results[0].hypothesis.score)
+            self.essai.write_scene(self.gt, yolo)
+        elif self.essai is not None:
+            self.essai.write_trajectoire()
+            self.essai.write_resultat(self.grasps[self.essai.first_grasp:])
+            self.essai = None
+
+    def flush_essai(self):
+        if self.essai is not None:
+            self.essai.write_trajectoire()
+
+    def cible(self, name, t):
+        """What the gripper is going to at time t: the object until held, then its bin."""
+        held = self.curves[name]['held']
+        return tri_scene.PAIRS[name] if held is not None and t >= held else name
 
     def goals(self, name, t):
         """(true target, YOLO target) at time t: the object until it is held, then its bin."""
@@ -241,6 +274,8 @@ class DashboardNode(Node):
             curve['gazebo'].append((t - curve['t0'], np.linalg.norm(tip - true_goal) * 1000))
         if yolo_goal is not None:
             curve['yolo'].append((t - curve['t0'], np.linalg.norm(tip - yolo_goal) * 1000))
+        if self.essai is not None:
+            self.essai.sample(t, name, self.cible(name, t), tip, true_goal, yolo_goal)
 
     def on_status(self, msg):
         self.status.append(msg.data)
@@ -358,7 +393,7 @@ class DashboardNode(Node):
         q, gap = self.joints.at(t)
         if gap > MAX_JOINT_GAP_S:
             return
-        _, est = self.tips.pose(cam, t, pose_matrix(msg), q)
+        true_tip, est = self.tips.pose(cam, t, pose_matrix(msg), q)
         if est is None:
             return
         fused, _ = self.tips.fused(t)
@@ -369,6 +404,8 @@ class DashboardNode(Node):
                 if true_goal is not None:
                     curve['dream'].append((t - curve['t0'],
                                            np.linalg.norm(fused - true_goal) * 1000))
+                if self.essai is not None:
+                    self.essai.dream(t, name, self.cible(name, t), fused, true_tip, true_goal)
 
 
 def fit_rows(table, rows):
@@ -409,10 +446,11 @@ class DashboardWindow(QWidget):
         grid.addWidget(self.gazebo_box, 0, 0)
 
         compare_box = QGroupBox('DREAM (pince) ↔ YOLO (objet) ↔ Gazebo (vérité)')
-        self.grasp_table = QTableWidget(0, 7)
+        self.grasp_table = QTableWidget(0, 8)
         self.grasp_table.setHorizontalHeaderLabels(
-            ['objet', 'YOLO objet x, y', 'DREAM pince x, y, z',
-             'DREAM ↔ Gazebo', 'YOLO ↔ Gazebo', 'images DREAM', 'tri'])
+            ['objet', 'YOLO objet x, y\n(mm)', 'DREAM pince x, y, z\n(mm)',
+             'DREAM ↔ Gazebo\n(XY, mm)', 'YOLO ↔ Gazebo\n(XY, mm)', 'DREAM ↔ codeurs\n(3D, mm)',
+             'images DREAM', 'tri'])
         self.grasp_table.setToolTip('Au serrage, la pince est sur l objet. Positions et écarts '
                                     'en mm, écarts dans le plan XY, par rapport à la vérité '
                                     'Gazebo. Le CSV tri_resultats.csv garde tous les écarts.')
@@ -559,8 +597,11 @@ class DashboardWindow(QWidget):
             gt = g['gt']
             to_gt = (lambda p: '—' if p is None or gt is None
                      else f'{np.linalg.norm(p[:2] - gt[:2]) * 1000:.1f}')
+            # Meme mesure que la colonne 3D du dashboard reel : pince DREAM contre pince des codeurs.
+            to_encoder = ('—' if g['dream'] is None or g['encoder'] is None
+                          else f'{np.linalg.norm(g["dream"] - g["encoder"]) * 1000:.1f}')
             cells = (g['name'], ', '.join(f'{v * 1000:.0f}' for v in g['yolo']), dream,
-                     to_gt(g['dream']), to_gt(g['yolo']), str(g['views']), g['verdict'])
+                     to_gt(g['dream']), to_gt(g['yolo']), to_encoder, str(g['views']), g['verdict'])
             for col, v in enumerate(cells):
                 self.grasp_table.setItem(i, col, QTableWidgetItem(v))
 
