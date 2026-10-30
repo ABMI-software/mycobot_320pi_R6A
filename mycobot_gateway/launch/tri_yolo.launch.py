@@ -242,6 +242,8 @@ def with_state_reset(world):
         '<module_name>state_reset</module_name><gz:system_priority>-100</gz:system_priority></plugin>')
 
 
+def randomize_nodes(context, seed, run_yaml):
+    """Step 2: redraw pieces and bins without restarting Gazebo, button with the GUI."""
 def randomize_nodes(context, seed, run_yaml, log_dir):
     """Step 2: redraw pieces and bins without restarting Gazebo; with the GUI, the
     panel's buttons Randomiser and Démarrer le tri (one bilan_tris.csv row per sort)."""
