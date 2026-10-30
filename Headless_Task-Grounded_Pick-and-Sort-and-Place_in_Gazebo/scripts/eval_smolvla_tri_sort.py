@@ -225,7 +225,7 @@ def run_piece_locked(node, model, target, start_q, args, out, snapshots):
     snap = snapshots[name] if snapshots is not None else node.snapshot()
     node.start_from(snap)
     piece0 = np.asarray(snap['poses'][name][:3])
-    start_state = list(node.joint_full)
+    start_state = node.policy_state(node.gz_state())
     start_t = node.now_ns()
     trace, poses, chunks, infer_s, frames = [], [], 0, [], []
     max_z, placed_after_pick = float(piece0[2]), False
@@ -236,16 +236,17 @@ def run_piece_locked(node, model, target, start_q, args, out, snapshots):
         chunk = model.predict(images, state, INSTRUCTIONS[name], seed=args.seed * 100000 + len(trace))
         infer_s.append(time.monotonic() - t)
         n = min(args.n_action_steps, args.max_steps - len(trace))
+        t_chunk = node.now_ns()
         node.publish_arm([a[:6] for a in chunk[:n]], dt=DT)
         grip = None
         for k, a in enumerate(chunk[:n]):
             if grip is None or abs(a[6] - grip) > 1e-4:
                 grip = float(a[6])
-                node.send_gripper(grip)
-            node.deliver()
-            node.step(int(round(DT * 1000)))
-            trace.append({'t_ns': node.now_ns() - start_t, 'chunk': chunks, 'state': list(node.joint_full),
-                          'action': [float(v) for v in a], 'tip': np.round(tool_tip(node.q_deg), 4).tolist()})
+            node.locked_action(grip, [(t_chunk + int(round(DT * 1e9)) * (i + 1), chunk[i][:6])
+                                      for i in sorted({0, n // 2, max(n - 2, 0)})] if k == 0 else ())
+            state = node.policy_state(node.gz_state())
+            trace.append({'t_ns': node.now_ns() - start_t, 'chunk': chunks, 'state': state,
+                          'action': [float(v) for v in a], 'tip': np.round(tool_tip(np.degrees(state[:6])), 4).tolist()})
             if k % 5 == 4:
                 poses.append({'t_ns': node.now_ns() - start_t,
                               'poses': {m: p.tolist() for m, p in node.object_poses().items()}})

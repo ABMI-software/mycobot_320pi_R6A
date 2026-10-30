@@ -33,17 +33,21 @@ import math
 import os
 import re
 import subprocess
+import threading
 import time
 from pathlib import Path
 
 import numpy as np
 import rclpy
 from builtin_interfaces.msg import Duration, Time
+from control_msgs.srv import QueryTrajectoryState
+from pal_statistics_msgs.msg import Statistics
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from mycobot_gateway.sim_sorting_grasp import ARM_JOINTS, GRIPPER_JOINTS, JOINT_SPEED_DPS, SETTLE_TOL_DEG, \
-    TRANSIT_Z, tool_tip
+from mycobot_gateway.sim_sorting_grasp import ARM_JOINTS, GRIPPER_JOINTS, GRIPPER_LIMITS, JOINT_SPEED_DPS, \
+    SETTLE_TOL_DEG, TRANSIT_Z, tool_tip
 from mycobot_gateway.vision import tri_scene
 
 STEP_NS = 1_000_000            # max_step_size 0.001 in the tri_yolo world
@@ -63,6 +67,7 @@ WARM_UP_OFFSET_DEG = np.array([10.0, -8.0, 6.0, 5.0, -5.0, 10.0])
 FAR_LIFT_M = 0.005             # pieces raised for the redraw before the exact reset
 ROBOT = 'mycobot_320'
 RESET_RESEND_S = 2.0
+CONFIRM_TIMEOUT_S = 30.0
 RESET_TIMEOUT_S = 60.0
 
 
@@ -83,6 +88,25 @@ class StepLock:
         self.create_subscription(JointState, '/joint_states', self._joint_full_cb, 10)
         self.locked = False
         self.phase_ns = None
+        self.t_ns = None
+        # Read-back of what the controllers send to the robot: the controller manager's
+        # introspection (BEST_EFFORT publisher, one sample per controller update, stamped with the
+        # simulation time), and the arm controller's query_state service.
+        self.introspection = []        # (arrival number, {joint: commanded position})
+        self.introspection_count = 0
+        self.create_subscription(Statistics, '/controller_manager/introspection_data/full', self._introspection_cb,
+                                 QoSProfile(depth=50, reliability=ReliabilityPolicy.BEST_EFFORT,
+                                            history=HistoryPolicy.KEEP_LAST))
+        self.query_state = self.create_client(QueryTrajectoryState, '/mycobot_controller/query_state')
+
+    def _introspection_cb(self, msg):
+        # Identified by arrival order, not by its stamp: the controller nodes stamp with their ROS
+        # clock, which follows a BEST_EFFORT /clock and lagged a step under load (29/10, test A).
+        self.introspection_count += 1
+        self.introspection.append((self.introspection_count, {
+            s.name[len('command_interface.'):-len('/position')]: s.value for s in msg.statistics
+            if s.name.startswith('command_interface.') and s.name.endswith('/position')}))
+        del self.introspection[:-200]
 
     def _joint_full_cb(self, msg):
         names = list(msg.name)
@@ -93,7 +117,10 @@ class StepLock:
             self.joint_stamp_ns = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
 
     def now_ns(self):
-        return self.get_clock().now().nanoseconds
+        """Locked: the simulation time this node has stepped to, set from Gazebo's own /stats at lock
+        and advanced by step() once /stats confirms it; the ROS /clock relay (BEST_EFFORT on this
+        node's side) is not used."""
+        return self.t_ns if self.locked else self.get_clock().now().nanoseconds
 
     def _control(self, req):
         subprocess.run(['gz', 'service', '-s', f'/world/{self.world}/control',
@@ -110,7 +137,7 @@ class StepLock:
         marker = os.environ.get('STEP_LOCK_DIR')
         if marker:
             Path(marker, 'lock_requested').touch()
-            deadline = time.monotonic() + 120.0
+            deadline = time.monotonic() + 300.0
             while not Path(marker, 'stepper_stopped').exists():
                 if time.monotonic() > deadline:
                     raise RuntimeError('step-locked: the start-up stepper did not stop')
@@ -120,39 +147,107 @@ class StepLock:
         seen = []
         while True:
             self._drain(0.5)
-            now = self.now_ns()
-            seen = (seen + [now])[-4:]
-            if now > 0 and len(seen) == 4 and len(set(seen)) == 1 and self.joint_stamp_ns > 0:
+            now = self.gz_sim_ns()
+            seen = (seen + [now])[-3:]
+            if now > 0 and len(seen) == 3 and len(set(seen)) == 1 and self.joint_stamp_ns > 0:
                 break
             if time.monotonic() > deadline:
-                raise RuntimeError(f'step-locked: clock not settled after pause ({seen} ns)')
+                raise RuntimeError(f'step-locked: Gazebo time not settled after pause ({seen} ns)')
+        self.t_ns = now
         self.locked = True
         self.lock_ns = now
 
     def step(self, n):
-        """Advance exactly n physics steps; return once /clock and /joint_states show the end."""
-        start = self.now_ns()
+        """Advance exactly n physics steps, confirmed on Gazebo's own clock (/stats), then wait for
+        the joint state of the last controller update in the block (exact stamp)."""
+        start = self.t_ns
         target = start + n * STEP_NS
         self._control(f'multi_step: {n}, pause: true')
         watchdog = time.monotonic() + 60.0 + n * 0.01 * self.wall_scale
         sent = time.monotonic()
-        while self.now_ns() < target or self.joint_stamp_ns <= target - CONTROL_NS:
-            # A request can go unanswered under load (29/10, A1: the clock stayed on its start). A
-            # queued block moves the clock within ~1 s here, so a clock still on `start` after
-            # RESEND_S means nothing was queued, and the block is sent again; requests add up, so
-            # it is never re-sent once the clock has moved.
-            if self.now_ns() == start and time.monotonic() - sent > RESEND_S:
-                if self.gz_sim_ns() == start:
-                    self._control(f'multi_step: {n}, pause: true')
+        while True:
+            now = self.gz_sim_ns()
+            if now == target:
+                break
+            if now > target:
+                raise RuntimeError(f'step-locked: Gazebo at {now} ns, past the target {target}')
+            # A request can go unanswered under load (29/10, A1). Gazebo still on `start` after
+            # RESEND_S means nothing was queued, so the block is sent again; requests add up, so it
+            # is never re-sent once Gazebo has moved.
+            if now == start and time.monotonic() - sent > RESEND_S:
+                self._control(f'multi_step: {n}, pause: true')
                 sent = time.monotonic()
             if time.monotonic() > watchdog:
-                raise RuntimeError(f'step-locked: clock at {self.now_ns()} ns, joints at '
-                                   f'{self.joint_stamp_ns} ns, target {target} ns')
-            rclpy.spin_once(self, timeout_sec=0.01)
+                raise RuntimeError(f'step-locked: Gazebo at {now} ns, target {target} ns')
+            self._drain(0.05)
         self._drain(DRIFT_CHECK_S)
-        if self.now_ns() != target:
-            raise RuntimeError(f'step-locked: clock at {self.now_ns()} ns after multi_step, expected {target} '
-                               '(the simulation ran past the block)')
+        now = self.gz_sim_ns()
+        if now != target:
+            raise RuntimeError(f'step-locked: Gazebo at {now} ns after the block, expected {target} '
+                               '(the simulation ran past it)')
+        self.t_ns = target
+
+    def gripper_command(self, g):
+        """The six position commands set_gripper sends for the recorded gripper action g."""
+        a = -float(g)
+        raw = [-a, a, a, -a, -a, a]
+        return {j: float(np.clip(v, lo, hi)) for j, v, (lo, hi) in zip(GRIPPER_JOINTS, raw, GRIPPER_LIMITS)}
+
+    def confirm(self, since, grip, arm_points=(), arm_command=None):
+        """Handshake after the controller update that consumed the commands. Among the
+        introspection samples that arrived after `since` (an arrival number taken before the block
+        was started), one must show exactly `grip`'s six gripper commands (and, with arm_command,
+        the arm's six commands within 1e-9: a hold trajectory ending at this update); every
+        (time ns, 6 positions) of arm_points must be what the arm controller's trajectory gives at
+        that time (query_state, within 1e-9; it does not sample a trajectory's final point, which it
+        treats as the end: the caller checks the first, middle and second-to-last). Anything
+        missing or different stops the run."""
+        want = self.gripper_command(grip)
+        if arm_command is not None:
+            want.update({j: float(v) for j, v in zip(ARM_JOINTS, arm_command)})
+        deadline = time.monotonic() + CONFIRM_TIMEOUT_S
+        last = None
+        while True:
+            for n, held in self.introspection:
+                if n > since:
+                    last = held
+                    if all(held.get(j) is not None and abs(held[j] - v) <= (0.0 if j in GRIPPER_JOINTS else 1e-9)
+                           for j, v in want.items()):
+                        break
+            else:
+                if time.monotonic() > deadline:
+                    raise RuntimeError(f'step-locked: no controller read-back matching the commands sent '
+                                       f'(last sample {last}, wanted {want})')
+                rclpy.spin_once(self, timeout_sec=0.01)
+                continue
+            break
+        for at, q in arm_points:
+            if not self.query_state.wait_for_service(timeout_sec=30.0):
+                raise RuntimeError('step-locked: /mycobot_controller/query_state unavailable')
+            future = self.query_state.call_async(QueryTrajectoryState.Request(
+                time=Time(sec=at // 1_000_000_000, nanosec=at % 1_000_000_000)))
+            end = time.monotonic() + CONFIRM_TIMEOUT_S
+            while not future.done():
+                if time.monotonic() > end:
+                    raise RuntimeError('step-locked: query_state did not answer')
+                rclpy.spin_once(self, timeout_sec=0.01)
+            r = future.result()
+            got = dict(zip(r.name, r.position)) if r.success else {}
+            off = {j: (got.get(j), float(v)) for j, v in zip(ARM_JOINTS, q)
+                   if got.get(j) is None or abs(got[j] - float(v)) > 1e-9}
+            if off:
+                raise RuntimeError(f'step-locked: arm controller does not hold the trajectory sent at {at} ns '
+                                   f'({r.message!r}): {off}')
+
+    def locked_action(self, grip, arm_points=()):
+        """One action period: commands confirmed at the first controller update, then the rest."""
+        self.send_gripper(grip)
+        self.deliver()
+        since = self.introspection_count
+        first = CONTROL_NS // STEP_NS
+        self.step(first)
+        self.confirm(since, grip, arm_points)
+        self.step(TICK_NS // STEP_NS - first)
 
     def gz_sim_ns(self):
         """Gazebo's own simulation time (its /stats), independent of the ROS /clock relay."""
@@ -248,34 +343,57 @@ class StepLock:
 
     def snapshot(self):
         """Everything start_from needs to put the scene back to the bit (velocities are reset to 0)."""
-        return {'joints': dict(self.joint_all), 'grip_cmd': self.grip_cmd, 'poses': self.piece_poses()}
+        return {'joints': dict(self.gz_state()['positions']), 'grip_cmd': self.grip_cmd, 'poses': self.piece_poses()}
 
-    def _reset(self, joints, poses, repeat=1):
-        """Hand a reset to gz_systems/state_reset.py; it applies in each of the next `repeat` simulated steps."""
+    def _replies_start(self):
+        """One listener on the plugin's reply topic for the whole run (a listener per request
+        missed replies while it subscribed)."""
+        self._replies = []
+        self._reply_proc = subprocess.Popen(['gz', 'topic', '-e', '-t', f'/world/{self.world}/state_reset/ack'],
+                                            stdout=subprocess.PIPE, text=True, bufsize=1)
+        threading.Thread(target=lambda: [self._replies.append(line.strip()) for line in self._reply_proc.stdout],
+                         daemon=True).start()
+        time.sleep(2.0)
+
+    def _request(self, payload, prefix):
+        """Send `payload` to gz_systems/state_reset.py until a reply '<prefix> <id>...' comes back
+        (one publish can be lost before the subscription connects, 29/10); return the reply's rest.
+        The simulation is paused throughout. A reset id is applied once only by the plugin."""
+        if getattr(self, '_reply_proc', None) is None:
+            self._replies_start()
         self.reset_count += 1
         rid = f'{os.getpid()}-{self.reset_count}'
-        data = base64.b64encode(json.dumps({'id': rid, 'model': ROBOT, 'joints': joints, 'poses': poses,
-                                            'repeat': repeat}).encode()).decode()
+        data = base64.b64encode(json.dumps(dict(payload, id=rid, model=ROBOT)).encode()).decode()
+        want = f'data: "{prefix} {rid}'
         topic = f'/world/{self.world}/state_reset'
-        # One publish can be lost before the plugin's subscription connects (29/10, under load), so
-        # the request is sent again every RESET_RESEND_S until "received <id>" comes back; the plugin
-        # applies an id once. The simulation is paused throughout, so nothing moves meanwhile.
-        echo = subprocess.Popen(['gz', 'topic', '-e', '-t', topic + '/ack'], stdout=subprocess.PIPE)
-        os.set_blocking(echo.stdout.fileno(), False)   # bytes: a non-blocking text read fails on an empty pipe
-        reply, deadline = '', time.monotonic() + RESET_TIMEOUT_S
-        try:
-            time.sleep(1.0)
-            while f'received {rid}' not in reply:
-                if time.monotonic() > deadline:
-                    raise RuntimeError(f'step-locked: state_reset did not acknowledge {rid}: {reply[-300:]!r}')
-                subprocess.run(['gz', 'topic', '-t', topic, '-m', 'gz.msgs.StringMsg', '-p', f'data: "{data}"'],
-                               check=True, capture_output=True, timeout=30)
-                end = time.monotonic() + RESET_RESEND_S
-                while time.monotonic() < end and f'received {rid}' not in reply:
-                    reply += (echo.stdout.read() or b'').decode(errors='replace')
-                    time.sleep(0.1)
-        finally:
-            echo.kill()
+        deadline = time.monotonic() + RESET_TIMEOUT_S
+        while True:
+            subprocess.run(['gz', 'topic', '-t', topic, '-m', 'gz.msgs.StringMsg', '-p', f'data: "{data}"'],
+                           check=True, capture_output=True, timeout=30)
+            end = time.monotonic() + RESET_RESEND_S
+            while time.monotonic() < end:
+                for line in self._replies:
+                    if line.startswith(want):
+                        return line[len(want):].strip().strip('"').strip()
+                time.sleep(0.05)
+            if time.monotonic() > deadline:
+                raise RuntimeError(f'step-locked: state_reset did not answer {prefix} {rid}')
+
+    def _reset(self, joints, poses, repeat=1):
+        """A reset, applied by the plugin in each of the next `repeat` simulated steps."""
+        self._request({'joints': joints, 'poses': poses, 'repeat': repeat}, 'received')
+
+    def gz_state(self):
+        """Every robot joint's position and velocity as Gazebo holds them now, with Gazebo's own
+        simulation time, which must be the time this node stepped to."""
+        state = json.loads(base64.b64decode(self._request({'state': True}, 'state')))
+        if state['t_ns'] != self.now_ns():
+            raise RuntimeError(f'step-locked: Gazebo state at {state["t_ns"]} ns, expected {self.now_ns()}')
+        return state
+
+    def policy_state(self, state):
+        """The 7 values the policy reads (6 arm joints, gripper), from gz_state."""
+        return [state['positions'][j] for j in ARM_JOINTS + [GRIPPER_JOINTS[0]]]
 
     def start_from(self, snap):
         """Exact state reset to `snap` on a camera tick that is also a controller update.
@@ -305,10 +423,13 @@ class StepLock:
         self.send_gripper(snap['grip_cmd'])
         self.deliver()
         self._reset(snap['joints'], snap['poses'], repeat=CONTROL_NS // STEP_NS)
+        since = self.introspection_count
         self.step(CONTROL_NS // STEP_NS)
-        if (self.now_ns() - self.phase_ns) % TICK_NS or self.joint_stamp_ns != self.now_ns():
-            raise RuntimeError(f'step-locked: exact reset not on a tick and a controller update '
-                               f'(now {self.now_ns()}, joints {self.joint_stamp_ns})')
+        self.confirm(since, snap['grip_cmd'], arm_command=q_arm)
+        if (self.now_ns() - self.phase_ns) % TICK_NS:
+            raise RuntimeError(f'step-locked: exact reset not on a tick (now {self.now_ns()})')
+        state = self.gz_state()
+        self.joint_all, self.joint_velocity = state['positions'], state['velocities']
         # Gazebo's last step leaves ~1e-14 rad and ~1e-11 rad/s (29/10); what must be identical is two
         # runs from the same snapshot, which the fingerprints compare. This only catches a failed reset.
         bad = {j: (self.joint_all.get(j), v) for j, v in snap['joints'].items()
@@ -358,4 +479,4 @@ class StepLock:
             rclpy.spin_once(self, timeout_sec=0.02)
         images = {c: decode(m) for c, m in self.images.items()}
         hashes = {c: hashlib.sha256(img.tobytes()).hexdigest() for c, img in images.items()}
-        return images, np.array(self.joint_full, dtype=np.float64), hashes
+        return images, np.array(self.policy_state(self.gz_state()), dtype=np.float64), hashes

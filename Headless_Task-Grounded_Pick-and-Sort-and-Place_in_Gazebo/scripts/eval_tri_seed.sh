@@ -56,16 +56,30 @@ if [ "${STEP_LOCKED:-0}" = 1 ]; then
     # done, so nothing is left queued when the evaluator locks. A request can time out unanswered
     # while the policy loads (29/10): if the iterations have not moved after 60 s, the block was
     # not queued and is sent again; the last block always finishes before stepper_stopped.
-    iterations() { gz topic -e -n 1 -t /world/tri_yolo/stats 2>/dev/null | awk '/^iterations:/ {print $2}'; }
+    # A /stats message without an iterations field means 0 (protobuf text leaves zeros out); no
+    # message at all prints nothing, "unknown".
+    iterations() { gz topic -e -n 1 -t /world/tri_yolo/stats 2>/dev/null \
+        | awk '/^iterations:/ {n = $2} /sim_time|real_time|paused/ {got = 1} END {if (got) print n + 0}'; }
+    # An empty /stats reading is "unknown", never a number (29/10: compared as 0, the wait never
+    # ended and the lock request went unanswered). A block not finished after 60 s is given up
+    # (the lock request is then seen); before answering, the stepper waits until the iteration
+    # count holds still, so no queued block is still running when the evaluator locks.
     ( while [ ! -e "$OUT/lock_requested" ]; do
-          start=$(iterations); start=${start:-0}
+          start=$(iterations)
+          if [ -z "$start" ]; then sleep 0.5; continue; fi
           gz service -s /world/tri_yolo/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \
               --timeout 5000 --req 'multi_step: 100, pause: true' > /dev/null || true
-          waited=0
-          until now=$(iterations); [ "${now:-0}" -ge $((start + 100)) ]; do
-              sleep 0.2; waited=$((waited + 1))
-              if [ $waited -ge 300 ] && [ "${now:-0}" = "$start" ]; then break; fi
+          t0=$SECONDS
+          while :; do
+              now=$(iterations)
+              if [ -n "$now" ] && [ "$now" -ge $((start + 100)) ]; then break; fi
+              if [ $((SECONDS - t0)) -ge 60 ]; then break; fi
+              sleep 0.2
           done
+      done
+      prev=x; t0=$SECONDS
+      while now=$(iterations); { [ -z "$now" ] || [ "$now" != "$prev" ]; } && [ $((SECONDS - t0)) -lt 60 ]; do
+          prev=$now; sleep 2
       done
       touch "$OUT/stepper_stopped" ) &
 fi
