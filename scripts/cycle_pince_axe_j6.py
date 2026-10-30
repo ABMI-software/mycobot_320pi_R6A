@@ -1,6 +1,10 @@
 """Un cycle saisie -> bac pour la pince sur support (axe J6), boucle ouverte.
 
-    .venv/bin/python scripts/cycle_pince_axe_j6.py <piece_x> <piece_y> <hauteur_piece> <bac_x> <bac_y>
+    .venv/bin/python scripts/cycle_pince_axe_j6.py <piece_x> <piece_y> <hauteur_piece> <bac_x> <bac_y> [--roulis DEG] [--outil-mesure] [--essai]
+
+--roulis tourne la pince autour de son axe pour la prise (doigts alignes sur la piece).
+--outil-mesure prend le centre de prise de tool_offset.json (mesure sur 4 prises) : des que
+la pince tourne, le centre [-24, 0, 146] tombe a 7-8 mm a cote et les doigts poussent la piece.
 
 Geometrie mesuree le 30/09 sur le cube rouge : centre de prise = bride +
 R @ [-24, 0, 146], R = axe J6 vers le bas ; affaissement ~10 mm en Z.
@@ -8,6 +12,7 @@ S'arrete au premier ecart (codeurs, statut pince, IK).
 """
 import itertools
 import json
+import os
 import socket
 import sys
 import time
@@ -20,8 +25,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import diff_ik                                                       # noqa: E402
 import pick_fsm as f                                                 # noqa: E402
 
-PI = ('10.10.0.219', 5005)
+PI = (os.environ.get('MYCOBOT_PI', '10.10.0.221'), 5005)
 T_OUTIL = np.array([-24.0, 0.0, 146.0])
+if '--outil-mesure' in sys.argv:
+    T_OUTIL = np.array(json.loads((Path(__file__).parent / 'tool_offset.json').read_text())['tool_offset_mm'])
 R0 = np.column_stack([[1, 0, 0], [0, -1, 0], [0, 0, -1]]).astype(float)
 AFFAISSEMENT = 10.0
 Z_SURVOL_BRIDE = 260.0
@@ -146,20 +153,22 @@ def main():
     az = float(np.degrees(np.arctan2(py, px)))
     zc = h / 2.0
     q = np.array(angles())
+    roulis = float(sys.argv[sys.argv.index('--roulis') + 1]) if '--roulis' in sys.argv else 0.0
+    R_prise = R0 @ rz(roulis)
 
-    print(f'--- piece ({px:.0f}, {py:.0f}) h {h:.0f}, bac ({bx:.0f}, {by:.0f})', flush=True)
-    survol = bride_pour([px, py, 0], R0)
+    print(f'--- roulis {roulis:.0f} deg, piece ({px:.0f}, {py:.0f}) h {h:.0f}, bac ({bx:.0f}, {by:.0f})', flush=True)
+    survol = bride_pour([px, py, 0], R_prise)
     survol[2] = Z_SURVOL_BRIDE
-    q_survol = ik_global(survol, R0, az)
+    q_survol = ik_global(survol, R_prise, az)
     q = va(q_survol, 20, 'survol', plancher=80)
 
     z_prise_bride = zc + T_OUTIL[2] + AFFAISSEMENT
-    cible = bride_pour([px, py, 0], R0)
+    cible = bride_pour([px, py, 0], R_prise)
     cible[2] = z_prise_bride
     milieu = cible.copy()
     milieu[2] = (Z_SURVOL_BRIDE + z_prise_bride) / 2.0
-    q_mi = suit(q_survol, milieu, R0, pas=6)
-    q_prise = suit(q_mi, cible, R0, pas=6)
+    q_mi = suit(q_survol, milieu, R_prise, pas=6)
+    q_prise = suit(q_mi, cible, R_prise, pas=6)
     derive = max(np.hypot(*(diff_ik.fk_pose(a_ + s_ * (b_ - a_))[0][:2] - cible[:2]))
                  for a_, b_ in ((q_survol, q_mi), (q_mi, q_prise)) for s_ in np.linspace(0, 1, 21))
     print(f'  descente d un seul trait : derive XY max {derive:.1f} mm', flush=True)

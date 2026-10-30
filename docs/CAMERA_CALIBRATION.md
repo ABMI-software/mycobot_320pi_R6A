@@ -136,6 +136,70 @@ Le premier essai cam_3 a produit `cy = 42` (alors que l'image fait 480 px de hau
 
 ---
 
+## Calibrer une caméra USB générique (SV Pro 5MP — cam_2)
+
+Validé le **17/06/2026** sur la SV Pro 5MP (`/dev/video2`).
+
+### Différences par rapport aux Arducam
+
+| Point | Arducam | SV Pro 5MP |
+|-------|---------|-----------|
+| Preset | `arducam` (auto-appliqué) | `--preset none` |
+| Résolution calibration | 640×480 | **800×600** (640×480 non supporté) |
+| FourCC recommandé | MJPG | MJPG |
+| Auto-exposition | désactivable | **reste en mode auto (ok=False) — laisser** |
+| Montage | droit | **à l'envers — ajouter flip 180° dans le pipeline** |
+
+### Convention board (⚠️ pièges fréquent)
+
+OpenCV `squaresX` = **nombre de colonnes**, `squaresY` = **nombre de lignes**.  
+Si le board physique est **11 colonnes × 8 lignes** mais que tu passes `--squares-x 8 --squares-y 11`, `detectBoard` retourne 0 coins ChArUco alors que les 44 markers ArUco sont bien détectés. Le symptôme classique :
+
+```
+No valid ChArUco board detected
+```
+
+malgré `Markers detected: 44`. Fix : inverser `squaresX`/`squaresY`.
+
+### Commande
+
+```bash
+python3 training/calibration/calibrate_camera.py \
+    --camera 2 \
+    --name cam_2 \
+    --preset none \
+    --width 800 --height 600 \
+    --fourcc MJPG \
+    --auto-wb off \
+    --wb-temperature 4600 \
+    --autofocus on \
+    --squares-x 11 --squares-y 8 \
+    --square-length-m 0.03 \
+    --marker-length-m 0.02
+```
+
+`--autofocus on` recommandé pour ce modèle — la mise au point fixe (192 par défaut) peut donner des frames floues.
+
+### Résultat (17/06/2026)
+
+| Caméra | Vues | RMS px | fx | fy | cx | cy |
+|--------|------|--------|----|----|----|----|
+| **cam_2** | 32 | **0.493** | 559.70 | 558.18 | 416.47 | 334.12 |
+
+Distorsion aux coins : 14–20 px (plus uniforme que les Arducam). Undistortion visuelle correcte.
+
+### Flip logiciel
+
+La caméra est physiquement montée à l'envers. Dans tout pipeline de capture, ajouter :
+
+```python
+frame = cv2.flip(frame, -1)   # rotation 180°
+```
+
+avant d'appliquer `cv2.undistort()`. Les intrinsèques calibrés sont valides — le flip n'affecte pas K.
+
+---
+
 ## Calibrer l'Astra RGB
 
 ⚠️ **À ce jour (28/04/2026), la calibration Astra est différée.** Voir [SESSION_RESUME](../SESSION_RESUME.md) pour les détails. Les sections ci-dessous documentent le chemin théorique pour la prochaine session.
@@ -203,14 +267,27 @@ python3 training/calibration/probe_astra.py
 
 Sauvegarde 4 PNG annotées dans `/tmp/probe_astra_*.png`. Compare visuellement quel mode décode le plus.
 
-### Régressions OpenCV 4.6
+### Compatibilité OpenCV — versions 4.6 et 4.13
 
-Le script `calibrate_camera.py` contourne deux régressions connues d'OpenCV 4.6 sur cette machine :
+Le script gère deux générations d'API ArUco via des fallbacks automatiques.
 
-- `cv2.aruco.DetectorParameters()` retourne un objet dont l'access à `cornerRefinementMethod` provoque un **segfault**. Fix : utiliser la fabrique legacy `DetectorParameters_create()`.
-- `cv2.aruco.CharucoBoard((sx, sy), …)` retourne un objet dont `interpolateCornersCharuco` provoque un **segfault**. Fix : utiliser la fabrique legacy `CharucoBoard_create(sx, sy, …)`.
+#### Régressions OpenCV 4.6 (fix existant)
 
-Ces deux fixes sont déjà dans `_create_detector_parameters()` et `_build_charuco_board()`. Si tu vois un `Erreur de segmentation (core dumped)`, c'est probablement une régression similaire dans une autre API — utilise les probes pour isoler.
+- `cv2.aruco.DetectorParameters()` → segfault sur accès à `cornerRefinementMethod`. Fix : fallback sur `DetectorParameters_create()`.
+- `cv2.aruco.CharucoBoard((sx, sy), …)` → segfault dans `interpolateCornersCharuco`. Fix : fallback sur `CharucoBoard_create(sx, sy, …)`.
+
+#### Suppressions OpenCV 4.13 (fix ajouté le 17/06/2026)
+
+Deux fonctions supprimées en 4.13 (sur ce poste, `cv2.__version__ == '4.13.0'`) :
+
+| Fonction supprimée | Remplacement |
+|--------------------|-------------|
+| `cv2.aruco.interpolateCornersCharuco()` | `cv2.aruco.CharucoDetector(board).detectBoard(gray, None, None, marker_corners, marker_ids)` |
+| `cv2.aruco.calibrateCameraCharuco()` | `board.matchImagePoints()` + `cv2.calibrateCameraExtended()` |
+
+Les deux chemins sont dans `_interpolate_charuco()` et dans le bloc de calibration (lignes ~340–360). Le fallback s'active automatiquement via `hasattr()` — aucune action manuelle requise.
+
+Si tu vois `AttributeError: module 'cv2.aruco' has no attribute 'interpolateCornersCharuco'` sur une nouvelle machine, c'est OpenCV ≥ 4.7 — le fix est déjà en place.
 
 ---
 

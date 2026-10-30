@@ -17,7 +17,7 @@ Usage:
     python3 training/capture_real_3cam.py \
         --output /tmp/dream_data/real_3cam_session1 \
         --num-samples 500 \
-        --pi-host 10.10.0.221 \
+        --pi-host 10.10.0.224 \
         --arducam-index 0 \
         --svpro-index 3
 """
@@ -573,7 +573,7 @@ def main():
     parser.add_argument('--cooldown-min',   type=float, default=60.0,
                         help='Cooldown countdown in minutes shown after capture so the servos cool. '
                              '0 = skip. Ctrl+C skips it live.')
-    parser.add_argument('--pi-host',        default='10.10.0.221', help='Raspberry Pi IP (robot bridge, port 5005)')
+    parser.add_argument('--pi-host',        default='10.10.0.224', help='Raspberry Pi IP (robot bridge, port 5005)')
     parser.add_argument('--arducam-index',  type=int_or_path, default=0, help='V4L2 index or /dev/v4l/by-id path of the ArduCam')
     parser.add_argument('--svpro-index',    type=int_or_path, default=3, help='V4L2 index or /dev/v4l/by-id path of the SVPRO 5MP USB camera')
     parser.add_argument('--arducam-exposure', type=int, default=75,

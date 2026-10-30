@@ -10,7 +10,7 @@ Un bouton par étape (comme le GUI gripper) :
 Toutes les commandes passent par un worker (thread) pour ne jamais figer l'UI
 (le gripper impose 1.6 s entre commandes, les mouvements prennent quelques s).
 
-Lancer : python3 scripts/pick_and_place_gui.py --host 10.10.0.221
+Lancer : python3 scripts/pick_and_place_gui.py --host 10.10.0.224
 """
 import argparse
 import sys
@@ -299,7 +299,7 @@ class PickPlaceGUI(QWidget):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--host', default='10.10.0.221')
+    ap.add_argument('--host', default='10.10.0.224')
     ap.add_argument('--speed', type=int, default=20)
     ap.add_argument('--open-angle', type=int, default=100)
     args = ap.parse_args()

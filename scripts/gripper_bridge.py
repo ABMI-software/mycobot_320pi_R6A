@@ -177,6 +177,18 @@ class BridgePiSimple:
                 self.mc.send_angles(angles, speed)
                 return f"OK: angles envoyés {angles}"
 
+            elif action == 'send_angle':
+                # Commande un seul axe, comme le dashboard de validation.
+                # Ne pas renvoyer J1-J5 évite leur remise en mouvement quand
+                # seul J6 doit tourner et préserve ainsi la hauteur du TCP.
+                joint = int(cmd.get('joint', 0))
+                if not 1 <= joint <= 6:
+                    return f"ERROR: joint invalide {joint} (attendu 1..6)"
+                angle = float(cmd.get('angle'))
+                speed = max(1, min(100, int(cmd.get('speed', 20))))
+                self.mc.send_angle(joint, angle, speed)
+                return f"OK: J{joint} envoyé à {angle}°"
+
             elif action == 'send_coords':
                 coords = cmd.get('coords', [])
                 speed = cmd.get('speed', 40)

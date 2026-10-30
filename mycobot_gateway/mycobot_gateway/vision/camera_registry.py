@@ -81,8 +81,19 @@ KNOWN_CAMERAS: List[KnownCamera] = [
                                    # donc '5mp' les distingue sans ambiguïté
         calib_stem='cam_2',        # SVPRO calibrée à 800x600 → rescalée à 640x480
         manual_exposure=-1,        # AUCUN réglage d'exposition/luminosité : la
-        manual_focus=-1,           # SVPRO tourne 100% par défaut (« elle est
-                                   # propre »). Ni expo, ni focus/contrast v4l2.
+                                   # SVPRO est propre de ce côté-là.
+        manual_focus=90,           # VERROU indispensable. Laissée à -1, la SVPRO
+                                   # garde le focus où le dernier programme l'a
+                                   # posé — relevé à 40/1023 le 23/09, soit une
+                                   # image franchement floue, l'autofocus étant
+                                   # déjà coupé et ne la rattrapant donc jamais.
+                                   # Balayage du 23/09 sur la scène du banc :
+                                   # focus  40 → netteté   83
+                                   # focus  96 → netteté  622
+                                   # focus 128 → netteté  727
+                                   # focus 256 → netteté   17
+                                   # 90 est la valeur du projet (3cam.py, net sur
+                                   # le poignet) et tombe dans ce palier net.
         image_topic='/camera_svpro/image_raw',
         keypoints_topic='/dream_svpro/keypoints',
         status_topic='/dream_svpro/status',

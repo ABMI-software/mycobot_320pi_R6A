@@ -9,7 +9,7 @@ This is the canonical 4-terminal workflow for the hand-teleoperation pipeline (o
 ```bash
 conda deactivate
 source /opt/ros/jazzy/setup.bash
-source ~/ros_jazzy/src/mycobot_R6A/install/setup.bash
+source ~/Osama_ws/install/setup.bash
 ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 ```
 
@@ -22,7 +22,7 @@ For **simulation**:
 ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=sim
 ```
 
-For **real robot** (bridge on Pi 10.10.0.223 must already be running):
+For **real robot** (bridge on Pi 10.10.0.224 must already be running):
 ```bash
 ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=real
 ```
@@ -36,7 +36,7 @@ ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=both
 
 ```bash
 conda activate hand-teleop
-cd ~/ros_jazzy/src/mycobot_R6A/teleop
+cd ~/Osama_ws/src/mycobot_R6A/teleop
 python3 mycobot_teleop.py --camera astra --ros --use-rosbridge --no-gripper
 ```
 
@@ -46,7 +46,7 @@ The `--no-gripper` flag is **mandatory** on the current physical robot (no gripp
 
 ```bash
 conda activate hand-teleop
-cd ~/ros_jazzy/src/mycobot_R6A/teleop
+cd ~/Osama_ws/src/mycobot_R6A/teleop
 python3 teleop_dashboard.py
 ```
 

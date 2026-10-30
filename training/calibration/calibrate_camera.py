@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Intrinsic calibration for the MyCobot 320 Pi cameras (Arducam ×2 + Astra RGB).
+"""Intrinsic calibration for the MyCobot 320 Pi cameras (Arducam ×2 + Astra RGB + SVPRO).
 
 Combines:
   - Capture-side settings freeze (v4l2-ctl recipes + OpenCV property setters
@@ -19,6 +19,11 @@ Per-camera workflow:
     # Astra RGB (typically /dev/video4 — the depth stream is separate, not handled here)
     python training/calibration/calibrate_camera.py --camera 4 --name astra_rgb \\
            --width 640 --height 480
+
+    # SVPRO (USB camera physically on the Raspberry Pi, served over TCP by
+    # pi_camera_server.py — --camera is the *Pi-side* camera index, not local)
+    python training/calibration/calibrate_camera.py --source svpro --camera 0 \\
+           --name svpro --pi-host 10.10.0.224
 
 Each run writes:
     training/calibration/<name>.npz             — mtx, dist, rvecs, tvecs
@@ -41,6 +46,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import socket
 import sys
 import time
 from dataclasses import dataclass
@@ -375,6 +381,86 @@ def reject_outliers(samples, calibration, max_view_error_px, trim_fraction):
     return [s for i, s in enumerate(samples) if i in keep_idx]
 
 
+# --------------------------- SVPRO (TCP) capture ------------------------- #
+
+class TCPCameraCapture:
+    """cv2.VideoCapture-compatible wrapper around pi_camera_server.py's
+    single-camera `capture` action (see mycobot_gateway/scripts/pi_camera_server.py).
+
+    `camera_index` is the *Pi-side* index (the one pi_camera_server.py was
+    launched with via --cameras), not a local /dev/videoN.
+    """
+
+    def __init__(self, host, port, camera_index, quality=95, timeout=10.0):
+        self.host = host
+        self.port = port
+        self.camera_index = camera_index
+        self.quality = quality
+        self.timeout = timeout
+        self.sock: Optional[socket.socket] = None
+        self.width = 0
+        self.height = 0
+
+    def connect(self) -> None:
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.settimeout(self.timeout)
+        self.sock.connect((self.host, self.port))
+        self.sock.sendall(json.dumps({"action": "list_cameras"}).encode() + b"\n")
+        resp = json.loads(self._recv_line())
+        print(f"  SVPRO server connected — cameras: {resp}")
+
+    def _recv_line(self) -> str:
+        buf = b""
+        while b"\n" not in buf:
+            chunk = self.sock.recv(1)
+            if not chunk:
+                raise ConnectionError("SVPRO server closed connection")
+            buf += chunk
+        return buf.decode("utf-8").strip()
+
+    def _recv_exact(self, n: int) -> bytes:
+        data = b""
+        while len(data) < n:
+            chunk = self.sock.recv(min(65536, n - len(data)))
+            if not chunk:
+                raise ConnectionError("SVPRO server closed connection")
+            data += chunk
+        return data
+
+    def isOpened(self) -> bool:  # noqa: N802 (match cv2.VideoCapture API)
+        return self.sock is not None
+
+    def read(self):
+        try:
+            req = {"action": "capture", "camera": self.camera_index, "quality": self.quality}
+            self.sock.sendall(json.dumps(req).encode() + b"\n")
+            meta = json.loads(self._recv_line())
+            if not meta.get("ok"):
+                print(f"  SVPRO capture failed: {meta.get('error')}", file=sys.stderr)
+                return False, None
+            jpeg = self._recv_exact(meta["size"])
+            self.width, self.height = meta["width"], meta["height"]
+            frame = cv2.imdecode(np.frombuffer(jpeg, dtype=np.uint8), cv2.IMREAD_COLOR)
+            if frame is None:
+                return False, None
+            return True, frame
+        except Exception as exc:
+            print(f"  SVPRO read error: {exc}", file=sys.stderr)
+            return False, None
+
+    def get(self, prop_id):
+        if prop_id == cv2.CAP_PROP_FRAME_WIDTH:
+            return self.width
+        if prop_id == cv2.CAP_PROP_FRAME_HEIGHT:
+            return self.height
+        return 0
+
+    def release(self) -> None:
+        if self.sock is not None:
+            self.sock.close()
+            self.sock = None
+
+
 # --------------------------- I/O ---------------------------------------- #
 
 def save_calibration(out_dir, name, calibration, samples, args):
@@ -458,11 +544,17 @@ def parse_args() -> argparse.Namespace:
 
     # camera identity / capture
     p.add_argument("--camera", type=int, default=-1,
-                   help="OpenCV camera index (e.g. 0, 2). Required for --source v4l2; ignored for astra.")
-    p.add_argument("--name", required=True, help="Output basename: cam_0, cam_3, astra_rgb, etc.")
-    p.add_argument("--source", choices=["v4l2", "astra"], default="v4l2",
+                   help="Camera index. For v4l2/astra: local OpenCV index (ignored for astra). "
+                        "For svpro: the Pi-side index pi_camera_server.py was launched with.")
+    p.add_argument("--name", required=True, help="Output basename: cam_0, cam_3, astra_rgb, svpro, etc.")
+    p.add_argument("--source", choices=["v4l2", "astra", "svpro"], default="v4l2",
                    help="Capture source. 'v4l2' = standard /dev/videoN UVC. "
-                        "'astra' = Orbbec Astra via teleop/orbbec_capture.py (OpenNI2 + oni_grabber).")
+                        "'astra' = Orbbec Astra via teleop/orbbec_capture.py (OpenNI2 + oni_grabber). "
+                        "'svpro' = USB camera on the Pi, served over TCP by pi_camera_server.py.")
+    p.add_argument("--pi-host", default="10.10.0.219",
+                   help="Raspberry Pi IP for --source svpro (pi_camera_server.py).")
+    p.add_argument("--pi-port", type=int, default=5006,
+                   help="TCP port of pi_camera_server.py for --source svpro.")
     p.add_argument("--preset", choices=sorted(CAMERA_PRESETS.keys()) + ["none"],
                    default=None,
                    help="Apply a known camera-control preset before capture (default: arducam for "
@@ -586,6 +678,27 @@ def main() -> int:
         if ow > 0 and oh > 0:
             args.width, args.height = ow, oh
         print(f"Astra capture opened — native resolution {ow}x{oh}")
+    elif args.source == "svpro":
+        if args.camera < 0:
+            print("--camera <pi-side index> is required for --source svpro.", file=sys.stderr)
+            return 1
+        cap = TCPCameraCapture(args.pi_host, args.pi_port, args.camera)
+        try:
+            cap.connect()
+        except Exception as exc:
+            print(f"Could not connect to pi_camera_server.py at "
+                  f"{args.pi_host}:{args.pi_port}: {exc}", file=sys.stderr)
+            return 1
+        if not cap.isOpened():
+            print("SVPRO TCP capture failed to open.", file=sys.stderr)
+            return 1
+        ok, frame = cap.read()
+        if not ok:
+            print(f"SVPRO camera index {args.camera} did not return a frame.", file=sys.stderr)
+            return 1
+        args.width, args.height = cap.width, cap.height
+        print(f"SVPRO capture opened via {args.pi_host}:{args.pi_port} "
+              f"(camera {args.camera}) — native resolution {args.width}x{args.height}")
     else:
         if args.camera < 0:
             print("--camera <index> is required for --source v4l2.", file=sys.stderr)

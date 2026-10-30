@@ -90,6 +90,17 @@ DEMI_COTE_BAC_MM = tc.BAC[0] / 2.0
 # rien a la prise d'un cube de 40 a 50 mm et eloigne les doigts du bois.
 MARGE_HAUTEUR_PRISE_MM = 1.0
 TENUE_CIBLE_S = 1.5
+# Un bac ne bouge pas : une detection peu sure ne doit pas le DEPLACER. Le 13/10,
+# bac_jaune cache par la pince, yolo26 a sorti un bac_jaune fantome a 0,25 au fond
+# de la planche (443 ; 219), a 494 mm : le suivi l'a pris pour le bac deplace et le
+# cycle a fini en ECHEC_PORTANT. Les vrais bacs sortent a 0,97-0,99 ; un bac qui
+# clignote sous le seuil garde sa derniere position suivie.
+CONF_BAC_MIN = 0.5
+# Cible VERROUILLEE par un cycle : tenue bien plus longtemps. En descente, le bras
+# masque la piece a la vue de dessus ; sans relais SVPRO (`--svpro-dream`, 13/10)
+# 1,5 s ne couvrait pas l'approche et la machine repartait sur une autre piece.
+# Une piece posee ne bouge pas seule ; la prise reste verifiee par la pince.
+TENUE_CIBLE_VERROUILLEE_S = 60.0
 # Nombre d'angles de prise qu'un objet a le droit de faire refuser avant que la
 # machine reprenne sa conclusion normale. Sans cette borne, changer d'angle est
 # une boucle sans fin (voir `_descente` dans `branche`).
@@ -368,6 +379,8 @@ def juge_bacs(vision, image, detections, module, angles=None, marqueurs=None):
     camera = 'arducam' if vision.source.startswith('arducam') else 'svpro'
     rendus = []
     for d in _retient(detections, BACS):
+        if d['conf'] < CONF_BAC_MIN:
+            continue
         boite, vue = d['boite'], vision
         if camera != 'arducam':
             depuis_haut = _boite_arducam(d['classe'])
@@ -557,12 +570,16 @@ def _renomme_les_cartons(fenetre):
             bouton.hide()
 
 
-def branche(module, service=None, inventaire=None, poids=None, seuil=None):
+def branche(module, service=None, inventaire=None, poids=None, seuil=None, arducam_seule=False):
     """Remplace objets, cartons et balle des DEUX cameras par yolo26.
 
     A appeler AVANT `correction_vision.branche` (pour que la carte corrige ce que
     yolo26 rend) et AVANT `Fenetre()` (`ctx.detecteur` et `suivi_cartons` sont
     lies a la construction de la fenetre).
+
+    `arducam_seule` : la SVPRO ne rend plus rien a YOLO, meme en appui. Elle est
+    reservee a DREAM (protocole reel, 13/10) et son extrinseque n'est plus tenue
+    a jour : une position d'appui passee par elle viserait a cote.
     """
     service = service or ServiceYOLO26(poids, seuil)
     atexit.register(service.ferme)
@@ -579,6 +596,8 @@ def branche(module, service=None, inventaire=None, poids=None, seuil=None):
     def _detections(vision, image, marqueurs):  # noqa: C901
         """(image jugee, detections, marqueurs cumules) ou None si rien encore."""
         camera = _camera(vision)
+        if arducam_seule and camera != 'arducam':
+            return None
         service.soumet(camera, image)
         if service.arrete:
             if not en_panne:
@@ -756,7 +775,9 @@ def branche(module, service=None, inventaire=None, poids=None, seuil=None):
             _CIBLE_TENUE[classe] = (np.asarray(vu, float), maintenant)
             return vu
         memoire = _CIBLE_TENUE.get(classe)
-        if memoire is None or maintenant - memoire[1] > TENUE_CIBLE_S:
+        tenue = (TENUE_CIBLE_VERROUILLEE_S if self.ctx.classe_objet == classe
+                 else TENUE_CIBLE_S)
+        if memoire is None or maintenant - memoire[1] > tenue:
             _CIBLE_TENUE.pop(classe, None)
             return None
         self.ctx.note(f'{classe} non vu depuis {maintenant - memoire[1]:.1f} s — '

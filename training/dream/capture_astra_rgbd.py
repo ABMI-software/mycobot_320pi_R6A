@@ -20,7 +20,7 @@ Prérequis : robot + bridge Pi actifs, ./oni_grabber_rgbd en cours.
 
 Usage (env hand-teleop ou venv avec cv2/PIL) :
     python capture_astra_rgbd.py --output dream_data/real_astra_rgbd \\
-        --num-samples 80 --pi-host 10.10.0.223
+        --num-samples 80 --pi-host 10.10.0.224
 """
 import argparse
 import csv
@@ -72,7 +72,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--output", required=True, help="dossier dataset (accumule les poses)")
     ap.add_argument("--num-samples", type=int, default=80, help="NOUVELLES poses cette session")
-    ap.add_argument("--pi-host", default="10.10.0.223", help="IP Pi (bridge, port 5005)")
+    ap.add_argument("--pi-host", default="10.10.0.224", help="IP Pi (bridge, port 5005)")
     ap.add_argument("--speed", type=int, default=25)          # comme capture_real_3cam
     ap.add_argument("--settle", type=float, default=3.0, help="attente après commande (s)")
     ap.add_argument("--limit-fraction", type=float, default=0.5,

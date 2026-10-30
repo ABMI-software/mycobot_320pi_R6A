@@ -2,12 +2,12 @@
 
 Checklist à suivre avant et pendant le test de la téléopération sur le robot réel. **À lire intégralement la première fois** — les sections sont organisées par ordre chronologique de la session.
 
-> ✅ **Premier test validé le 22/04/2026 sur le MyCobot 320 Pi (IP 10.10.0.223).**
+> ✅ **Premier test validé le 22/04/2026 sur le MyCobot 320 Pi (IP 10.10.0.224).**
 > Le pipeline complet `Astra → Wilor → rosbridge → trajectory_to_robot_bridge → bridge_tour → bridge_pi_simple → pymycobot → servos` est fonctionnel. Gains initiaux 0.6/0.6/0.6, tfs 0.3 s, speed 25 — mouvements lents et précis du bras.
 
 > ⚠️ **Le robot réel MyCobot 320 Pi actuel n'a pas de gripper physique.** Ce document assume donc un test **bras seul**. Le pipeline gripper est codé mais non câblé par défaut (voir [`TELEOPERATION.md § Limitations`](TELEOPERATION.md#limitations-connues)).
 
-> 📝 **L'IP par défaut de la Pi est `10.10.0.223`** (pas `10.10.0.225` comme indiqué dans les anciens docs).
+> 📝 **L'IP par défaut de la Pi est `10.10.0.224`** (pas `10.10.0.223` ni `.225` comme indiqué dans les anciens docs).
 
 ---
 
@@ -40,7 +40,7 @@ Checklist à suivre avant et pendant le test de la téléopération sur le robot
 ## Étape 1 — Démarrage côté Pi
 
 ```bash
-ssh er@10.10.0.223
+ssh er@10.10.0.224
 ```
 
 ```bash
@@ -118,14 +118,14 @@ ros2 launch mycobot_gateway mycobot_teleop.launch.py target:=real rosbridge:=fal
 **C. IP Pi custom** :
 ```bash
 ros2 launch mycobot_gateway mycobot_teleop.launch.py \
-    target:=real rosbridge:=false pi_ip:=10.10.0.223 real_speed:=20
+    target:=real rosbridge:=false pi_ip:=10.10.0.224 real_speed:=20
 ```
 
 > **⚠️ Paramètre `real_speed`** : c'est la vitesse pymycobot (0–100) pour chaque `send_angles`. **Pour le premier test commence bas** (20–30). Tu pourras monter ensuite si le comportement est sain.
 
 **Attendu dans le log T2** :
 ```
-[bridge_tour]: ✅ Connecté à la Pi (10.10.0.223:5005)
+[bridge_tour]: ✅ Connecté à la Pi (10.10.0.224:5005)
 [trajectory_to_robot_bridge]: Bridging /mycobot_controller/joint_trajectory → /to_robot
 ```
 
@@ -352,7 +352,7 @@ Arrête la téléop (`Ctrl+C` sur T3) **immédiatement** si tu observes :
 
 | Métrique | Observation |
 |----------|-------------|
-| Pi IP | `10.10.0.223` |
+| Pi IP | `10.10.0.224` |
 | Vitesse pymycobot | 25 (real_speed=25 dans le launch) |
 | Gains teleop | 0.6 / 0.6 / 0.6 puis montée progressive |
 | Latence visuelle | imperceptible (<200 ms entre geste et mouvement robot) |
@@ -368,7 +368,7 @@ Arrête la téléop (`Ctrl+C` sur T3) **immédiatement** si tu observes :
 
 2. **Unités** : `bridge_pi_simple.py` appelle `mc.send_angles(angles_deg, speed)` — pymycobot attend des **degrés**. Notre `trajectory_to_robot_bridge` convertit bien rad → deg avant publication. ✓
 
-3. **Défaut d'IP dans les docs anciens** : `10.10.0.225` → à remplacer par `10.10.0.223` partout.
+3. ~~**Défaut d'IP dans les docs anciens** : `.225` → à remplacer par `.223` partout.~~ Fait, puis re-corrigé le 13/07/2026 : la vraie IP est `10.10.0.224`, `.223` était aussi fausse.
 
 4. **Priorité prochaine session** : test performance_analyzer sur le réel (attention : `/joint_states` Gazebo pas disponible côté réel, donc les RMS/max seront faussés — juger visuellement).
 
