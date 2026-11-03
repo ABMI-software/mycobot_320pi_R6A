@@ -37,10 +37,14 @@ Usage (venv_dream) :
 """
 import argparse
 import csv
+import json
 import math
 import os
 import sys
 from pathlib import Path
+
+import numpy as np
+from PIL import Image
 
 RACINE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RACINE / 'training' / 'dream'))
@@ -52,6 +56,7 @@ from convert_to_ndds import (                                    # noqa: E402
 from mycobot_fk import (                                         # noqa: E402
     _camera_transform_from_urdf, keypoints_in_camera_frame, project_keypoints,
 )
+from annotations_completes import SourceCollecte, enrichir        # noqa: E402
 
 
 def charge_poses(chemin):
@@ -109,11 +114,11 @@ def main():
     for chemin in args.input.split(','):
         e = Path(chemin)
         sources.append((e, charge_poses(e / 'camera_poses.csv'),
-                        load_labels(str(e / 'labels.csv'))))
+                        load_labels(str(e / 'labels.csv')), SourceCollecte(e)))
 
     idx, idx_tenu = 0, 0
     sans_pose, hors_champ, sans_image = 0, 0, 0
-    for entree, poses, lignes in sources:
+    for entree, poses, lignes, compagnons in sources:
       for r in lignes:
         if r['camera'] != args.camera:
             continue
@@ -142,7 +147,16 @@ def main():
         dossier = args.output_tenu if tenue else args.output
         rang = idx_tenu if tenue else idx
         copy_image_as_ndds(str(img), dossier, rang)
-        write_frame_json(dossier, rang, kp_cam, projs)
+        chemin_json = write_frame_json(dossier, rang, kp_cam, projs)
+        # Annotations completes (docs/SYNTHETIC_DATA.md) : les champs de
+        # DREAM restent tels quels, le reste s'ajoute a cote.
+        data = json.load(open(chemin_json))
+        masque = enrichir(data, compagnons, n, T_cam, joints, GAZEBO_INTRINSICS, (xyz, rpy), VISEE_XY)
+        with open(chemin_json, 'w') as f:
+            json.dump(data, f, indent=2)
+        if masque is not None:
+            Image.fromarray((masque * 255).astype(np.uint8)).save(
+                os.path.join(dossier, f'{rang:06d}.seg.png'))
         if tenue:
             idx_tenu += 1
         else:

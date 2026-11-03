@@ -163,6 +163,41 @@ le GPU et la simulation tombe à 0,08× le temps réel.
 | j5 | `joint6_to_joint5` | Poignet roll |
 | j6 | `joint6output_to_joint6` | Effecteur |
 
+### Collecte caméra libre : fichiers compagnons (depuis le 03/11/2026)
+
+| Fichier | Contenu |
+|---|---|
+| `camera_poses.csv` | pose du lien caméra dans le monde par trame (`x, y, z, roll, pitch, yaw`) |
+| `joints_complets.csv` | positions **mesurées** de toutes les articulations (bras et 6 de la pince), horodatages simulés de l'image et des articulations |
+| `robot.urdf` | l'URDF réellement chargé dans Gazebo (`/robot_description`) |
+| `masques.csv`, `images/masque/` | masque du robot, `frais = 1` s'il vient du même rendu que l'image |
+| `composition.csv` | après `composer_fonds.py` : trame composée ou non, image de fond |
+
+### Annotations NDDS complètes (`convert_to_ndds_camera_libre.py`)
+
+Pour que le jeu serve aussi à d'autres méthodes que DREAM (RoboPEPP, HPE,
+CtRNet…), chaque `XXXXXX.json` porte tout ce que Gazebo et l'URDF donnent.
+Les champs lus par DREAM sont inchangés ; un champ n'est écrit que si la
+collecte a ses fichiers compagnons (une collecte de septembre n'a ni URDF ni
+articulations complètes). Mètres, radians sauf `*_deg`, pixels de l'image
+640×480, repère caméra optique OpenCV (x droite, y bas, z avant),
+quaternions `x, y, z, w`. Code : `training/dream/annotations_completes.py`,
+cinématique `training/dream/fk_urdf.py` (écart aux keypoints de
+`mycobot_fk` : 0,02 mm).
+
+| Champ | Contenu |
+|---|---|
+| `objects[0].keypoints[*]` | les 7 keypoints de DREAM : `name`, `location` (caméra), `projected_location` (px) — plus `location_monde`, `profondeur_m`, `dans_image`, `masque_au_point` (le masque nettoyé vaut robot à ce pixel ; `false` = occulté par un autre objet ou keypoint au bord du corps) |
+| `objects[0].location`, `quaternion_xyzw`, `pose_transform` | pose de la base du robot dans le repère caméra (caméra ← base, 4×4) : la pose caméra-robot |
+| `objects[0].joint_names`, `joint_angles_rad`, `joint_angles_deg` | les 6 articulations du bras, mesurées |
+| `objects[0].joints_complets_rad` | toutes les articulations mesurées, pince comprise |
+| `objects[0].liens[*]` | les 18 liens de l'URDF (bras, pince, caméras fixes) : `location`, `quaternion_xyzw` (caméra), `location_monde`, `projected_location`, `profondeur_m`, `dans_image` |
+| `objects[0].bouts_doigts`, `pointe_pince` | bout de chaque doigt (sommet le plus éloigné de son maillage, suit l'ouverture) et leur milieu, centre de la prise |
+| `objects[0].bbox_keypoints`, `bbox_masque`, `part_robot` | boîtes englobantes `[x_min, y_min, x_max, y_max]` et part de l'image couverte par le robot |
+| `camera_data` | intrinsèques, pose de la caméra dans le monde (monde ← caméra), azimut autour du point visé, distance, hauteur |
+| `source` | collecte et index d'origine, horodatages, masque frais, fond composé et image de fond |
+| `XXXXXX.seg.png` | masque du robot (255 = bras et pince), nettoyé des 4 caméras fixes de l'URDF, quand il est frais |
+
 ---
 
 ## Build

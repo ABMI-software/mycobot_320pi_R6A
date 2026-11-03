@@ -27,6 +27,16 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **`scripts/garde_thermique.sh <pid> <journal>`** : pause d'un entraînement
   au-delà de 90 °C, reprise sous 80 °C. À n'utiliser que sur un entraînement
   lancé détaché (`setsid nohup`).
+- **Annotations NDDS complètes** (`training/dream/annotations_completes.py`,
+  `training/dream/fk_urdf.py`) : pose caméra-robot, 12 articulations
+  mesurées, 18 liens en 3D et 2D, bouts des doigts, boîtes, masque
+  `XXXXXX.seg.png`, intrinsèques et pose caméra, provenance. Les champs de
+  DREAM ne changent pas. Le collecteur caméra libre enregistre pour cela
+  `robot.urdf` et `joints_complets.csv`. Format dans `docs/SYNTHETIC_DATA.md`.
+- **Corrigé : garde au sol de la pince** du collecteur caméra libre, qui
+  surveillait un point à 10 cm à côté de la pince ; 1,0 % des images de
+  septembre ont les doigts dans la table. Le masque est aussi nettoyé des 4
+  caméras fixes de l'URDF.
 - **`training/dream/composer_fonds.py`** (E3.3) : pose le robot masqué sur
   une image COCO tirée au hasard (recadrage, échelle 1-1,6, miroir, bord
   adouci d'un pixel) pour une part `--part` des trames à masque frais, dans

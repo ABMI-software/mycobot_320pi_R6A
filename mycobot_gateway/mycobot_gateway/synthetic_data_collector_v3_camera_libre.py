@@ -48,8 +48,9 @@ import numpy as np
 import rclpy
 
 from rclpy.executors import SingleThreadedExecutor
-from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
-from sensor_msgs.msg import Image
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+from sensor_msgs.msg import Image, JointState
+from std_msgs.msg import String
 from ros_gz_interfaces.msg import Entity
 from ros_gz_interfaces.srv import SetEntityPose
 
@@ -140,6 +141,16 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
         self.chemin_masques = os.path.join(self.output_dir, 'masques.csv')
         with open(self.chemin_masques, 'w', newline='') as f:
             csv.writer(f).writerow(['index', 'frais', 'part_robot', 'ecart_s'])
+        # Annotations completes (docs/SYNTHETIC_DATA.md, « Format de sortie ») :
+        # l'URDF reellement charge et les positions MESUREES de toutes les
+        # articulations, pince comprise — le v3 ne garde que les 6 du bras.
+        self._etat_complet = None
+        self._noms_complets = None
+        self.chemin_joints = os.path.join(self.output_dir, 'joints_complets.csv')
+        self.create_subscription(JointState, '/joint_states', self._on_etat_complet, 10)
+        self.create_subscription(
+            String, '/robot_description', self._on_urdf,
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
         self.create_subscription(
             Image, self.TOPIC_MASQUE, self._on_masque,
             QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -150,28 +161,36 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
             f'(distance {self.DIST_MIN:.2f}-{self.DIST_MAX:.2f} m, elevation '
             f'{math.degrees(self.ELEV_MIN):.0f}-{math.degrees(self.ELEV_MAX):.0f} deg)')
 
-    # Bout de la pince dans le repere de la bride, pour la garde au sol.
-    # URDF `mycobot_pro_320_pi_gazebo.urdf` : `gripper_base` fixe sur link6 en
-    # (0, -0.007, 0.056) rpy=(pi/2, 0, 0), doigts ~0,10 m au-dela. Valeur reprise
-    # telle quelle de `synthetic_data_collector_v4_gripper.py`, qui l'avait
-    # derivee de la meme chaine.
+    # Bouts des deux doigts dans le repere de link6 (la bride), pour la garde
+    # au sol : sommet le plus eloigne des maillages gripper_left1/right1, pince
+    # ouverte, calcule le 03/11 par la cinematique de l'URDF charge
+    # (training/dream/fk_urdf.py). La pince s'etend selon +z de link6.
     #
-    # Sans ce point, `_is_collision_free` ne surveille que les liens : une pose
-    # a 50 mm de la BRIDE enfonce les doigts 60 mm SOUS la table, puisqu'ils
-    # descendent 110 mm plus bas. Le v3 pouvait s'en passer, son URDF n'ayant
-    # pas de pince ; ici elle est montee.
-    _GRIPPER_TIP = np.array([0.0, -0.107, 0.056, 1.0])
+    # Corrige le 03/11 : l'ancien point (0, -0.107, 0.056), repris du collecteur
+    # v4_gripper, partait de 10 cm selon -y, a cote de la pince. La garde
+    # surveillait donc un point qui n'est pas le bout des doigts : sur les
+    # 23 270 images de septembre, 1,0 % ont les doigts DANS la table (jusqu'a
+    # -47 mm) alors que la garde visait 50 mm.
+    #
+    # Sans ces points, `_is_collision_free` ne surveille que les liens : une pose
+    # a 50 mm de la BRIDE enfonce les doigts sous la table.
+    # Le premier point (milieu des doigts) est le bout de la capsule « pince »
+    # de l'auto-collision (`pts[7]` dans `_is_collision_free`) ; les deux
+    # suivants, les doigts eux-memes, n'entrent que dans la garde au sol.
+    _BOUTS_DOIGTS = [np.array([0.0024, 0.0147, 0.1361, 1.0]),
+                     np.array([-0.0651, 0.0147, 0.1371, 1.0]),
+                     np.array([0.0699, 0.0147, 0.1350, 1.0])]
 
     def _fk_points(self, angles):
-        """Les 7 origines de repere, plus le bout de la pince en 8e point.
+        """Les 7 origines de repere, plus les bouts des deux doigts.
 
         `_is_collision_free` balaie les couples consecutifs pour la garde au sol
-        (R1) : ajouter la pointe en fin de chaine y fait entrer le segment
+        (R1) : ajouter les doigts en fin de chaine y fait entrer les segments
         bride -> doigts sans toucher au v3. R2 et R3 designent leurs points par
-        indice explicite, un 8e element ne les perturbe pas.
+        indice explicite, des elements en plus ne les perturbent pas.
         """
-        return super()._fk_points(angles) + [
-            (self._matrice_bride(angles) @ self._GRIPPER_TIP)[:3].copy()]
+        bride = self._matrice_bride(angles)
+        return super()._fk_points(angles) + [(bride @ b)[:3].copy() for b in self._BOUTS_DOIGTS]
 
     def _matrice_bride(self, angles):
         M = np.eye(4)
@@ -618,6 +637,28 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
         super()._capture_and_save(target_angles)
         if self.n_recorded > enregistres:
             self._enregistre_masque(index)
+            self._enregistre_joints(index)
+
+    def _on_etat_complet(self, msg):
+        self._etat_complet = msg
+
+    def _on_urdf(self, msg):
+        with open(os.path.join(self.output_dir, 'robot.urdf'), 'w') as f:
+            f.write(msg.data)
+
+    def _enregistre_joints(self, index):
+        """Toutes les articulations mesurees + horodatage simule de l'image."""
+        etat, image = self._etat_complet, self.current_images.get('libre')
+        if self._noms_complets is None:
+            self._noms_complets = list(etat.name)
+            with open(self.chemin_joints, 'w', newline='') as f:
+                csv.writer(f).writerow(['index', 't_image_s', 't_joints_s'] + self._noms_complets)
+        valeurs = dict(zip(etat.name, etat.position))
+        with open(self.chemin_joints, 'a', newline='') as f:
+            csv.writer(f).writerow(
+                [index, round(image.header.stamp.sec + image.header.stamp.nanosec * 1e-9, 4),
+                 round(etat.header.stamp.sec + etat.header.stamp.nanosec * 1e-9, 4)]
+                + [round(valeurs.get(n, float('nan')), 6) for n in self._noms_complets])
 
     def _start_collection_once(self):
         """Attend `/joint_states` et un premier masque avant la premiere pose.

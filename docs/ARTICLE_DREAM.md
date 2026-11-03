@@ -115,6 +115,7 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.4 | Distracteurs : primitives aux couleurs tirées, apparues et retirées à chaque lot, occultations comprises | Labels inchangés, collecte stable sur 1 000 images | à faire |
 | E3.5 | Recoloration du robot et lumières libres (couleur, nombre) | Diversité visible sur une planche de 50 images | à faire |
 | E3.6 | Pince montée | Pince visible, keypoints identiques au schéma à 7 points | fait : le launch caméra libre monte déjà la pince Pro (`mycobot_pro_320_pi_gazebo.urdf`), visible sur la planche de E3.1 |
+| E3.6b | Annotations complètes pour d'autres méthodes (RoboPEPP, HPE…) : pose caméra-robot, 12 articulations, 18 liens en 3D et 2D, doigts, masque, boîtes | JSON validés sur une collecte (écart FK ≤ 0,1 mm, points superposés à l'œil), lus par DREAM | fait le 03/11 : format dans `docs/SYNTHETIC_DATA.md`, 20 trames, écart 0,02 mm, `eval_papier.py` les lit |
 | E3.7 | Collecte : volume visé ~100k (papier), un secteur d'azimut tenu à l'écart, `run.yaml`, md5 | Jeu NDDS figé, md5, secteur tenu à l'écart documenté | à faire |
 | E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | à faire |
 | E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | à faire |
@@ -178,6 +179,20 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   comme dans le papier. Les 4 caméras fixes de l'URDF sont des liens du modèle
   robot : elles portent son label et restent dans le masque, petites boîtes
   sombres sur certains fonds (déjà présentes dans les rendus bruts).
+- **03/11 — Garde au sol de la pince fausse depuis septembre** : le
+  collecteur caméra libre surveillait le « bout de la pince » en (0, −0,107,
+  0,056) dans le repère de link6, repris du collecteur `v4_gripper`. Or la
+  pince s'étend selon +z de link6 (doigts à z ≈ 0,136 m) : le point était
+  10 cm à côté. Sur les 23 270 images de septembre (jeu de E3.0), **1,0 % ont
+  les doigts dans la table**, jusqu'à −47 mm, la garde croyant tenir 50 mm.
+  Corrigé dans le collecteur (bouts des deux doigts et leur milieu, tirés des
+  maillages). Les collectes suivantes en sont exemptes ; E3.0 reste tel quel,
+  ce défaut est à citer avec lui.
+- **03/11 — Masque et caméras fixes** : le label de segmentation couvre tout le
+  modèle, y compris les 4 caméras de l'URDF ; la boîte du masque en devenait
+  fausse ([0, 13, 460, 382] pour un bras de 200 px). On ne garde que les
+  régions touchées par un keypoint (`masque_du_robot`), dans les annotations
+  comme dans la composition des fonds.
 - **03/11 — ADD et PCK** : à PCK@5 0,93, l'ADD médiane vaut 17,7 mm mais le
   p90 65 mm : 6 points quasi alignés conditionnent mal le PnP en profondeur.
   Toujours donner la part sous 20 mm et l'AUC avec échecs comptés.
