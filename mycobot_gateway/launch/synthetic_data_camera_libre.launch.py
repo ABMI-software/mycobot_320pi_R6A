@@ -71,6 +71,10 @@ def generate_launch_description():
         # delai — 20 relances pour 18 images le 02/09. Chaque relance coute une
         # attente entiere, il est moins cher d'attendre une fois assez longtemps.
         DeclareLaunchArgument('settle_time', default_value='2.5'),
+        # Relances quand le bras n'a pas atteint sa cible a 2 deg pres. Pilote
+        # du 03/11 : ~4 par image (le bras converge lentement), soit l'essentiel
+        # des ~9 s par image ; les etiquettes viennent des angles MESURES.
+        DeclareLaunchArgument('max_settle_skips', default_value='4'),
         # 1,0 s demandait au controleur d'avaler 80 deg en une seconde : il
         # saturait et restait en retard.
         DeclareLaunchArgument('move_time', default_value='2.0'),
@@ -183,6 +187,7 @@ def generate_launch_description():
                 'num_samples': LaunchConfiguration('num_samples'),
                 'output_dir': LaunchConfiguration('output_dir'),
                 'settle_time': LaunchConfiguration('settle_time'),
+                'max_settle_skips': ParameterValue(LaunchConfiguration('max_settle_skips'), value_type=int),
                 'move_time': LaunchConfiguration('move_time'),
                 'multi_view': True,
                 'domain_randomize': LaunchConfiguration('domain_randomize'),

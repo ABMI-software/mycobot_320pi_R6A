@@ -41,6 +41,7 @@ import random
 import signal
 import time
 import zlib
+from collections import deque
 
 from pathlib import Path
 
@@ -76,6 +77,15 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
     # la meme capture toutes les 0,1 s jusqu'a 1,5 s, sans bouger le bras.
     ATTENTE_MASQUE_PAS_S = 0.1
     ATTENTE_MASQUE_ESSAIS = 15
+    # Articulations a l'instant de l'IMAGE, interpolees dans l'historique de
+    # `/joint_states`. Pilote du 03/11 : le bras bouge encore pendant les vues
+    # (~7 deg/s), et l'image qui arrive au collecteur a deja jusqu'a ~1 s de
+    # retard sur `/joint_states` (latence du pont image) ; la derniere mesure
+    # recue s'ecartait ainsi de l'image jusqu'a 1 s, soit plusieurs degres
+    # d'erreur d'etiquette. Attendre ne corrige pas un retard : on lit les
+    # articulations au temps simule de l'image.
+    HISTORIQUE_JOINTS_S = 3.0
+    PAS_INTERPOLATION_MAX_S = 0.05
 
     # Coquille de tirage autour du poste de travail. Les deux cameras reelles y
     # sont : l'arducam a 1,077 m et 80 deg d'elevation, la svpro a 0,98 m et
@@ -145,6 +155,8 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
         # l'URDF reellement charge et les positions MESUREES de toutes les
         # articulations, pince comprise — le v3 ne garde que les 6 du bras.
         self._etat_complet = None
+        self._historique = deque()
+        self._joints_image = None
         self._noms_complets = None
         self.chemin_joints = os.path.join(self.output_dir, 'joints_complets.csv')
         self.create_subscription(JointState, '/joint_states', self._on_etat_complet, 10)
@@ -764,14 +776,20 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
                 f'(total {self._n_collisions_mesurees})')
             self._collect_next()
             return
-        if self._ecart_masque() > self.ECART_MASQUE_MAX_S \
-                and self._essais_masque < self.ATTENTE_MASQUE_ESSAIS:
+        self._joints_image = self._joints_a_l_image()
+        desynchronise = (self._ecart_masque() > self.ECART_MASQUE_MAX_S
+                         or self._joints_image is None)
+        if desynchronise and self._essais_masque < self.ATTENTE_MASQUE_ESSAIS:
             self._essais_masque += 1
             minuteur = self.create_timer(
                 self.ATTENTE_MASQUE_PAS_S,
                 lambda: (minuteur.cancel(), self._capture_and_save(target_angles)))
             return
         self._essais_masque = 0
+        if self._joints_image is not None:
+            # Le v3 ecrit `current_joints` dans labels.csv : ce sont desormais
+            # les angles au temps de l'image.
+            self.current_joints = [self._joints_image[0][n] for n in self.JOINT_NAMES]
         index, enregistres = self.sample_idx, self.n_recorded
         super()._capture_and_save(target_angles)
         if self.n_recorded > enregistres:
@@ -780,23 +798,50 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
 
     def _on_etat_complet(self, msg):
         self._etat_complet = msg
+        t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        self._historique.append((t, dict(zip(msg.name, msg.position))))
+        while self._historique and t - self._historique[0][0] > self.HISTORIQUE_JOINTS_S:
+            self._historique.popleft()
+
+    def _joints_a_l_image(self):
+        """(angles au temps de l'image, pas entre les deux mesures) ou None."""
+        image = self.current_images.get('libre')
+        if image is None or len(self._historique) < 2:
+            return None
+        t = image.header.stamp.sec + image.header.stamp.nanosec * 1e-9
+        for (t0, q0), (t1, q1) in zip(self._historique, list(self._historique)[1:]):
+            if t0 <= t <= t1 and t1 - t0 <= self.PAS_INTERPOLATION_MAX_S:
+                a = 0.0 if t1 == t0 else (t - t0) / (t1 - t0)
+                return {n: q0[n] + a * (q1[n] - q0[n]) for n in q0 if n in q1}, t1 - t0
+        return None
 
     def _on_urdf(self, msg):
         with open(os.path.join(self.output_dir, 'robot.urdf'), 'w') as f:
             f.write(msg.data)
 
     def _enregistre_joints(self, index):
-        """Toutes les articulations mesurees + horodatage simule de l'image."""
+        """Toutes les articulations au temps de l'image, pince comprise.
+
+        `t_joints_s` est l'instant des valeurs ecrites : egal a `t_image_s`
+        quand elles sont interpolees (`pas_interp_s` = ecart entre les deux
+        mesures encadrantes), sinon celui de la derniere mesure recue.
+        """
         etat, image = self._etat_complet, self.current_images.get('libre')
         if self._noms_complets is None:
             self._noms_complets = list(etat.name)
             with open(self.chemin_joints, 'w', newline='') as f:
-                csv.writer(f).writerow(['index', 't_image_s', 't_joints_s'] + self._noms_complets)
-        valeurs = dict(zip(etat.name, etat.position))
+                csv.writer(f).writerow(['index', 't_image_s', 't_joints_s', 'pas_interp_s']
+                                       + self._noms_complets)
+        t_image = image.header.stamp.sec + image.header.stamp.nanosec * 1e-9
+        if self._joints_image is not None:
+            valeurs, pas = self._joints_image
+            t_valeurs = t_image
+        else:
+            valeurs, pas = dict(zip(etat.name, etat.position)), ''
+            t_valeurs = etat.header.stamp.sec + etat.header.stamp.nanosec * 1e-9
         with open(self.chemin_joints, 'a', newline='') as f:
             csv.writer(f).writerow(
-                [index, round(image.header.stamp.sec + image.header.stamp.nanosec * 1e-9, 4),
-                 round(etat.header.stamp.sec + etat.header.stamp.nanosec * 1e-9, 4)]
+                [index, round(t_image, 4), round(t_valeurs, 4), pas if pas == '' else round(pas, 4)]
                 + [round(valeurs.get(n, float('nan')), 6) for n in self._noms_complets])
 
     def _start_collection_once(self):

@@ -27,6 +27,14 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **`scripts/garde_thermique.sh <pid> <journal>`** : pause d'un entraînement
   au-delà de 90 °C, reprise sous 80 °C. À n'utiliser que sur un entraînement
   lancé détaché (`setsid nohup`).
+- **Articulations au temps de l'image** (collecteur caméra libre) : les
+  angles écrits dans `labels.csv` et `joints_complets.csv` sont interpolés
+  au temps simulé de l'image dans un historique de `/joint_states`, au lieu
+  de la dernière mesure reçue, qui pouvait avoir jusqu'à 1 s d'écart avec
+  une image en retard pendant que le bras bougeait encore (colonne
+  `pas_interp_s`, champ `source.joints_interpoles`). Paramètre de launch
+  `max_settle_skips` exposé : à 1, la collecte passe de 9,1 à 4,1 s/image.
+- **Pilote E3.7 de 1 000 images** : complet, 0 gel, 97,5 % de masques frais.
 - **Lumières ajoutées et robot teinté** (E3.5) : 0 à 3 lumières (point ou
   spot, 40 % teintées) posées avec les distracteurs, sans repère visuel
   (`<visualize>false</visualize>`, sinon la caméra de segmentation plante),

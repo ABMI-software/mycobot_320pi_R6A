@@ -116,7 +116,7 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.5 | Recoloration du robot et lumières libres (couleur, nombre) | Diversité visible sur une planche de 50 images | fait le 03/11 : 0-3 lumières ajoutées par lot de 40 trames (point ou spot, 40 % teintées, `lumieres.csv`), robot teinté hors ligne par le masque (`composer_fonds.py --part-teinte 0.3`, ombrage conservé) ; planche de 24 sur 45 trames |
 | E3.6 | Pince montée | Pince visible, keypoints identiques au schéma à 7 points | fait : le launch caméra libre monte déjà la pince Pro (`mycobot_pro_320_pi_gazebo.urdf`), visible sur la planche de E3.1 |
 | E3.6b | Annotations complètes pour d'autres méthodes (RoboPEPP, HPE…) : pose caméra-robot, 12 articulations, 18 liens en 3D et 2D, doigts, masque, boîtes | JSON validés sur une collecte (écart FK ≤ 0,1 mm, points superposés à l'œil), lus par DREAM | fait le 03/11 : format dans `docs/SYNTHETIC_DATA.md`, 20 trames, écart 0,02 mm, `eval_papier.py` les lit |
-| E3.7 | Collecte : volume visé ~100k (papier), un secteur d'azimut tenu à l'écart, `run.yaml`, md5 | Jeu NDDS figé, md5, secteur tenu à l'écart documenté | en cours : pilote de 1 000 images lancé le 03/11 à 17:15 (`~/dream_article/E3/E3_7_pilote/`) ; cadence initiale ~10 s/image, soit ~11 jours pour 100k : volume ou cadence à décider |
+| E3.7 | Collecte : volume visé ~100k (papier), un secteur d'azimut tenu à l'écart, `run.yaml`, md5 | Jeu NDDS figé, md5, secteur tenu à l'écart documenté | en cours : en cours : pilote de 1 000 images fait le 03/11 (`~/dream_article/E3/E3_7_pilote/`) — complet, 0 gel, 97,5 % de masques frais, mais 9,1 s/image en moyenne (7,9 → 10,1 s, en dérive) et articulations lues jusqu'à 0,73 s de l'image ; garde de synchronisation ajoutée, cadence à régler avant les ~100k |
 | E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | à faire |
 | E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | à faire |
 | E3.10 | Évaluation : E2, `real_tri_test`, test de décalage, revue du metrologue | Critère de E3 (tableau des expériences) | à faire |
@@ -199,6 +199,29 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   rayon minimal autour du socle compte désormais la taille de l'objet. Les
   occultations restent rares (4 keypoints sur 413) : objets petits et
   dispersés. Écart au papier : formes simples au lieu des objets YCB.
+- **03/11 — Pilote de 1 000 images (E3.7)** : collecte complète sans gel ni
+  plantage, 975 masques frais sur 1 000 (97,5 %), 83 lots de distracteurs,
+  35 de lumières. Trois constats :
+  - **Le bras bouge encore pendant les vues** : les 3 vues d'une « même » pose
+    diffèrent de 13° (médiane) ; il converge lentement vers sa cible (J6 à
+    ~7°/s), bien après `move_time` + `settle_time`. Cause probable : le gain
+    proportionnel par défaut de l'interface `position` de `gz_ros2_control`,
+    non réglé dans l'URDF (partagé avec le tri, non modifié). Les étiquettes
+    restent celles des angles mesurés.
+  - **Articulations et image pas toujours synchrones** : écart médian 20 ms,
+    p95 0,12 s, max 0,73 s, soit jusqu'à ~7° d'erreur d'étiquette sur un bras
+    en mouvement. Corrigé le 03/11 : attendre ne suffit pas (l'image arrive avec
+    jusqu'à ~1 s de retard sur `/joint_states`, par la latence du pont image),
+    donc le collecteur **interpole les articulations au temps simulé de
+    l'image** dans un historique de 3 s (mesures à 4 ms d'écart) : 100/100
+    trames interpolées, liens superposés au robot même quand il a bougé de
+    20-29° entre deux vues. Le pilote, collecté avant, garde ce défaut.
+  - **Cadence** : 9,1 s/image, dont l'essentiel en relances de stabilisation
+    (≈ 4 par image, le bras n'atteignant presque jamais sa cible à 2°), et une
+    dérive de 7,9 à 10,1 s sur 1 000 images. À ce rythme, 100 000 images
+    prennent ~11 jours. Avec `max_settle_skips:=1` (les étiquettes étant
+    interpolées, viser la cible au degré près n'apporte rien) : **4,1 s/image**,
+    ~5 jours pour 100 000. La dérive impose de collecter par tranches relancées.
 - **03/11 — Lumières ajoutées et caméra de segmentation** : une lumière posée
   par `create` porte par défaut un repère visuel sans label, et la caméra de
   segmentation plante dessus dès la première image (`Ogre::

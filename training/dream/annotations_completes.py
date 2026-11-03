@@ -148,7 +148,7 @@ def enrichir(data, source, index, T_monde_cam, joints_bras, K, pose_camera_xyz_r
     objet = data['objects'][0]
     joints_ligne = source.joints.get(index)
     positions = {n: float(v) for n, v in joints_ligne.items()
-                 if n not in ('index', 't_image_s', 't_joints_s')} if joints_ligne else {}
+                 if n not in ('index', 't_image_s', 't_joints_s', 'pas_interp_s')} if joints_ligne else {}
     for nom, valeur in zip(ARTICULATIONS_BRAS, joints_bras):
         positions.setdefault(nom, float(valeur))
 
@@ -229,6 +229,7 @@ def enrichir(data, source, index, T_monde_cam, joints_bras, K, pose_camera_xyz_r
         'collecte': str(source.dossier), 'index': index,
         't_image_s': float(joints_ligne['t_image_s']) if joints_ligne else None,
         't_joints_s': float(joints_ligne['t_joints_s']) if joints_ligne else None,
+        'joints_interpoles': bool(joints_ligne and joints_ligne.get('pas_interp_s')),
         'masque_frais': masque is not None,
         'ecart_masque_s': float(masque_ligne['ecart_s']) if masque_ligne.get('ecart_s') else None,
         'fond_compose': composition.get('composee') == '1',
