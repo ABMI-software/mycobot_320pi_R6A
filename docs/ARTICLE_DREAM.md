@@ -113,10 +113,10 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.2 | Masque du robot : caméra de segmentation au même endroit que la caméra libre | Masque par image, aligné au pixel sur le rendu | fait le 29/10 : capteur `cam_libre_masque` (label 1 via `mycobot_pro_320_pi_gazebo_masque.urdf.xacro`), `images/masque/` + `masques.csv` ; capture resynchronisée sur l'horodatage : 31/40 masques du même rendu que l'image, tous alignés au pixel (planche de 24), les 9 autres marqués `frais = 0` |
 | E3.3 | Fonds aléatoires : composition hors ligne derrière le masque, sur une part des images | Source d'images choisie (décision utilisateur), part fixée, 50 images contrôlées | fait le 03/11 : COCO val2017 (5 000 images, comme le papier, `~/dream_article/fonds/coco/val2017`) ; `training/dream/composer_fonds.py --part 0.5` par défaut (la part est un facteur de E4) ; 31 trames composées sur 40, keypoints en place sur la planche de 24 |
 | E3.4 | Distracteurs : primitives aux couleurs tirées, apparues et retirées à chaque lot, occultations comprises | Labels inchangés, collecte stable sur 1 000 images | fait sur 80 images le 03/11 : 2-6 formes visuelles seules par lot de 40 trames, via le pont ROS (`create`/`remove`), présentes dans les 80 images, consignées dans `distracteurs.csv` et les annotations ; stabilité sur 1 000 images à vérifier au pilote de E3.7 |
-| E3.5 | Recoloration du robot et lumières libres (couleur, nombre) | Diversité visible sur une planche de 50 images | à faire |
+| E3.5 | Recoloration du robot et lumières libres (couleur, nombre) | Diversité visible sur une planche de 50 images | fait le 03/11 : 0-3 lumières ajoutées par lot de 40 trames (point ou spot, 40 % teintées, `lumieres.csv`), robot teinté hors ligne par le masque (`composer_fonds.py --part-teinte 0.3`, ombrage conservé) ; planche de 24 sur 45 trames |
 | E3.6 | Pince montée | Pince visible, keypoints identiques au schéma à 7 points | fait : le launch caméra libre monte déjà la pince Pro (`mycobot_pro_320_pi_gazebo.urdf`), visible sur la planche de E3.1 |
 | E3.6b | Annotations complètes pour d'autres méthodes (RoboPEPP, HPE…) : pose caméra-robot, 12 articulations, 18 liens en 3D et 2D, doigts, masque, boîtes | JSON validés sur une collecte (écart FK ≤ 0,1 mm, points superposés à l'œil), lus par DREAM | fait le 03/11 : format dans `docs/SYNTHETIC_DATA.md`, 20 trames, écart 0,02 mm, `eval_papier.py` les lit |
-| E3.7 | Collecte : volume visé ~100k (papier), un secteur d'azimut tenu à l'écart, `run.yaml`, md5 | Jeu NDDS figé, md5, secteur tenu à l'écart documenté | à faire |
+| E3.7 | Collecte : volume visé ~100k (papier), un secteur d'azimut tenu à l'écart, `run.yaml`, md5 | Jeu NDDS figé, md5, secteur tenu à l'écart documenté | en cours : pilote de 1 000 images lancé le 03/11 à 17:15 (`~/dream_article/E3/E3_7_pilote/`) |
 | E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | à faire |
 | E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | à faire |
 | E3.10 | Évaluation : E2, `real_tri_test`, test de décalage, revue du metrologue | Critère de E3 (tableau des expériences) | à faire |
@@ -199,6 +199,18 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   rayon minimal autour du socle compte désormais la taille de l'objet. Les
   occultations restent rares (4 keypoints sur 413) : objets petits et
   dispersés. Écart au papier : formes simples au lieu des objets YCB.
+- **03/11 — Lumières ajoutées et caméra de segmentation** : une lumière posée
+  par `create` porte par défaut un repère visuel sans label, et la caméra de
+  segmentation plante dessus dès la première image (`Ogre::
+  ItemIdentityException` dans `Ogre2SegmentationCamera::Render`, Gazebo
+  s'arrête, 3 images sur 80). `<visualize>false</visualize>` dans le SDF de
+  la lumière règle le problème (45 images sans plantage). Toute entité ajoutée
+  à la scène doit être testée avec le capteur de masque actif.
+- **03/11 — Recoloration du robot** : sans liaisons Python de gz-transport,
+  `visual_config` n'est joignable que par la ligne de commande `gz`, celle
+  qui avait empoisonné la découverte en septembre. Le robot est donc teinté
+  hors ligne, par le masque (multiplication des pixels, ombrage conservé), au
+  même titre que la composition des fonds.
 - **03/11 — Rendu logiciel** : les notes de juin (collecteur v3) disent que
   Gazebo peut tomber en rendu logiciel sur cette machine hybride (Intel +
   NVIDIA ; `libEGL: failed to create dri2 screen`) et figer des images. Le

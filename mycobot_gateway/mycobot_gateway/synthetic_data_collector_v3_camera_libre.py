@@ -159,7 +159,11 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
         self.declare_parameter('distracteurs', True)
         self._distracteurs_actifs = self.get_parameter('distracteurs').value
         self._distracteurs = []
+        self._lumieres = []
         self._n_lots = 0
+        self.chemin_lumieres = os.path.join(self.output_dir, 'lumieres.csv')
+        with open(self.chemin_lumieres, 'w', newline='') as f:
+            csv.writer(f).writerow(['index_debut', 'nom', 'type', 'r', 'g', 'b', 'intensite', 'x', 'y', 'z'])
         self.chemin_distracteurs = os.path.join(self.output_dir, 'distracteurs.csv')
         with open(self.chemin_distracteurs, 'w', newline='') as f:
             csv.writer(f).writerow(['index_debut', 'nom', 'forme', 'dim_x', 'dim_y', 'dim_z',
@@ -557,6 +561,14 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
     PART_FLOTTANTS = 0.3
     HAUTEUR_FLOTTANTS = (0.05, 0.50)
 
+    # Lumieres en plus du soleil du v3 (E3.5 ; papier § II.C : nombre, couleur
+    # et position tires). Posees par le meme pont `create` que les distracteurs
+    # (un SDF peut etre une <light>), au meme rythme. Une part seulement est
+    # teintee : le banc reel est sous un eclairage neutre.
+    N_LUMIERES = (0, 3)
+    PART_LUMIERES_TEINTEES = 0.4
+    INTENSITE_LUMIERES = (0.2, 1.0)
+
     def _ouvre_client_pose(self):
         """Un client de service ROS unique, permanent, pour toute la collecte.
 
@@ -620,7 +632,13 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
             requete.entity = Entity(name=nom, type=Entity.MODEL)
             self._appel(self._cli_retirer, requete)
         self._distracteurs = []
+        for nom in self._lumieres:
+            requete = DeleteEntity.Request()
+            requete.entity = Entity(name=nom, type=Entity.LIGHT)
+            self._appel(self._cli_retirer, requete)
+        self._lumieres = []
         self._n_lots += 1
+        self._pose_lumieres()
         for k in range(random.randint(*self.N_DISTRACTEURS)):
             forme, dims, geometrie, couleur, xyz, rpy = self._tire_distracteur()
             nom = f'distracteur_{self._n_lots}_{k}'
@@ -643,6 +661,40 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
                     csv.writer(f).writerow([self.sample_idx, nom, forme] + [round(v, 4) for v in dims]
                                            + [round(v, 3) for v in couleur] + [round(v, 4) for v in xyz]
                                            + [round(v, 4) for v in rpy])
+
+    def _pose_lumieres(self):
+        for k in range(random.randint(*self.N_LUMIERES)):
+            nom = f'lumiere_{self._n_lots}_{k}'
+            sorte = random.choice(['point', 'spot'])
+            if random.random() < self.PART_LUMIERES_TEINTEES:
+                couleur = [random.uniform(0.3, 1.0) for _ in range(3)]
+            else:
+                couleur = [random.uniform(0.85, 1.0)] * 3
+            intensite = random.uniform(*self.INTENSITE_LUMIERES)
+            angle, rayon = random.uniform(-math.pi, math.pi), random.uniform(0.3, 1.5)
+            xyz = (rayon * math.cos(angle), rayon * math.sin(angle), random.uniform(0.4, 1.8))
+            r, g, b = couleur
+            spot = ('<spot><inner_angle>0.4</inner_angle><outer_angle>1.2</outer_angle>'
+                    '<falloff>1</falloff></spot><direction>0 0 -1</direction>' if sorte == 'spot' else '')
+            sdf = (f'<sdf version="1.9"><light type="{sorte}" name="{nom}">'
+                   f'<diffuse>{r:.3f} {g:.3f} {b:.3f} 1</diffuse><specular>0.2 0.2 0.2 1</specular>'
+                   f'<intensity>{intensite:.3f}</intensity><cast_shadows>false</cast_shadows>'
+                   # Sans ce drapeau, Gazebo dessine un repere visuel de la
+                   # lumiere, sans label, et la camera de segmentation plante
+                   # dessus (Ogre ItemIdentityException, mesure du 03/11).
+                   f'<visualize>false</visualize>'
+                   f'<attenuation><range>6</range><constant>0.5</constant><linear>0.05</linear>'
+                   f'<quadratic>0.01</quadratic></attenuation>{spot}</light></sdf>')
+            requete = SpawnEntity.Request()
+            requete.entity_factory.name = nom
+            requete.entity_factory.sdf = sdf
+            requete.entity_factory.pose.position.x, requete.entity_factory.pose.position.y, \
+                requete.entity_factory.pose.position.z = xyz
+            if self._appel(self._cli_creer, requete):
+                self._lumieres.append(nom)
+                with open(self.chemin_lumieres, 'a', newline='') as f:
+                    csv.writer(f).writerow([self.sample_idx, nom, sorte] + [round(v, 3) for v in couleur]
+                                           + [round(intensite, 3)] + [round(v, 3) for v in xyz])
 
     def _applique(self, pose):
         """Applique la pose et ne l'enregistre QUE si l'appel a abouti.

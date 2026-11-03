@@ -42,6 +42,10 @@ from convert_to_ndds_camera_libre import charge_poses
 from mycobot_fk import _camera_transform_from_urdf, keypoints_in_camera_frame, project_keypoints
 
 LARGEUR, HAUTEUR = 640, 480
+# Teinte du robot (E3.5 ; le papier tire la couleur du robot) : multiplication
+# des pixels du robot par une couleur, ce qui garde l'ombrage du rendu. Le
+# robot réel est blanc ; une teinte trop sombre le rendrait méconnaissable.
+TEINTE_MIN = 0.25
 # Les bords du robot sont lissés par le rendu : un masque dur garderait un
 # liseré du décor Gazebo. Un adoucissement d'un pixel le fond dans le fond.
 FLOU_BORD_PX = 0.8
@@ -63,10 +67,15 @@ def fond_aleatoire(chemin, hasard):
     return fond
 
 
-def composer(rendu, masque, fond):
+def composer(rendu, masque, fond, teinte):
+    """Robot (éventuellement teinté) sur le fond ; `fond` None garde le décor."""
     alpha = np.asarray(masque.filter(ImageFilter.GaussianBlur(FLOU_BORD_PX)), np.float32)[..., None] / 255.0
-    image = np.asarray(rendu, np.float32) * alpha + np.asarray(fond, np.float32) * (1.0 - alpha)
-    return Image.fromarray(image.round().astype(np.uint8))
+    robot = np.asarray(rendu, np.float32)
+    if teinte is not None:
+        robot = robot * np.asarray(teinte, np.float32)
+    arriere = np.asarray(fond if fond is not None else rendu, np.float32)
+    image = robot * alpha + arriere * (1.0 - alpha)
+    return Image.fromarray(image.round().clip(0, 255).astype(np.uint8))
 
 
 def main():
@@ -76,6 +85,8 @@ def main():
     p.add_argument("--sortie", type=Path, required=True)
     p.add_argument("--part", type=float, default=0.5,
                    help="part des trames à masque frais qui reçoivent un fond (défaut 0,5)")
+    p.add_argument("--part-teinte", type=float, default=0.3,
+                   help="part des trames à masque frais dont le robot est teinté (défaut 0,3)")
     p.add_argument("--graine", type=int, default=0)
     args = p.parse_args()
 
@@ -87,7 +98,8 @@ def main():
         raise SystemExit(f"aucune image dans {args.fonds}")
 
     (args.sortie / "images" / "libre").mkdir(parents=True)
-    for nom in ("labels.csv", "camera_poses.csv", "masques.csv", "joints_complets.csv", "robot.urdf"):
+    for nom in ("labels.csv", "camera_poses.csv", "masques.csv", "joints_complets.csv", "robot.urdf",
+                "distracteurs.csv", "lumieres.csv"):
         if (args.collecte / nom).exists():
             shutil.copy2(args.collecte / nom, args.sortie / nom)
     os.symlink((args.collecte / "images" / "masque").resolve(), args.sortie / "images" / "masque")
@@ -96,28 +108,33 @@ def main():
     angles = {int(r["index"]): [float(r[f"j{i}_rad"]) for i in range(1, 7)]
               for r in load_labels(str(args.collecte / "labels.csv")) if r["camera"] == "libre"}
 
-    n_composees = 0
+    n_fonds = n_teintes = 0
     with open(args.sortie / "composition.csv", "w", newline="") as f:
         sortie_csv = csv.writer(f)
-        sortie_csv.writerow(["index", "composee", "fond"])
+        sortie_csv.writerow(["index", "composee", "fond", "teinte_r", "teinte_g", "teinte_b"])
         for rendu_chemin in sorted((args.collecte / "images" / "libre").glob("*.png")):
             index = int(rendu_chemin.stem)
             cible = args.sortie / "images" / "libre" / rendu_chemin.name
-            if index in frais and index in poses and index in angles and hasard.random() < args.part:
-                chemin_fond = hasard.choice(fonds)
-                fond = fond_aleatoire(chemin_fond, hasard)
-                # Sans les 4 cameras fixes de l'URDF, qui portent le label du robot.
-                points = project_keypoints(keypoints_in_camera_frame(
-                    angles[index], _camera_transform_from_urdf(*poses[index])), GAZEBO_INTRINSICS)
-                brut = np.asarray(Image.open(args.collecte / "images" / "masque" / rendu_chemin.name)) > 0
-                masque = Image.fromarray((masque_du_robot(brut, points) * 255).astype(np.uint8))
-                composer(Image.open(rendu_chemin).convert("RGB"), masque, fond).save(cible)
-                sortie_csv.writerow([index, 1, os.path.basename(chemin_fond)])
-                n_composees += 1
-            else:
+            utilisable = index in frais and index in poses and index in angles
+            chemin_fond = hasard.choice(fonds) if utilisable and hasard.random() < args.part else None
+            teinte = ([hasard.uniform(TEINTE_MIN, 1.0) for _ in range(3)]
+                      if utilisable and hasard.random() < args.part_teinte else None)
+            if chemin_fond is None and teinte is None:
                 os.symlink(rendu_chemin.resolve(), cible)
-                sortie_csv.writerow([index, 0, ""])
-    print(f"{n_composees} trames composées sur {len(frais)} à masque frais -> {args.sortie}")
+                sortie_csv.writerow([index, 0, "", "", "", ""])
+                continue
+            # Sans les 4 cameras fixes de l'URDF, qui portent le label du robot.
+            points = project_keypoints(keypoints_in_camera_frame(
+                angles[index], _camera_transform_from_urdf(*poses[index])), GAZEBO_INTRINSICS)
+            brut = np.asarray(Image.open(args.collecte / "images" / "masque" / rendu_chemin.name)) > 0
+            masque = Image.fromarray((masque_du_robot(brut, points) * 255).astype(np.uint8))
+            fond = fond_aleatoire(chemin_fond, hasard) if chemin_fond else None
+            composer(Image.open(rendu_chemin).convert("RGB"), masque, fond, teinte).save(cible)
+            sortie_csv.writerow([index, int(chemin_fond is not None), os.path.basename(chemin_fond or "")]
+                                + ([round(v, 3) for v in teinte] if teinte else ["", "", ""]))
+            n_fonds += chemin_fond is not None
+            n_teintes += teinte is not None
+    print(f"{n_fonds} fonds et {n_teintes} teintes sur {len(frais)} trames à masque frais -> {args.sortie}")
 
 
 if __name__ == "__main__":

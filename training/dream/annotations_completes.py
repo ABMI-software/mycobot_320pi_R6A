@@ -116,13 +116,17 @@ class SourceCollecte:
         self.composition = self._csv_par_index('composition.csv')
         chemin = self.dossier / 'distracteurs.csv'
         self.distracteurs = list(csv.DictReader(open(chemin))) if chemin.exists() else None
+        chemin = self.dossier / 'lumieres.csv'
+        self.lumieres = list(csv.DictReader(open(chemin))) if chemin.exists() else None
+
+    @staticmethod
+    def lot_de(lignes, index):
+        debuts = [int(r['index_debut']) for r in lignes if int(r['index_debut']) <= index]
+        return [r for r in lignes if debuts and int(r['index_debut']) == max(debuts)]
 
     def distracteurs_de(self, index):
         """Le lot en place a la trame `index` : le dernier pose avant elle."""
-        debuts = [int(r['index_debut']) for r in self.distracteurs if int(r['index_debut']) <= index]
-        if not debuts:
-            return []
-        return [r for r in self.distracteurs if int(r['index_debut']) == max(debuts)]
+        return self.lot_de(self.distracteurs, index)
 
     def _csv_par_index(self, nom):
         chemin = self.dossier / nom
@@ -213,6 +217,12 @@ def enrichir(data, source, index, T_monde_cam, joints_bras, K, pose_camera_xyz_r
              'rpy_monde': [float(r[c]) for c in ('roulis', 'tangage', 'lacet')],
              **_point(np.array([float(r[c]) for c in ('x', 'y', 'z')]), T_cam_monde, K)}
             for r in source.distracteurs_de(index)]
+    if source.lumieres is not None:
+        data['lumieres_ajoutees'] = [
+            {'name': r['nom'], 'type': r['type'], 'couleur_rgb': [float(r[c]) for c in ('r', 'g', 'b')],
+             'intensite': float(r['intensite']),
+             'location_monde': [float(r[c]) for c in ('x', 'y', 'z')]}
+            for r in source.lot_de(source.lumieres, index)]
     composition = source.composition.get(index, {})
     masque_ligne = source.masques.get(index, {})
     data['source'] = {
@@ -223,5 +233,7 @@ def enrichir(data, source, index, T_monde_cam, joints_bras, K, pose_camera_xyz_r
         'ecart_masque_s': float(masque_ligne['ecart_s']) if masque_ligne.get('ecart_s') else None,
         'fond_compose': composition.get('composee') == '1',
         'fond': composition.get('fond') or None,
+        'teinte_robot_rgb': ([float(composition[c]) for c in ('teinte_r', 'teinte_g', 'teinte_b')]
+                             if composition.get('teinte_r') else None),
     }
     return masque

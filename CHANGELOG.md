@@ -27,6 +27,13 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **`scripts/garde_thermique.sh <pid> <journal>`** : pause d'un entraînement
   au-delà de 90 °C, reprise sous 80 °C. À n'utiliser que sur un entraînement
   lancé détaché (`setsid nohup`).
+- **Lumières ajoutées et robot teinté** (E3.5) : 0 à 3 lumières (point ou
+  spot, 40 % teintées) posées avec les distracteurs, sans repère visuel
+  (`<visualize>false</visualize>`, sinon la caméra de segmentation plante),
+  consignées dans `lumieres.csv` et le champ `lumieres_ajoutees` ;
+  `composer_fonds.py --part-teinte` teinte le robot par le masque, la teinte
+  est dans `composition.csv` et `source.teinte_robot_rgb`. Le compositeur
+  recopie désormais tous les fichiers compagnons (distracteurs, lumières).
 - **Distracteurs dans la collecte caméra libre** (E3.4) : 2 à 6 formes
   (boîtes, cylindres, sphères) aux couleurs tirées, visuelles seules, posées
   sur la table ou flottantes, renouvelées toutes les 40 trames par le pont
