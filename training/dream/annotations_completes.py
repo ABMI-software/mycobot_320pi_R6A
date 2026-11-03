@@ -114,6 +114,15 @@ class SourceCollecte:
         self.joints = self._csv_par_index('joints_complets.csv')
         self.masques = self._csv_par_index('masques.csv')
         self.composition = self._csv_par_index('composition.csv')
+        chemin = self.dossier / 'distracteurs.csv'
+        self.distracteurs = list(csv.DictReader(open(chemin))) if chemin.exists() else None
+
+    def distracteurs_de(self, index):
+        """Le lot en place a la trame `index` : le dernier pose avant elle."""
+        debuts = [int(r['index_debut']) for r in self.distracteurs if int(r['index_debut']) <= index]
+        if not debuts:
+            return []
+        return [r for r in self.distracteurs if int(r['index_debut']) == max(debuts)]
 
     def _csv_par_index(self, nom):
         chemin = self.dossier / nom
@@ -196,6 +205,14 @@ def enrichir(data, source, index, T_monde_cam, joints_bras, K, pose_camera_xyz_r
         'hauteur_m': float(xyz[2]),
         'repere': 'optique OpenCV : x droite, y bas, z avant ; pose_monde = monde <- camera',
     }
+    if source.distracteurs is not None:
+        data['distracteurs'] = [
+            {'name': r['nom'], 'forme': r['forme'],
+             'dimensions_m': [float(r[c]) for c in ('dim_x', 'dim_y', 'dim_z')],
+             'couleur_rgb': [float(r[c]) for c in ('r', 'g', 'b')],
+             'rpy_monde': [float(r[c]) for c in ('roulis', 'tangage', 'lacet')],
+             **_point(np.array([float(r[c]) for c in ('x', 'y', 'z')]), T_cam_monde, K)}
+            for r in source.distracteurs_de(index)]
     composition = source.composition.get(index, {})
     masque_ligne = source.masques.get(index, {})
     data['source'] = {

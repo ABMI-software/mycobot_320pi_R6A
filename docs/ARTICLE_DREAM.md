@@ -112,7 +112,7 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.1 | Collecteur caméra libre : contrôle visuel des labels reprojetés | 24 images, keypoints superposés au robot à l'œil sur toutes | fait le 29/10 : jeu de septembre (23 272 images collectées, 17 702 + 2 145 vue tenue en NDDS), labels sur le robot partout, vue tenue comprise |
 | E3.2 | Masque du robot : caméra de segmentation au même endroit que la caméra libre | Masque par image, aligné au pixel sur le rendu | fait le 29/10 : capteur `cam_libre_masque` (label 1 via `mycobot_pro_320_pi_gazebo_masque.urdf.xacro`), `images/masque/` + `masques.csv` ; capture resynchronisée sur l'horodatage : 31/40 masques du même rendu que l'image, tous alignés au pixel (planche de 24), les 9 autres marqués `frais = 0` |
 | E3.3 | Fonds aléatoires : composition hors ligne derrière le masque, sur une part des images | Source d'images choisie (décision utilisateur), part fixée, 50 images contrôlées | fait le 03/11 : COCO val2017 (5 000 images, comme le papier, `~/dream_article/fonds/coco/val2017`) ; `training/dream/composer_fonds.py --part 0.5` par défaut (la part est un facteur de E4) ; 31 trames composées sur 40, keypoints en place sur la planche de 24 |
-| E3.4 | Distracteurs : primitives aux couleurs tirées, apparues et retirées à chaque lot, occultations comprises | Labels inchangés, collecte stable sur 1 000 images | à faire |
+| E3.4 | Distracteurs : primitives aux couleurs tirées, apparues et retirées à chaque lot, occultations comprises | Labels inchangés, collecte stable sur 1 000 images | fait sur 80 images le 03/11 : 2-6 formes visuelles seules par lot de 40 trames, via le pont ROS (`create`/`remove`), présentes dans les 80 images, consignées dans `distracteurs.csv` et les annotations ; stabilité sur 1 000 images à vérifier au pilote de E3.7 |
 | E3.5 | Recoloration du robot et lumières libres (couleur, nombre) | Diversité visible sur une planche de 50 images | à faire |
 | E3.6 | Pince montée | Pince visible, keypoints identiques au schéma à 7 points | fait : le launch caméra libre monte déjà la pince Pro (`mycobot_pro_320_pi_gazebo.urdf`), visible sur la planche de E3.1 |
 | E3.6b | Annotations complètes pour d'autres méthodes (RoboPEPP, HPE…) : pose caméra-robot, 12 articulations, 18 liens en 3D et 2D, doigts, masque, boîtes | JSON validés sur une collecte (écart FK ≤ 0,1 mm, points superposés à l'œil), lus par DREAM | fait le 03/11 : format dans `docs/SYNTHETIC_DATA.md`, 20 trames, écart 0,02 mm, `eval_papier.py` les lit |
@@ -193,6 +193,19 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   fausse ([0, 13, 460, 382] pour un bras de 200 px). On ne garde que les
   régions touchées par un keypoint (`masque_du_robot`), dans les annotations
   comme dans la composition des fonds.
+- **03/11 — Distracteurs (E3.4)** : visuels seuls (ni collision ni
+  physique), ils ne bloquent pas le bras mais peuvent le traverser quand il
+  bouge pendant un lot ; le robot réel n'aura jamais d'objet en travers. Le
+  rayon minimal autour du socle compte désormais la taille de l'objet. Les
+  occultations restent rares (4 keypoints sur 413) : objets petits et
+  dispersés. Écart au papier : formes simples au lieu des objets YCB.
+- **03/11 — Rendu logiciel** : les notes de juin (collecteur v3) disent que
+  Gazebo peut tomber en rendu logiciel sur cette machine hybride (Intel +
+  NVIDIA ; `libEGL: failed to create dri2 screen`) et figer des images. Le
+  message apparaît encore, alors que `nvidia-smi` montre le serveur sur le
+  GPU. Pour la grande collecte, forcer le GPU :
+  `__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
+  __GLX_VENDOR_LIBRARY_NAME=nvidia __NV_PRIME_RENDER_OFFLOAD=1`.
 - **03/11 — ADD et PCK** : à PCK@5 0,93, l'ADD médiane vaut 17,7 mm mais le
   p90 65 mm : 6 points quasi alignés conditionnent mal le PnP en profondeur.
   Toujours donner la part sous 20 mm et l'AUC avec échecs comptés.

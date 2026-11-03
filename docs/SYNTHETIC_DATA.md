@@ -171,6 +171,7 @@ le GPU et la simulation tombe à 0,08× le temps réel.
 | `joints_complets.csv` | positions **mesurées** de toutes les articulations (bras et 6 de la pince), horodatages simulés de l'image et des articulations |
 | `robot.urdf` | l'URDF réellement chargé dans Gazebo (`/robot_description`) |
 | `masques.csv`, `images/masque/` | masque du robot, `frais = 1` s'il vient du même rendu que l'image |
+| `distracteurs.csv` | chaque distracteur posé : trame de début de son lot, forme, dimensions, couleur, pose monde |
 | `composition.csv` | après `composer_fonds.py` : trame composée ou non, image de fond |
 
 ### Annotations NDDS complètes (`convert_to_ndds_camera_libre.py`)
@@ -196,6 +197,7 @@ cinématique `training/dream/fk_urdf.py` (écart aux keypoints de
 | `objects[0].bbox_keypoints`, `bbox_masque`, `part_robot` | boîtes englobantes `[x_min, y_min, x_max, y_max]` et part de l'image couverte par le robot |
 | `camera_data` | intrinsèques, pose de la caméra dans le monde (monde ← caméra), azimut autour du point visé, distance, hauteur |
 | `source` | collecte et index d'origine, horodatages, masque frais, fond composé et image de fond |
+| `distracteurs` | les distracteurs en place : forme, dimensions, couleur, position monde et caméra, projection, `dans_image` |
 | `XXXXXX.seg.png` | masque du robot (255 = bras et pince), nettoyé des 4 caméras fixes de l'URDF, quand il est frais |
 
 ---

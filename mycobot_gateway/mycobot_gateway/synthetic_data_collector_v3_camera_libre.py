@@ -52,7 +52,7 @@ from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPo
 from sensor_msgs.msg import Image, JointState
 from std_msgs.msg import String
 from ros_gz_interfaces.msg import Entity
-from ros_gz_interfaces.srv import SetEntityPose
+from ros_gz_interfaces.srv import DeleteEntity, SetEntityPose, SpawnEntity
 
 from mycobot_gateway.synthetic_data_collector_v3_garde_basse import CollecteurGardeBasse
 
@@ -156,6 +156,18 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
             QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
                        history=HistoryPolicy.KEEP_LAST, depth=1))
         self._ouvre_client_pose()
+        self.declare_parameter('distracteurs', True)
+        self._distracteurs_actifs = self.get_parameter('distracteurs').value
+        self._distracteurs = []
+        self._n_lots = 0
+        self.chemin_distracteurs = os.path.join(self.output_dir, 'distracteurs.csv')
+        with open(self.chemin_distracteurs, 'w', newline='') as f:
+            csv.writer(f).writerow(['index_debut', 'nom', 'forme', 'dim_x', 'dim_y', 'dim_z',
+                                    'r', 'g', 'b', 'x', 'y', 'z', 'roulis', 'tangage', 'lacet'])
+        self._cli_creer = self._noeud_pose.create_client(
+            SpawnEntity, f'/world/{self.world_name}/create')
+        self._cli_retirer = self._noeud_pose.create_client(
+            DeleteEntity, f'/world/{self.world_name}/remove')
         self.get_logger().warn(
             f'camera LIBRE : pose retiree a chaque trame '
             f'(distance {self.DIST_MIN:.2f}-{self.DIST_MAX:.2f} m, elevation '
@@ -532,6 +544,19 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
     # de l'ordre de la milliseconde, et une expiration ici coute une trame.
     ATTENTE_POSE = 5.0
 
+    # Distracteurs (E3.4 de docs/ARTICLE_DREAM.md ; Lee et al. 2020, § II.C) :
+    # formes simples aux couleurs tirees, renouvelees par lot au rythme de
+    # l'eclairage pour borner les appels a Gazebo. VISUELLES SEULEMENT (ni
+    # collision ni physique) : elles ne peuvent ni bloquer le bras ni deplacer
+    # quoi que ce soit, et n'ont pas le label du robot, donc le masque les
+    # traite en fond et `masque_au_point` signale les keypoints qu'elles
+    # cachent. Une part flotte pour cacher le bras sous des angles varies.
+    PERIODE_DISTRACTEURS = 40
+    N_DISTRACTEURS = (2, 6)
+    RAYON_DISTRACTEURS = (0.12, 0.65)
+    PART_FLOTTANTS = 0.3
+    HAUTEUR_FLOTTANTS = (0.05, 0.50)
+
     def _ouvre_client_pose(self):
         """Un client de service ROS unique, permanent, pour toute la collecte.
 
@@ -556,6 +581,68 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
             rclpy.shutdown()
             return
         self.get_logger().warn('set_pose via le pont ROS — aucun processus lance')
+
+    def _appel(self, client, requete):
+        futur = client.call_async(requete)
+        self._exec_pose.spin_until_future_complete(futur, timeout_sec=self.ATTENTE_POSE)
+        if futur.done() and futur.result() is not None:
+            return futur.result().success
+        futur.cancel()
+        return False
+
+    def _tire_distracteur(self):
+        forme = random.choice(['box', 'cylinder', 'sphere'])
+        if forme == 'box':
+            dims = [random.uniform(0.02, 0.14) for _ in range(3)]
+            geometrie = f'<box><size>{dims[0]:.4f} {dims[1]:.4f} {dims[2]:.4f}</size></box>'
+        elif forme == 'cylinder':
+            r, h = random.uniform(0.015, 0.06), random.uniform(0.04, 0.22)
+            dims = [2 * r, 2 * r, h]
+            geometrie = f'<cylinder><radius>{r:.4f}</radius><length>{h:.4f}</length></cylinder>'
+        else:
+            r = random.uniform(0.015, 0.07)
+            dims = [2 * r] * 3
+            geometrie = f'<sphere><radius>{r:.4f}</radius></sphere>'
+        couleur = [random.random() for _ in range(3)]
+        # Le rayon minimal compte la taille de l'objet : mesure du 03/11, a
+        # 0,12 m du seul centre, des boites de 14 cm traversaient le socle.
+        rayon = random.uniform(self.RAYON_DISTRACTEURS[0] + max(dims) / 2.0, self.RAYON_DISTRACTEURS[1])
+        angle = random.uniform(-math.pi, math.pi)
+        z = (random.uniform(*self.HAUTEUR_FLOTTANTS) if random.random() < self.PART_FLOTTANTS
+             else dims[2] / 2.0)
+        rpy = [random.uniform(-math.pi, math.pi) for _ in range(3)] if z > dims[2] else [0.0, 0.0, random.uniform(-math.pi, math.pi)]
+        return forme, dims, geometrie, couleur, (rayon * math.cos(angle), rayon * math.sin(angle), z), rpy
+
+    def _renouvelle_distracteurs(self):
+        """Retire le lot precedent, en pose un nouveau, consigne ce qui a abouti."""
+        for nom in self._distracteurs:
+            requete = DeleteEntity.Request()
+            requete.entity = Entity(name=nom, type=Entity.MODEL)
+            self._appel(self._cli_retirer, requete)
+        self._distracteurs = []
+        self._n_lots += 1
+        for k in range(random.randint(*self.N_DISTRACTEURS)):
+            forme, dims, geometrie, couleur, xyz, rpy = self._tire_distracteur()
+            nom = f'distracteur_{self._n_lots}_{k}'
+            r, g, b = couleur
+            sdf = (f'<sdf version="1.9"><model name="{nom}"><static>true</static><link name="l">'
+                   f'<visual name="v"><geometry>{geometrie}</geometry><material>'
+                   f'<ambient>{r:.3f} {g:.3f} {b:.3f} 1</ambient><diffuse>{r:.3f} {g:.3f} {b:.3f} 1</diffuse>'
+                   f'</material></visual></link></model></sdf>')
+            requete = SpawnEntity.Request()
+            requete.entity_factory.name = nom
+            requete.entity_factory.sdf = sdf
+            requete.entity_factory.pose.position.x, requete.entity_factory.pose.position.y, \
+                requete.entity_factory.pose.position.z = xyz
+            (requete.entity_factory.pose.orientation.x, requete.entity_factory.pose.orientation.y,
+             requete.entity_factory.pose.orientation.z, requete.entity_factory.pose.orientation.w) = \
+                self._quaternion(*rpy)
+            if self._appel(self._cli_creer, requete):
+                self._distracteurs.append(nom)
+                with open(self.chemin_distracteurs, 'a', newline='') as f:
+                    csv.writer(f).writerow([self.sample_idx, nom, forme] + [round(v, 4) for v in dims]
+                                           + [round(v, 3) for v in couleur] + [round(v, 4) for v in xyz]
+                                           + [round(v, 4) for v in rpy])
 
     def _applique(self, pose):
         """Applique la pose et ne l'enregistre QUE si l'appel a abouti.
@@ -743,6 +830,8 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
         # plus du tout de gz-transport.
         if self.sample_idx % self.PERIODE_ECLAIRAGE == 0:
             super()._randomize_scene()
+        if self._distracteurs_actifs and self.sample_idx % self.PERIODE_DISTRACTEURS == 0:
+            self._renouvelle_distracteurs()
         pose = self._tire_pose()
         if pose is not None:
             self._applique(pose)

@@ -124,6 +124,10 @@ def generate_launch_description():
             # remettre le compteur a zero. Le pont, lui, est un processus unique
             # et permanent : un seul noeud gz-transport pour toute la collecte.
             f'/world/{WORLD_NAME}/set_pose@ros_gz_interfaces/srv/SetEntityPose',
+            # Distracteurs (E3.4) : meme raison, un pont permanent plutot qu'un
+            # `gz service` par lot.
+            f'/world/{WORLD_NAME}/create@ros_gz_interfaces/srv/SpawnEntity',
+            f'/world/{WORLD_NAME}/remove@ros_gz_interfaces/srv/DeleteEntity',
         ],
         remappings=[(f'/world/{WORLD_NAME}/model/mycobot_320/joint_state',
                      '/gz/joint_states')])

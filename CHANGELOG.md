@@ -27,6 +27,12 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **`scripts/garde_thermique.sh <pid> <journal>`** : pause d'un entraînement
   au-delà de 90 °C, reprise sous 80 °C. À n'utiliser que sur un entraînement
   lancé détaché (`setsid nohup`).
+- **Distracteurs dans la collecte caméra libre** (E3.4) : 2 à 6 formes
+  (boîtes, cylindres, sphères) aux couleurs tirées, visuelles seules, posées
+  sur la table ou flottantes, renouvelées toutes les 40 trames par le pont
+  ROS (`/world/<monde>/create` et `remove`) ; paramètre `distracteurs`
+  (défaut vrai) ; consignées dans `distracteurs.csv` et dans le champ
+  `distracteurs` des annotations.
 - **Annotations NDDS complètes** (`training/dream/annotations_completes.py`,
   `training/dream/fk_urdf.py`) : pose caméra-robot, 12 articulations
   mesurées, 18 liens en 3D et 2D, bouts des doigts, boîtes, masque
