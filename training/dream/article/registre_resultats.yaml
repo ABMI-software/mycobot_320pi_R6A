@@ -138,3 +138,13 @@ resultats:
     reserve: "pose d'observation hors domaine (J5 ≈ 2°) ; cas courant à citer à côté de E"
     comparable_papier: apres_recalcul
     recalcul: "E1, 29/10, depuis les CSV de la session : tout n = 994, PCK 0,627/0,772/0,819 ; J5 dans [45, 93]° n = 679, 0,733/0,891/0,937 ; statique (= pose d'observation) n = 401, 0,578/0,736/0,776 ; dynamique n = 571, 0,671/0,808/0,860. Pas d'ADD (pas de 3D). Metrologue : a_preciser — images à ~0,2 s, n efficace de quelques dizaines de poses (bootstrap par blocs à faire) ; offsets signés 1-4 px par caméra. Contrôles du 29/10 : aucune image commune avec le fine-tuning (md5, 1 473 images), 0,3 % des 612 poses à moins de 2° d'une pose d'entraînement ; IC 95 % bootstrap par blocs de 2 s : tout (94 blocs) [0,585 ; 0,667] / [0,726 ; 0,814] / [0,775 ; 0,857] ; J5 45-93° (63 blocs) [0,703 ; 0,762] / [0,861 ; 0,917] / [0,912 ; 0,959] ; 6 points dans ic_bootstrap_blocs.json"
+
+  - id: E3.0
+    affirmation: "Synthétique seul, caméra libre sans randomisation d'apparence (vgg_e3_0_camlibre_synth_e50_b, 17 702 images) : secteur d'azimut 60-100° tenu à l'écart PCK 0,712/0,932/0,977, ADD médiane 17,7 mm ; real_tri_test PCK 0,006/0,014/0,080, détection 0,534"
+    source: docs/ARTICLE_DREAM.md
+    archive: ~/dream_article/E3/E3_0/
+    tenu_a_l_ecart: "secteur d'azimut 60-100° (élévation, distance et décor partagés) ; réel : autre domaine"
+    verdict: a_preciser
+    reserve: "Metrologue 03/11 : réel tenu comme échec mesuré (0,03 identique), cause confondue (apparence, couverture des 2 caméras réelles, distorsion, pose d'observation) ; 1 entraînement, 1 graine ; vue tenue = interpolation d'azimut, poses articulaires non disjointes, pas d'IC ni de md5 ; ADD vue tenue p90 65,3 mm, AUC 0-100 mm 0,729 ; ADD réelle AUC 0,045 (échecs comptés). Formulation admise : « sans randomisation d'apparence, un modèle synthétique seul à caméra libre ne transfère pas à nos deux caméras réelles (PCK@5 0,014, n = 200, 1 graine) »"
+    comparable_papier: non
+    recalcul: "témoin caméra fixe à volume égal et 3 graines pour attribuer l'effet ; IC par blocs par caméra ; couverture des poses de caméra synthétiques contre les 2 réelles ; test de décalage"

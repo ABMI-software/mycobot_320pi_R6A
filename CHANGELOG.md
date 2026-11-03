@@ -27,6 +27,13 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **`scripts/garde_thermique.sh <pid> <journal>`** : pause d'un entraînement
   au-delà de 90 °C, reprise sous 80 °C. À n'utiliser que sur un entraînement
   lancé détaché (`setsid nohup`).
+- **`training/dream/composer_fonds.py`** (E3.3) : pose le robot masqué sur
+  une image COCO tirée au hasard (recadrage, échelle 1-1,6, miroir, bord
+  adouci d'un pixel) pour une part `--part` des trames à masque frais, dans
+  un dossier jumeau de la collecte ; `composition.csv` trace chaque trame.
+- **E3.0 mesuré (03/11)** : synthétique seul, secteur d'azimut tenu à
+  l'écart PCK@5 0,932, banc réel PCK@5 0,014 (détection 0,534) : sans
+  randomisation d'apparence, pas de transfert à nos deux caméras réelles.
 - E3.0 lancé : DREAM synthétique seul sur le jeu caméra libre de septembre
   (17 702 images), référence sans randomisation d'apparence.
 

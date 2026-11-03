@@ -108,10 +108,10 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 
 | Étape | Contenu | Critère de sortie | État |
 |---|---|---|---|
-| E3.0 | Référence : synthétique seul sur le jeu caméra libre de septembre (17 702 images, pince montée, sans randomisation d'apparence), encodage DREAM | Checkpoint `vgg_e3_0_camlibre_synth_e50`, évalué sur la vue tenue et `real_tri_test` | en cours : relancé le 29/10 à 16:55, détaché, sur les cœurs 20-27, garde thermique `scripts/garde_thermique.sh` (`~/dream_article/E3/E3_0/journal_b.txt`) ; le premier essai a été tué à l'époque 7 |
+| E3.0 | Référence : synthétique seul sur le jeu caméra libre de septembre (17 702 images, pince montée, sans randomisation d'apparence), encodage DREAM | Checkpoint `vgg_e3_0_camlibre_synth_e50`, évalué sur la vue tenue et `real_tri_test` | fait le 03/11 (registre E3.0, `a_preciser`) : azimut tenu à l'écart PCK@5 0,932 ; réel `real_tri_test` PCK@5 0,014, détection 0,534 — ne transfère pas sans randomisation d'apparence |
 | E3.1 | Collecteur caméra libre : contrôle visuel des labels reprojetés | 24 images, keypoints superposés au robot à l'œil sur toutes | fait le 29/10 : jeu de septembre (23 272 images collectées, 17 702 + 2 145 vue tenue en NDDS), labels sur le robot partout, vue tenue comprise |
 | E3.2 | Masque du robot : caméra de segmentation au même endroit que la caméra libre | Masque par image, aligné au pixel sur le rendu | fait le 29/10 : capteur `cam_libre_masque` (label 1 via `mycobot_pro_320_pi_gazebo_masque.urdf.xacro`), `images/masque/` + `masques.csv` ; capture resynchronisée sur l'horodatage : 31/40 masques du même rendu que l'image, tous alignés au pixel (planche de 24), les 9 autres marqués `frais = 0` |
-| E3.3 | Fonds aléatoires : composition hors ligne derrière le masque, sur une part des images | Source d'images choisie (décision utilisateur), part fixée, 50 images contrôlées | à faire |
+| E3.3 | Fonds aléatoires : composition hors ligne derrière le masque, sur une part des images | Source d'images choisie (décision utilisateur), part fixée, 50 images contrôlées | fait le 03/11 : COCO val2017 (5 000 images, comme le papier, `~/dream_article/fonds/coco/val2017`) ; `training/dream/composer_fonds.py --part 0.5` par défaut (la part est un facteur de E4) ; 31 trames composées sur 40, keypoints en place sur la planche de 24 |
 | E3.4 | Distracteurs : primitives aux couleurs tirées, apparues et retirées à chaque lot, occultations comprises | Labels inchangés, collecte stable sur 1 000 images | à faire |
 | E3.5 | Recoloration du robot et lumières libres (couleur, nombre) | Diversité visible sur une planche de 50 images | à faire |
 | E3.6 | Pince montée | Pince visible, keypoints identiques au schéma à 7 points | fait : le launch caméra libre monte déjà la pince Pro (`mycobot_pro_320_pi_gazebo.urdf`), visible sur la planche de E3.1 |
@@ -162,6 +162,25 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   « statique » d'une session de tri est surtout cette pose.
 - **29/10 — Effectif** : les images d'une session à ~0,2 s d'intervalle sont
   corrélées ; un IC se calcule par blocs (2 s ou par pose), jamais sur n images.
+- **03/11 — E3.0, diversité de caméra sans apparence** : synthétique seul sur
+  17 702 images caméra libre, le modèle est bon dans son domaine (secteur
+  d'azimut tenu à l'écart : PCK@5 0,932, médiane 1,85 px) et nul sur le banc
+  réel (PCK@5 0,014, détection 0,534 ; papier en synthétique seul : 0,83).
+  Formulation tenue par le metrologue : « sans randomisation d'apparence, un
+  modèle synthétique seul à caméra libre ne transfère pas à nos deux caméras
+  réelles ». On ne peut pas en conclure que la diversité de caméra n'aide pas :
+  il faudrait un témoin à caméra fixe et 3 graines. Le « secteur tenu à
+  l'écart » est une interpolation d'azimut (élévation, distance, décor
+  partagés), pas un point de vue absolument nouveau.
+- **03/11 — Composition des fonds (E3.3)** : elle se fait hors ligne sur la
+  collecte brute, avant la conversion NDDS, dans un dossier jumeau ; labels et
+  poses de caméra sont copiés tels quels. Le robot flotte sans table ni ombre,
+  comme dans le papier. Les 4 caméras fixes de l'URDF sont des liens du modèle
+  robot : elles portent son label et restent dans le masque, petites boîtes
+  sombres sur certains fonds (déjà présentes dans les rendus bruts).
+- **03/11 — ADD et PCK** : à PCK@5 0,93, l'ADD médiane vaut 17,7 mm mais le
+  p90 65 mm : 6 points quasi alignés conditionnent mal le PnP en profondeur.
+  Toujours donner la part sous 20 mm et l'AUC avec échecs comptés.
 - **29/10 — Jeu caméra libre existant** : 17 702 images NDDS + 2 145 d'un
   secteur d'azimut tenu à l'écart (60-100°, `convert_to_ndds_camera_libre.py
   --azimut-tenu`), pince montée, collectées en septembre. Aucun modèle
