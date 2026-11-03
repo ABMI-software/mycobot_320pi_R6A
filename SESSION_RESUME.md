@@ -1,5 +1,27 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (3 novembre 2026 — fin d'après-midi, pilote E3.7 en cours)
+
+### Ce qui a été accompli
+- E3.0 mesuré (synthétique seul, caméra libre sans apparence) : PCK@5 0,932 sur le secteur tenu, 0,014 sur le banc réel ; registre `a_preciser`.
+- E3.3 (fonds COCO), E3.4 (distracteurs), E3.5 (lumières ajoutées, robot teinté), E3.6b (annotations NDDS complètes pour RoboPEPP & co) faits et committés.
+- Corrigé : garde au sol de la pince (1,0 % des images de septembre ont les doigts dans la table), masque pollué par les 4 caméras de l'URDF, plantage de la caméra de segmentation par les lumières ajoutées.
+- Pilote E3.7 de 1 000 images lancé à 17:15, détaché (`~/dream_article/E3/E3_7_pilote/`) : 51 images à 17:23, 44 masques frais.
+
+### Décisions prises
+- Fonds : COCO val2017 (`~/dream_article/fonds/coco/val2017`).
+
+### Prochaines actions
+1. [ROUGE] Relire le pilote : `launch.log` (plantages, gels), part de masques frais, cadence. Mesurée au début : ~10 s/image, soit ~2 h 45 pour 1 000 et **~11 jours pour 100 000** — décider du volume ou accélérer (settle_time, plusieurs vues par pose) avant de lancer E3.7.
+2. [ROUGE] Arrêter Gazebo à la fin du pilote : il ne s'arrête pas seul (`pgrep -a "gz|ruby"` puis `kill -INT` par PID).
+3. [JAUNE] Commit des changements du pilote s'il y en a ; puis E3.7, E3.8 (pilote d'encodage), E3.9, E3.10 (avec E2 au banc).
+
+### Commande rapide de reprise
+```bash
+bash scripts/etat_session.sh
+grep -oE "📸 \[[0-9]+/1000\]" ~/dream_article/E3/E3_7_pilote/launch.log | tail -1
+```
+
 ## État actuel (29 octobre 2026 — soir, E3 démarré)
 
 ### Ce qui a été accompli aujourd'hui
