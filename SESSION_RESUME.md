@@ -1,5 +1,27 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (4 novembre 2026 — après-midi, collecte E3.7 en cours)
+
+### Ce qui a été accompli
+- Pilote E3.7 de 1 000 images : complet, 0 gel, 97,5 % de masques frais ; deux défauts trouvés et corrigés : le bras bouge encore pendant les vues et les articulations étaient lues jusqu'à 1 s de l'image → angles **interpolés au temps de l'image** (100/100, contrôlé à l'œil sur un bras en mouvement).
+- Cadence ramenée de 9,1 à 4,1 s/image (`max_settle_skips:=1`).
+- `scripts/collecte_tranches.sh` : collecte par tranches relancées, reprise automatique.
+- **E3.7 lancé le 04/11 à 14:50** : 50 000 images (10 tranches de 5 000, ~5,7 h chacune, ~2,5 jours), `~/dream_article/E3/E3_7/`.
+
+### Décisions prises
+- 50 000 images d'abord ; 100 000 à décider après l'évaluation de E3.9.
+
+### Prochaines actions
+1. [ROUGE] Suivre `~/dream_article/E3/E3_7/journal.txt` (une ligne par tranche). Une tranche « INTERROMPUE » : regarder son `launch.log`. Relancer le script reprend où il s'était arrêté. Ne rien lancer sur le GPU pendant la collecte.
+2. [ROUGE] À la fin : `composer_fonds.py --part 0.5 --part-teinte 0.3` sur chaque tranche, puis `convert_to_ndds_camera_libre.py --input <tranches,…> --azimut-tenu 60,100`, md5 des labels dans `run.yaml`.
+3. [JAUNE] E3.8 (pilote 10k : encodage entier σ 2 contre sous-pixel σ 1), puis E3.9, E3.10 (avec E2 au banc).
+
+### Commande rapide de reprise
+```bash
+bash scripts/etat_session.sh
+cat ~/dream_article/E3/E3_7/journal.txt
+```
+
 ## État actuel (3 novembre 2026 — fin d'après-midi, pilote E3.7 en cours)
 
 ### Ce qui a été accompli
