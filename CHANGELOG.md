@@ -27,6 +27,10 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **`scripts/garde_thermique.sh <pid> <journal>`** : pause d'un entraînement
   au-delà de 90 °C, reprise sous 80 °C. À n'utiliser que sur un entraînement
   lancé détaché (`setsid nohup`).
+- **`scripts/collecte_tranches.sh <dossier> <n> [par_tranche]`** : collecte
+  caméra libre par tranches, Gazebo relancé à chaque tranche (la cadence
+  dérive sinon), arrêté proprement, reprise où l'on s'était arrêté
+  (fichier `fait`), journal daté.
 - **Articulations au temps de l'image** (collecteur caméra libre) : les
   angles écrits dans `labels.csv` et `joints_complets.csv` sont interpolés
   au temps simulé de l'image dans un historique de `/joint_states`, au lieu
