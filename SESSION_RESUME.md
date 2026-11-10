@@ -1,5 +1,25 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (10 novembre 2026 — matin, E3.7 presque fini, protocoles E2 et E3.8)
+
+### Ce qui a été accompli
+- E3.7 : 8 tranches closes sur 10 (39 740 images), la 9e en cours. La cadence dérive dans chaque tranche (3,7 → 23 s/image, ~12 s en moyenne) : 4 tranches ont touché le délai à 4 866-4 988 images, données valides, marquées `fait` à la main.
+- Composition des fonds lancée sur les tranches closes, 4 à la fois sur les cœurs 20-27 : `~/dream_article/E3/E3_7/scripts/composer_tranches.sh` (relançable), suivi dans `journal_compose.txt`.
+- Protocole E2 rédigé : [`docs/PROTOCOLE_E2_MULTIVUES.md`](docs/PROTOCOLE_E2_MULTIVUES.md) (6-10 positions, ≥ 2 dans le secteur 60-100°, mêmes 50 poses partout, graine 2001, leave-one-out ≤ 3 mm, contrôle en hauteur).
+- Protocole E3.8 rédigé dans `docs/ARTICLE_DREAM.md` (3 bras : entier σ 2, sous-pixel σ 2, sous-pixel σ 1 ; choix sur le secteur tenu, jamais sur le réel).
+- Bibliographie confiée à l'agent `veilleur-biblio` (`training/dream/article/biblio.md`).
+
+### Prochaines actions
+1. [ROUGE] Fin de E3.7 prévue le 11/11 vers midi : relancer `composer_tranches.sh` pour les tranches 09-10, puis `convert_to_ndds_camera_libre.py --input <tranches>/compose,… --azimut-tenu 60,100`, md5 dans `run.yaml`.
+2. [ROUGE] E2 : lever les 4 préalables du protocole (option d'extrinsèque dans `capture_real_tri.py`, script azimut/distance/élévation, bloc du contrôle en hauteur, supports de caméra), puis la session au banc.
+3. [JAUNE] E3.8 dès que le GPU est libre (tranches 01-02), puis E3.9, E3.10.
+
+### Commande rapide de reprise
+```bash
+bash scripts/etat_session.sh
+cat ~/dream_article/E3/E3_7/journal.txt ~/dream_article/E3/E3_7/journal_compose.txt
+```
+
 ## État actuel (4 novembre 2026 — après-midi, collecte E3.7 en cours)
 
 ### Ce qui a été accompli

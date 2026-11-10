@@ -61,7 +61,7 @@ Chaque expérience suit `.claude/skills/campagne-mesure` (protocole écrit avant
 | Id | Expérience | Dépend de | Critère de sortie | Priorité | État |
 |---|---|---|---|---|---|
 | E1 | Métriques du papier (PCK + AUC, ADD, seuils 0,01 et 0,03) recalculées pour les modèles existants | — | Tableau au format du tableau I du papier pour les jeux A, E, E', G du registre | rouge | fait le 29/10 : tableau pour A, E, E', G avec PCK 7 et 6 points, ADD, deux seuils, IC bootstrap par blocs, md5 train/test (registre, `~/dream_article/E1/`). Tout reste `a_preciser` : référence ArUco et point de vue unique, que seul E2 lève |
-| E2 | Jeu réel multi-vues : 6 à 10 positions de caméra jamais vues, référence indépendante de DREAM | — | Jeu figé, md5, positions relevées, leave-one-out de l'extrinsèque publié | rouge | à faire |
+| E2 | Jeu réel multi-vues : 6 à 10 positions de caméra jamais vues, référence indépendante de DREAM | — | Jeu figé, md5, positions relevées, leave-one-out de l'extrinsèque publié | rouge | protocole rédigé le 10/11 ([`PROTOCOLE_E2_MULTIVUES.md`](PROTOCOLE_E2_MULTIVUES.md)) ; session au banc à faire, 4 préalables listés |
 | E3 | Synthétique seul multi-vues : caméra libre + randomisation du papier + augmentation v5, aucune image réelle | E1 | PCK@5 ≥ 0,83 et PCK@10 ≥ 0,90 sur E2 ; test de décalage ≥ 95 % ; ADD ≥ 0,80 à 20 mm | rouge | en cours : feuille de route E3.1-E3.10 ci-dessous |
 | E4 | Ablations : résolution Q/H/F, encodage des cartes (entier contre sous-pixel), volume 25k/50k/100k, perte L2 contre pondérée, recette du papier, randomisation par bloc | E3 | Un tableau par facteur, 3 graines minimum | jaune | à faire |
 | E5 | Plusieurs images contre hand-eye (marqueur sur la bride) : erreur en fonction du nombre d'images | E2 | Courbe équivalente à la Fig. 6 du papier | jaune | à faire |
@@ -123,6 +123,30 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 
 E3.10 dépend de E2 (jeu réel multi-vues), qui demande une session au banc : la
 préparer pendant que la collecte et l'entraînement tournent.
+
+### Protocole de E3.8 (rédigé le 10/11, avant mesure)
+
+- **Objectif** : choisir l'encodage des cartes de croyance de E3.9 sur du
+  synthétique seul, sans regarder une image réelle.
+- **Données** : les tranches 01 et 02 de E3.7, composées (~9 850 images),
+  converties avec `--azimut-tenu 60,100`. Entraînement sur le reste, **test
+  sur le secteur tenu à l'écart** de ces deux tranches (~1 100 images).
+- **Trois bras**, identiques à tout le reste près (VGG-19 ImageNet, sans
+  `--pretrained`, `train_dream_ultimate_v5_geo.py`, 50 époques, patience 8,
+  graine 42, `taskset -c 16-27`), ~3 h chacun :
+  `--encodage entier` (σ 2, DREAM) ; `--encodage sous-pixel --sigma-carte 2` ;
+  `--encodage sous-pixel --sigma-carte 1`. Le bras du milieu sépare l'effet de
+  l'encodage de celui de σ.
+- **Mesure** : `eval_papier.py` sur le secteur tenu, PCK@2,5/5/10 (non détecté
+  = faux), AUC 0-20 px, détection ; IC bootstrap par pose (3 vues d'une pose
+  dans le même bloc), et IC de la **différence** à l'encodage entier.
+- **Critère de sortie** : on retient le sous-pixel σ 1 si son PCK@2,5 dépasse
+  l'entier d'au moins **0,05** avec un IC de la différence qui exclut 0, sans
+  perdre plus de 0,01 en PCK@5, PCK@10 et détection ; sinon le sous-pixel σ 2
+  à la même règle ; sinon l'entier. Choix **provisoire** (une graine) : E4
+  le rejoue sur 3 graines.
+- **Ne pas faire** : départager sur `real_tri_test` ou sur E2 (ce serait choisir
+  sur le test) ; prolonger un bras qui perd « pour lui laisser sa chance ».
 
 ### Point de départ de E3
 
