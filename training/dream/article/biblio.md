@@ -1,34 +1,94 @@
 # Bibliographie de l'article DREAM
 
-Tenue par l'agent `veilleur-biblio`. Une ligne « vérifié : non » n'est pas
-citable : la référence a été notée de mémoire le 29/10/2026 et doit être
-ouverte, contrôlée et complétée (lieu, pages, chiffres publiés).
+Tenue par l'agent `veilleur-biblio`. Mise à jour le 10/11/2026 : chaque ligne
+marquée « oui » a été ouverte (arXiv, ar5iv, Crossref ou PDF local) et ses
+chiffres relevés sur la page ouverte. Une ligne « non » n'est pas citable.
+
+Conventions : ADD AUC = aire sous la courbe de réussite ADD de 0 à 100 mm, en % ;
+PCK en fraction. « Angles connus » = les angles articulaires sont une entrée de
+la méthode. « Synthétique seul » = aucune image réelle, même non étiquetée, à
+l'entraînement. Les chiffres DREAM-F/Q/H cités par des tiers sont ceux du papier
+DREAM recopiés : on cite de préférence la source première.
+
+Réserves de vérification :
+
+- Le **lieu** de publication n'est considéré lu que si la colonne le dit. Sinon il
+  vient du champ « comments » arXiv ou d'un résultat de recherche : « lieu à
+  confirmer » sur la page de l'éditeur.
+- SGTAPose et RoboPose ont été lus sur le miroir ar5iv (le PDF arXiv n'est pas
+  lisible par l'outil).
+- Les tableaux d'articles tiers qui recopient DREAM ne remplacent pas le tableau I
+  du papier DREAM (lu dans `papiers/`).
 
 ## Keypoints + PnP, caméra → robot
 
 | Travail | Année | Hypothèses | Jeux / métriques | Chiffres publiés | Vérifié |
 |---|---|---|---|---|---|
-| Lee et al., « Camera-to-Robot Pose Estimation from a Single Image » (DREAM), ICRA, [arXiv:1911.09231](https://arxiv.org/abs/1911.09231) | 2020 | Angles connus, synthétique seul, 1 vue | Panda-3Cam, Panda-Orb ; PCK, ADD | Tableau I : RS 0,24 / 0,83 / 0,96 (PCK@2,5/5/10) ; Orb 0,28 / 0,67 / 0,83 ; tableau II : erreur atteinte 27,4 ± 4,7 mm | oui (`papiers/`) |
-| Lambrecht & Kästner, ICAR | 2019 | Réel + synthétique | — | — | non |
-| Lu et al., placement optimisé des keypoints, RA-L | 2022 | — | — | — | non |
+| Lee, Tremblay, To, Cheng, Mosier, Kroemer, Fox, Birchfield, « Camera-to-Robot Pose Estimation from a Single Image » (DREAM), ICRA 2020, [arXiv:1911.09231](https://arxiv.org/abs/1911.09231) (v1 nov. 2019, v4 avr. 2020) | 2020 | Angles connus, synthétique seul (~100k images randomisées par robot, 50 époques), 1 vue, intrinsèques connus ; Kuka et Baxter entraînés mais **qualitatif seulement** (azimut Baxter limité à ±45°) | Panda-3Cam (XK, RS, AK), Panda-Orb (caméra à poses multiples), sim DR / non-DR ; PCK@2,5/5/10 px, ADD@20/40/60 mm, AUC | Tableau I, DREAM-vgg-F, PCK@2,5 / 5 / 10 puis ADD@20 / 40 / 60 : XK 0,15 / 0,37 / 0,59 puis 0,23 / 0,48 / 0,54 ; RS 0,24 / 0,83 / 0,96 puis 0,80 / 0,83 / 0,87 ; AK 0,36 / 0,65 / 0,90 puis 0,32 / 0,86 / 0,94 ; Orb 0,28 / 0,67 / 0,83 puis 0,57 / 0,77 / 0,80 ; sim DR 0,79 / 0,88 / 0,90 puis 0,81 / 0,88 / 0,90. Fig. 4, AUC PCK (Q / F / H) : XK 0,623 / 0,491 / 0,737 ; RS 0,731 / 0,794 / 0,799 ; AK 0,627 / 0,751 / 0,742. Fig. 4, AUC ADD : XK 0,427 / 0,416 / 0,638 ; RS 0,777 / 0,764 / 0,795 ; AK 0,537 / 0,705 / 0,630. Fig. 3 (sim DR), AUC PCK : Q 0,779, F 0,848, H 0,841. Tableau II (erreur atteinte, 5 marqueurs × 2 hauteurs), min / max / moyenne / écart-type en mm : DREAM (1 image RGB) 20,2 / 34,7 / 27,4 / 4,7 ; HEC (10 images) 9,4 / 51,3 / 28,2 / 14,2 ; DART (profondeur) 10,1 / 44,3 / 21,4 / 12,3. Fig. 6 : erreur ADD en fonction du nombre d'images, DREAM contre HEC. Texte : écart-type de la vérité terrain DART 1,6 mm (XK), 2,2 mm (RS), 2,9 mm (AK) | oui (`papiers/`, PDF pages 4-7 relues le 10/11 ; page arXiv ouverte pour le lieu) |
+| Lambrecht & Kästner, « Towards the Usage of Synthetic Data for Marker-Less Pose Estimation of Articulated Robots in RGB Images », 19th ICAR, pp. 240-247, DOI 10.1109/ICAR46387.2019.8981600 | 2019 | D'après DREAM (§ IV) : réseau de keypoints + PnP, **réel + synthétique** (pas synthétique seul) | Non relus | Non relus | oui pour la référence (Crossref ouvert : titre, auteurs, ICAR 2019, pp. 240-247) ; **non** pour l'hypothèse et les chiffres (texte non ouvert, l'hypothèse vient du papier DREAM) |
+| Lu, Richter, Yip, « Pose Estimation for Robot Manipulators via Keypoint Optimization and Sim-to-Real Transfer », IEEE RA-L vol. 7 no. 2, pp. 4622-4629, avril 2022, DOI 10.1109/LRA.2022.3151981, [arXiv:2010.08054](https://arxiv.org/abs/2010.08054) | 2022 | Choix itératif des keypoints en simulation, randomisation de domaine, synthétique ; Baxter et dVRK | Calibration caméra-robot, suivi d'outil | Résumé arXiv : « amélioré significativement », **aucun chiffre** ; tableaux non ouverts | oui pour la référence ; chiffres non relevés |
+| Lu, Richter, Yip, « Markerless Camera-to-Robot Pose Estimation via Self-supervised Sim-to-Real Transfer » (CtRNet), **CVPR 2023** (et non ICCV : corrigé), [arXiv:2302.14332](https://arxiv.org/abs/2302.14332) | 2023 | Angles connus (FK donne les keypoints 3D), pré-entraînement synthétique (1000 époques) **puis** auto-supervisé sur réel non étiqueté (500 époques) : **pas synthétique seul** | DREAM-real (AK, XK, RS, Orb) ; ADD AUC, ADD moyen (en-tête « m » tel qu'imprimé) | Tableau 1, AUC AK / XK / RS / Orb / tous : CtRNet 89,928 / 79,465 / 90,789 / 85,289 / 85,962 ; RoboPose 76,497 / 85,926 / 76,863 / 80,504 / 80,094 ; DREAM-F 68,912 / 24,359 / 76,130 / 61,930 / 60,740 ; DREAM-Q 52,382 / 37,471 / 77,984 / 57,087 / 56,988 ; DREAM-H 60,520 / 64,005 / 78,825 / 69,054 / 68,584. Pas de PCK sur ces jeux | oui |
+| Lu, Liang, Xie, Ritcher, Lin, Liu, Yip, « CtRNet-X: Camera-to-Robot Pose Estimation in Real-world Conditions Using a Single Camera », [arXiv:2409.10441](https://arxiv.org/abs/2409.10441) (ICRA 2025 d'après la page projet, lieu à confirmer) | 2024 | Angles connus, robot partiellement visible, parties détectées par modèle vision-langage ; pré-entraîné synthétique puis **auto-entraîné sur réel non étiqueté** : pas synthétique seul | DREAM-real (AK, XK, RS, Orb agrégés) ; jeu Panda propre de 60 épisodes ; ADD AUC, ADD moyen | Tableau II (DREAM-real agrégé), AUC : CtRNet-X 86,231, CtRNet 85,962, RoboPose 80,094, DREAM-H 68,584, DREAM-F 60,740, DREAM-Q 56,988. Tableau III (jeu propre, robot visible) : CtRNet 16,764, CtRNet-X une image 60,317, lot 70,817 ; (entrée-sortie) 35,944 / 59,828 / 79,665. Pas de PCK | oui |
+| Chen, Qin, Zhou, Su, « EasyHeC: Accurate and Automatic Hand-eye Calibration via Differentiable Rendering and Space Exploration », [arXiv:2305.01191](https://arxiv.org/abs/2305.01191) (lieu non lu) | 2023 | Angles connus (FK), modèle 3D du bras connu, 1 à 5 vues ; segmentation entraînée sur synthétique (affinée sur réel pour xArm) ; **repasse DREAM sur un xArm simulé (SAPIEN) et sur Baxter réel** | xArm synthétique, Baxter réel ; erreur de rotation (°), translation (cm), PCK 3D 2/5/10 cm | xArm synthétique, rotation (°), 1 / 2 / 3 / 4 / 5 vues : DREAM 1,924 / 1,240 / 0,981 / 0,764 / 0,704 ; EasyHeC (exploration) 0,322 / 0,128 / 0,109 / 0,097 / 0,081. Translation (cm), DREAM : 0,529 / 0,473 / 0,374 / 0,347 / 0,303. Baxter réel, PCK 3D @2/5/10 cm : DREAM 0,01 / 0,08 / 0,32 ; EasyHeC 1 vue 0,10 / 0,65 / 0,90 | oui |
+| Tang, Liu, Xu, Lu, « Kalib: Easy Hand-Eye Calibration with Reference Point Tracking », [arXiv:2408.10562](https://arxiv.org/abs/2408.10562) | 2024 | Sans entraînement (suivi de point par modèle de fondation, un clic) ; compare à DREAM en simulation Panda, caméra posée au hasard | RFUniverse (Panda), DROID (60 séquences) | Tableau II (sim), erreur x / y / z (cm) : DREAM 0,90 / 1,01 / 1,13 ; Kalib 0,30 / 0,45 / 0,60 ; rotation 0,01 rad pour les deux (en-têtes altérés dans la source, lecture à confirmer). Dit que générer les données DREAM d'un robot prend des heures | oui |
 
 ## Sim-to-real
 
 | Travail | Année | Hypothèses | Jeux / métriques | Chiffres publiés | Vérifié |
 |---|---|---|---|---|---|
-| Lu et al., CtRNet, ICCV | 2023 | Auto-supervisé par segmentation | — | — | non |
+| Labbé, Carpentier, Aubry, Sivic, « Single-view robot pose and joint angle estimation via render & compare » (RoboPose), CVPR 2021 (lieu à confirmer, la page ar5iv ne le dit pas), [arXiv:2104.09359](https://arxiv.org/abs/2104.09359) | 2021 | **Synthétique seul** (randomisation de domaine, § 3.3), angles connus **et** inconnus (deux colonnes), 1 vue | Baxter DR, Kuka DR/Photo, Panda DR/Photo, Panda-3Cam AK/XK/RS, Orb ; ADD AUC | Tableau 1, ADD AUC, angles connus (ResNet34) : AK 76,54, XK 85,97, RS 76,90, Orb 80,54 ; Panda DR 92,70, Photo 89,89 ; Kuka DR 89,62, Photo 86,87 ; Baxter DR 86,59. Angles inconnus : AK 70,37, XK 77,61, RS 74,31, Orb 70,39 ; Panda DR 82,85, Photo 79,72 ; Kuka DR 80,17, Photo 73,23 ; Baxter DR 32,66. Même tableau, DREAM-F : AK 68,91, XK 24,36, RS 76,13, Orb 61,93 ; DREAM-Q 52,38 / 37,47 / 77,98 / 57,09 ; DREAM-H 60,52 / 64,01 / 78,83 / 69,05. Pas de PCK | oui |
+| Goswami, Krishnamurthy, LeCun, Khorrami, « RoboPEPP: Vision-Based Robot Pose and Joint Angle Estimation through Embedding Predictive Pre-Training », CVPR 2025 (lieu à confirmer, la page HTML arXiv ne le dit pas), [arXiv:2411.17662](https://arxiv.org/abs/2411.17662) (v2 mai 2025) | 2025 | **Angles inconnus** ; pré-entraînement par masquage d'embeddings puis réglage fin ; synthétique randomisé puis auto-supervision sim-to-real sur réel (la page ne dit pas si le tableau 2 réel l'inclut) : à ne pas citer comme synthétique seul | Panda Photo/DR, AK, XK, RS, Orb ; Kuka ; Baxter ; ADD AUC, PCK, erreur d'angle | Tableau 2, ADD AUC RoboPEPP : Panda Photo 84,1, DR 83,0, AK 75,3, XK 78,5, RS 80,5, Orb 77,5 ; Kuka Photo 76,1, DR 76,2 ; Baxter DR 34,4. Tableau 4, PCK@2,5 / 5 / 10, DREAM puis RoboPEPP : DR 0,79 / 0,88 / 0,90 puis 0,84 / 0,91 / 0,93 ; AK 0,36 / 0,65 / 0,90 puis 0,16 / 0,62 / 0,93 ; XK 0,15 / 0,37 / 0,59 puis 0,09 / 0,37 / 0,96 ; RS 0,24 / 0,83 / 0,96 puis 0,31 / 0,82 / 0,97 ; Orb 0,28 / 0,67 / 0,83 puis 0,28 / 0,73 / 0,96 ; moyenne 0,43 / 0,71 / 0,85 puis 0,43 / 0,73 / 0,95. Tableau 3, erreur d'angle moyenne (°, sets synthétiques seuls, Panda DR) : RoboPEPP 3,8 ; HPE 4,4 ; RoboPose 4,9 | oui |
+| Zhou, Wang, Zhang, « Accurate Robot Arm Attitude Estimation Based on Multi-View Images and Super-Resolution Keypoint Detection Networks », Sensors 2024, DOI 10.3390/s24010305 | 2024 | Réseau entraîné **surtout sur synthétique puis affiné sur un petit jeu réel** ; 3 vues ; angles **estimés** par ajustement cinématique pondéré par la confiance | UR10 réel ; PCK@0,15 ; erreur d'angle | Résumé (Crossref) : PCK@0,15 = 96,07 % ; erreur d'angle moyenne 0,53° à 3 vues. Tableaux et protocole non ouverts | oui pour la référence (Crossref) et le résumé ; protocole et tableaux **non** relus |
+| Tremblay, Tyree, Mosier, Birchfield, « Indirect Object-to-Robot Pose Estimation from an External Monocular RGB Camera », IROS 2020 (d'après les commentaires arXiv), [arXiv:2008.11822](https://arxiv.org/abs/2008.11822) | 2020 | DREAM utilisé en ligne pour calibrer une caméra qui peut bouger ; deux réseaux **entièrement synthétiques** | Saisie réelle d'objets | Résumé : aucun chiffre ; tableaux non ouverts | oui pour la référence ; chiffres non relevés |
 
 ## Angles inconnus
 
 | Travail | Année | Hypothèses | Jeux / métriques | Chiffres publiés | Vérifié |
 |---|---|---|---|---|---|
-| Zuo et al., CRAVES, CVPR | 2019 | Bras bas coût, adaptation de domaine | — | — | non |
-| Labbé et al., RoboPose, CVPR | 2021 | Rendu-et-comparaison | — | — | non |
-| Ban et al., estimation holistique, ECCV | 2024 | — | — | — | non |
-| RoboPEPP | 2024-25 | — | — | — | non |
+| Zuo, Qiu, Xie, Zhong, Wang, Yuille, « CRAVES: Controlling Robotic Arm with a Vision-based Economic System », CVPR 2019 (lieu à confirmer, la page HTML arXiv ne le dit pas), [arXiv:1812.00725](https://arxiv.org/abs/1812.00725) | 2019 | **Bras bas coût** OWI-535 (< 40 $, sans capteur), 4 angles + 6 paramètres de caméra **inconnus** ; synthétique (UE4, 5 000 images) + raffinement semi-supervisé sur **images réelles non étiquetées** : pas synthétique seul ; 1 caméra | Virtuel, Lab (428 images annotées), YouTube (275) ; PCK@0,2, erreur angulaire | Tableau 1, PCK@0,2 (%), baseline synthétique : Virtuel 99,95, Lab 95,66, YouTube 80,05 ; méthode proposée 99,63 / 99,55 / 87,01. Tableau 2 (Lab) : angle moyen des moteurs 7,13° (synthétique) puis 4,81° (raffiné) ; rotation caméra 6,29° puis 5,29° ; position caméra 7,58 puis 6,73 cm. Tableau 5 : 6 vues de caméra, 9 cibles, erreur 2,66 cm, succès 59,3 % | oui |
+| Labbé et al., RoboPose (CVPR 2021) | 2021 | Voir « Sim-to-real » | | | oui |
+| Ban, Fan, Zhu, Ma, Qiao, Wang, « Real-time Holistic Robot Pose Estimation with Unknown States », ECCV 2024 (d'après arXiv, lieu à confirmer, la page HTML v4 ne le dit pas), [arXiv:2402.05655](https://arxiv.org/abs/2402.05655) (v4 juil. 2024) | 2024 | **Angles inconnus**, 1 vue, une seule passe ; ~100k images synthétiques randomisées, **puis auto-supervision sur images réelles non étiquetées** pour le Panda réel : pas synthétique seul ; pas de PCK | Baxter, Kuka, Panda DR/Photo, 3CAM AK/XK/RS, Orb ; ADD AUC, ADD moyen | Tableau 1, AUC angles inconnus : AK 82,2, XK 76,0, RS 75,2, Orb 75,2 ; Panda DR 82,7, Photo 82,0 ; Kuka DR 75,1, Photo 73,9 ; Baxter 58,8 ; ADD moyen (mm) AK 18,9, XK 24,0, RS 24,8, Orb 24,8. Tableau 3, angles connus, AUC : AK 90,2, XK 81,2, RS 91,9, Orb 87,6. Tableau 2 : 22,6 FPS contre 1,8 pour RoboPose. Erreur d'angle (ablation, tableau 6) 9,29° sur Panda DR | oui |
+| Tian, Zhang, Huang, Wang, Wang, Pang, Dong, « RoboKeyGen: Robot Pose and Joint Angles Estimation via Diffusion-based 3D Keypoint Generation », ICRA 2024 (d'après arXiv, lieu à confirmer), [arXiv:2403.18259](https://arxiv.org/abs/2403.18259) | 2024 | Angles inconnus (tableau I) et connus (tableau VI) ; entraînement sur **leur** jeu simulé RGB-D Franka ; test sur **leurs jeux réels RealSense et AzureKinect** (pas les jeux DREAM) ; une image ou en ligne | RealSense-Franka, AzureKinect-Franka ; ADD AUC@0,1 m, médiane, moyenne | Tableau I (inconnus), AUC RealSense / Azure : RoboPose 29,01 / 32,00 ; RoboKeyGen 67,00 / 60,72 (en ligne 72,93 / 63,33). Tableau VI (connus) : DREAM-ResNet-H 40,75 / 51,05, DREAM-VGG-Q 27,48 / 32,35 ; RoboPose 44,21 / 41,50 ; RoboKeyGen 68,34 / 63,74. Pas de PCK ni d'erreur d'angle | oui |
+| Zhu, Jiang, Zhang, Qian, Yang, Xie, « MonoSE(3)-Diffusion », [arXiv:2510.10434](https://arxiv.org/abs/2510.10434) | 2025 | Diffusion SE(3) mono-image ; évalué sur DREAM et RoboKeyGen ; la page ouverte ne dit ni angles ni régime d'entraînement | DREAM, RoboKeyGen ; AUC | Résumé : AUC 66,75 sur le jeu le plus difficile, +32,3 % sur l'état de l'art. Tableaux non ouverts | oui pour la référence et le résumé ; hypothèses et tableaux **non** relus |
+| Smith, Van Hoorick, Guizilini, Wang, « Fiducial Exoskeletons: Image-Centric Robot State Estimation », [arXiv:2601.08034](https://arxiv.org/abs/2601.08034) | 2026 | **Bras bas coût** (modèle non nommé sur la page ouverte), **avec marqueurs** (exosquelette imprimé en 3D), 1 image, angles par optimisation cinématique, amorçage possible par les codeurs | Non lus | Résumé qualitatif, **aucun chiffre lu** | oui pour la référence ; chiffres **non** relevés |
+| Sefercik & Akgun, « Learning Markerless Robot-Depth Camera Calibration and End-Effector Pose Estimation », CoRL (d'après arXiv, année à confirmer), [arXiv:2212.07567](https://arxiv.org/abs/2212.07567) | 2022 | Profondeur, **données réelles** générées automatiquement, aucune simulation | — | Résumé : erreur « sub-centimétrique », pas de valeur | oui pour la référence ; chiffres **non** relevés |
+| Heindl, Zambal, Pönitz, Pichler, Scharinger, « 3D Robot Pose Estimation from 2D Images », [arXiv:1902.04987](https://arxiv.org/abs/1902.04987) | 2019 | Chaînes cinématiques 3D de plusieurs robots depuis une image ; rendus synthétiques avec fonds photographiques | Non lus | Non relevés | oui pour la référence (ar5iv, résumé) ; chiffres **non** relevés |
 
 ## Temporel et multi-vues
 
 | Travail | Année | Hypothèses | Jeux / métriques | Chiffres publiés | Vérifié |
 |---|---|---|---|---|---|
-| Tian et al., SGTAPose, CVPR | 2023 | Séquences | — | — | non |
+| Tian, Zhang, Yin, Dong, « Robot Structure Prior Guided Temporal Attention for Camera-to-Robot Pose Estimation from Image Sequence » (SGTAPose), CVPR 2023, pp. 8917-8926, [arXiv:2307.12106](https://arxiv.org/abs/2307.12106) | 2023 | Angles connus, séquences d'images (1 vue), **synthétique seul** (jeu « Panda Syn Training » propre) | Panda 3CAM-RS, 3CAM-AK, Orb (**pas de XK**) ; PCK AUC, PCK médiane, ADD AUC, ADD médiane | Tableau 1 (ar5iv), PCK AUC / médiane px / ADD AUC / médiane mm : RS, DREAM 64,82 / 3,90 / 58,60 / 24,57, SGTAPose 75,68 / 2,68 / 79,89 / 9,77 ; AK, DREAM 52,28 / 4,83 / 44,55 / 33,68, SGTAPose 62,75 / 3,19 / 49,42 / 29,61 ; Orb, DREAM 57,44 / 3,73 / 52,56 / 22,53, SGTAPose 63,28 / 3,46 / 60,30 / 18,12. Attention : ces chiffres « DREAM » sont réentraînés par les auteurs sur leur jeu, ils ne sont **pas** ceux du papier DREAM (RS : 0,24 / 0,83 / 0,96) | oui (miroir ar5iv) |
+| Zhou et al., Sensors 2024 | 2024 | Voir « Sim-to-real » (3 vues, UR10) | | | oui (réserve ci-dessus) |
+| EasyHeC (2023) | 2023 | Voir « Keypoints + PnP » (1 à 5 vues) | | | oui |
+| Lee et al., DREAM, Fig. 6 | 2020 | Plusieurs images d'une pose statique, un seul PnP | Panda-3Cam | Voir la ligne DREAM : erreur ADD en fonction du nombre d'images, comparée à HEC | oui |
+
+## Recouvrement avec nos contributions revendiquées
+
+Source : `docs/ARTICLE_DREAM.md`, « Thèse visée » et E3, E5-E8.
+
+| Contribution revendiquée | Déjà couverte ? | Par quoi |
+|---|---|---|
+| Synthétique seul vers réel, au format du papier (PCK@2,5/5/10 + ADD AUC) | **Oui, sur Panda** | DREAM (PCK, ADD), RoboPose (synthétique seul, ADD AUC), SGTAPose (synthétique seul, PCK + ADD). Pas nouveau en soi |
+| Idem sur un **bras bas coût 6 axes** (MyCobot 320 Pi) avec chiffres PCK/ADD au format du papier | Aucun travail ouvert ne donne ces chiffres | CRAVES est bas coût et synthétique mais avec adaptation réelle non étiquetée, PCK@0,2 et angles inconnus ; « Fiducial Exoskeletons » est bas coût mais à marqueurs |
+| Test sur des **points de vue réels jamais vus**, vue tenue à l'écart | **Non trouvé, non exclu** | DREAM a trois capteurs et une caméra mobile (Orb) mais n'y annonce pas de règle de vue tenue à l'écart ; RoboKeyGen et EasyHeC changent de caméra sans ce protocole. Aucun papier ouvert ne retient explicitement un point de vue |
+| Caméra libre multi-vues + randomisation (fonds COCO, lumières, distracteurs) | Recette de DREAM (§ II.C) | Notre variante est une **reproduction étendue** ; ne pas la présenter comme nouvelle |
+| Plusieurs images contre hand-eye (E5) | Oui | DREAM Fig. 6 |
+| Erreur atteinte (E6) | Oui | DREAM tableau II |
+| Boucle fermée avec extrinsèque DREAM (E7) | Non trouvé | Tremblay et al. IROS 2020 utilise DREAM en ligne pour la saisie (chiffres non relus) |
+| Keypoint en aval du dernier axe (E8, J6 observable) | **Non cherché à fond** | À vérifier : schémas de keypoints de CtRNet-X et RoboPEPP ; rien de lu ne le couvre |
+| Angles connus (codeurs) | Oui | DREAM, SGTAPose, CtRNet, CtRNet-X, EasyHeC |
+
+## Menaces pour la nouveauté (à traiter dans l'article)
+
+1. **« Synthétique seul transfère au réel » n'est pas une contribution** : DREAM, RoboPose et SGTAPose le montrent sur Panda. La thèse doit porter sur le **point de vue réel tenu à l'écart** et le **bras bas coût**, pas sur le principe.
+2. **DREAM a déjà une caméra mobile réelle (Panda-Orb)** et trois capteurs. Il faut montrer ce que notre protocole ajoute (vue retenue, nombre de vues, référence indépendante) ; le nombre de poses de caméra de l'Orb n'a pas été relevé dans une source ouverte.
+3. **Les méthodes récentes battent DREAM sur ses propres jeux** (RoboPose, HPE, CtRNet, CtRNet-X, RoboPEPP). Parmi elles, seuls RoboPose et SGTAPose sont synthétique seul ; HPE, CtRNet, CtRNet-X et (probablement) RoboPEPP ajoutent une auto-supervision sur images réelles. Les références honnêtes pour « synthétique seul » : DREAM, RoboPose, SGTAPose.
+4. **Bras bas coût** : CRAVES (2019) existe, avec un OWI-535. La nouveauté tient au robot 6 axes à servos et aux métriques du papier DREAM, pas au « bas coût » en général.
+5. **Multi-vues** : Zhou et al. (Sensors 2024, UR10, 3 vues, 0,53°) est mixte synthétique et réel affiné, mais couvre l'idée « keypoints + plusieurs vues vers angles ».
+6. **PCK@2,5 réel faible chez tous** (DREAM 0,24 à RS ; RoboPEPP 0,09-0,31 sur XK/AK/RS) : s'attendre au même niveau sur banc réel ; la quantification Q (voir `ARTICLE_DREAM.md`) n'est pas la seule cause.
+
+Limites de cette veille : recherche web seulement, pas de lecture exhaustive des
+travaux 2025-2026 ; « Fiducial Exoskeletons » et MonoSE(3)-Diffusion n'ont été
+lus qu'au résumé. Aucun travail sur le MyCobot ou un bras bas coût 6 axes évalué
+au format DREAM n'a été trouvé, ce qui n'en prouve pas l'absence.

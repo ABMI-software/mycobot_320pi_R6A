@@ -165,6 +165,14 @@ préparer pendant que la collecte et l'entraînement tournent.
 Chaque constat porte sa date. Quand un constat change, on le **corrige ici
 même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoire.
 
+- **10/11 — Positionnement (bibliographie)** : « synthétique seul vers réel »
+  est déjà publié sur Panda (DREAM, RoboPose, SGTAPose) et ne peut pas être
+  revendiqué. Aucun papier ouvert n'évalue sur un **point de vue réel tenu à
+  l'écart** : c'est l'apport possible, avec un 6 axes bas coût mesuré au
+  format PCK/ADD de DREAM (CRAVES traite déjà un bras bas coût, autrement).
+  Les seules références comparables en synthétique seul sont DREAM, RoboPose et
+  SGTAPose ; les autres (CtRNet, HPE, RoboPEPP…) s'adaptent sur du réel non
+  étiqueté. Détail et lignes encore à vérifier : `training/dream/article/biblio.md`.
 - **29/10 — PCK** : `evaluate_dream.py` ne compte que les détectés ; au sens du
   papier, 98,1 % « < 5 px » devient 0,941 sur `real_tri_test`.
 - **29/10 — Seuil de pic** : 0,01 (code) ou 0,03 (texte) ne change rien au-delà
