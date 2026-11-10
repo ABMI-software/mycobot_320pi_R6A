@@ -10,7 +10,7 @@
 - Bibliographie confiée à l'agent `veilleur-biblio` (`training/dream/article/biblio.md`).
 
 ### Prochaines actions
-1. [ROUGE] Fin de E3.7 prévue le 11/11 vers midi : relancer `composer_tranches.sh` pour les tranches 09-10, puis `convert_to_ndds_camera_libre.py --input <tranches>/compose,… --azimut-tenu 60,100`, md5 dans `run.yaml`.
+1. [ROUGE] Fin de E3.7 : la tranche 09 finit ce soir, puis `scripts/tranche_10_courte.sh` (détaché) collecte la 10 en 5 × 1 000 dans `tranche_10/` (journal : `tranche_10/journal.txt`). Composer la 09 à `PART=0.85 PART_TEINTE=0.5` si ses masques à jour restent ~60 %, les sous-tranches de la 10 à 0,5 / 0,3 (`composer_tranches.sh` ne voit pas encore les sous-tranches), puis `convert_to_ndds_camera_libre.py --input <tranches>/compose,… --azimut-tenu 60,100`, md5 dans `run.yaml`.
 2. [ROUGE] E2 : lever les 4 préalables du protocole (option d'extrinsèque dans `capture_real_tri.py`, script azimut/distance/élévation, bloc du contrôle en hauteur, supports de caméra), puis la session au banc.
 3. [JAUNE] E3.8 dès que le GPU est libre (tranches 01-02), puis E3.9, E3.10.
 
