@@ -49,9 +49,23 @@ jamais sur les supports des deux montages actuels. Couvrir :
 | Au moins une vue rasante (élévation < 25°) et une plongeante (> 55°) | Les deux régimes de PnP |
 | Optionnel, **P0** = montage arducam actuel | Témoin, relie E2 à `real_tri_test` ; **ne compte pas** parmi les vues jamais vues |
 
-Azimut, distance et élévation se calculent depuis l'extrinsèque, dans le repère
-base et avec la convention de `convert_to_ndds_camera_libre.azimut_deg`, pour
-que le secteur tenu à l'écart soit le même en réel et en synthétique.
+Azimut, distance et élévation se calculent depuis l'extrinsèque par
+`training/dream/geometrie_camera.py`, dans la convention du collecteur
+synthétique (azimut autour du point visé, par la fonction même qui découpe le
+secteur tenu) : une position réelle « dans le secteur » l'est au même sens
+qu'une trame synthétique.
+
+Les deux montages actuels, mesurés le 10/11 :
+
+| Montage | Azimut | Distance | Élévation | Secteur tenu |
+|---|---|---|---|---|
+| arducam (`arducam_extrinsic_pick.yaml`) | −109° | 0,88 m | 74° | non |
+| SVPRO (`svpro_extrinsic_servo.yaml`, `…_labels.yaml`) | 70° | 0,98 m | 25° | **oui** |
+
+La SVPRO fixe est donc déjà dans le secteur 60-100°. Les positions E2 de ce
+secteur doivent s'en écarter nettement (≥ 15° d'azimut ou ≥ 20° d'élévation),
+sinon elles ne sont pas « jamais vues » pour un modèle affiné sur
+`real_tri/train`.
 
 Les deux caméras (arducam `cam_3`, SVPRO `cam_2`) peuvent servir, une position
 chacune à la fois : leurs intrinsèques sont celles du registre
@@ -119,9 +133,14 @@ autofocus) : sans quoi les intrinsèques ne valent plus.
 ## Étape 3 — Capture (par position)
 
 - **Objectif** : 50 poses appariées, images et codeurs.
-- **Actions** : `training/capture_real_tri.py` avec la graine 2001 et
-  l'extrinsèque de la position (option à ajouter, voir « Ce qui manque »), bras
-  arrêté à chaque prise, angles mesurés et non commandés.
+- **Actions** : bras arrêté à chaque prise, angles mesurés et non commandés :
+  ```bash
+  /usr/bin/python3 training/capture_real_tri.py --jeu e2 --poses 50 --graine 2001 \
+      --extrinseque arducam=training/calibration/e2_Pxx_arducam_extrinsic.yaml \
+      --sortie training/dream/dream_data/real_e2/Pxx
+  ```
+  Seule la caméra nommée capture ; l'extrinsèque utilisée est écrite dans
+  `sessions.json`. `--plan` tire et résout les poses sans bouger.
 - **Consigner** : `labels.csv`, `keypoints_2d.csv`, images brutes, poses non
   atteintes et leur raison.
 - **Critère de sortie** : ≥ 45 poses valides sur 50.
@@ -162,12 +181,9 @@ entier.
 
 ## Ce qui manque avant la session
 
-1. `capture_real_tri.py` lit des extrinsèques **en dur**
-   (`EXTRINSEQUES`, `arducam_extrinsic_pick.yaml` et `svpro_extrinsic_labels.yaml`) :
-   ajouter une option pour l'extrinsèque de la position, une caméra à la fois,
-   et un dossier de sortie par position.
-2. Un petit script qui donne azimut, distance et élévation depuis une
-   extrinsèque, avec la convention du synthétique.
+1. **Fait le 10/11** : `capture_real_tri.py --jeu e2 --extrinseque CAMERA=YAML
+   --sortie DOSSIER`.
+2. **Fait le 10/11** : `training/dream/geometrie_camera.py`.
 3. Le bloc du contrôle en hauteur (ArUco de 50 mm sur un support rigide de
    ~100 et ~200 mm) et une procédure de relevé au robot.
 4. Les supports de caméra pour 6 à 10 positions (trépieds, bras), et les

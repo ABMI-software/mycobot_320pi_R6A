@@ -4,6 +4,10 @@
     /usr/bin/python3 training/capture_real_tri.py --jeu essai --poses 5
     /usr/bin/python3 training/capture_real_tri.py --jeu train --poses 300 --graine 1
     /usr/bin/python3 training/capture_real_tri.py --jeu test  --poses 100 --graine 1001
+    # E2 (docs/PROTOCOLE_E2_MULTIVUES.md) : une camera, l'extrinseque de sa position
+    /usr/bin/python3 training/capture_real_tri.py --jeu e2 --poses 50 --graine 2001 \
+        --extrinseque arducam=training/calibration/e2_P01_arducam_extrinsic.yaml \
+        --sortie training/dream/dream_data/real_e2/P01
 
 Suite de `capture_real_3cam.py` (memes cameras, meme `labels.csv`, meme
 `images/<camera>/NNNNNN.png`, index continu entre sessions d'un meme jeu), avec
@@ -126,9 +130,9 @@ def trajet_haut(qa, qb):
     return all(fsm.pointe(qa + s * (qb - qa))[2] >= Z_TRAJET_MIN_MM for s in np.linspace(0, 1, 21))
 
 
-def projections():
+def projections(extrinseques):
     out = {}
-    for nom, chemin in EXTRINSEQUES.items():
+    for nom, chemin in extrinseques.items():
         d = yaml.safe_load(chemin.read_text())
         T = np.array(d['T_cam_world'], float)
         K, dist = registre.load_intrinsics(d['intrinsics_stem'])
@@ -149,13 +153,23 @@ def index_v4l2(motif):
 
 def main():
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    a.add_argument('--jeu', choices=('essai', 'train', 'test'), required=True)
+    a.add_argument('--jeu', choices=('essai', 'train', 'test', 'e2'), required=True)
     a.add_argument('--poses', type=int, required=True)
     a.add_argument('--graine', type=int, default=0)
     a.add_argument('--plan', action='store_true', help='tirer et resoudre les poses, sans bouger')
     a.add_argument('--autour-observation', action='store_true',
                    help='poses entre l observation et le travail, J5 0-90 deg (voir J5_OBSERVATION_DEG)')
+    a.add_argument('--extrinseque', action='append', metavar='CAMERA=YAML',
+                   help='extrinseque d une camera (repetable) ; seules les cameras nommees capturent')
+    a.add_argument('--sortie', type=Path, help='dossier de sortie, a la place de real_tri/<jeu>')
     args = a.parse_args()
+    if args.jeu == 'e2' and not (args.extrinseque and args.sortie):
+        a.error('--jeu e2 exige --extrinseque et --sortie (une extrinseque par position)')
+    extrinseques = (dict((nom, Path(chemin)) for nom, chemin in (e.split('=', 1) for e in args.extrinseque))
+                    if args.extrinseque else EXTRINSEQUES)
+    inconnues = set(extrinseques) - set(EXTRINSEQUES)
+    if inconnues:
+        a.error(f'camera inconnue : {", ".join(sorted(inconnues))} (arducam, svpro)')
     tire = pose_autour_observation if args.autour_observation else pose_tiree
 
     rng = np.random.default_rng(args.graine)
@@ -168,7 +182,7 @@ def main():
         print('J1-J6 min', np.round(np.min(qs, axis=0)).tolist(), ' max', np.round(np.max(qs, axis=0)).tolist())
         return
 
-    sortie = SORTIE / (f"essai_{datetime.now():%Y-%m-%d_%H-%M-%S}" if args.jeu == 'essai' else args.jeu)
+    sortie = args.sortie or SORTIE / (f"essai_{datetime.now():%Y-%m-%d_%H-%M-%S}" if args.jeu == 'essai' else args.jeu)
     labels, kp2d, manifeste = sortie / 'labels.csv', sortie / 'keypoints_2d.csv', sortie / 'sessions.json'
     sortie.mkdir(parents=True, exist_ok=True)
     debut = 0
@@ -186,11 +200,12 @@ def main():
     if any(s['graine'] == args.graine for s in sessions):
         raise SystemExit(f'graine {args.graine} deja utilisee dans {sortie.name} : poses repetees')
 
-    cameras = {
-        'arducam': c3.LocalCamera(index_v4l2('arducam'), 'arducam', exposure=75),
-        'svpro': c3.LocalCamera(index_v4l2('svpro'), 'svpro', fourcc='MJPG'),
+    ouvertures = {
+        'arducam': lambda: c3.LocalCamera(index_v4l2('arducam'), 'arducam', exposure=75),
+        'svpro': lambda: c3.LocalCamera(index_v4l2('svpro'), 'svpro', fourcc='MJPG'),
     }
-    proj = projections()
+    proj = projections(extrinseques)
+    cameras = {nom: ouvertures[nom]() for nom in extrinseques}
     ctx = fsm.Contexte()
     ctx.pont = fsm.Pont()
     t0 = time.time()
@@ -228,6 +243,7 @@ def main():
         sessions.append({'date': datetime.now().isoformat(timespec='seconds'), 'debut': debut,
                          'poses': faites, 'graine': args.graine, 'cameras': list(cameras),
                          'tirage': 'autour_observation' if args.autour_observation else 'travail',
+                         'extrinseques': {nom: str(chemin) for nom, chemin in extrinseques.items()},
                          'duree_s': round(time.time() - t0)})
         manifeste.write_text(json.dumps(sessions, indent=1))
         for ligne in ctx.journal:

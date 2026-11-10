@@ -9,6 +9,16 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — E2 : capture réelle multi-vues (10/11)
+
+- `training/capture_real_tri.py --jeu e2 --extrinseque CAMERA=YAML --sortie DOSSIER` :
+  capture d'une position de caméra avec sa propre extrinsèque ; seules les
+  caméras nommées capturent, l'extrinsèque est consignée dans `sessions.json`.
+  Sans ces options, le comportement est inchangé.
+- `training/dream/geometrie_camera.py` : azimut, distance et élévation d'une
+  extrinsèque dans la convention du collecteur caméra libre, avec le secteur
+  tenu à l'écart. Protocole : `docs/PROTOCOLE_E2_MULTIVUES.md`.
+
 ### Ajouté — E3 : feuille de route et masque du robot (29/10)
 
 - **Feuille de route E3.0-E3.10** et section **« Ce qu'on a appris »** dans

@@ -61,7 +61,7 @@ Chaque expérience suit `.claude/skills/campagne-mesure` (protocole écrit avant
 | Id | Expérience | Dépend de | Critère de sortie | Priorité | État |
 |---|---|---|---|---|---|
 | E1 | Métriques du papier (PCK + AUC, ADD, seuils 0,01 et 0,03) recalculées pour les modèles existants | — | Tableau au format du tableau I du papier pour les jeux A, E, E', G du registre | rouge | fait le 29/10 : tableau pour A, E, E', G avec PCK 7 et 6 points, ADD, deux seuils, IC bootstrap par blocs, md5 train/test (registre, `~/dream_article/E1/`). Tout reste `a_preciser` : référence ArUco et point de vue unique, que seul E2 lève |
-| E2 | Jeu réel multi-vues : 6 à 10 positions de caméra jamais vues, référence indépendante de DREAM | — | Jeu figé, md5, positions relevées, leave-one-out de l'extrinsèque publié | rouge | protocole rédigé le 10/11 ([`PROTOCOLE_E2_MULTIVUES.md`](PROTOCOLE_E2_MULTIVUES.md)) ; session au banc à faire, 4 préalables listés |
+| E2 | Jeu réel multi-vues : 6 à 10 positions de caméra jamais vues, référence indépendante de DREAM | — | Jeu figé, md5, positions relevées, leave-one-out de l'extrinsèque publié | rouge | protocole rédigé le 10/11 ([`PROTOCOLE_E2_MULTIVUES.md`](PROTOCOLE_E2_MULTIVUES.md)) ; session au banc à faire ; préalables 1-2 (capture, géométrie) faits le 10/11, 3-4 (bloc en hauteur, supports) au banc |
 | E3 | Synthétique seul multi-vues : caméra libre + randomisation du papier + augmentation v5, aucune image réelle | E1 | PCK@5 ≥ 0,83 et PCK@10 ≥ 0,90 sur E2 ; test de décalage ≥ 95 % ; ADD ≥ 0,80 à 20 mm | rouge | en cours : feuille de route E3.1-E3.10 ci-dessous |
 | E4 | Ablations : résolution Q/H/F, encodage des cartes (entier contre sous-pixel), volume 25k/50k/100k, perte L2 contre pondérée, recette du papier, randomisation par bloc | E3 | Un tableau par facteur, 3 graines minimum | jaune | à faire |
 | E5 | Plusieurs images contre hand-eye (marqueur sur la bride) : erreur en fonction du nombre d'images | E2 | Courbe équivalente à la Fig. 6 du papier | jaune | à faire |
@@ -165,6 +165,12 @@ préparer pendant que la collecte et l'entraînement tournent.
 Chaque constat porte sa date. Quand un constat change, on le **corrige ici
 même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoire.
 
+- **10/11 — La SVPRO fixe est dans le secteur tenu à l'écart** : azimut 70°,
+  0,98 m, élévation 25° (`geometrie_camera.py`, convention du synthétique) ;
+  l'arducam est à −109°, 0,88 m, 74°. La moitié SVPRO de `real_tri_test` est
+  donc un point de vue que le synthétique de E3 n'a pas vu : à séparer par
+  caméra en E3.10. Mais elle est vue par `vgg_tri_reel_ft_e10` (borne haute),
+  d'où l'écart imposé aux positions E2 de ce secteur.
 - **10/11 — Positionnement (bibliographie)** : « synthétique seul vers réel »
   est déjà publié sur Panda (DREAM, RoboPose, SGTAPose) et ne peut pas être
   revendiqué. Aucun papier ouvert n'évalue sur un **point de vue réel tenu à
