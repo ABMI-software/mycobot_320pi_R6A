@@ -268,7 +268,13 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
     données valides, marquées `fait` à la main pour qu'une relance ne les
     écrase pas. Cause non établie (piste : entités `create`/`remove` qui
     s'accumulent côté rendu). Des tranches de ~1 000 images tiendraient
-    ~5 s/image en moyenne.
+    ~5 s/image en moyenne. **Les masques dérivent avec** : 95 % de masques à
+    jour en début de tranche, 50-55 % au milieu, 22-27 % à la fin (tranches
+    01, 03, 08), 59 % sur une tranche entière contre 97,5 % au pilote de
+    1 000. Le rendu ralentit, le masque arrive au-delà des 15 relances. Les
+    étiquettes, elles, restent justes en fin de tranche (8 images de la fin
+    de la tranche 08 contrôlées à l'œil). Conséquence : à `--part 0.5`, ~29 %
+    des images d'une tranche reçoivent un fond COCO au lieu de ~50 %.
 - **03/11 — Lumières ajoutées et caméra de segmentation** : une lumière posée
   par `create` porte par défaut un repère visuel sans label, et la caméra de
   segmentation plante dessus dès la première image (`Ogre::
