@@ -11,12 +11,13 @@
 ### Prochaines actions
 1. [ROUGE] Suivre `~/dream_article/E3/E3_7/journal_final.txt` puis `~/dream_article/E3/E3_8/journal.txt`. Relancer : `bash ~/dream_article/E3/E3_8/lancer.sh` (reprend au bras suivant).
 2. [ROUGE] À la fin de E3.8 : `python training/dream/comparer_pck.py ~/dream_article/E3/E3_8/eval_vgg_e3_8_entier_s2 …_souspixel_s1 …_souspixel_s2 --critere --json ~/dream_article/E3/E3_8/choix.json` (critère écrit d'avance), revue du metrologue, registre ; choix de l'encodage pour E3.9.
-3. [JAUNE] E2 : bloc du contrôle en hauteur et supports de caméra, puis session au banc.
+3. [ROUGE] E3.7b (10 × 1 000 avec les poses du pick) démarre seul à la fin de E3.8 (`~/dream_article/E3/E3_7b/journal.txt`) ; E3.7 n'en avait eu aucune (1,7 % des images à hauteur de tri). Ensuite : composer, convertir E3.7 + E3.7b ensemble, puis E3.9.
+4. [JAUNE] E2 : bloc du contrôle en hauteur et supports de caméra, puis session au banc.
 
 ### Commande rapide de reprise
 ```bash
 bash scripts/etat_session.sh
-cat ~/dream_article/E3/E3_7/journal_final.txt ~/dream_article/E3/E3_8/journal.txt
+cat ~/dream_article/E3/E3_7/journal_final.txt ~/dream_article/E3/E3_8/journal.txt ~/dream_article/E3/E3_7b/journal.txt
 ```
 
 ## État actuel (10 novembre 2026 — matin, E3.7 presque fini, protocoles E2 et E3.8)

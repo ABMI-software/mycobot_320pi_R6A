@@ -13,8 +13,13 @@ journal="$dossier/journal.txt"
 mkdir -p "$dossier"
 # Avant `set -u` : les scripts d'environnement de ROS lisent des variables non définies.
 source /opt/ros/jazzy/setup.bash
-source "$(git -C "$(dirname "$0")" rev-parse --show-toplevel)/../../install/setup.bash"
+racine=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
+source "$racine/../../install/setup.bash"
 set -u
+# Sans ce fichier le collecteur tire tout en uniforme et ne fait qu'un
+# avertissement : E3.7 en a perdu les 40 % de poses du pick (12/11).
+poses_pick="$racine/training/dream/captures/real_montage_0901/labels.csv"
+[ -f "$poses_pick" ] || { echo "$poses_pick absent (non suivi par git) : le copier depuis l'autre clone" >&2; exit 1; }
 
 arreter_gazebo() {
   kill -INT -"$1" 2>/dev/null

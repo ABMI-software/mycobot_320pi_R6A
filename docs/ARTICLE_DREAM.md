@@ -117,6 +117,7 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.6 | Pince montée | Pince visible, keypoints identiques au schéma à 7 points | fait : le launch caméra libre monte déjà la pince Pro (`mycobot_pro_320_pi_gazebo.urdf`), visible sur la planche de E3.1 |
 | E3.6b | Annotations complètes pour d'autres méthodes (RoboPEPP, HPE…) : pose caméra-robot, 12 articulations, 18 liens en 3D et 2D, doigts, masque, boîtes | JSON validés sur une collecte (écart FK ≤ 0,1 mm, points superposés à l'œil), lus par DREAM | fait le 03/11 : format dans `docs/SYNTHETIC_DATA.md`, 20 trames, écart 0,02 mm, `eval_papier.py` les lit |
 | E3.7 | Collecte : volume visé ~100k (papier), un secteur d'azimut tenu à l'écart, `run.yaml`, md5 | Jeu NDDS figé, md5, secteur tenu à l'écart documenté | en cours : en cours : pilote de 1 000 images fait le 03/11 (`~/dream_article/E3/E3_7_pilote/`) — complet, 0 gel, 97,5 % de masques frais, mais 9,1 s/image en moyenne (7,9 → 10,1 s, en dérive) et articulations lues jusqu'à 0,73 s de l'image ; articulations interpolées au temps de l'image, 4,1 s/image ; **50 000 images** décidées le 04/11 (10 tranches de 5 000, `scripts/collecte_tranches.sh`, `~/dream_article/E3/E3_7/journal.txt`), 100k à décider après E3.9 ; au 10/11, 8 tranches closes (39 740 images), la 9e en cours ; la 10e en 5 sous-tranches de 1 000 (masques et cadence dérivent dans une tranche de 5 000) ; tranches 01-08 recomposées à `--part 0.85 --part-teinte 0.5` (~59 % de masques à jour, d'où ~50 % de fonds et ~30 % de teintes sur l'ensemble) |
+| E3.7b | Complément de E3.7 avec les poses du pick (40 % du tirage), 10 × 1 000 | Pointe de pince à 72-115 mm sur une part nettement supérieure aux 1,7 % de E3.7 ; même format, md5 | programmé le 12/11 : démarre à la fin de E3.8 (`~/dream_article/E3/E3_7b/`, décision utilisateur : compléter avant E3.9) |
 | E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | en cours : lancé le 12/11 (`~/dream_article/E3/E3_8/e3_8.sh`, journal `journal.txt`) ; jeu des tranches 01-02, puis 3 bras à la suite (~3 h chacun) dès la fin de la conversion E3.7 |
 | E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | à faire |
 | E3.10 | Évaluation : E2, `real_tri_test`, test de décalage, revue du metrologue | Critère de E3 (tableau des expériences) | à faire |
@@ -171,7 +172,7 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   n'existe que dans le clone `~/Osama_ws` ; les 14 `launch.log` de E3.7 disent
   « aucune pose du pick, tirage uniforme seul ». E3.7 est donc en tirage
   uniforme dans les butées, garde au sol 50 mm. Le manuscrit le décrit tel
-  quel. À trancher avant E3.9 : est-ce gênant pour le tri réel (pointe à
+  quel. Tranché le 12/11 : complément E3.7b avant E3.9. Est-ce gênant pour le tri réel (pointe à
   72-114 mm, la zone dont l'absence avait causé le biais de 52 px en
   septembre) ? Mesuré le 12/11 sur 2 054 annotations (1 sur 5) : pointe de
   pince médiane à 385 mm, p5 à 160 mm ; **1,7 % des images seulement ont la

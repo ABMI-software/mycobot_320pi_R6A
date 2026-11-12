@@ -9,6 +9,14 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — collecte caméra libre sans les poses du pick (12/11)
+
+- `scripts/collecte_tranches.sh` refuse de démarrer sans
+  `training/dream/captures/real_montage_0901/labels.csv` (non suivi par git) :
+  le collecteur se contentait d'un avertissement et tirait tout en uniforme,
+  ce qui a privé E3.7 des 40 % de poses du pick prévus. Tranches de 1 000
+  images par défaut (dérive de cadence et de masques au-delà).
+
 ### Ajouté — comparaison de modèles au format du papier (12/11)
 
 - `training/dream/comparer_pck.py` : écart de PCK@2,5/5/10 et de détection
