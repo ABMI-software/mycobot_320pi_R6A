@@ -121,6 +121,7 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | en cours : lancé le 12/11 (`~/dream_article/E3/E3_8/e3_8.sh`, journal `journal.txt`) ; jeu des tranches 01-02, puis 3 bras à la suite (~3 h chacun) dès la fin de la conversion E3.7 |
 | E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | à faire |
 | E3.10 | Évaluation : E2, `real_tri_test`, test de décalage, revue du metrologue | Critère de E3 (tableau des expériences) | à faire |
+| E3.11 | Modèle de déploiement : même recette que E3.9, tous azimuts (secteur 60-100° compris), hors article | Checkpoint pour le banc, si E3.10 atteint son critère | à faire (décision du 12/11) |
 
 E3.10 dépend de E2 (jeu réel multi-vues), qui demande une session au banc : la
 préparer pendant que la collecte et l'entraînement tournent.
@@ -166,6 +167,19 @@ préparer pendant que la collecte et l'entraînement tournent.
 Chaque constat porte sa date. Quand un constat change, on le **corrige ici
 même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoire.
 
+- **12/11 — Secteur 60-100° tenu à l'écart : pourquoi, et pour quel modèle** :
+  un secteur d'azimut entier est retiré de l'entraînement parce qu'une
+  validation tirée au hasard partage les points de vue de l'entraînement et ne
+  voit pas un réseau qui récite le cadrage (leçon de septembre ;
+  `convert_to_ndds_camera_libre.py`, 19/10). Les bornes 60-100° ne sont
+  justifiées nulle part ; elles se trouvent contenir la SVPRO fixe (70°).
+  **Décision utilisateur du 12/11** : E3.9 (modèle de l'article) garde le
+  secteur à l'écart ; si E3.10 est bon, un modèle de déploiement est entraîné
+  en plus sur tous les azimuts, hors article.
+- **12/11 — Jeu E3.7 figé** : 44 262 images d'entraînement, 5 473 dans le
+  secteur tenu, 5 écartées hors champ ; md5 des labels 2456b9cf… et fe3e84c0…
+  (`~/dream_article/E3/E3_7/run.yaml`), copie NDDS dans
+  `~/Desktop/E3_7_synthetique_50k/` (15 Go).
 - **12/11 — E3.7 tiré sans les poses du pick** : le collecteur prévoit 40 %
   de poses tirées autour des configurations réelles du pick
   (`training/dream/captures/real_montage_0901/labels.csv`), mais ce fichier
