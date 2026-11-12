@@ -1,5 +1,24 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (12 novembre 2026 — matin, E3.7 collecté, E3.8 lancé)
+
+### Ce qui a été accompli
+- E3.7 collecté (11/11, 00:39) : 49 740 images. Tranche 10 en 5 × 1 000 : 3,85 s/image et 96 % de masques à jour, contre 12 s et 59 % en tranches de 5 000 → `collecte_tranches.sh` passe à 1 000 par défaut.
+- Tranches 01-08 recomposées : 49,3 % de fonds, 29,6 % de teintes.
+- `finaliser.sh` était bloqué depuis le 11/11 par un `pgrep -f` qui se trouvait lui-même ; corrigé et relancé le 12/11 à 09:52 (composition 09 et 10, puis conversion vers `~/Desktop/E3_7_synthetique_50k/`).
+- E3.8 lancé, détaché : `~/dream_article/E3/E3_8/e3_8.sh` (jeu des tranches 01-02, puis 3 entraînements à la suite dès la fin de la conversion E3.7, puis `eval_papier.py` sur le secteur tenu).
+
+### Prochaines actions
+1. [ROUGE] Suivre `~/dream_article/E3/E3_7/journal_final.txt` puis `~/dream_article/E3/E3_8/journal.txt`. Relancer : `bash ~/dream_article/E3/E3_8/lancer.sh` (reprend au bras suivant).
+2. [ROUGE] À la fin de E3.8 : IC bootstrap par blocs de la différence au bras entier, appliquer le critère écrit d'avance, revue du metrologue, registre ; choix de l'encodage pour E3.9.
+3. [JAUNE] E2 : bloc du contrôle en hauteur et supports de caméra, puis session au banc.
+
+### Commande rapide de reprise
+```bash
+bash scripts/etat_session.sh
+cat ~/dream_article/E3/E3_7/journal_final.txt ~/dream_article/E3/E3_8/journal.txt
+```
+
 ## État actuel (10 novembre 2026 — matin, E3.7 presque fini, protocoles E2 et E3.8)
 
 ### Ce qui a été accompli
