@@ -9,6 +9,13 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — comparaison de modèles au format du papier (12/11)
+
+- `training/dream/comparer_pck.py` : écart de PCK@2,5/5/10 et de détection
+  entre modèles évalués par `eval_papier.py` sur les mêmes images, IC 95 %
+  par bootstrap apparié par blocs d'images consécutives ; `--critere`
+  applique la règle de choix de E3.8.
+
 ### Ajouté — E2 : capture réelle multi-vues (10/11)
 
 - `training/capture_real_tri.py --jeu e2 --extrinseque CAMERA=YAML --sortie DOSSIER` :

@@ -10,7 +10,7 @@
 
 ### Prochaines actions
 1. [ROUGE] Suivre `~/dream_article/E3/E3_7/journal_final.txt` puis `~/dream_article/E3/E3_8/journal.txt`. Relancer : `bash ~/dream_article/E3/E3_8/lancer.sh` (reprend au bras suivant).
-2. [ROUGE] À la fin de E3.8 : IC bootstrap par blocs de la différence au bras entier, appliquer le critère écrit d'avance, revue du metrologue, registre ; choix de l'encodage pour E3.9.
+2. [ROUGE] À la fin de E3.8 : `python training/dream/comparer_pck.py ~/dream_article/E3/E3_8/eval_vgg_e3_8_entier_s2 …_souspixel_s1 …_souspixel_s2 --critere --json ~/dream_article/E3/E3_8/choix.json` (critère écrit d'avance), revue du metrologue, registre ; choix de l'encodage pour E3.9.
 3. [JAUNE] E2 : bloc du contrôle en hauteur et supports de caméra, puis session au banc.
 
 ### Commande rapide de reprise
