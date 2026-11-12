@@ -41,7 +41,7 @@ if [ -d "$HOME/dream_article" ]; then
   if [ -z "$dernier" ]; then
     echo "Post LinkedIn : aucun brouillon encore (skill post-linkedin)"
   else
-    jours=$(( ( $(date +%s) - $(date -d "$(basename "$dernier" .md)" +%s) ) / 86400 ))
+    jours=$(( ( $(date +%s) - $(date -d "$(basename "$dernier" | cut -c1-10)" +%s) ) / 86400 ))
     [ "$jours" -ge "$cadence" ] && echo "Post LinkedIn : dernier brouillon il y a $jours jours (skill post-linkedin)"
   fi
 fi
