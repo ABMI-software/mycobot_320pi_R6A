@@ -165,6 +165,15 @@ préparer pendant que la collecte et l'entraînement tournent.
 Chaque constat porte sa date. Quand un constat change, on le **corrige ici
 même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoire.
 
+- **12/11 — E3.7 tiré sans les poses du pick** : le collecteur prévoit 40 %
+  de poses tirées autour des configurations réelles du pick
+  (`training/dream/captures/real_montage_0901/labels.csv`), mais ce fichier
+  n'existe que dans le clone `~/Osama_ws` ; les 14 `launch.log` de E3.7 disent
+  « aucune pose du pick, tirage uniforme seul ». E3.7 est donc en tirage
+  uniforme dans les butées, garde au sol 50 mm. Le manuscrit le décrit tel
+  quel. À trancher avant E3.9 : est-ce gênant pour le tri réel (pointe à
+  72-114 mm, la zone dont l'absence avait causé le biais de 52 px en
+  septembre) ? À vérifier sur la distribution des hauteurs de pointe de E3.7.
 - **10/11 — La SVPRO fixe est dans le secteur tenu à l'écart** : azimut 70°,
   0,98 m, élévation 25° (`geometrie_camera.py`, convention du synthétique) ;
   l'arducam est à −109°, 0,88 m, 74°. La moitié SVPRO de `real_tri_test` est
