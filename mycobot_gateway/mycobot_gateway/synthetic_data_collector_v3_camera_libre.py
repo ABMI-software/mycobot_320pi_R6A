@@ -84,7 +84,10 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
     # recue s'ecartait ainsi de l'image jusqu'a 1 s, soit plusieurs degres
     # d'erreur d'etiquette. Attendre ne corrige pas un retard : on lit les
     # articulations au temps simule de l'image.
-    HISTORIQUE_JOINTS_S = 3.0
+    # 10 s et non 3 : sur les tranches de 5 000 de E3.7, le retard de l'image
+    # depassait l'historique et 53 % des trames gardaient la derniere mesure
+    # (12/11). L'historique coute ~2 500 messages en memoire.
+    HISTORIQUE_JOINTS_S = 10.0
     PAS_INTERPOLATION_MAX_S = 0.05
 
     # Coquille de tirage autour du poste de travail. Les deux cameras reelles y

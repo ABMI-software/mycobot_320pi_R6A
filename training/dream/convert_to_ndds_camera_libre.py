@@ -97,6 +97,9 @@ def main():
                     help='secteur reserve, en degres, ex. "60,100"')
     ap.add_argument('--output-tenu', default=None,
                     help='dossier du secteur reserve (obligatoire avec --azimut-tenu)')
+    ap.add_argument('--angles-interpoles', action='store_true',
+                    help='ne garder que les trames dont les angles sont interpoles au temps de '
+                         "l'image (joints_complets.csv, pas_interp_s renseigne)")
     args = ap.parse_args()
 
     secteur = None
@@ -117,7 +120,7 @@ def main():
                         load_labels(str(e / 'labels.csv')), SourceCollecte(e)))
 
     idx, idx_tenu = 0, 0
-    sans_pose, hors_champ, sans_image = 0, 0, 0
+    sans_pose, hors_champ, sans_image, non_interpolees = 0, 0, 0, 0
     for entree, poses, lignes, compagnons in sources:
       for r in lignes:
         if r['camera'] != args.camera:
@@ -136,6 +139,10 @@ def main():
                or p[0] < -50 or p[0] > 690 or p[1] < -50 or p[1] > 530
                for p in projs):
             hors_champ += 1
+            continue
+
+        if args.angles_interpoles and not compagnons.joints.get(n, {}).get('pas_interp_s'):
+            non_interpolees += 1
             continue
 
         img = entree / r['image_path']
@@ -166,7 +173,7 @@ def main():
 
     print(f'  entrainement : {idx} trames  |  secteur tenu : {idx_tenu} trames')
     print(f'  ecartees : {hors_champ} hors champ, {sans_pose} sans pose, '
-          f'{sans_image} sans image')
+          f'{sans_image} sans image, {non_interpolees} angles non interpoles')
 
 
 if __name__ == '__main__':

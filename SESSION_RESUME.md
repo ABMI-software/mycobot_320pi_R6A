@@ -1,5 +1,35 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (12 novembre 2026 — midi, chaîne autonome jusqu'à E3.9)
+
+L'utilisateur est absent au moins 4 jours. Tout s'enchaîne seul : `~/dream_article/E3/E3_9/chaine.sh`.
+
+### Ce qui a été accompli
+- Fiche du jeu E3.7 : `~/Desktop/E3_7_synthetique_50k/LISEZMOI.md`.
+- Constat : 53 % des images des tranches de 5 000 ont des angles non interpolés (~4 % du jeu au-delà de 2,5 px). Décision : on les écarte. `convert_to_ndds_camera_libre.py --angles-interpoles`, historique des angles du collecteur 3 → 10 s.
+- E3.7b porté à 30 × 1 000 pour retrouver ~49 000 images propres. Règles de la chaîne écrites avant les résultats : `docs/ARTICLE_DREAM.md`, « Chaîne du 12/11 ».
+- Meilleur modèle d'Osama (`vgg_tri_reel_ft_e10`) évalué sur le test de E3.8 : PCK@5 0,111 (hors de son domaine) ; E3.0 : 0,579.
+
+### Calendrier estimé
+| Étape | Fin estimée |
+|---|---|
+| E3.8 (3 bras + évaluations), puis choix de l'encodage | 12/11 vers minuit |
+| E3.7b, 30 × 1 000 | 14/11 vers 10 h |
+| Composition + conversion | 14/11 vers 11 h |
+| E3.9 (entraînement ~49 000 images) + évaluations | 15/11 dans la journée |
+
+### Au retour
+1. [ROUGE] Lire `~/dream_article/E3/E3_9/journal.txt` (une ligne par étape, `ARRÊT` si quelque chose a cassé ; relancer `chaine.sh` reprend à l'étape en cours).
+2. [ROUGE] E3.8 : `~/dream_article/E3/E3_8/choix.txt`, `comparaison_tenu_interpolees.txt`, `comparaison_tout.txt` → revue du metrologue, registre.
+3. [ROUGE] E3.9 : `comparaison_tenu.txt`, `eval_e3_9_real_tri_test/resume.json` → revue du metrologue ; test de décalage sur le banc avant tout chiffre réel.
+4. [JAUNE] E2 au banc (bloc en hauteur, supports), puis E3.10.
+
+### Commande rapide de reprise
+```bash
+bash scripts/etat_session.sh
+cat ~/dream_article/E3/E3_9/journal.txt ~/dream_article/E3/E3_8/journal.txt
+```
+
 ## État actuel (12 novembre 2026 — matin, E3.7 collecté, E3.8 lancé)
 
 ### Ce qui a été accompli

@@ -117,9 +117,9 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.6 | Pince montée | Pince visible, keypoints identiques au schéma à 7 points | fait : le launch caméra libre monte déjà la pince Pro (`mycobot_pro_320_pi_gazebo.urdf`), visible sur la planche de E3.1 |
 | E3.6b | Annotations complètes pour d'autres méthodes (RoboPEPP, HPE…) : pose caméra-robot, 12 articulations, 18 liens en 3D et 2D, doigts, masque, boîtes | JSON validés sur une collecte (écart FK ≤ 0,1 mm, points superposés à l'œil), lus par DREAM | fait le 03/11 : format dans `docs/SYNTHETIC_DATA.md`, 20 trames, écart 0,02 mm, `eval_papier.py` les lit |
 | E3.7 | Collecte : volume visé ~100k (papier), un secteur d'azimut tenu à l'écart, `run.yaml`, md5 | Jeu NDDS figé, md5, secteur tenu à l'écart documenté | en cours : en cours : pilote de 1 000 images fait le 03/11 (`~/dream_article/E3/E3_7_pilote/`) — complet, 0 gel, 97,5 % de masques frais, mais 9,1 s/image en moyenne (7,9 → 10,1 s, en dérive) et articulations lues jusqu'à 0,73 s de l'image ; articulations interpolées au temps de l'image, 4,1 s/image ; **50 000 images** décidées le 04/11 (10 tranches de 5 000, `scripts/collecte_tranches.sh`, `~/dream_article/E3/E3_7/journal.txt`), 100k à décider après E3.9 ; au 10/11, 8 tranches closes (39 740 images), la 9e en cours ; la 10e en 5 sous-tranches de 1 000 (masques et cadence dérivent dans une tranche de 5 000) ; tranches 01-08 recomposées à `--part 0.85 --part-teinte 0.5` (~59 % de masques à jour, d'où ~50 % de fonds et ~30 % de teintes sur l'ensemble) |
-| E3.7b | Complément de E3.7 avec les poses du pick (40 % du tirage), 10 × 1 000 | Pointe de pince à 72-115 mm sur une part nettement supérieure aux 1,7 % de E3.7 ; même format, md5 | programmé le 12/11 : démarre à la fin de E3.8 (`~/dream_article/E3/E3_7b/`, décision utilisateur : compléter avant E3.9) |
+| E3.7b | Complément de E3.7 avec les poses du pick (40 % du tirage), 30 × 1 000 (porté de 10 à 30 le 12/11, voir « Chaîne du 12/11 ») | Pointe de pince à 72-115 mm sur une part nettement supérieure aux 1,7 % de E3.7 ; même format, md5 | programmé le 12/11 : étape 2 de la chaîne du 12/11, démarre à la fin de E3.8 (`~/dream_article/E3/E3_7b/`) |
 | E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | en cours : lancé le 12/11 (`~/dream_article/E3/E3_8/e3_8.sh`, journal `journal.txt`) ; jeu des tranches 01-02, puis 3 bras à la suite (~3 h chacun) dès la fin de la conversion E3.7 |
-| E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | à faire |
+| E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | programmé le 12/11 : étapes 4-6 de la chaîne du 12/11 (angles interpolés seuls, encodage choisi par E3.8) ; fin estimée vers le 15-16/11 |
 | E3.10 | Évaluation : E2, `real_tri_test`, test de décalage, revue du metrologue | Critère de E3 (tableau des expériences) | à faire |
 | E3.11 | Modèle de déploiement : même recette que E3.9, tous azimuts (secteur 60-100° compris), hors article | Checkpoint pour le banc, si E3.10 atteint son critère | à faire (décision du 12/11) |
 
@@ -150,6 +150,34 @@ préparer pendant que la collecte et l'entraînement tournent.
 - **Ne pas faire** : départager sur `real_tri_test` ou sur E2 (ce serait choisir
   sur le test) ; prolonger un bras qui perd « pour lui laisser sa chance ».
 
+### Chaîne du 12/11 (absence de l'utilisateur ≥ 4 jours) — règles écrites avant les résultats
+
+Décision utilisateur du 12/11 : **écarter de l'entraînement les images dont les
+angles ne sont pas interpolés au temps de l'image**, compléter le jeu si
+nécessaire, et juger soi-même d'une nouvelle collecte. Jugement porté le 12/11,
+avant tout résultat de E3.8 :
+
+- **Volume** : filtré, E3.7 ne garde que ~23 000 images d'entraînement sur
+  44 262 (52 % interpolées), contre les 50 000 décidés le 04/11. **E3.7b passe
+  de 10 à 30 tranches de 1 000** (~33 h) : ~26 000 images propres de plus, soit
+  ~49 000 au total, dont ~40 % de poses du pick sur la partie E3.7b.
+- **Collecteur** : historique des angles porté de 3 à 10 s
+  (`HISTORIQUE_JOINTS_S`), pour que le retard de l'image ne le dépasse plus.
+- **Choix de l'encodage (E3.8)** : la règle de E3.8 s'applique aux **484 images
+  de test à angles interpolés** (`tenu_interpolees.npy`), le test complet étant
+  donné à titre de contrôle. Si le choix échoue (évaluation manquante),
+  encodage entier de DREAM.
+- **E3.9** : conversion de E3.7 + E3.7b avec `--angles-interpoles`, secteur
+  60-100° à part, puis entraînement synthétique seul (VGG-19 ImageNet, 50
+  époques, patience 8) avec l'encodage retenu ; évaluation sur le secteur tenu
+  et sur `real_tri_test`, références (Osama `vgg_tri_reel_ft_e10`, E3.0) sur
+  le même secteur tenu.
+- **Arrêts** : moins de 24 tranches E3.7b finies, conversion ou entraînement
+  en échec → la chaîne s'arrête et l'écrit dans son journal. Aucun chiffre
+  n'entre au registre sans la revue du metrologue.
+- Script : `~/dream_article/E3/E3_9/chaine.sh` (reprend où il s'est arrêté),
+  journal : `~/dream_article/E3/E3_9/journal.txt`.
+
 ### Point de départ de E3
 
 - Générateur : `mycobot_gateway/synthetic_data_collector_v3_camera_libre.py`
@@ -177,8 +205,7 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   ~4 % du jeu. Le drapeau `source.joints_interpoles` permet de filtrer.
   Conséquence pour E3.8 : 484 des 1 063 images de test sont interpolées ;
   comparer aussi sur ce sous-ensemble (`comparer_pck.py --garder
-  ~/dream_article/E3/E3_8/tenu_interpolees.npy`). À trancher avant E3.9 :
-  filtrer ou non. E3.7b (tranches de 1 000) n'en souffre pas.
+  ~/dream_article/E3/E3_8/tenu_interpolees.npy`). Tranché le 12/11 (utilisateur) : on écarte, voir « Chaîne du 12/11 ». E3.7b (tranches de 1 000) n'en souffre pas.
 - **12/11 — Le meilleur modèle d'Osama sur le secteur synthétique tenu** :
   `vgg_tri_reel_ft_e10` (affiné sur le réel, 19/10) évalué sur le test de E3.8
   (1 063 images, azimut 60-100°, randomisation E3.7) : détection 0,457,

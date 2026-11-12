@@ -9,6 +9,15 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — angles non interpolés écartés (12/11)
+
+- `convert_to_ndds_camera_libre.py --angles-interpoles` : ne garde que les
+  trames dont les angles sont interpolés au temps de l'image ; le compte des
+  trames écartées est affiché.
+- Collecteur caméra libre : historique des angles porté de 3 à 10 s
+  (`HISTORIQUE_JOINTS_S`) : sur les tranches de 5 000 de E3.7, le retard de
+  l'image le dépassait pour 53 % des trames.
+
 ### Corrigé — collecte caméra libre sans les poses du pick (12/11)
 
 - `scripts/collecte_tranches.sh` refuse de démarrer sans
