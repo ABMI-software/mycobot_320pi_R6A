@@ -173,7 +173,9 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   uniforme dans les butées, garde au sol 50 mm. Le manuscrit le décrit tel
   quel. À trancher avant E3.9 : est-ce gênant pour le tri réel (pointe à
   72-114 mm, la zone dont l'absence avait causé le biais de 52 px en
-  septembre) ? À vérifier sur la distribution des hauteurs de pointe de E3.7.
+  septembre) ? Mesuré le 12/11 sur 2 054 annotations (1 sur 5) : pointe de
+  pince médiane à 385 mm, p5 à 160 mm ; **1,7 % des images seulement ont la
+  pointe entre 72 et 115 mm**. La zone du tri est présente mais rare.
 - **10/11 — La SVPRO fixe est dans le secteur tenu à l'écart** : azimut 70°,
   0,98 m, élévation 25° (`geometrie_camera.py`, convention du synthétique) ;
   l'arducam est à −109°, 0,88 m, 74°. La moitié SVPRO de `real_tri_test` est
