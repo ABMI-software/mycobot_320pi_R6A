@@ -21,7 +21,10 @@ langue: fr                 # ou: en
 embargo: actif             # « levé » une fois l'article soumis ou accepté
 crediter_osama: oui        # nommer le stagiaire quand son travail est en jeu
 cadence_jours: 14          # rappel au démarrage de session au-delà
+doc_partage: https://claude.ai/artifact/DU64iun8XyQxqfkiyBhsji
 ```
+
+L'utilisateur (l'encadrant) poste lui-même : le texte est rédigé à son nom.
 
 ## Déroulé
 
@@ -41,8 +44,16 @@ cadence_jours: 14          # rappel au démarrage de session au-delà
 4. **Vérifier les chiffres** : agent `metrologue` sur la section
    « Vérification » du brouillon. Tout chiffre qu'il juge non soutenu sort du
    post (il passe dans « Écarté »).
-5. **Présenter** à l'utilisateur : le post, l'accroche de rechange, le visuel,
-   et les points de « Écarté » à trancher. Ne rien publier.
+5. **Mettre au propre dans le document partagé** (skill `docs` d'abord) :
+   l'URL est `doc_partage` dans les réglages. Ajouter une section datée juste
+   sous « Mode d'emploi » (le plus récent en haut) : le post prêt à copier
+   (court, 200-300 mots, avec son accroche de rechange), le visuel inséré
+   dans le document, puis un tableau bref « Sources et vérification » et ce
+   qui est gardé pour plus tard. Visuel : images existantes du projet, **sans
+   personne reconnaissable** (les fonds COCO en contiennent souvent : regarder
+   l'image avant de la placer), copié dans `visuels/`.
+6. **Présenter** à l'utilisateur : le lien du document et les points à
+   trancher. Ne rien publier sur LinkedIn : c'est l'utilisateur qui poste.
 
 ## Garde-fous
 
