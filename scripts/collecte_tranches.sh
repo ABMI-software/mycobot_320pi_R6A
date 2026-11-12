@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Collecte caméra libre par tranches (E3.7 de docs/ARTICLE_DREAM.md).
 #   bash scripts/collecte_tranches.sh <dossier> <nb_tranches> [images_par_tranche]
+# Tranches de 1 000 : à 5 000, la cadence passe de 3,7 à 23 s/image et les
+# masques à jour de 95 à 25 % (E3.7, 11/11) ; à 1 000, 3,9 s/image et 96 %.
 # Chaque tranche relance Gazebo : sur le pilote du 03/11, la cadence dérivait
 # de 7,9 à 10,1 s/image en 1 000 images, et une relance la remet à zéro. Une
 # tranche finie porte un fichier `fait` et n'est pas refaite : relancer le
 # script reprend où il s'était arrêté. À lancer détaché :
 #   setsid nohup bash scripts/collecte_tranches.sh ~/dream_article/E3/E3_7 10 > /dev/null 2>&1 &
-dossier=$1; nb=$2; par_tranche=${3:-5000}
+dossier=$1; nb=$2; par_tranche=${3:-1000}
 journal="$dossier/journal.txt"
 mkdir -p "$dossier"
 # Avant `set -u` : les scripts d'environnement de ROS lisent des variables non définies.

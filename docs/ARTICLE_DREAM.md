@@ -275,6 +275,12 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
     étiquettes, elles, restent justes en fin de tranche (8 images de la fin
     de la tranche 08 contrôlées à l'œil). Conséquence : à `--part 0.5`, ~29 %
     des images d'une tranche reçoivent un fond COCO au lieu de ~50 %.
+    Confirmé le 11/11 par la tranche 10, collectée en 5 × 1 000 : **3,85 s/image**
+    (3,8 au début, 4,1 à la fin de chaque sous-tranche) et **95-97 % de masques
+    à jour**, contre 12 s et 59 % en tranches de 5 000. La dérive tient à la
+    durée de vie de Gazebo : collecter par tranches de 1 000. Tranches 01-08
+    recomposées à `--part 0.85 --part-teinte 0.5` : 49,3 % de fonds et 29,6 %
+    de teintes sur 39 740 images.
 - **03/11 — Lumières ajoutées et caméra de segmentation** : une lumière posée
   par `create` porte par défaut un repère visuel sans label, et la caméra de
   segmentation plante dessus dès la première image (`Ogre::
