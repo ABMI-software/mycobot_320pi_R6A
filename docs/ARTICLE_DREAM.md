@@ -167,6 +167,26 @@ préparer pendant que la collecte et l'entraînement tournent.
 Chaque constat porte sa date. Quand un constat change, on le **corrige ici
 même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoire.
 
+- **12/11 — E3.7 : la moitié des angles ne sont pas interpolés** : sur les
+  tranches 01-09 (5 000 images), ~53 % des images ont les angles de la
+  dernière mesure reçue et non ceux de l'instant de l'image (écart médian
+  0,12 s, max 1,4 s) ; tranche 10 (5 × 1 000) : 99 % interpolés. Même cause
+  que la dérive des masques : le retard de l'image dépasse l'historique de 3 s.
+  Erreur estimée sur ces images (vitesse × écart, reprojetée, pire keypoint) :
+  médiane 0,05 px, **7-8 % au-delà de 2,5 px**, 1 % au-delà de ~17 px, soit
+  ~4 % du jeu. Le drapeau `source.joints_interpoles` permet de filtrer.
+  Conséquence pour E3.8 : 484 des 1 063 images de test sont interpolées ;
+  comparer aussi sur ce sous-ensemble (`comparer_pck.py --garder
+  ~/dream_article/E3/E3_8/tenu_interpolees.npy`). À trancher avant E3.9 :
+  filtrer ou non. E3.7b (tranches de 1 000) n'en souffre pas.
+- **12/11 — Le meilleur modèle d'Osama sur le secteur synthétique tenu** :
+  `vgg_tri_reel_ft_e10` (affiné sur le réel, 19/10) évalué sur le test de E3.8
+  (1 063 images, azimut 60-100°, randomisation E3.7) : détection 0,457,
+  PCK@2,5/5/10 0,044 / 0,111 / 0,192. E3.0 (synthétique seul, sans
+  randomisation d'apparence) : 0,773 et 0,392 / 0,579 / 0,666. Hors du
+  domaine du premier (caméras fixes, apparence du banc) : ce n'est pas une
+  comparaison sur sa tâche. La comparaison qui compte pour lui est le réel
+  (`real_tri_test`, E1 : PCK@5 0,941), en E3.10. `a_preciser`.
 - **12/11 — Secteur 60-100° tenu à l'écart : pourquoi, et pour quel modèle** :
   un secteur d'azimut entier est retiré de l'entraînement parce qu'une
   validation tirée au hasard partage les points de vue de l'entraînement et ne

@@ -23,6 +23,8 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   entre modèles évalués par `eval_papier.py` sur les mêmes images, IC 95 %
   par bootstrap apparié par blocs d'images consécutives ; `--critere`
   applique la règle de choix de E3.8.
+  `--garder` restreint la comparaison à un sous-ensemble d'images (booléens
+  `.npy`), par exemple celles dont les angles sont interpolés.
 
 ### Ajouté — E2 : capture réelle multi-vues (10/11)
 

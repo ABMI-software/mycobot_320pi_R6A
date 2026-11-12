@@ -45,6 +45,8 @@ def main():
     ap.add_argument("--graine", type=int, default=0)
     ap.add_argument("--critere", action="store_true", help="appliquer la règle de choix de E3.8")
     ap.add_argument("--json", type=Path, help="écrire le bilan ici")
+    ap.add_argument("--garder", type=Path,
+                    help="booléens .npy, un par image dans l'ordre de l'évaluation : sous-ensemble à comparer")
     args = ap.parse_args()
 
     modeles = {d.name: charger(d) for d in [args.reference, *args.autres]}
@@ -52,6 +54,12 @@ def main():
     if len(n) != 1:
         raise SystemExit(f"jeux de tailles différentes : {sorted(n)} images")
     n = n.pop()
+    if args.garder:
+        garder = np.load(args.garder)
+        if garder.shape != (n,):
+            raise SystemExit(f"--garder : {garder.shape[0]} booléens pour {n} images")
+        modeles = {nom: (e[garder], d[garder]) for nom, (e, d) in modeles.items()}
+        n = int(garder.sum())
     blocs = [np.arange(i, min(i + args.bloc, n)) for i in range(0, n, args.bloc)]
     hasard = np.random.default_rng(args.graine)
     tirages = [np.concatenate([blocs[i] for i in hasard.integers(0, len(blocs), len(blocs))])
