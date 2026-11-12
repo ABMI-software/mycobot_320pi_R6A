@@ -33,6 +33,19 @@ if [ -f docs/ARTICLE_DREAM.md ]; then
   [ -n "$etape" ] && echo "  étape suivante : ${etape} (feuille de route, docs/ARTICLE_DREAM.md)"
 fi
 
+# Rappel de communication (skill post-linkedin) : brouillons hors du dépôt.
+linkedin="$HOME/dream_article/communication/linkedin"
+if [ -d "$HOME/dream_article" ]; then
+  cadence=$(sed -n 's/^cadence_jours: *\([0-9]*\).*/\1/p' "$linkedin/reglages.yaml" 2>/dev/null); cadence=${cadence:-14}
+  dernier=$(ls "$linkedin"/20*.md 2>/dev/null | sort | tail -1)
+  if [ -z "$dernier" ]; then
+    echo "Post LinkedIn : aucun brouillon encore (skill post-linkedin)"
+  else
+    jours=$(( ( $(date +%s) - $(date -d "$(basename "$dernier" .md)" +%s) ) / 86400 ))
+    [ "$jours" -ge "$cadence" ] && echo "Post LinkedIn : dernier brouillon il y a $jours jours (skill post-linkedin)"
+  fi
+fi
+
 derniere=$(grep -m1 -oE '^## État actuel \([^)]*\)' SESSION_RESUME.md 2>/dev/null | sed 's/^## //')
 [ -n "$derniere" ] && echo "SESSION_RESUME.md : dernière entrée « $derniere »"
 

@@ -9,6 +9,18 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — brouillons de posts LinkedIn sur l'avancement (12/11)
+
+- Skill `post-linkedin` et agent `communicant-linkedin` : brouillon de post
+  technique sur une à deux semaines de travail (apprentissages, résultats,
+  setup, état de l'art), tiré du `git log`, de `SESSION_RESUME.md`, de
+  « Ce qu'on a appris » et du registre ; chiffres vérifiés par le
+  `metrologue`, embargo de l'article respecté, jamais publié
+  automatiquement. Brouillons et réglages hors du dépôt
+  (`~/dream_article/communication/linkedin/`).
+- `scripts/etat_session.sh` rappelle au démarrage quand le dernier brouillon
+  date de plus de 14 jours.
+
 ### Modifié — angles non interpolés écartés (12/11)
 
 - `convert_to_ndds_camera_libre.py --angles-interpoles` : ne garde que les
