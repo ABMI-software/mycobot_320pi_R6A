@@ -39,8 +39,12 @@
 1. [FAIT 18/11] Diagnostiquer le biais de la base : convention du point base
    (collecteur contre labels réels), image SVPRO rééchelonnée, test de
    décalage (`scripts/dream_test_decalage.py`), erreurs par caméra avec IC.
-2. [JAUNE] Selon le diagnostic : corriger la convention et réévaluer, ou
-   attaquer l'écart d'apparence (rendu `realistic`, textures du robot réel).
+2. [JAUNE] E3.9b, protocole écrit le 18/11 (`docs/ARTICLE_DREAM.md`) :
+   rejouer les 100 poses de `real_tri_test` dans la réplique du banc, rendu
+   d'entraînement contre `realistic`. Outil de rejeu à écrire ; mesure dès
+   que la carte graphique est libre (entraînement RoboPEPP en cours).
+   Établi le 18/11 : les deux caméras réelles sont dans la plage de points
+   de vue d'entraînement (SVPRO dans le secteur tenu, à 0,968 en synthétique).
 3. [VERT] Décider si l'échec réel entre dans un post LinkedIn.
 
 ### Commande rapide de reprise
