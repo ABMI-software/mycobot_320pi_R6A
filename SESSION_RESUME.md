@@ -1,5 +1,38 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (18 novembre 2026 — matin, chaîne du 12/11 finie, E3.9 n'a pas transféré)
+
+### Ce qui a été accompli
+- La chaîne autonome du 12/11 est allée au bout sans intervention : E3.8 (13/11
+  01:11), E3.7b 30 × 1 000 collecté et composé (14/11), jeu E3.9 de 49 595 +
+  6 125 images, entraînement `vgg_e3_9_synth_seul` (15/11 16:22), évaluations.
+- **E3.8** : sous-pixel σ 1 retenu (PCK@2,5 0,678 contre 0,529, 484 images).
+- **E3.9** : secteur tenu PCK 0,910/0,968/0,984 ; **réel 0,004/0,068/0,169**,
+  détection 0,70, ADD médiane 83 mm. Transfert non obtenu.
+- Registre : E3.8 et E3.9 inscrits `a_preciser` (metrologue du 18/11).
+- Post LinkedIn du 12/11 mis à jour dans le document partagé (encodage
+  retenu, suite) ; l'échec réel n'y figure pas (embargo, à trancher).
+
+### Décisions prises
+- E3.10 (E2 au banc) n'a de sens qu'après avoir expliqué le biais constant
+  de la base sur le réel (−4 à −6 px en v, MAD 0,3 px, deux caméras).
+- E3.11 (modèle de déploiement) suspendu : son déclencheur, E3.10 réussi,
+  n'est pas atteint.
+
+### Prochaines actions
+1. [ROUGE] Diagnostiquer le biais de la base : convention du point base
+   (collecteur contre labels réels), image SVPRO rééchelonnée, test de
+   décalage (`scripts/dream_test_decalage.py`), erreurs par caméra avec IC.
+2. [JAUNE] Selon le diagnostic : corriger la convention et réévaluer, ou
+   attaquer l'écart d'apparence (rendu `realistic`, textures du robot réel).
+3. [VERT] Décider si l'échec réel entre dans un post LinkedIn.
+
+### Commande rapide de reprise
+```bash
+cat ~/dream_article/E3/E3_9/comparaison_tenu.txt
+python3 -c "import json;print(json.load(open('$HOME/dream_article/E3/E3_9/eval_e3_9_real_tri_test/resume.json'))['seuil_0.01']['pck'])"
+```
+
 ## État actuel (12 novembre 2026 — midi, chaîne autonome jusqu'à E3.9)
 
 L'utilisateur est absent au moins 4 jours. Tout s'enchaîne seul : `~/dream_article/E3/E3_9/chaine.sh`.

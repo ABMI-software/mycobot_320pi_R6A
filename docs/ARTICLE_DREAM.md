@@ -117,9 +117,9 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.6 | Pince montée | Pince visible, keypoints identiques au schéma à 7 points | fait : le launch caméra libre monte déjà la pince Pro (`mycobot_pro_320_pi_gazebo.urdf`), visible sur la planche de E3.1 |
 | E3.6b | Annotations complètes pour d'autres méthodes (RoboPEPP, HPE…) : pose caméra-robot, 12 articulations, 18 liens en 3D et 2D, doigts, masque, boîtes | JSON validés sur une collecte (écart FK ≤ 0,1 mm, points superposés à l'œil), lus par DREAM | fait le 03/11 : format dans `docs/SYNTHETIC_DATA.md`, 20 trames, écart 0,02 mm, `eval_papier.py` les lit |
 | E3.7 | Collecte : volume visé ~100k (papier), un secteur d'azimut tenu à l'écart, `run.yaml`, md5 | Jeu NDDS figé, md5, secteur tenu à l'écart documenté | en cours : en cours : pilote de 1 000 images fait le 03/11 (`~/dream_article/E3/E3_7_pilote/`) — complet, 0 gel, 97,5 % de masques frais, mais 9,1 s/image en moyenne (7,9 → 10,1 s, en dérive) et articulations lues jusqu'à 0,73 s de l'image ; articulations interpolées au temps de l'image, 4,1 s/image ; **50 000 images** décidées le 04/11 (10 tranches de 5 000, `scripts/collecte_tranches.sh`, `~/dream_article/E3/E3_7/journal.txt`), 100k à décider après E3.9 ; au 10/11, 8 tranches closes (39 740 images), la 9e en cours ; la 10e en 5 sous-tranches de 1 000 (masques et cadence dérivent dans une tranche de 5 000) ; tranches 01-08 recomposées à `--part 0.85 --part-teinte 0.5` (~59 % de masques à jour, d'où ~50 % de fonds et ~30 % de teintes sur l'ensemble) |
-| E3.7b | Complément de E3.7 avec les poses du pick (40 % du tirage), 30 × 1 000 (porté de 10 à 30 le 12/11, voir « Chaîne du 12/11 ») | Pointe de pince à 72-115 mm sur une part nettement supérieure aux 1,7 % de E3.7 ; même format, md5 | programmé le 12/11 : étape 2 de la chaîne du 12/11, démarre à la fin de E3.8 (`~/dream_article/E3/E3_7b/`) |
-| E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | en cours : lancé le 12/11 (`~/dream_article/E3/E3_8/e3_8.sh`, journal `journal.txt`) ; jeu des tranches 01-02, puis 3 bras à la suite (~3 h chacun) dès la fin de la conversion E3.7 |
-| E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | programmé le 12/11 : étapes 4-6 de la chaîne du 12/11 (angles interpolés seuls, encodage choisi par E3.8) ; fin estimée vers le 15-16/11 |
+| E3.7b | Complément de E3.7 avec les poses du pick (40 % du tirage), 30 × 1 000 (porté de 10 à 30 le 12/11, voir « Chaîne du 12/11 ») | Pointe de pince à 72-115 mm sur une part nettement supérieure aux 1,7 % de E3.7 ; même format, md5 | fait le 14/11 : 30 tranches collectées puis composées (masques à jour 0,95, ~53 % de fonds, ~32 % de teintes) ; jeu E3.9 = 49 595 images d'entraînement + 6 125 du secteur tenu, 24 014 images à angles non interpolés écartées (`~/dream_article/E3/E3_9/run.yaml`, md5 des labels) |
+| E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | fait le 13/11 : **sous-pixel σ 1 retenu** par la règle écrite d'avance (484 images à angles interpolés : Δ PCK@2,5 +0,149 [+0,132 ; +0,167], Δ PCK@5 +0,042 [+0,031 ; +0,052], pas de perte à 10 px ni en détection) ; sous-pixel σ 2 : +0,037 seulement ; 1 graine par bras (`~/dream_article/E3/E3_8/choix.txt`) ; verdict du metrologue à inscrire |
+| E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | fait le 15/11 (`vgg_e3_9_synth_seul`) : secteur 60-100° tenu, 6 125 images, PCK 0,910/0,968/0,984, détection 0,994 ; **réel (`real_tri_test`, 200 images) : PCK 0,004/0,068/0,169, détection 0,70, ADD médiane 83 mm** (E3.0 : 0,014 à 5 px, 173 mm) — le transfert au réel reste un échec ; biais vertical constant de la base (−4 à −6 px, MAD 0,3 px, deux caméras) à expliquer avant E3.10 (`~/dream_article/E3/E3_9/`) |
 | E3.10 | Évaluation : E2, `real_tri_test`, test de décalage, revue du metrologue | Critère de E3 (tableau des expériences) | à faire |
 | E3.11 | Modèle de déploiement : même recette que E3.9, tous azimuts (secteur 60-100° compris), hors article | Checkpoint pour le banc, si E3.10 atteint son critère | à faire (décision du 12/11) |
 
@@ -194,6 +194,23 @@ avant tout résultat de E3.8 :
 
 Chaque constat porte sa date. Quand un constat change, on le **corrige ici
 même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoire.
+
+- **18/11 — E3.9 : très bon en simulation, échec sur le réel** : le modèle
+  synthétique seul (49 595 images, sous-pixel σ 1) atteint PCK@5 0,968 sur
+  les 6 125 images du secteur 60-100° tenu à l'écart, mais 0,068 sur les 200
+  images réelles de `real_tri_test` (détection 0,70 ; E3.0 : 0,014). La
+  randomisation d'apparence aide, sans suffire. Piste à fermer d'abord : la
+  base, point fixe, est prédite **4 à 6 px trop haut sur les deux caméras,
+  avec une dispersion de 0,3 px** — un biais constant, pas du bruit. Sim et
+  réel prennent leurs keypoints dans le même `mycobot_fk.py` ; le metrologue
+  note que le rapport arducam/SVPRO ne colle pas à un décalage en Z et
+  suggère une convention d'image (rééchelonnage 800×600 → 640×480 de la
+  SVPRO, origine du pixel) ou du point « base ». Hypothèse, pas une cause
+  (registre E3.9, `a_preciser`).
+- **13/11 — E3.8 : sous-pixel σ 1 retenu** par la règle écrite d'avance
+  (Δ PCK@2,5 +0,149 [+0,132 ; +0,167] sur 484 images). La perte de détection
+  n'est pas exclue par l'IC ([−0,017 ; +0,000], tolérance 0,01) : le critère
+  passe sur l'estimation ponctuelle. Une graine par bras (registre E3.8).
 
 - **12/11 — E3.7 : la moitié des angles ne sont pas interpolés** : sur les
   tranches 01-09 (5 000 images), ~53 % des images ont les angles de la

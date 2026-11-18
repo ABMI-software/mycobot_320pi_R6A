@@ -148,3 +148,23 @@ resultats:
     reserve: "Metrologue 03/11 : réel tenu comme échec mesuré (0,03 identique), cause confondue (apparence, couverture des 2 caméras réelles, distorsion, pose d'observation) ; 1 entraînement, 1 graine ; vue tenue = interpolation d'azimut, poses articulaires non disjointes, pas d'IC ni de md5 ; ADD vue tenue p90 65,3 mm, AUC 0-100 mm 0,729 ; ADD réelle AUC 0,045 (échecs comptés). Données d'entraînement : 1,0 % des images ont les doigts dans la table (garde au sol fausse, corrigée le 03/11 pour les collectes suivantes). Formulation admise : « sans randomisation d'apparence, un modèle synthétique seul à caméra libre ne transfère pas à nos deux caméras réelles (PCK@5 0,014, n = 200, 1 graine) »"
     comparable_papier: non
     recalcul: "témoin caméra fixe à volume égal et 3 graines pour attribuer l'effet ; IC par blocs par caméra ; couverture des poses de caméra synthétiques contre les 2 réelles ; test de décalage"
+
+  - id: E3.8
+    affirmation: "Choix de l'encodage des cartes de croyance (8 791 images synthétiques, 1 graine par bras) : sur 484 images à angles interpolés du secteur 60-100° tenu à l'écart, sous-pixel σ 1 PCK@2,5 0,678 contre 0,529 pour l'encodage entier σ 2 de DREAM (Δ +0,149 [+0,132 ; +0,167]) ; sous-pixel σ 2 0,565 ; retenu par une règle fixée avant mesure"
+    source: docs/ARTICLE_DREAM.md
+    archive: ~/dream_article/E3/E3_8/
+    tenu_a_l_ecart: "secteur d'azimut 60-100° ; angles interpolés seuls (484/1 063)"
+    verdict: a_preciser
+    reserve: "Metrologue 18/11 : règle appliquée à la lettre, gain PCK@2,5 net ; perte de détection non exclue (IC [−0,017 ; +0,000] pour une tolérance de 0,01, critère passé sur l'estimation ponctuelle) ; blocs de 10 probablement trop courts pour la corrélation des séquences ; 1 graine (σ 1 / σ 2 écartés de 0,11 : effet de réglage, variance entre graines inconnue) ; choix et rapport sur le même jeu ; non démontré à 49k images. Formulation admise : « sur 484 images synthétiques à angles interpolés du secteur 60-100° tenu à l'écart, l'encodage sous-pixel σ 1 (une graine, 8 791 images) a donné un PCK@2,5 de 0,678 contre 0,529 pour l'encodage entier ; il a été retenu par une règle fixée avant mesure »"
+    comparable_papier: non
+    recalcul: "3 graines par bras ; IC par séquence ou blocs de taille justifiée ; choix sur un jeu distinct du jeu de rapport"
+
+  - id: E3.9
+    affirmation: "Synthétique seul (vgg_e3_9_synth_seul, 49 595 images E3.7 + E3.7b à angles interpolés, sous-pixel σ 1, aucune image réelle) : secteur 60-100° tenu à l'écart (6 125 images) PCK 0,910/0,968/0,984, détection 0,994 ; real_tri_test (200 images, 100 arducam + 100 SVPRO) PCK 0,004/0,068/0,169, détection 0,70, ADD médiane 83 mm sur 69,5 % de PnP réussis"
+    source: docs/ARTICLE_DREAM.md
+    archive: ~/dream_article/E3/E3_9/
+    tenu_a_l_ecart: "secteur d'azimut 60-100° (même générateur) ; réel : autre domaine (SVPRO dans le secteur, arducam hors secteur)"
+    verdict: a_preciser
+    reserve: "Metrologue 18/11 : synthétique citable mais sim-vers-sim (même générateur), images corrélées, recouvrement avec les 484 images de E3.8 à vérifier. Réel : non_soutenu comme transfert — échec mesuré ; ADD biaisée par survivant ; labels ArUco valables à Z = 0 ; n = 200, 1 graine. Biais constant de la base en v (arducam −5,5 px, SVPRO −4,3 px, MAD 0,3 px) : ne suit pas le rapport attendu d'un décalage Z (≈ 3× plus fort sur la SVPRO), plutôt une convention d'image ou de point « base » — hypothèse, pas une cause. Formulation admise : « entraîné sur ~49,6k images synthétiques seules, le modèle atteint un PCK@5 de 0,968 sur 6 125 images synthétiques d'un secteur d'azimut tenu à l'écart ; sur 200 images réelles il détecte 70 % des points et PCK@5 vaut 0,068, soit un transfert non obtenu »"
+    comparable_papier: non
+    recalcul: "test de convention du point base (FK réelle contre collecteur, décalage Z projeté par caméra, décalage d'image SVPRO 800×600→640×480) ; mesure réelle par caméra avec IC ; ADD sur toutes les images"
