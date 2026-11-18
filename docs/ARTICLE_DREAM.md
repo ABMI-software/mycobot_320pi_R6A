@@ -230,6 +230,26 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   étiquettes, pas avec le robot ; (3) E2 doit étiqueter avec une extrinsèque
   recalibrée **le jour même**, contrôle au robot compris (déjà dans
   `docs/PROTOCOLE_E2_MULTIVUES.md`).
+  **Suite du diagnostic, 18/11 après-midi** (`~/dream_article/E3/E3_9/diag_arducam/`,
+  non relu par le metrologue) :
+  - **arducam, `base` et `link1`** : cachés sous l'épaule en vue zénithale ;
+    E3.9 s'y trompe vraiment (20 et 40 px, même après ajustement de pose).
+    C'est un échec de perception sur des points occultés ;
+  - **arducam, `link3`-`link6`** : les prédictions sont cohérentes avec la
+    géométrie du robot (une pose fixe : résidu 1,4-5,7 px). Une pose à 65 mm
+    de l'extrinsèque ArUco explique **à la fois** les marqueurs (0,7-3,1 px)
+    et ces prédictions (médiane 3,7 px, PCK@5 0,66). En vue zénithale, 4
+    marqueurs au sol contraignent mal la profondeur : les étiquettes des
+    points en hauteur sont incertaines de plusieurs pixels ;
+  - **SVPRO** : une pose fixe explique 92 % des prédictions à 2,2 px, mais
+    elle place les marqueurs à 7-11 px. Désaccord réel, cause non tranchée
+    (biais d'échelle du réseau ~5 %, ou intrinsèques) ;
+  - la distorsion de l'arducam (`cam_3` : k1 5,4 ; k2 18,8 ; k3 −48) est
+    extrême ; sans elle, le PCK@10 d'E3.9 arducam double (0,10 → 0,20).
+  Conséquence : `real_tri_test` ne départage pas, à 2,5-5 px, un échec de
+  transfert d'une erreur d'étiquette pour les points en hauteur. E2 doit
+  avoir un contrôle en hauteur (marqueur haut ≤ 2 px, déjà au protocole) et
+  des intrinsèques vérifiées.
 - **13/11 — E3.8 : sous-pixel σ 1 retenu** par la règle écrite d'avance
   (Δ PCK@2,5 +0,149 [+0,132 ; +0,167] sur 484 images). La perte de détection
   n'est pas exclue par l'IC ([−0,017 ; +0,000], tolérance 0,01) : le critère

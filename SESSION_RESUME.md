@@ -30,9 +30,18 @@
 - `vgg_tri_reel_ft_e10` a appris ce biais SVPRO (réserve ajoutée au
   registre, entrée E).
 
+### Prédictions E3.9 sur les images réelles (18/11, fin d'après-midi)
+- Arducam : `base`/`link1` cachés sous l'épaule → vrai échec (20/40 px).
+  `link3`-`link6` cohérents ; une pose compatible avec les marqueurs (à
+  65 mm de l'ArUco) les explique à 3,7 px : étiquettes en hauteur incertaines.
+- SVPRO : prédictions cohérentes entre elles (2,2 px), incompatibles avec
+  les marqueurs (7-11 px) : cause non tranchée.
+- Distorsion `cam_3` extrême (k3 −48) ; à recalibrer.
+
 ### Prochaines actions
-0. [ROUGE] Attaquer l'écart sim → réel sur l'arducam (link1 à 41 px) :
-   regarder les prédictions sur les images, comparer au rendu `realistic`.
+0. [ROUGE] Relecture du diagnostic par le metrologue ; recalibrer les
+   intrinsèques arducam ; contrôle en hauteur pour les étiquettes réelles
+   (protocole E2). Le rendu `realistic` reste à comparer.
 1. [FAIT 18/11] Diagnostiquer le biais de la base : convention du point base
    (collecteur contre labels réels), image SVPRO rééchelonnée, test de
    décalage (`scripts/dream_test_decalage.py`), erreurs par caméra avec IC.
