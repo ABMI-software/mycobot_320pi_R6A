@@ -19,8 +19,21 @@
 - E3.11 (modèle de déploiement) suspendu : son déclencheur, E3.10 réussi,
   n'est pas atteint.
 
+### Diagnostic du biais de la base (18/11, après-midi)
+- Pas un défaut du réseau (aucun biais en simulation), pas un décalage 3D
+  commun aux deux caméras.
+- **Étiquettes SVPRO de `real_tri` (13/10) faites avec une extrinsèque
+  fausse** de 12,7-19,1 mm (`svpro_extrinsic_labels.avant_1410.yaml`).
+  Réétiquetée au 15/10 : E3.9 SVPRO PCK@10 0,24 → 0,45-0,59.
+- L'arducam (extrinsèque saine) reste très mauvaise : l'échec réel est
+  bien un écart sim → réel, la base n'en est pas la cause.
+- `vgg_tri_reel_ft_e10` a appris ce biais SVPRO (réserve ajoutée au
+  registre, entrée E).
+
 ### Prochaines actions
-1. [ROUGE] Diagnostiquer le biais de la base : convention du point base
+0. [ROUGE] Attaquer l'écart sim → réel sur l'arducam (link1 à 41 px) :
+   regarder les prédictions sur les images, comparer au rendu `realistic`.
+1. [FAIT 18/11] Diagnostiquer le biais de la base : convention du point base
    (collecteur contre labels réels), image SVPRO rééchelonnée, test de
    décalage (`scripts/dream_test_decalage.py`), erreurs par caméra avec IC.
 2. [JAUNE] Selon le diagnostic : corriger la convention et réévaluer, ou

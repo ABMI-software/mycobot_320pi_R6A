@@ -207,6 +207,29 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   suggère une convention d'image (rééchelonnage 800×600 → 640×480 de la
   SVPRO, origine du pixel) ou du point « base ». Hypothèse, pas une cause
   (registre E3.9, `a_preciser`).
+  **Diagnostic du 18/11** (`~/dream_article/E3/E3_9/diag_base/`) :
+  - en simulation, la base n'a aucun biais (0,26 ; 0,01 px) : le décodage
+    du réseau n'est pas en cause ;
+  - aucun décalage 3D commun de la base n'explique les deux caméras (résidu
+    jusqu'à 2,9 px) : le biais est propre à chaque caméra ;
+  - **les étiquettes SVPRO de `real_tri` (train et test, capturés le 13/10)
+    sortent de `svpro_extrinsic_labels.avant_1410.yaml`**, la version que la
+    recalibration du 15/10 donnait fausse de 12,7-19,1 mm aux marqueurs.
+    Reprojetées avec l'extrinsèque SVPRO du 15/10, elles bougent de 4-6 px
+    et E3.9 passe de PCK 0,001/0,114/0,239 à 0,039-0,060 / 0,141-0,146 /
+    0,451-0,589 sur la SVPRO. L'extrinsèque du 15/10 n'est pas une vérité
+    (caméra peut-être bougée entre-temps), mais elle a été recalibrée contre
+    la référence au robot ;
+  - l'arducam, elle, est étiquetée par une extrinsèque saine (13/10,
+    leave-one-out 0,5-3,4 mm) et reste très mauvaise (médianes 7-41 px,
+    link1 à 41 px) : là, l'écart est bien d'apparence ou de point de vue.
+  Conséquences : (1) le biais de la base n'est **pas** la cause de l'échec
+  réel, qui reste un écart sim → réel ; (2) la moitié SVPRO de `real_tri`
+  porte une erreur d'étiquetage de quelques pixels, apprise telle quelle par
+  `vgg_tri_reel_ft_e10` : son PCK SVPRO (E1) mesure l'accord avec ces
+  étiquettes, pas avec le robot ; (3) E2 doit étiqueter avec une extrinsèque
+  recalibrée **le jour même**, contrôle au robot compris (déjà dans
+  `docs/PROTOCOLE_E2_MULTIVUES.md`).
 - **13/11 — E3.8 : sous-pixel σ 1 retenu** par la règle écrite d'avance
   (Δ PCK@2,5 +0,149 [+0,132 ; +0,167] sur 484 images). La perte de détection
   n'est pas exclue par l'IC ([−0,017 ; +0,000], tolérance 0,01) : le critère
