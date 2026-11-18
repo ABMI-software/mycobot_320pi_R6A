@@ -205,6 +205,30 @@ Rien de ceci n'est appliqué au 06/10.
 
 ---
 
+## 6. Suivre un entraînement à distance (depuis le 18/11/2026)
+
+La tour est joignable hors du labo par **Tailscale** (réseau privé chiffré, aucun
+port ouvert sur Internet) puis SSH. L'adresse n'est pas écrite ici : `tailscale
+ip -4` sur la tour la donne, et la console Tailscale liste les appareils du compte.
+
+```bash
+ssh genji@<adresse-tailscale-de-la-tour>   # clé ed25519 du PC distant ; mot de passe en secours
+tmux new -s train                          # lancer l'entraînement dedans
+# Ctrl+B puis D : se détacher, l'entraînement continue
+tmux attach -t train                       # reprendre, même après une coupure SSH
+```
+
+- **Lancer tout calcul long dans tmux** : sans lui, une coupure SSH tue le processus.
+  Un redémarrage de la tour, lui, tue aussi tmux ; Tailscale et SSH redémarrent seuls.
+- La mise en veille de la tour est désactivée.
+- Pièges de la mise en place : le préfixe `!` de Claude Code n'a pas de terminal,
+  donc pas de `sudo` (lancer ces commandes dans un vrai terminal) ; un paquet `code`
+  à moitié installé bloquait apt ; des listes apt d'avril donnaient un 404 sur tmux
+  (`sudo apt update`).
+- Poste de la société : l'usage de Tailscale est à faire valider par l'informatique.
+
+---
+
 ## Sources
 
 - Scratchpad de session `dream_tri/` : `resume.txt` (campagne de rendu), `entrainement_temp.txt` (pauses de l'entraînement), `entrainement.sh` (épinglage 8-19 et garde 90/80 °C).

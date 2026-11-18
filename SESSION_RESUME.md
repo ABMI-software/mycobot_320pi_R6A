@@ -12,6 +12,8 @@
 - Registre : E3.8 et E3.9 inscrits `a_preciser` (metrologue du 18/11).
 - Post LinkedIn du 12/11 mis à jour dans le document partagé (encodage
   retenu, suite) ; l'échec réel n'y figure pas (embargo, à trancher).
+- Accès distant à la tour : Tailscale + SSH par clé + tmux, vérifié depuis
+  un PC distant (`docs/DONNEES_ET_CONSOMMATION.md` § 6).
 
 ### Décisions prises
 - E3.10 (E2 au banc) n'a de sens qu'après avoir expliqué le biais constant
