@@ -207,49 +207,46 @@ même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoi
   suggère une convention d'image (rééchelonnage 800×600 → 640×480 de la
   SVPRO, origine du pixel) ou du point « base ». Hypothèse, pas une cause
   (registre E3.9, `a_preciser`).
-  **Diagnostic du 18/11** (`~/dream_article/E3/E3_9/diag_base/`) :
-  - en simulation, la base n'a aucun biais (0,26 ; 0,01 px) : le décodage
-    du réseau n'est pas en cause ;
-  - aucun décalage 3D commun de la base n'explique les deux caméras (résidu
-    jusqu'à 2,9 px) : le biais est propre à chaque caméra ;
-  - **les étiquettes SVPRO de `real_tri` (train et test, capturés le 13/10)
-    sortent de `svpro_extrinsic_labels.avant_1410.yaml`**, la version que la
-    recalibration du 15/10 donnait fausse de 12,7-19,1 mm aux marqueurs.
-    Reprojetées avec l'extrinsèque SVPRO du 15/10, elles bougent de 4-6 px
-    et E3.9 passe de PCK 0,001/0,114/0,239 à 0,039-0,060 / 0,141-0,146 /
-    0,451-0,589 sur la SVPRO. L'extrinsèque du 15/10 n'est pas une vérité
-    (caméra peut-être bougée entre-temps), mais elle a été recalibrée contre
-    la référence au robot ;
-  - l'arducam, elle, est étiquetée par une extrinsèque saine (13/10,
-    leave-one-out 0,5-3,4 mm) et reste très mauvaise (médianes 7-41 px,
-    link1 à 41 px) : là, l'écart est bien d'apparence ou de point de vue.
-  Conséquences : (1) le biais de la base n'est **pas** la cause de l'échec
-  réel, qui reste un écart sim → réel ; (2) la moitié SVPRO de `real_tri`
-  porte une erreur d'étiquetage de quelques pixels, apprise telle quelle par
-  `vgg_tri_reel_ft_e10` : son PCK SVPRO (E1) mesure l'accord avec ces
-  étiquettes, pas avec le robot ; (3) E2 doit étiqueter avec une extrinsèque
-  recalibrée **le jour même**, contrôle au robot compris (déjà dans
-  `docs/PROTOCOLE_E2_MULTIVUES.md`).
-  **Suite du diagnostic, 18/11 après-midi** (`~/dream_article/E3/E3_9/diag_arducam/`,
-  non relu par le metrologue) :
-  - **arducam, `base` et `link1`** : cachés sous l'épaule en vue zénithale ;
-    E3.9 s'y trompe vraiment (20 et 40 px, même après ajustement de pose).
-    C'est un échec de perception sur des points occultés ;
-  - **arducam, `link3`-`link6`** : les prédictions sont cohérentes avec la
-    géométrie du robot (une pose fixe : résidu 1,4-5,7 px). Une pose à 65 mm
-    de l'extrinsèque ArUco explique **à la fois** les marqueurs (0,7-3,1 px)
-    et ces prédictions (médiane 3,7 px, PCK@5 0,66). En vue zénithale, 4
-    marqueurs au sol contraignent mal la profondeur : les étiquettes des
-    points en hauteur sont incertaines de plusieurs pixels ;
-  - **SVPRO** : une pose fixe explique 92 % des prédictions à 2,2 px, mais
-    elle place les marqueurs à 7-11 px. Désaccord réel, cause non tranchée
-    (biais d'échelle du réseau ~5 %, ou intrinsèques) ;
-  - la distorsion de l'arducam (`cam_3` : k1 5,4 ; k2 18,8 ; k3 −48) est
-    extrême ; sans elle, le PCK@10 d'E3.9 arducam double (0,10 → 0,20).
-  Conséquence : `real_tri_test` ne départage pas, à 2,5-5 px, un échec de
-  transfert d'une erreur d'étiquette pour les points en hauteur. E2 doit
-  avoir un contrôle en hauteur (marqueur haut ≤ 2 px, déjà au protocole) et
-  des intrinsèques vérifiées.
+  **Diagnostic du 18/11** (`~/dream_article/E3/E3_9/diag_base/` et
+  `diag_arducam/`), corrigé le même jour après relecture du metrologue :
+  - **écarté** : le décodage du réseau (la base n'a aucun biais en
+    simulation : 0,26 ; 0,01 px) et un décalage 3D commun de la base (aucun
+    n'explique les deux caméras, résidu jusqu'à 2,9 px) ;
+  - **étiquettes SVPRO** : celles de `real_tri` (train et test, 13/10)
+    sortent de `svpro_extrinsic_labels.avant_1410.yaml`. Reprojetées avec
+    l'extrinsèque du 15/10, elles bougent de 4-6 px et le PCK@10 SVPRO
+    d'E3.9 passe de 0,24 à 0,45-0,59 ; **mais les marqueurs visibles dans
+    ces images ne discriminent pas ces versions (1,8-3,6 px pour celle du
+    13/10, 5,1-8,0 px pour `labels.yaml`) : la plage mesure la sensibilité
+    aux étiquettes, pas une étiquette corrigée**. Juger une extrinsèque par
+    l'accord avec le modèle évalué serait circulaire ;
+  - **arducam, `base` et `link1`** : erreurs de 20 et 40 px même après
+    ajustement de pose. La base est prédite avec 0,3 px de dispersion, une
+    sortie quasi constante ; l'occultation sous l'épaule est plausible mais
+    non mesurée (pas de visibilité par keypoint) ;
+  - **arducam, `link3`-`link6`** : cohérents avec la géométrie du robot
+    (une pose fixe : résidu 1,4-5,7 px). Une pose à 65 mm de l'ArUco les
+    explique à 3,7 px et les marqueurs à 0,7-3,1 px, contre 0,3-0,7 px pour
+    la pose ArUco ; avec 4 centres coplanaires (2 degrés de liberté), ce
+    n'est pas une preuve. Cet ajustement absorbe aussi tout biais lisse du
+    réseau (erreur radiale −11 à −16 px, sans lien avec la hauteur, r = −0,18) ;
+  - **SVPRO** (tenu) : une pose fixe explique 92 % des prédictions à 2,2 px
+    mais place les marqueurs à 7-11 px ; une similitude (×1,053, décalage
+    −7,5 ; −11,6 px) ramène l'erreur de 13,7 à 4,5 px. Plutôt la géométrie
+    d'image (intrinsèques rééchelonnées 800×600 → 640×480) qu'un biais
+    d'échelle du réseau, à vérifier sur mire ;
+  - **distorsion arducam** (`cam_3`) : coefficients extrêmes (k3 = −48),
+    effet 4,4 px médian, 15,8 px max ; sans elle le PCK@10 passe de 0,10 à
+    0,20, mais sans réajuster l'extrinsèque : indicatif seulement.
+  Conséquences : l'échec réel d'E3.9 **demeure** ; l'hypothèse d'une erreur
+  d'étiquette pour les points en hauteur est compatible, pas démontrée.
+  `real_tri_test` ne départage pas les deux pour ces points, à un niveau
+  pouvant atteindre ~10 px ; un modèle entraîné sur ces étiquettes
+  (`vgg_tri_reel_ft_e10`) en apprend le biais, son PCK@5 0,94 mesure
+  l'accord avec elles. Contrôles au banc pour trancher : (1) un marqueur de
+  50 mm posé à 250-300 mm de haut, vu des deux caméras (erreur d'étiquette
+  en hauteur lue sans modèle) ; (2) marqueurs revus le jour même, extrinsèque
+  réajustée, mire pour les intrinsèques SVPRO et la distorsion arducam.
 - **13/11 — E3.8 : sous-pixel σ 1 retenu** par la règle écrite d'avance
   (Δ PCK@2,5 +0,149 [+0,132 ; +0,167] sur 484 images). La perte de détection
   n'est pas exclue par l'IC ([−0,017 ; +0,000], tolérance 0,01) : le critère

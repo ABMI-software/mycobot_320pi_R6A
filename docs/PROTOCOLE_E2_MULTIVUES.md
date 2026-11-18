@@ -116,9 +116,14 @@ autofocus) : sans quoi les intrinsèques ne valent plus.
      mesurée, leave-one-marker-out), positions de `planche_actuelle.yaml` ;
      sortie `training/calibration/e2_Pxx_<camera>_extrinsic.yaml` (non commité).
   2. **Contrôle en hauteur** : un ArUco de 50 mm sur un bloc rigide, posé à
-     ~100 mm et ~200 mm de haut, sa position relevée **au robot** (pince sur
-     son centre, codeurs lus) ; on mesure l'écart entre sa projection et sa
-     détection.
+     ~100 mm, ~200 mm et ~280 mm de haut (hauteur de `link3`-`link5`), sa
+     position relevée **au robot** (pince sur son centre, codeurs lus) ; on
+     mesure l'écart entre sa projection et sa détection. Ajouté le 18/11 :
+     sur `real_tri`, l'erreur d'étiquette des points en hauteur n'a pas pu
+     être bornée (jusqu'à ~10 px possibles, `docs/ARTICLE_DREAM.md`).
+  2b. **Intrinsèques** : mire d'étalonnage pour chaque caméra avant la
+     session si `cam_2` (SVPRO, rééchelonnée 800×600 → 640×480) ou `cam_3`
+     (arducam, distorsion k3 = −48) n'ont pas été refaites.
   3. Squelette FK projeté sur 3 poses (dont la plus haute) : contrôle à l'œil.
 - **Consigner** : RMS, leave-one-out par marqueur (mm), écart du marqueur
   haut (px et mm), azimut / distance / élévation calculés.

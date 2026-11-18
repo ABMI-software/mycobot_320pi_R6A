@@ -19,29 +19,21 @@
 - E3.11 (modèle de déploiement) suspendu : son déclencheur, E3.10 réussi,
   n'est pas atteint.
 
-### Diagnostic du biais de la base (18/11, après-midi)
-- Pas un défaut du réseau (aucun biais en simulation), pas un décalage 3D
-  commun aux deux caméras.
-- **Étiquettes SVPRO de `real_tri` (13/10) faites avec une extrinsèque
-  fausse** de 12,7-19,1 mm (`svpro_extrinsic_labels.avant_1410.yaml`).
-  Réétiquetée au 15/10 : E3.9 SVPRO PCK@10 0,24 → 0,45-0,59.
-- L'arducam (extrinsèque saine) reste très mauvaise : l'échec réel est
-  bien un écart sim → réel, la base n'en est pas la cause.
-- `vgg_tri_reel_ft_e10` a appris ce biais SVPRO (réserve ajoutée au
-  registre, entrée E).
-
-### Prédictions E3.9 sur les images réelles (18/11, fin d'après-midi)
-- Arducam : `base`/`link1` cachés sous l'épaule → vrai échec (20/40 px).
-  `link3`-`link6` cohérents ; une pose compatible avec les marqueurs (à
-  65 mm de l'ArUco) les explique à 3,7 px : étiquettes en hauteur incertaines.
-- SVPRO : prédictions cohérentes entre elles (2,2 px), incompatibles avec
-  les marqueurs (7-11 px) : cause non tranchée.
-- Distorsion `cam_3` extrême (k3 −48) ; à recalibrer.
+### Diagnostic de l'échec réel (18/11, relu par le metrologue)
+- Écartés : le décodage du réseau, un décalage 3D commun de la base.
+- Réétiqueter la SVPRO avec l'extrinsèque du 15/10 fait passer son PCK@10
+  de 0,24 à 0,45-0,59, mais les marqueurs ne disent pas quelle extrinsèque
+  est juste : c'est une sensibilité, pas une correction.
+- Arducam : base/link1 ratés (20/40 px) ; link3-6 cohérents avec la forme
+  du robot. SVPRO : prédictions cohérentes entre elles, pas avec les
+  marqueurs (tenu) ; plutôt les intrinsèques.
+- Conclusion : l'échec réel d'E3.9 demeure ; l'erreur d'étiquette en
+  hauteur est une hypothèse compatible, pas démontrée.
 
 ### Prochaines actions
-0. [ROUGE] Relecture du diagnostic par le metrologue ; recalibrer les
-   intrinsèques arducam ; contrôle en hauteur pour les étiquettes réelles
-   (protocole E2). Le rendu `realistic` reste à comparer.
+0. [ROUGE] Au banc : marqueur de 50 mm à 250-300 mm de haut vu des deux
+   caméras ; mire pour les intrinsèques SVPRO et la distorsion arducam ;
+   extrinsèques du jour. Le rendu `realistic` reste à comparer.
 1. [FAIT 18/11] Diagnostiquer le biais de la base : convention du point base
    (collecteur contre labels réels), image SVPRO rééchelonnée, test de
    décalage (`scripts/dream_test_decalage.py`), erreurs par caméra avec IC.
