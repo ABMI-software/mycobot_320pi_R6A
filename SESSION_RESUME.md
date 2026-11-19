@@ -43,9 +43,12 @@
    rejouer les 100 poses de `real_tri_test` dans la réplique du banc, rendu
    d'entraînement contre `realistic`. Amendé le 19/11 par le metrologue
    (condition C au monde d'entraînement, équivalence TOST). Outil
-   `scripts/rejouer_poses_banc.py` écrit, mondes générés ; le rejeu ROS n'a
-   pas encore tourné : à lancer dès que la carte graphique est libre
-   (entraînement RoboPEPP en cours).
+   `scripts/rejouer_poses_banc.py` écrit, mondes générés. Chaîne lancée le
+   19/11 à 10:35 (`~/dream_article/E3/E3_9b/chaine.sh`, journal
+   `journal.txt`) : elle attend 10 min de carte graphique libre (RoboPEPP
+   run 3, jusqu'à 300 époques de ~15 min), fait un essai de 3 poses, puis
+   C, A, B, l'évaluation et `analyse.txt`. Avant toute conclusion : planche
+   et luminance du robot (protocole), puis le metrologue.
    Établi le 19/11 : le point de vue de la SVPRO est couvert (PCK@5 0,976
    sur sa tranche du secteur tenu, n = 198) ; l'arducam est hors domaine
    par le cadrage (visée à 15,8° de l'axe, 9° au plus à l'entraînement).
