@@ -9,6 +9,18 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — calibration intrinsèque avec la planche ChArUco du banc (19/11)
+
+- `training/calibration/calibrate_camera.py` : `--first-marker-id` (la planche du banc
+  porte les identifiants 8 à 51) et `--legacy-pattern` (ancienne disposition ChArUco,
+  OpenCV ≥ 4.7, donc `.venv/bin/python`) ; chemin OpenCV ≥ 4.7 par `CharucoDetector` et
+  `cv2.calibrateCameraExtended` ; le `.npz` garde les coins ChArUco pour réajuster un
+  autre modèle de distorsion sans recapturer. La planche réelle est 11 × 8, carrés 30 mm,
+  marqueurs **22 mm** (et non 20 mm comme le dit `docs/CAMERA_CALIBRATION.md`).
+- Mesure du 19/11 en 640 × 480 : SVPRO fx 394,2 (focus 40) / 397,2 (focus 90), arducam
+  fx 518,5. Ces valeurs **ne s'appliquent pas** aux images du 13/10 (`real_tri`) : l'optique
+  de la SVPRO a changé depuis (voir `SESSION_RESUME.md`, 19/11).
+
 ### Ajouté — rejeu de poses réelles dans Gazebo (19/11)
 
 - `scripts/rejouer_poses_banc.py` : `monde` place l'arducam et la SVPRO aux

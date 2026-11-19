@@ -1,5 +1,70 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (19 novembre 2026 — après-midi, essais E0/E1 à la Pi, calibration au banc)
+
+### Ce qui a été accompli aujourd'hui
+- **Essais E0/E1 menés directement sur la Pi** (`er@<pi>:~/Test-JB/Essaies`, dépôt git
+  local, journal dans son `CLAUDE.md`), sans bridge : `pymycobot` sur `/dev/ttyAMA0`.
+  Copie hors dépôt : `~/essais_bras/Essaies_pi/` (19/11). ⚠ La Pi est réglée sur le fuseau
+  chinois (CST, UTC+8, horloge juste) : ses dossiers `resultats_*/2026111920xxxx` sont à
+  13-14 h heure de Paris.
+  - **E1, stylo sur table** (`cercle_angles.py`, `send_angles` + IK maison, `send_coords`
+    rejeté en erreur 33) : cercle exécuté, **aucun trait sur le papier**, cause non établie.
+    Contact pointe/table non détectable sans câblage : charge servo (reg 60 de J3) et
+    hauteur lue noyées dans un jeu de **~1,6 mm selon le sens d'arrivée**. Erreur 5 du
+    contrôleur = **J5 hors limite** (169° > 168°) : relâcher et ramener J5 à la main.
+  - **E0, codeurs** (`aller_retour.py`, A = B avec J1 −10°, `send_angles`) : 3 essais de
+    2 cycles. Sans compensation, B revient **8,5 mm** sous la pose relevée (les angles lus
+    sont déjà affaissés, l'affaissement s'applique deux fois). Avec compensation itérative
+    (J2 +2,0°) : B à 0,09° (un pas de codeur). RP 0,05 mm sur 2 cycles : **non significatif**,
+    30 cycles à faire.
+  - Le banc ISO hérité `encodeurs_reel.py` est **inutilisable sur la Pi** :
+    `solve_inv_kinematics` n'existe pas dans pymycobot 3.6.1, et il passe par `send_coords`
+    (écarté le 20/08). Le dépôt a l'IK qui marche : `scripts/diff_ik.py`.
+- **Limite de mesure à garder en tête** : E0 lu par `get_angles`/`get_coords` est la FK
+  des codeurs — il **ne voit pas l'affaissement** et sa résolution est le pas de codeur
+  (0,09°, ≈ 0,5 mm à 330 mm). Un RP de 0,05 mm aux codeurs ne dit rien de la pointe réelle.
+- **Calibration intrinsèque au banc (étape 1)** : la SVPRO avait été calibrée le 17/06
+  **en autofocus**, à 800 × 600, alors que les captures verrouillent la mise au point
+  (40 dans `capture_trajectoires.py`, 90 dans `camera_registry.py`). Hypothèse : la focale
+  bouge avec la mise au point, d'où le facteur ×1,053 trouvé sur les étiquettes du
+  13/10. **Mesuré** en 640 × 480 (`~/dream_article/calib_1911/`, 32 vues, modèle
+  standard) : focus 40 → fx 394,2 ± 1,0, cx 342,1, RMS 0,27 px ; focus 90 → fx 397,2 ± 1,8,
+  cx 343,2, RMS 0,36 px. **La mise au point ne bouge la focale que de 0,8 % (écartée)**,
+  mais l'ancienne `cam_2` ramenée en 640 donnait fx 447,8 : **12 % trop long**. Distorsion
+  devenue raisonnable (k1 0,09 au lieu de k3 16,9). Arducam : fx 518,5 ± 2,1, cx 327,0,
+  RMS 0,41 px (ancienne `cam_3` : 496,3 / 313,4). Écrites au modèle standard sous
+  `training/calibration/{svpro,arducam}_640_1911.meta.json` (locales, non suivies).
+- **Mais elles ne décrivent pas les caméras du 13/10 : réétiquetage de `real_tri` abandonné.**
+  Sur les images du 13/10, les 4 marqueurs de la planche s'ajustent **mieux avec les
+  anciennes intrinsèques** (SVPRO RMS 1,08 px / leave-one-out 5-10 mm, contre 1,79 px /
+  13-29 mm avec celles du 19/11). Profil RMS(fx) sur ces images : minimum à fx ≈ 424-434,
+  contre 394 aujourd'hui → l'objectif à focale variable de la SVPRO n'est plus dans l'état
+  du 13/10. Arducam : profil plat (vue quasi zénithale), test non concluant. Jeu produit
+  marqué invalide : `~/dream_article/E3/E3_9c/` (`LISEZMOI.txt`, `reetiquette.py`).
+  **Leçon** : calibrer les intrinsèques **dans la session de capture**, mise au point et
+  bague de focale bloquées (adhésif), et noter leur valeur dans `run.yaml`.
+- Le banc a changé depuis le 13/10 (contrôle de l'extrinsèque arducam : marqueurs à 250 mm
+  de la référence, SVPRO vue tournée, robot au stylo) : pas d'extrinsèque du jour avant la
+  fin des essais au stylo.
+- **La planche ChArUco du banc** n'est pas celle de la doc : 11 × 8, carrés 30 mm,
+  marqueurs **22 mm**, identifiants **8 à 51**, **ancienne disposition** (illisible par
+  l'OpenCV 4.6 du système). `calibrate_camera.py` gagne `--first-marker-id 8
+  --legacy-pattern` (OpenCV ≥ 4.7 : lancer avec `.venv/bin/python`, sans les variables
+  GTK du snap) et garde les coins ChArUco dans le `.npz`.
+- ⚠ Pendant la calibration, la SVPRO **visait le sol** à côté de la table (déplacée de son
+  poste ?) : extrinsèque à refaire une fois remise en place ; son point de vue ne sera
+  plus exactement celui du 13/10.
+
+### Prochaines actions
+1. [ROUGE] Les étiquettes réelles de `real_tri` restent non vérifiables par recalibration :
+   la question « étiquettes ou modèle ? » se tranchera sur une **nouvelle capture** (E2
+   multi-vues) avec intrinsèques et extrinsèques du jour, optique bloquée.
+2. [ROUGE] Après les essais au stylo : extrinsèques du jour (60 images, 4 ArUco, SQPNP)
+   avec `*_640_1911`, puis contrôle en hauteur (marqueur 50 mm à ~100/200/280 mm).
+3. [JAUNE] E0 : 30 cycles `aller_retour.py` ; E1 : décider du moyen de mesure physique
+   (le stylo n'a rien tracé).
+
 ## État actuel (18 novembre 2026 — matin, chaîne du 12/11 finie, E3.9 n'a pas transféré)
 
 ### Ce qui a été accompli

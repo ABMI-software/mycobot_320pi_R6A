@@ -198,18 +198,23 @@ def _create_detector_parameters():
     return parameters
 
 
-def _build_charuco_board(squares_x, squares_y, square_length_m, marker_length_m, dictionary):
+def _build_charuco_board(squares_x, squares_y, square_length_m, marker_length_m, dictionary,
+                         legacy_pattern=False):
     # Prefer the legacy `_create()` factory — on OpenCV 4.6 the new
     # `CharucoBoard((sx, sy), ...)` constructor returns an object that
     # crashes `interpolateCornersCharuco` (segfault, same family of
     # regressions as DetectorParameters()).
     if hasattr(cv2.aruco, "CharucoBoard_create"):
+        if legacy_pattern:
+            raise SystemExit("--legacy-pattern exige OpenCV >= 4.7 (.venv du dépôt)")
         return cv2.aruco.CharucoBoard_create(
             squares_x, squares_y, square_length_m, marker_length_m, dictionary
         )
-    return cv2.aruco.CharucoBoard(
+    board = cv2.aruco.CharucoBoard(
         (squares_x, squares_y), square_length_m, marker_length_m, dictionary
     )
+    board.setLegacyPattern(legacy_pattern)
+    return board
 
 
 def _detect_markers(gray, dictionary, parameters):
@@ -220,6 +225,11 @@ def _detect_markers(gray, dictionary, parameters):
 
 
 def _interpolate_charuco(marker_corners, marker_ids, gray, board):
+    if not hasattr(cv2.aruco, "interpolateCornersCharuco"):
+        charuco_corners, charuco_ids, _, _ = cv2.aruco.CharucoDetector(board).detectBoard(
+            gray, markerCorners=marker_corners, markerIds=marker_ids
+        )
+        return (0 if charuco_ids is None else len(charuco_ids)), charuco_corners, charuco_ids
     try:
         return cv2.aruco.interpolateCornersCharuco(
             markerCorners=marker_corners, markerIds=marker_ids, image=gray, board=board
@@ -272,11 +282,19 @@ def _maybe_clahe(gray: np.ndarray, enabled: bool) -> np.ndarray:
 def detect_charuco_sample(
     frame, dictionary, board, parameters,
     min_markers, min_charuco, grid_cols, grid_rows,
-    *, clahe: bool = False,
+    *, clahe: bool = False, first_marker_id: int = 0,
 ):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray = _maybe_clahe(gray, clahe)
     marker_corners, marker_ids, _ = _detect_markers(gray, dictionary, parameters)
+    if first_marker_id and marker_ids is not None:
+        # Planche imprimée avec des identifiants décalés (la nôtre : 8 à 51) ;
+        # on les ramène à 0 pour la planche OpenCV, le reste est ignoré.
+        n_markers = len(board.ids) if hasattr(board, "ids") else len(board.getIds())
+        shifted = marker_ids.ravel() - first_marker_id
+        keep = (shifted >= 0) & (shifted < n_markers)
+        marker_corners = tuple(c for c, k in zip(marker_corners, keep) if k)
+        marker_ids = shifted[keep].reshape(-1, 1).astype(np.int32) if keep.any() else None
     preview = frame.copy()
     if marker_ids is not None and len(marker_ids) > 0:
         cv2.aruco.drawDetectedMarkers(preview, marker_corners, marker_ids)
@@ -331,6 +349,22 @@ def calibrate_charuco(samples, board, image_size):
         | cv2.CALIB_FIX_TAUX_TAUY
     )
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 200, 1e-9)
+
+    if not hasattr(cv2.aruco, "calibrateCameraCharuco"):
+        object_points = board.getChessboardCorners()
+        obj = [object_points[i.ravel()].astype(np.float32) for i in all_ids]
+        img = [c.reshape(-1, 1, 2).astype(np.float32) for c in all_corners]
+        (rms, mtx, dist, rvecs, tvecs,
+         std_intrinsics, std_extrinsics, per_view_errors) = cv2.calibrateCameraExtended(
+            obj, img, image_size, None, None, flags=flags, criteria=criteria,
+        )
+        return {
+            "rms": float(rms), "mtx": mtx, "dist": dist,
+            "rvecs": rvecs, "tvecs": tvecs,
+            "std_intrinsics": std_intrinsics,
+            "std_extrinsics": std_extrinsics,
+            "per_view_errors": np.asarray(per_view_errors).reshape(-1),
+        }
 
     extended_fn = getattr(cv2.aruco, "calibrateCameraCharucoExtended", None)
     if extended_fn is not None:
@@ -477,6 +511,9 @@ def save_calibration(out_dir, name, calibration, samples, args):
         dist=calibration["dist"],
         rvecs=np.asarray(calibration["rvecs"], dtype=np.float64),
         tvecs=np.asarray(calibration["tvecs"], dtype=np.float64),
+        # Coins gardés pour réajuster un autre modèle de distorsion sans recapturer.
+        charuco_corners=np.asarray([s.charuco_corners for s in samples], dtype=object),
+        charuco_ids=np.asarray([s.charuco_ids for s in samples], dtype=object),
     )
 
     mtx = calibration["mtx"]
@@ -493,6 +530,8 @@ def save_calibration(out_dir, name, calibration, samples, args):
             "squares_y": args.squares_y,
             "square_length_m": args.square_length_m,
             "marker_length_m": args.marker_length_m,
+            "first_marker_id": args.first_marker_id,
+            "legacy_pattern": args.legacy_pattern,
         },
         "capture": {
             "min_markers": args.min_markers,
@@ -566,6 +605,10 @@ def parse_args() -> argparse.Namespace:
 
     # board
     p.add_argument("--dictionary", default="DICT_4X4_1000")
+    p.add_argument("--first-marker-id", type=int, default=0,
+                   help="identifiant du premier marqueur imprimé (planche du banc : 8)")
+    p.add_argument("--legacy-pattern", action="store_true",
+                   help="disposition ChArUco d'avant OpenCV 4.6 (planche du banc) ; exige OpenCV >= 4.7")
     p.add_argument("--squares-x", type=int, default=6)
     p.add_argument("--squares-y", type=int, default=9)
     p.add_argument("--square-length-m", type=float, default=0.030)
@@ -647,7 +690,7 @@ def main() -> int:
     board = _build_charuco_board(
         args.squares_x, args.squares_y,
         args.square_length_m, args.marker_length_m,
-        dictionary,
+        dictionary, legacy_pattern=args.legacy_pattern,
     )
     parameters = _create_detector_parameters()
 
@@ -766,7 +809,7 @@ def main() -> int:
                 dictionary=dictionary, board=board, parameters=parameters,
                 min_markers=args.min_markers, min_charuco=args.min_charuco,
                 grid_cols=args.grid_cols, grid_rows=args.grid_rows,
-                clahe=args.clahe,
+                clahe=args.clahe, first_marker_id=args.first_marker_id,
             )
 
             now = time.time()
