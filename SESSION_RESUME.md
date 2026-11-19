@@ -58,6 +58,23 @@
   poste ?) : extrinsèque à refaire une fois remise en place ; son point de vue ne sera
   plus exactement celui du 13/10.
 
+- **E3.9 sur les autres jeux réels d'Osama** (100 images régulières par jeu, `eval_papier.py`,
+  pendant RoboPEPP sous garde thermique ; `~/dream_article/E3/E3_9/eval_autres_reels/`) :
+
+  | Jeu | Détection | PCK@5 | PCK@10 | Erreur médiane | Décalage médian (u, v) |
+  |---|---|---|---|---|---|
+  | `real_montage_0901` arducam | 0,68 | 0,191 | 0,374 | 8,6 px | (7,4 ; −1,9) |
+  | `real_montage_0901` SVPRO | 0,73 | 0,157 | 0,554 | 7,6 px | (−0,6 ; −6,3) |
+  | `real_tri_test` (rappel) | 0,70 | 0,068 | 0,169 | 13,2 px | (0,9 ; −10,1) |
+  | `real_3cam_session6` arducam / SVPRO / Astra | 0,65 / 0,88 / 0,40 | ≈ 0 | ≤ 0,016 | 48 / 32 / 82 px | (33 ; −5) / (−8 ; 23) / (−27 ; 56) |
+  | `real_arducam_full` / `real_svpro_full` (juin) | 0,69 / 0,79 | 0 | ≤ 0,002 | 84 / 173 px | (−54 ; 26) / (−90 ; 3) |
+
+  Aucun jeu n'approche le critère de 0,83. Les jeux de juin-juillet laissent 30 à 170 px avec
+  de forts décalages systématiques : étiquettes de l'époque suspectes (le `_camera_settings`
+  SVPRO de `session6` porte cx = 416, valeur 800 × 600, pour des images 640 × 480), donc
+  inutilisables pour juger un modèle. `real_montage_0901` est le jeu où E3.9 fait le mieux,
+  même chaîne d'étiquettes que `real_tri`. Chiffres non relus par le metrologue, hors registre.
+
 ### Prochaines actions
 1. [ROUGE] Les étiquettes réelles de `real_tri` restent non vérifiables par recalibration :
    la question « étiquettes ou modèle ? » se tranchera sur une **nouvelle capture** (E2
