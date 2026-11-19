@@ -1,6 +1,6 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
-## État actuel (19 novembre 2026 — après-midi, essais E0/E1 à la Pi, calibration au banc)
+## État actuel (19 novembre 2026 — soir, calibration au banc, protocole E2 prêt, reprise mardi 24/11)
 
 ### Ce qui a été accompli aujourd'hui
 - **Essais E0/E1 menés directement sur la Pi** (`er@<pi>:~/Test-JB/Essaies`, dépôt git
@@ -74,6 +74,19 @@
   SVPRO de `session6` porte cx = 416, valeur 800 × 600, pour des images 640 × 480), donc
   inutilisables pour juger un modèle. `real_montage_0901` est le jeu où E3.9 fait le mieux,
   même chaîne d'étiquettes que `real_tri`. Chiffres non relus par le metrologue, hors registre.
+
+### Reprise prévue mardi 24/11 : essais puis session E2-article
+Protocole : `docs/PROTOCOLE_E2_MULTIVUES.md` (amendé et relu le 19/11). « E2-article »
+(jeu multi-vues) ≠ « E2-ISO » (vision ArUco du plan ABMI).
+1. Matériel : creux au pointeau sur la planche, centres de 19 et 23 marqués, bloc à
+   marqueurs ~100/200/280 mm, adhésif, trépieds ou bras pour 6 à 10 positions.
+2. Essais avant capture : `gripper_bridge.py` sur la Pi (aucun script de `~/Test-JB/Essaies`
+   en même temps), pivot du stylo (`scripts/pivot_pointe.py pivot`), pointage de 19, 23 et
+   du bloc ; vérifier que le pivot réel passe les seuils (RMS ≤ 0,8 mm, max ≤ 1,5 mm).
+3. Puis session E2 : mire du jour par caméra (étape 0b), positions, captures pince montée,
+   mire de fin.
+En attente sans intervention : la chaîne E3.9b démarre seule quand RoboPEPP libère la carte
+(`~/dream_article/E3/E3_9b/journal.txt`).
 
 ### Prochaines actions
 1. [ROUGE] Les étiquettes réelles de `real_tri` restent non vérifiables par recalibration :
