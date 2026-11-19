@@ -37,6 +37,7 @@ Le YAML des marqueurs, en millimetres, repere base, Z=0 au plan de travail :
       26: [530.0, -176.0, 0.0]
 """
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -136,7 +137,9 @@ def main():
     a = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     a.add_argument('--index', type=int, default=3, help='index V4L2 de la camera')
-    a.add_argument('--intrinsics', required=True, help='.npz contenant mtx et dist')
+    a.add_argument('--intrinsics', required=True,
+                   help='.npz (mtx, dist) ou <stem>.meta.json de calibrate_camera.py ; '
+                        'le stem est ecrit dans la sortie (intrinsics_stem)')
     a.add_argument('--markers', required=True, help='YAML des positions marqueurs')
     a.add_argument('--out', required=True, help='YAML extrinseque a ecrire')
     a.add_argument('--image', help='photo existante au lieu de la camera')
@@ -148,9 +151,17 @@ def main():
     a.add_argument('--table-z', type=float, default=0.0, help='plan de travail (mm)')
     args = a.parse_args()
 
-    npz = np.load(args.intrinsics)
-    K = npz['mtx'].astype(float)
-    dist = npz['dist'].astype(float)
+    chemin = Path(args.intrinsics)
+    if chemin.name.endswith('.meta.json'):
+        r = json.loads(chemin.read_text())['results']
+        K = np.array([[r['fx'], 0, r['cx']], [0, r['fy'], r['cy']], [0, 0, 1]], float)
+        dist = np.array(r['dist_coeffs'], float)
+        stem = chemin.name[:-len('.meta.json')]
+    else:
+        npz = np.load(chemin)
+        K = npz['mtx'].astype(float)
+        dist = npz['dist'].astype(float)
+        stem = chemin.stem
 
     d = yaml.safe_load(Path(args.markers).read_text())
     monde = {int(k): np.array(v, float) / 1000.0 for k, v in d['markers'].items()}
@@ -250,6 +261,7 @@ def main():
     Path(args.out).write_text(yaml.safe_dump({
         'source': f'{len(obj)} coins ArUco, {len(trames)} image(s), IPPE + RefineLM',
         'camera_index': args.index,
+        'intrinsics_stem': stem,
         'reprojection_rms_px': round(rms, 4),
         'marker_size_mesure_mm': round(float(moyen), 3),
         'marker_size_yaml_mm': round(cote_yaml * 1000, 3),

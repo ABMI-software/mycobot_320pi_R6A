@@ -100,6 +100,9 @@ def bilan_add(add, pnp_possible):
 
 def intrinseques(dossier, label, cache):
     camera = label.get("source", {}).get("camera")
+    stem = label.get("source", {}).get("intrinsics_stem")
+    if stem is not None:
+        camera = stem
     if camera not in cache:
         if camera is None:
             reglages = json.load(open(os.path.join(dossier, "_camera_settings.json")))
@@ -109,7 +112,8 @@ def intrinseques(dossier, label, cache):
         else:
             sys.path.insert(0, str(RACINE / "mycobot_gateway" / "mycobot_gateway" / "vision"))
             import camera_registry
-            cache[camera] = camera_registry.load_intrinsics(INTRINSEQUES_PAR_CAMERA[camera])
+            cache[camera] = camera_registry.load_intrinsics(
+                stem if stem is not None else INTRINSEQUES_PAR_CAMERA[camera])
     return cache[camera]
 
 

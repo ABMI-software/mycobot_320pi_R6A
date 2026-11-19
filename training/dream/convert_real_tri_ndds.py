@@ -37,7 +37,13 @@ def main():
     a.add_argument('source', type=Path)
     a.add_argument('sortie', type=Path)
     a.add_argument('--cameras', nargs='+', default=['arducam', 'svpro'])
+    a.add_argument('--extrinseque', action='append', default=[], metavar='CAMERA=YAML',
+                   help='remplace l extrinseque par defaut de cette camera (une position E2)')
     args = a.parse_args()
+    extrinseques = dict(EXTRINSEQUES)
+    for e in args.extrinseque:
+        nom, chemin = e.split('=', 1)
+        extrinseques[nom] = Path(chemin)
 
     if args.sortie.exists() and any(args.sortie.iterdir()):
         raise SystemExit(f'{args.sortie} n est pas vide')
@@ -45,9 +51,9 @@ def main():
 
     cams = {}
     for nom in args.cameras:
-        d = yaml.safe_load(EXTRINSEQUES[nom].read_text())
+        d = yaml.safe_load(extrinseques[nom].read_text())
         K, dist = registre.load_intrinsics(d['intrinsics_stem'])
-        cams[nom] = (np.array(d['T_cam_world'], float), K, dist)
+        cams[nom] = (np.array(d['T_cam_world'], float), K, dist, d['intrinsics_stem'])
 
     n = 0
     for ligne in csv.DictReader((args.source / 'labels.csv').open()):
@@ -57,7 +63,7 @@ def main():
         image = (args.source / ligne['image_path']).resolve()
         if not image.exists():
             continue
-        T, K, dist = cams[nom]
+        T, K, dist, stem = cams[nom]
         q = np.array([float(ligne[f'j{j}_deg']) for j in range(1, 7)])
         pos, _ = forward_kinematics(np.radians(q))
         monde = np.array([pos[k] for k in KEYPOINT_NAMES], float)
@@ -67,11 +73,12 @@ def main():
             'class': 'mycobot320',
             'keypoints': [{'name': k, 'location': cam[i].tolist(), 'projected_location': uv[i].tolist()}
                           for i, k in enumerate(KEYPOINT_NAMES)],
-        }], 'source': {'camera': nom, 'index': int(ligne['index']), 'angles_deg': q.tolist()}}))
+        }], 'source': {'camera': nom, 'index': int(ligne['index']), 'angles_deg': q.tolist(),
+                   'intrinsics_stem': stem}}))
         os.symlink(image, args.sortie / f'{n:06d}.rgb.png')
         n += 1
 
-    T, K, _ = cams[args.cameras[0]]
+    T, K, _, _ = cams[args.cameras[0]]
     (args.sortie / '_camera_settings.json').write_text(json.dumps({'camera_settings': [{
         'name': 'mycobot_camera',
         'intrinsic_settings': {'fx': K[0, 0], 'fy': K[1, 1], 'cx': K[0, 2], 'cy': K[1, 2], 's': 0.0},

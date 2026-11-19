@@ -9,6 +9,20 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — protocole E2 : intrinsèques de la session, de bout en bout (19/11)
+
+- `docs/PROTOCOLE_E2_MULTIVUES.md` amendé avant mesure : étape 0b (mire le jour
+  même, focus et bague bloqués, ≥ 2 vues par case, RMS ≤ 0,5 px), contrôle de
+  focale par les marqueurs (étape 2, vues obliques), mire de fin de session (fx à
+  ± 1 %), pince montée et planche dégagée à l'étape 0.
+- `scripts/calibrer_extrinseque_4aruco.py --intrinsics` accepte un `.meta.json` et
+  écrit `intrinsics_stem` dans l'extrinsèque.
+- `training/dream/convert_real_tri_ndds.py --extrinseque CAMERA=YAML` (une position
+  E2) ; chaque label porte `intrinsics_stem`. Non-régression : les étiquettes de
+  `real_tri_test` régénérées avec les extrinsèques du 13/10 sont identiques (0 px).
+- `training/dream/eval_papier.py` prend l'intrinsèque écrite dans le label, à défaut
+  `cam_3` / `cam_2` comme avant.
+
 ### Ajouté — calibration intrinsèque avec la planche ChArUco du banc (19/11)
 
 - `training/calibration/calibrate_camera.py` : `--first-marker-id` (la planche du banc

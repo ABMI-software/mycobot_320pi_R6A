@@ -69,6 +69,26 @@ L'Astra n'expose pas `/dev/videoN` (interface OpenNI propriétaire) — voir la 
 
 ---
 
+## La planche du banc (constat du 19/11/2026)
+
+La planche ChArUco présente au banc n'est pas celle des commandes ci-dessous :
+**11 × 8, carrés 30 mm, marqueurs 22 mm, identifiants 8 à 51, ancienne
+disposition**. L'OpenCV 4.6 du système ne la lit pas (résidu de 50-60 px sur
+les coins). Commande qui marche, sous le `.venv` du dépôt :
+
+```bash
+env -u GTK_PATH -u GTK_EXE_PREFIX -u LOCPATH -u GIO_MODULE_DIR -u GSETTINGS_SCHEMA_DIR -u GTK_IM_MODULE_FILE \
+  .venv/bin/python training/calibration/calibrate_camera.py --camera <index> --name <nom> \
+    --preset none --width 640 --height 480 --fourcc MJPG --autofocus off --focus <valeur> \
+    --squares-x 11 --squares-y 8 --square-length-m 0.03 --marker-length-m 0.022 \
+    --first-marker-id 8 --legacy-pattern --max-per-cell 4 --target-samples 35
+```
+
+Calibrer **à la résolution de capture** et **le jour de la capture**, bague
+de focale bloquée : le 19/11, la SVPRO mesurait fx = 394 en 640 × 480, alors
+que les images du 13/10 s'ajustent vers fx ≈ 430
+([`PROTOCOLE_E2_MULTIVUES.md`](PROTOCOLE_E2_MULTIVUES.md)).
+
 ## Calibrer une Arducam (cam_0 ou cam_3)
 
 ### Commande
