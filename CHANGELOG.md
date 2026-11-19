@@ -32,8 +32,10 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   autre modèle de distorsion sans recapturer. La planche réelle est 11 × 8, carrés 30 mm,
   marqueurs **22 mm** (et non 20 mm comme le dit `docs/CAMERA_CALIBRATION.md`).
 - Mesure du 19/11 en 640 × 480 : SVPRO fx 394,2 (focus 40) / 397,2 (focus 90), arducam
-  fx 518,5. Ces valeurs **ne s'appliquent pas** aux images du 13/10 (`real_tri`) : l'optique
-  de la SVPRO a changé depuis (voir `SESSION_RESUME.md`, 19/11).
+  fx 518,5. Rien ne montre qu'elles valent pour les images du 13/10 (`real_tri`) : les marqueurs
+  y s'ajustent mieux avec les anciennes. Un changement d'optique de la SVPRO est
+  plausible, non démontré (correction du même jour après relecture du metrologue ;
+  voir `SESSION_RESUME.md`, 19/11).
 
 ### Ajouté — rejeu de poses réelles dans Gazebo (19/11)
 

@@ -39,8 +39,10 @@
   Sur les images du 13/10, les 4 marqueurs de la planche s'ajustent **mieux avec les
   anciennes intrinsèques** (SVPRO RMS 1,08 px / leave-one-out 5-10 mm, contre 1,79 px /
   13-29 mm avec celles du 19/11). Profil RMS(fx) sur ces images : minimum à fx ≈ 424-434,
-  contre 394 aujourd'hui → l'objectif à focale variable de la SVPRO n'est plus dans l'état
-  du 13/10. Arducam : profil plat (vue quasi zénithale), test non concluant. Jeu produit
+  contre 394 aujourd'hui. Un changement d'optique (objectif à focale variable) est
+  **plausible, pas démontré** : ce minimum est biaisé par les positions déduites de 25 et
+  26 et par cx, cy, distorsion fixés (metrologue, 19/11) ; ce qui est tenu, c'est qu'on
+  ne peut pas montrer que les intrinsèques du 19/11 valent pour le 13/10. Arducam : profil plat (vue quasi zénithale), test non concluant. Jeu produit
   marqué invalide : `~/dream_article/E3/E3_9c/` (`LISEZMOI.txt`, `reetiquette.py`).
   **Leçon** : calibrer les intrinsèques **dans la session de capture**, mise au point et
   bague de focale bloquées (adhésif), et noter leur valeur dans `run.yaml`.

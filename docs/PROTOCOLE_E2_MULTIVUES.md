@@ -8,12 +8,15 @@ avoir constaté que celles du jour ne décrivaient plus les caméras du 13/10.
 
 ## Ce que le 19/11 a appris, et qui fixe la méthode
 
-- **Une intrinsèque ne survit pas aux semaines.** Le 19/11, la SVPRO mesure
-  fx = 394 en 640 × 480 ; sur les images du 13/10, les marqueurs de la planche
-  s'ajustent au mieux vers fx ≈ 430, et mieux avec l'ancienne `cam_2` qu'avec la
-  neuve. Son objectif est à focale variable : une bague touchée, et l'étiquette
-  est fausse sans que rien ne le signale. D'où : calibrer **le jour même**,
-  **bloquer** mise au point et bague à l'adhésif, **revérifier en fin de session**.
+- **Une intrinsèque d'une autre session n'est pas démontrable.** Le 19/11, la
+  SVPRO mesure fx = 394 en 640 × 480 ; sur les images du 13/10, les marqueurs de
+  la planche s'ajustent mieux avec l'ancienne `cam_2` qu'avec la neuve (RMS 1,08
+  contre 1,79 px), et le profil RMS(fx) a son minimum vers 430. Que l'optique ait
+  changé (objectif à focale variable, bague touchée) est **plausible, pas
+  démontré** : ce minimum est biaisé par les positions déduites des marqueurs 25
+  et 26 et par cx, cy et la distorsion fixés (relecture du metrologue, 19/11).
+  D'où : calibrer **le jour même**, **bloquer** mise au point et bague à
+  l'adhésif, **revérifier en fin de session**.
 - **La mise au point seule pèse peu** : focus 40 → fx 394,2, focus 90 → 397,2
   (0,8 %). On la fixe quand même, pour la netteté et la traçabilité.
 - **La planche ChArUco du banc** : 11 × 8, carrés 30 mm, marqueurs 22 mm,
@@ -139,11 +142,20 @@ autofocus) : sans quoi les intrinsèques ne valent plus.
   (les variables GTK du snap retirées, sans quoi la fenêtre ne s'ouvre pas).
   Réajuster au modèle standard (k1 k2 p1 p2 k3) sur les coins gardés dans le
   `.npz`, comme le 19/11, et l'écrire en `training/calibration/e2_<date>_<camera>.meta.json`.
-- **Consigner** : valeur de focus, photo de l'adhésif, RMS, fx ± écart-type,
-  cx, cy, vues par case de la grille 4 × 3.
-- **Critère de sortie** : RMS ≤ 0,5 px ; **≥ 2 vues dans chacune des 12 cases**
-  (le 19/11, le haut de l'image de l'arducam en manquait) ; écart-type de fx
-  ≤ 0,5 %. Sinon recapturer.
+- **Consigner** : valeur de focus, photo de l'adhésif, RMS, fx, cx, cy et
+  leurs écarts-types, vues par case de la grille 4 × 3, vues inclinées.
+- **Critère de sortie** (relu par le metrologue le 19/11) :
+  - RMS ≤ 0,5 px — nécessaire, pas suffisant : un RMS de mire bas ne dit rien
+    de l'usage ;
+  - **≥ 2 vues dans chacune des 12 cases, ≥ 3 dans les 4 cases de coin** (le
+    19/11, le haut de l'image de l'arducam en manquait) ;
+  - **≥ 8 vues avec la mire inclinée de plus de 30°** : sur des vues de face, fx
+    se confond avec la distance ;
+  - écart-type de fx ≤ 0,5 % (≈ 0,35 px d'étiquette au bord du champ), de cx et
+    de cy ≤ 1,5 px ;
+  - **stabilité** : fx ajusté sur chaque moitié des vues, |Δfx| ≤ 0,5 % ;
+  - sinon recapturer. Le 19/11, le focus 90 de la SVPRO était à 0,45 % : il
+    passait à peine.
 - **Ne pas faire** : reprendre une intrinsèque d'une autre session, même
   « récente » ; toucher la bague après la mire.
 
@@ -169,10 +181,16 @@ autofocus) : sans quoi les intrinsèques ne valent plus.
      `training/calibration/e2_Pxx_<camera>_extrinsic.yaml` (non commité), qui
      porte `intrinsics_stem` : capture, conversion et `eval_papier.py` le
      relisent.
-  1b. **Contrôle de focale par les marqueurs** (vues obliques, élévation
-     < 60°) : profil du RMS d'ajustement en fonction de fx (± 10 %), méthode
-     du 19/11 (`~/dream_article/E3/E3_9c/`). Le minimum doit tomber à ± 3 % du
-     fx de l'étape 0b ; sinon la caméra a changé depuis la mire.
+  1b. **Alarme de focale par les marqueurs, non bloquante** (vues obliques,
+     élévation < 60°) : profil du RMS d'ajustement en fonction de fx (± 10 %),
+     méthode du 19/11 (`~/dream_article/E3/E3_9c/`). Quatre marqueurs
+     coplanaires n'ont **pas le pouvoir** de trancher ± 3 % : la position du
+     minimum a un écart-type de ≈ 7-10 % (simulation du metrologue, 19/11). On
+     signale seulement un minimum à plus de ± 8 % du fx de l'étape 0b, et le
+     profil est « non concluant » si RMS(min ± 5 %) − RMS(min) < 0,3 px (vue
+     zénithale : toujours). Un profil plat ne vaut **pas** « passé ». Le vrai
+     contrôle de la focale à la position est le marqueur en hauteur (point 2,
+     sensibilité ε·d/Z) et la mire de fin de session (étape 4).
   2. **Contrôle en hauteur** : un ArUco de 50 mm sur un bloc rigide, posé à
      ~100 mm, ~200 mm et ~280 mm de haut (hauteur de `link3`-`link5`), sa
      position relevée **au robot** (pince sur son centre, codeurs lus) ; on
@@ -214,10 +232,17 @@ autofocus) : sans quoi les intrinsèques ne valent plus.
   extrinsèque, écart à celle de l'étape 2.
 - **Critère de sortie** : ≤ 1 mm et ≤ 0,1° ; sinon la position est
   **invalide et se rejoue en entier** (étapes 1 à 4), elle ne se complète pas.
-- **En fin de session**, par caméra : 15 vues de mire (même commande que 0b,
-  `--target-samples 15`, autre `--name`), adhésif intact. fx à ± 1 % de
-  l'étape 0b, sinon **toutes les positions de cette caméra depuis la dernière
-  vérification sont invalides**.
+- **En fin de session**, par caméra : **une mire complète** (même commande
+  et mêmes critères de couverture que 0b, autre `--name`), adhésif intact.
+  15 vues ne suffisent pas : sur les coins du 19/11, des tirages de 15 vues
+  donnent un écart-type de fx de 0,7 à 1,3 % même en n'ajustant que fx, contre
+  0,25 à 0,45 % sur 32 vues.
+- **Critère** : |Δfx| ≤ 1 % **et** |Δfx| ≤ 2·σ(Δ), où σ(Δ) combine les deux
+  écarts-types ; |Δk1| ≤ 0,02 ; |Δcx|, |Δcy| ≤ 3 px. Si σ(Δ) > 0,5 %, la
+  caméra est « non vérifiable à ± 1 % ». Dans les deux cas d'échec, **toutes
+  les positions de cette caméra depuis la dernière vérification sont
+  invalides**. Repère : 1 % de fx vaut 0,7 à 1,1 px d'étiquette au bord du
+  champ pour un keypoint à 0,2-0,28 m au-dessus de la table, à 0,75 m.
 
 ## Étape 5 — Figer le jeu
 

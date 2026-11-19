@@ -86,7 +86,9 @@ env -u GTK_PATH -u GTK_EXE_PREFIX -u LOCPATH -u GIO_MODULE_DIR -u GSETTINGS_SCHE
 
 Calibrer **à la résolution de capture** et **le jour de la capture**, bague
 de focale bloquée : le 19/11, la SVPRO mesurait fx = 394 en 640 × 480, alors
-que les images du 13/10 s'ajustent vers fx ≈ 430
+que les marqueurs des images du 13/10 s'ajustent mieux avec l'ancienne
+intrinsèque (minimum vers fx ≈ 430, estimation biaisée : changement d'optique
+plausible, non démontré)
 ([`PROTOCOLE_E2_MULTIVUES.md`](PROTOCOLE_E2_MULTIVUES.md)).
 
 ## Calibrer une Arducam (cam_0 ou cam_3)
