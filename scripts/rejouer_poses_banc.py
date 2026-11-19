@@ -27,6 +27,8 @@ import argparse
 import csv
 import hashlib
 import json
+import re
+import subprocess
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -49,6 +51,8 @@ ARTICULATIONS = ['joint2_to_joint1', 'joint3_to_joint2', 'joint4_to_joint3',
 # traverserait les bacs et les pièces, et la physique les déplacerait
 # différemment d'une passe à l'autre.
 POSE_REFUGE = [0.0] * 6
+# Liens dont l'origine est le keypoint de la FK (base, puis l'enfant de chaque articulation).
+LIENS = ['base', 'link1', 'link2', 'link3', 'link4', 'link5', 'link6']
 
 
 def md5(chemin):
@@ -85,9 +89,30 @@ def cmd_monde(args):
     fichier_monde = args.sortie / f'{nom_monde}.sdf'
     arbre.write(fichier_monde, encoding='utf-8', xml_declaration=True)
     (args.sortie / 'cameras.json').write_text(json.dumps(
-        {'base': str(args.base.resolve()), 'md5_base': md5(args.base), **cameras}, indent=2))
+        {'monde': nom_monde, 'base': str(args.base.resolve()), 'md5_base': md5(args.base), **cameras},
+        indent=2))
     print(f'ros2 launch mycobot_gateway banc_realiste.launch.py headless:=true '
           f'world_file:={fichier_monde.resolve()} world_name:={nom_monde} robot_appearance:=original')
+
+
+def ecart_fk_mm(nom_monde, q_rad):
+    """Plus grand écart entre l'origine Gazebo des liens et la FK de mycobot_fk.py.
+
+    Les poses de /pose/info sont relatives au parent : le modèle du robot, posé
+    à l'origine du monde.
+    """
+    texte = subprocess.run(['gz', 'topic', '-e', '-n', '1', '-t', f'/world/{nom_monde}/pose/info'],
+                           capture_output=True, text=True, timeout=20).stdout
+    gazebo = {}
+    for bloc in re.findall(r'pose \{(.*?)orientation', texte, re.S):
+        nom = re.search(r'name: "([^"]+)"', bloc)
+        xyz = [re.search(rf'{a}: (\S+)', bloc.split('position', 1)[-1]) for a in 'xyz']
+        if nom and nom.group(1) in LIENS:
+            gazebo[nom.group(1)] = np.array([float(m.group(1)) if m else 0.0 for m in xyz])
+    if set(gazebo) != set(LIENS):
+        return float('nan')
+    pos, _ = forward_kinematics(q_rad)
+    return max(np.linalg.norm(gazebo[l] - np.array(pos[k])) * 1000 for l, k in zip(LIENS, KEYPOINT_NAMES))
 
 
 def poses_du_jeu(reel):
@@ -110,9 +135,12 @@ def cmd_rejouer(args):
     if args.sortie.exists() and any(args.sortie.iterdir()):
         raise SystemExit(f'{args.sortie} n est pas vide')
     args.sortie.mkdir(parents=True, exist_ok=True)
-    cameras = {k: v for k, v in json.loads((args.monde / 'cameras.json').read_text()).items()
-               if k in ('arducam', 'svpro')}
+    config = json.loads((args.monde / 'cameras.json').read_text())
+    cameras = {k: v for k, v in config.items() if k in ('arducam', 'svpro')}
     images, uniques = poses_du_jeu(args.reel)
+    if args.max_poses:
+        uniques = uniques[:args.max_poses]
+        images = [im for im in images if im[2] in uniques]
     print(f'{len(images)} images, {len(uniques)} poses')
 
     rclpy.init()
@@ -171,13 +199,16 @@ def cmd_rejouer(args):
         frais = attendre(lambda: all(secondes(dernieres[c].header.stamp) > t_repos + 0.15
                                      for c in cameras), 30.0)
         q_lu = etat['joints'].copy()
+        fk_mm = ecart_fk_mm(config['monde'], q_lu) if p < args.controle_fk else ''
         valide = atteint and frais and ecart <= args.tolerance_deg
         sorties[q_deg] = (q_lu, {c: dernieres[c] for c in cameras}, valide)
-        lignes.append({'pose': p, 'ecart_max_deg': round(float(ecart), 4), 'atteint': atteint,
+        lignes.append({'pose': p, 'ecart_max_deg': round(float(ecart), 4), 'ecart_fk_mm': fk_mm,
+                       'atteint': atteint,
                        'image_fraiche': frais, 'valide': valide,
                        **{f'j{j + 1}_cmd_deg': q_deg[j] for j in range(6)},
                        **{f'j{j + 1}_lu_deg': round(float(np.degrees(q_lu[j])), 4) for j in range(6)}})
-        print(f'pose {p + 1:3d}/{len(uniques)} écart {ecart:.3f}° {"" if valide else "ÉCARTÉE"}',
+        print(f'pose {p + 1:3d}/{len(uniques)} écart {ecart:.3f}° {f"FK {fk_mm:.2f} mm " if fk_mm != "" else ""}'
+              f'{"" if valide else "ÉCARTÉE"}',
               flush=True)
 
     for numero, nom, q_deg in images:
@@ -232,6 +263,8 @@ def main():
     r.add_argument('--duree-s', type=float, default=3.0)
     r.add_argument('--repos-s', type=float, default=1.0)
     r.add_argument('--tolerance-deg', type=float, default=0.5)
+    r.add_argument('--max-poses', type=int, default=0, help='essai court : les N premières poses')
+    r.add_argument('--controle-fk', type=int, default=10, help='poses contrôlées contre la FK (Gazebo /pose/info)')
     args = a.parse_args()
     {'monde': cmd_monde, 'rejouer': cmd_rejouer}[args.commande](args)
 
