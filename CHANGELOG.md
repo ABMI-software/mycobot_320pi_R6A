@@ -9,6 +9,16 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — rejeu de poses réelles dans Gazebo (19/11)
+
+- `scripts/rejouer_poses_banc.py` : `monde` place l'arducam et la SVPRO aux
+  extrinsèques d'un jeu réel dans la réplique du banc ou un autre monde
+  (`--base`) ; `rejouer` pilote le bras simulé sur les poses du jeu réel et
+  écrit un NDDS à étiquettes exactes, à la même numérotation (E3.9b,
+  `docs/ARTICLE_DREAM.md`).
+- `banc_realiste.launch.py` : arguments `world_file` et `world_name` (défauts
+  inchangés).
+
 ### Ajouté — brouillons de posts LinkedIn sur l'avancement (12/11)
 
 - Skill `post-linkedin` et agent `communicant-linkedin` : brouillon de post

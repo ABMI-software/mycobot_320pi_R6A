@@ -92,7 +92,10 @@ class CollecteurCameraLibre(CollecteurGardeBasse):
 
     # Coquille de tirage autour du poste de travail. Les deux cameras reelles y
     # sont : l'arducam a 1,077 m et 80 deg d'elevation, la svpro a 0,98 m et
-    # 53 deg. On elargit largement de part et d'autre.
+    # 53 deg. On elargit largement de part et d'autre. Remesure le 19/11 sur les
+    # extrinseques qui ont etiquete real_tri (13/10), autour de VISEE : arducam
+    # 0,88 m et 75 deg, svpro 0,98 m et 25 deg ; et l'arducam vise a 15,8 deg de
+    # son axe, que _robot_dans_le_champ refuserait (E3.9b).
     DIST_MIN, DIST_MAX = 0.70, 1.45
     ELEV_MIN, ELEV_MAX = math.radians(18.0), math.radians(86.0)
     ROULIS_MAX = math.radians(9.0)

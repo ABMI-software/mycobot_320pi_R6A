@@ -15,6 +15,7 @@ Variante realiste de `real_table.launch.py`. Ce qu'elle apporte :
 
     ros2 launch mycobot_gateway banc_realiste.launch.py
     ros2 launch mycobot_gateway banc_realiste.launch.py headless:=true
+    ros2 launch mycobot_gateway banc_realiste.launch.py world_file:=<variante.sdf> world_name:=<nom>
 
 Les images sortent sur /arducam/image_raw et /svpro/image_raw, ou
 `scripts/gazebo_yolo26.py` vient les lire.
@@ -59,12 +60,16 @@ def generate_launch_description():
                               description='0.34 = fiche 320 Pi 2022'),
         DeclareLaunchArgument('robot_appearance', default_value='realistic',
                               choices=['original', 'realistic']),
+        # Variante du monde (cameras deplacees, scripts/rejouer_poses_banc.py) :
+        # world_name doit valoir le nom du <world> qu'elle declare.
+        DeclareLaunchArgument('world_file', default_value=monde),
+        DeclareLaunchArgument('world_name', default_value=MONDE),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(gateway_pkg, 'launch', 'sim_grasp.launch.py')),
             launch_arguments={
-                'world_name': MONDE,
-                'world_file': monde,
+                'world_name': LaunchConfiguration('world_name'),
+                'world_file': LaunchConfiguration('world_file'),
                 'headless': LaunchConfiguration('headless'),
                 'arm_mass_kg': LaunchConfiguration('arm_mass_kg'),
                 'gripper_mass_kg': LaunchConfiguration('gripper_mass_kg'),

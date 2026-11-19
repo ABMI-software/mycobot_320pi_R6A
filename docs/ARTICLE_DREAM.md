@@ -120,7 +120,7 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.7b | Complément de E3.7 avec les poses du pick (40 % du tirage), 30 × 1 000 (porté de 10 à 30 le 12/11, voir « Chaîne du 12/11 ») | Pointe de pince à 72-115 mm sur une part nettement supérieure aux 1,7 % de E3.7 ; même format, md5 | fait le 14/11 : 30 tranches collectées puis composées (masques à jour 0,95, ~53 % de fonds, ~32 % de teintes) ; jeu E3.9 = 49 595 images d'entraînement + 6 125 du secteur tenu, 24 014 images à angles non interpolés écartées (`~/dream_article/E3/E3_9/run.yaml`, md5 des labels) |
 | E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | fait le 13/11 : **sous-pixel σ 1 retenu** par la règle écrite d'avance (484 images à angles interpolés : Δ PCK@2,5 +0,149 [+0,132 ; +0,167], Δ PCK@5 +0,042 [+0,031 ; +0,052], pas de perte à 10 px ni en détection) ; sous-pixel σ 2 : +0,037 seulement ; 1 graine par bras (`~/dream_article/E3/E3_8/choix.txt`) ; verdict du metrologue à inscrire |
 | E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | fait le 15/11 (`vgg_e3_9_synth_seul`) : secteur 60-100° tenu, 6 125 images, PCK 0,910/0,968/0,984, détection 0,994 ; **réel (`real_tri_test`, 200 images) : PCK 0,004/0,068/0,169, détection 0,70, ADD médiane 83 mm** (E3.0 : 0,014 à 5 px, 173 mm) — le transfert au réel reste un échec ; biais vertical constant de la base (−4 à −6 px, MAD 0,3 px, deux caméras) à expliquer avant E3.10 (`~/dream_article/E3/E3_9/`) |
-| E3.9b | Diagnostic : les 100 poses de `real_tri_test` rejouées dans la réplique Gazebo du banc, rendu d'entraînement contre rendu `realistic`, étiquettes exactes | Part de l'échec réel due à l'apparence du robot, à la scène, au reste (protocole ci-dessous) | protocole écrit le 18/11, outil de rejeu à écrire ; attend la carte graphique (RoboPEPP en cours) |
+| E3.9b | Diagnostic : les 100 poses de `real_tri_test` rejouées en Gazebo aux caméras d'étiquetage — monde d'entraînement (C), réplique du banc (A), et rendu `realistic` (B) ; étiquettes exactes | Part de l'échec réel due au cadrage, à la scène, à l'apparence du robot, au reste (protocole ci-dessous) | protocole écrit le 18/11, amendé le 19/11 (metrologue : condition C, équivalence, cadrage arducam hors domaine) ; outil `scripts/rejouer_poses_banc.py` écrit, mondes générés (`~/dream_article/E3/E3_9b/`) ; rejeu à lancer quand la carte graphique est libre (RoboPEPP en cours) |
 | E3.10 | Évaluation : E2, `real_tri_test`, test de décalage, revue du metrologue | Critère de E3 (tableau des expériences) | à faire |
 | E3.11 | Modèle de déploiement : même recette que E3.9, tous azimuts (secteur 60-100° compris), hors article | Checkpoint pour le banc, si E3.10 atteint son critère | à faire (décision du 12/11) |
 
@@ -151,65 +151,100 @@ préparer pendant que la collecte et l'entraînement tournent.
 - **Ne pas faire** : départager sur `real_tri_test` ou sur E2 (ce serait choisir
   sur le test) ; prolonger un bras qui perd « pour lui laisser sa chance ».
 
-### Protocole de E3.9b (rédigé le 18/11, avant mesure)
+### Protocole de E3.9b (rédigé le 18/11, amendé le 19/11 après relecture du metrologue, avant mesure)
 
 - **Objectif** : dire quelle part de l'échec réel d'E3.9 (PCK@5 0,068 sur
-  `real_tri_test`) tient à l'apparence du robot, à la scène du banc, ou à ce
-  que la simulation ne modélise pas (optique et photométrie des caméras,
-  étiquettes réelles). La simulation donne des étiquettes **exactes** : c'est ce
-  qui sépare l'apparence d'une erreur d'étiquette.
-- **Fait géométrique établi avant mesure** (18/11, centre des extrinsèques
-  d'étiquetage autour du point visé du collecteur) : l'arducam est à
-  l'azimut −103°, élévation 75°, 0,88 m, dans la coquille d'entraînement ; la
-  SVPRO à l'azimut 70°, dans le secteur 60-100° tenu à l'écart, où E3.9 fait
-  PCK@5 0,968 en synthétique. Le point de vue seul n'explique pas l'échec.
+  `real_tri_test`) tient à l'apparence du robot, à la scène du banc, au
+  cadrage des caméras réelles, ou à ce que la simulation ne modélise pas. La
+  simulation donne des étiquettes **exactes** : c'est ce qui sépare ces
+  facteurs d'une erreur d'étiquette.
+- **Point de vue, établi avant mesure** (19/11, extrinsèques d'étiquetage,
+  autour du point visé du collecteur ; relu par le metrologue) :
+
+  | | azimut | élévation | distance | roulis | visée hors axe |
+  |---|---|---|---|---|---|
+  | arducam (`avant_1410_1454`) | −102,7° | 75,3° | 0,878 m | 2,2° | 15,8° |
+  | SVPRO (`labels.avant_1410`) | 70,2° (secteur tenu) | 24,9° | 0,976 m | 3,6° | 8,0° |
+
+  E3.9 sur le secteur synthétique tenu, à ce point de vue de la SVPRO
+  (élévation 20-30°, distance 0,90-1,05 m) : PCK@5 **0,976** [0,963 ; 0,987],
+  n = 198. **Le point de vue de la SVPRO n'explique pas son échec.** L'arducam,
+  elle, est **hors domaine par le cadrage** : à l'entraînement, la visée n'est
+  jamais à plus de 9,0° de l'axe optique (critère `_robot_dans_le_champ` du
+  collecteur, qui rejetterait cette pose), contre 15,8° ; le PCK@5 tenu baisse
+  déjà de 0,971 (0-5°) à 0,953 (5-10°). Son échec (détection 0,454) peut en
+  partie venir de là (`~/dream_article/E3/E3_9b/tranche.py`).
 - **Référence réelle, par caméra** (E3.9 sur `real_tri_test`) : arducam
   détection 0,454, PCK@5 0,021 ; SVPRO détection 0,946, PCK@5 0,114.
-- **Deux conditions**, mêmes poses, mêmes caméras, même scène :
-  A = `banc_realiste.launch.py robot_appearance:=original` (le rendu
-  d'entraînement) ; B = `robot_appearance:=realistic`. Caméras posées aux
-  extrinsèques **qui ont étiqueté** `real_tri_test`
-  (`arducam_extrinsic_pick.avant_1410_1454.yaml`,
-  `svpro_extrinsic_labels.avant_1410.yaml`), intrinsèques `cam_3` et `cam_2`
-  rééchelonnée en 640 × 480, **sans distorsion**. Pas de fonds COCO, de
-  distracteurs ni de teinte : la scène est celle du banc.
-- **Actions** : outil de rejeu à écrire (`scripts/`, Python système ROS 2) :
-  pour chacune des 100 poses (`source.angles_deg` des JSON de
-  `real_tri_test`), trajectoire vers la pose, attente du repos, une image par
-  caméra, angles lus au temps de l'image, étiquettes par la FK de
-  `training/dream/mycobot_fk.py` projetées avec K. Gazebo sur `taskset -c
-  16-19`, **jamais pendant un entraînement**. Puis `eval_papier.py` avec
-  `vgg_e3_9_synth_seul` sur A, B et le réel.
-- **Contrôles avant d'évaluer** : planche de 24 poses, étiquettes superposées
-  au robot à l'œil sur A et B ; planche A / B / réel côte à côte (le rendu
-  `realistic` ressemble-t-il au robot réel ? consigné, sans chiffre).
+- **Trois conditions**, mêmes 100 poses, mêmes caméras (poses des
+  extrinsèques **qui ont étiqueté** `real_tri_test`, intrinsèques `cam_3` et
+  `cam_2` rééchelonnée en 640 × 480, **sans distorsion**) :
+  - **C** = monde d'entraînement (`randomized`, celui de la collecte), sans
+    fonds COCO, teinte ni distracteurs ;
+  - **A** = réplique du banc (`banc_realiste`), `robot_appearance:=original` ;
+  - **B** = réplique du banc, `robot_appearance:=realistic`.
+
+  C, A et B rendent un **sous-ensemble** du domaine d'entraînement (aucune
+  randomisation d'apparence), pas « le rendu d'entraînement » tout court.
+- **Différences connues avec les images réelles**, consignées et non
+  corrigées : sur le banc réel, bacs en colonne avec pièces, câbles,
+  plante, écran ; la pince porte un cube à ArUco ; l'ouverture de la pince
+  n'est pas consignée dans `real_tri_test` (pince ouverte en simulation) ;
+  éclairage de labo contre lumières de la réplique ; l'affaissement du bras
+  (13-15 mm) n'est pas simulé, l'étiquette réelle est la FK des codeurs.
+- **Actions** : `scripts/rejouer_poses_banc.py` (docstring) : `monde` place
+  les deux caméras aux extrinsèques d'étiquetage dans le monde choisi ;
+  `rejouer` passe par le bras droit entre deux poses (la physique ne déplace
+  pas la scène différemment d'une passe à l'autre), attend le repos, prend
+  une image par caméra, étiquette par la FK des angles lus. Gazebo sur
+  `taskset -c 16-19`, **jamais pendant un entraînement**. Puis
+  `eval_papier.py` avec `vgg_e3_9_synth_seul` sur C, A, B et le réel.
+- **Contrôles avant d'évaluer** : écart entre la pose Gazebo des liens
+  (`gz model -m mycobot_320 -l <lien>`) et la FK de `mycobot_fk.py` ≤ 1 mm
+  sur 10 poses par monde ; planche de 24 poses, étiquettes superposées ;
+  planche C / A / B / réel côte à côte, et luminance médiane du robot
+  masqué dans chacune (un chiffre, pas seulement un coup d'œil).
 - **Invalidation** : une pose dont un angle lu s'écarte de plus de 0,5° de la
-  consigne est écartée **des deux conditions** ; plus de 5 poses écartées, ou
-  une étiquette hors du robot sur la planche → corriger et rejouer A et B en
-  entier.
-- **Consigner** : `run.yaml` (commit, modèle, extrinsèques, intrinsèques,
-  monde, apparence), par image : pose, caméra, angles consigne et lus,
-  erreurs par keypoint ; dans `~/dream_article/E3/E3_9b/`.
+  consigne est écartée **des trois conditions** (le seuil protège
+  l'appariement : l'étiquette, elle, suit l'angle lu). Les poses écartées
+  sont listées ; au-delà de 5, l'analyse est refaite aussi sur les 100.
+  Contrôle FK > 1 mm → corriger et rejouer la condition en entier.
+- **Consigner** : `run.yaml` (commit, modèle, extrinsèques et md5,
+  intrinsèques, monde, apparence) ; `rejeu.csv` (angles consigne et lus) ;
+  NDDS à la numérotation du jeu réel ; dans `~/dream_article/E3/E3_9b/`.
 - **Mesure** : PCK@2,5/5/10 (non détecté = faux), détection, par caméra et
-  ensemble ; IC bootstrap par pose (100 blocs, les deux vues d'une pose dans
-  le même bloc) ; IC des différences appariées A − B, A − réel, B − réel.
-- **Critère de sortie** (sur PCK@5, deux caméras ensemble, puis par caméra) :
-  1. **Scène** : si PCK@5(A) < 0,83 (seuil de E3), la scène du banc est hors
-     distribution même au rendu d'entraînement ; priorité à la scène et aux
-     fonds, et B − réel ne s'interprète pas.
-  2. **Apparence du robot** : Δ = PCK@5(A) − PCK@5(B). Facteur majeur si
-     Δ ≥ 0,20 avec une borne basse d'IC > 0,10 ; écarté si l'IC de Δ tient
-     dans [−0,05 ; +0,05] ; entre les deux, effet modéré, à trancher
-     (utilisateur, avec le metrologue).
-  3. **Reste** : si PCK@5(B) ≥ 0,83, l'écart B − réel revient à ce que la
+  ensemble. Bootstrap par pose (100 blocs, les deux vues d'une pose dans le
+  même bloc), **2 000 rééchantillonnages, graine 0** ; différences appariées
+  C − A, A − B, B − réel.
+- **Critère de sortie** (PCK@5, par caméra puis ensemble ; une seule graine
+  d'entraînement : tout écart est conditionnel à ce modèle, et 0,83 n'a pas
+  d'intervalle de graine) :
+  1. **Cadrage et poses** : si PCK@5(C) < 0,83 (seuil de E3), le point de vue
+     ou la répartition des poses suffit à faire échouer E3.9 sans la scène ni
+     l'apparence (attendu pour l'arducam, au vu du cadrage).
+  2. **Scène** : C − A ≥ 0,20 avec une borne basse d'IC à 95 % > 0,10 →
+     la scène du banc est un facteur majeur.
+  3. **Apparence du robot** : A − B, même règle. Ce seuil commande une
+     décision : un facteur majeur fait passer la randomisation d'apparence
+     du robot (textures, coques blanches) avant la session au banc.
+  4. **« Écarté »** seulement par équivalence : IC à **90 %** (TOST) de la
+     différence dans [−0,05 ; +0,05]. Si l'écart-type par pose de la
+     différence dépasse 0,26, la règle est hors de portée à n = 100 : on écrit
+     « non démontré », jamais « écarté ».
+  5. **Reste** : si PCK@5(B) ≥ 0,83, l'écart B − réel revient à ce que la
      simulation ne modélise pas (distorsion, bruit, flou, exposition,
-     textures réelles) **et** aux étiquettes réelles, sans pouvoir les
-     séparer ici : la session au banc (marqueur en hauteur, mire) tranche les
-     étiquettes.
+     éclairage, scène réelle encombrée, cube sur la pince) **et** aux
+     étiquettes réelles, sans pouvoir les séparer.
+- **Ce que E3.9b ne peut pas voir** : une erreur d'extrinsèque ou
+  d'intrinsèque (la simulation place la caméra à l'extrinsèque d'étiquetage
+  et rend avec le même K : une erreur commune s'y annule). Le défaut
+  possible des intrinsèques SVPRO, ou l'erreur d'étiquette en hauteur,
+  tombent dans le « reste » : la session au banc (marqueur en hauteur, mire)
+  les tranche.
 - **Ne pas faire** : retoucher le rendu `realistic` après avoir vu les
   chiffres et le réévaluer sous le même nom (ce serait E3.9c, avec son propre
-  protocole) ; entraîner sur ces images ; comparer A au secteur synthétique
-  tenu comme s'il s'agissait de la même distribution ; tirer de E3.9b une
+  protocole) ; entraîner sur ces images ; comparer C, A ou B au secteur
+  synthétique tenu comme à une même distribution ; tirer de E3.9b une
   conclusion sur la justesse des étiquettes réelles.
 
 ### Chaîne du 12/11 (absence de l'utilisateur ≥ 4 jours) — règles écrites avant les résultats

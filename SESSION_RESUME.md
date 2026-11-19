@@ -41,10 +41,14 @@
    décalage (`scripts/dream_test_decalage.py`), erreurs par caméra avec IC.
 2. [JAUNE] E3.9b, protocole écrit le 18/11 (`docs/ARTICLE_DREAM.md`) :
    rejouer les 100 poses de `real_tri_test` dans la réplique du banc, rendu
-   d'entraînement contre `realistic`. Outil de rejeu à écrire ; mesure dès
-   que la carte graphique est libre (entraînement RoboPEPP en cours).
-   Établi le 18/11 : les deux caméras réelles sont dans la plage de points
-   de vue d'entraînement (SVPRO dans le secteur tenu, à 0,968 en synthétique).
+   d'entraînement contre `realistic`. Amendé le 19/11 par le metrologue
+   (condition C au monde d'entraînement, équivalence TOST). Outil
+   `scripts/rejouer_poses_banc.py` écrit, mondes générés ; le rejeu ROS n'a
+   pas encore tourné : à lancer dès que la carte graphique est libre
+   (entraînement RoboPEPP en cours).
+   Établi le 19/11 : le point de vue de la SVPRO est couvert (PCK@5 0,976
+   sur sa tranche du secteur tenu, n = 198) ; l'arducam est hors domaine
+   par le cadrage (visée à 15,8° de l'axe, 9° au plus à l'entraînement).
 3. [VERT] Décider si l'échec réel entre dans un post LinkedIn.
 
 ### Commande rapide de reprise
