@@ -113,16 +113,70 @@ autofocus) : sans quoi les intrinsèques ne valent plus.
   `gripper_bridge.py` sur la Pi — **aucun script d'essai** de `~/Test-JB/Essaies`
   ne tourne en même temps (ils ouvrent `/dev/ttyAMA0` en direct) —,
   `scripts/real_robot_preflight.sh $MYCOBOT_PI`, puis arrêt du `bridge_tour`
-  qu'il laisse. **Pince montée** (pas le stylo des essais E1 : `tool_offset.json`
-  décrit la pince). Planche dégagée (aucune feuille sur les marqueurs).
-  Contrôle de la planche : pince sur 19 et 23, lecture des codeurs sans ordre
-  moteur ; écart ≤ 2 mm à `planche_actuelle.yaml`, sinon remesurer au robot et
-  réécrire la référence (le 19/11, l'arducam voyait les marqueurs à 250 mm de
-  la référence : banc réarrangé pour les essais au stylo).
+  qu'il laisse. Planche dégagée (aucune feuille sur les marqueurs). Contrôle
+  de la planche **au stylo** (étape 0a) : pointe sur les centres de 19 et 23 ;
+  écart ≤ 2 mm à `planche_actuelle.yaml`, sinon réécrire la référence depuis
+  ces deux points (méthode de `PICK_AND_PLACE_REAL.md` § « Calibration contre
+  le robot », étapes 2-3 ; le 19/11, l'arducam voyait les marqueurs à 250 mm
+  de la référence : banc réarrangé pour les essais au stylo). Un écart peut
+  venir de l'ancienne référence elle-même : elle a été relevée à la pince, au
+  « centre de prise », juste à quelques millimètres.
 - **Consigner** : date, opérateur, IP de la Pi, commit, écart 19/23, éclairage
   (lampes, fenêtres, heure), température.
-- **Critère de sortie** : preflight OK, planche à ≤ 2 mm.
+- **Critère de sortie** : preflight OK, planche à ≤ 2 mm (ou référence
+  réécrite et consignée).
 - **Ne pas faire** : relever la planche à travers une caméra.
+
+## Étape 0a — Le stylo comme pointeur (une fois par session)
+
+Pourquoi le stylo et pas la pince : une pointe est un point, la pince désigne
+un « centre de prise » ajusté sur des saisies réussies (`tool_offset.json`,
+juste à quelques millimètres en XY). Pourquoi **la pince pour les images** :
+E3 est entraîné pince montée (E3.6) et `real_tri_test` la montre ; un
+porte-stylo changerait l'apparence autour de `link6`, et E2 mesurerait
+l'outil autant que le point de vue. Le stylo **pointe**, la pince **pose**.
+
+- **Objectif** : connaître la pointe dans le repère de la bride à mieux que
+  1 mm, puis relever au robot les points de référence de la session.
+- **Préparer** : un creux conique (coup de pointeau dans une plaque, ou
+  perçage peu profond) fixé sur la planche ; les centres de 19 et 23 marqués
+  (diagonales au crayon fin et à la règle, puis un coup de pointe) ; le bloc
+  du contrôle en hauteur posé **pour toute la session** dans un coin de la
+  planche hors de la course du bras, ses trois marqueurs (~100, ~200,
+  ~280 mm) centrés de la même façon.
+- **Actions** :
+  1. Pivot, porte-stylo monté, pointe dans le creux, contact léger (ressort
+     juste engagé, toujours le même : une feuille pincée sous la pointe) :
+     ```bash
+     MYCOBOT_PI=<ip> /usr/bin/python3 scripts/pivot_pointe.py pivot \
+         --sortie-outil scripts/tool_offset_stylo.json
+     ```
+     `r` relâche les servos (**tenir le bras**), on incline la bride, `v`
+     verrouille, on vérifie que la pointe est restée dans le creux, `m`
+     mesure (médiane de 5 lectures). **8 orientations** : verticale, ± 20°
+     autour de X, ± 20° autour de Y, deux diagonales, une rotation de J6 de
+     45°. Après chaque relâchement, regarder J5 : au-delà de 166°, le
+     contrôleur passe en erreur 5 (constaté le 19/11).
+  2. Pointage, même script, mode `pointe --outil scripts/tool_offset_stylo.json` :
+     19, 23, puis les trois marqueurs du bloc. Chaque point deux fois, en
+     revenant d'en haut à chaque fois (jamais en glissant latéralement : 1,6 mm
+     de jeu selon le sens d'arrivée, mesuré le 19/11).
+  3. Remonter la pince pour la suite ; le stylo ne sert plus.
+- **Consigner** : `results/pivot/<date>_pivot/` (angles bruts, `bilan.json`),
+  `results/pivot/<date>_pointe/points.csv`, copiés dans l'archive E2.
+- **Critère de sortie** :
+  - pivot : ≥ 6 poses, axes de bride écartés de ≥ 30°, résidu RMS ≤ 0,8 mm,
+    résidu max ≤ 1,5 mm (au-dessus du seul bruit des codeurs : simulation à
+    ± 20°, pas de 0,09°, résidu RMS médian 0,49 mm, p95 0,66 ; erreur sur la
+    pointe médiane 0,54 mm, p90 0,97). Le script n'écrit l'outil que si c'est
+    conforme ;
+  - pointage : les deux relevés d'un même point à ≤ 1 mm l'un de l'autre.
+- **Ce que le stylo ne corrige pas** : la résolution des codeurs (≈ 0,5 mm à
+  300 mm du pied) et l'affaissement non modélisé, qui change avec la pose. La
+  pointe est plus fine que la pince, la mesure reste celle des codeurs.
+- **Ne pas faire** : mesurer servos relâchés (on verrouille avant de lire) ;
+  appuyer franchement (le ressort absorbe 3 mm) ; reprendre `PEN_MM = 160` des
+  essais de la Pi au lieu du pivot.
 
 ## Étape 0b — Intrinsèques du jour (par caméra, une fois par session)
 
@@ -193,8 +247,8 @@ autofocus) : sans quoi les intrinsèques ne valent plus.
      sensibilité ε·d/Z) et la mire de fin de session (étape 4).
   2. **Contrôle en hauteur** : un ArUco de 50 mm sur un bloc rigide, posé à
      ~100 mm, ~200 mm et ~280 mm de haut (hauteur de `link3`-`link5`), sa
-     position relevée **au robot** (pince sur son centre, codeurs lus) ; on
-     mesure l'écart entre sa projection et sa détection. Ajouté le 18/11 :
+     position relevée **au stylo** à l'étape 0a (le bloc ne bouge pas de la
+     session) ; on mesure l'écart entre sa projection et sa détection. Ajouté le 18/11 :
      sur `real_tri`, l'erreur d'étiquette des points en hauteur n'a pas pu
      être bornée (jusqu'à ~10 px possibles, `docs/ARTICLE_DREAM.md`).
   3. Squelette FK projeté sur 3 poses (dont la plus haute) : contrôle à l'œil.
@@ -283,9 +337,11 @@ hors ± 1 %), un bridge tombé pendant une série. L'essai se rejoue en entier.
    commande dans `~/dream_article/E3/E3_9c/`).
 5. Rouleau d'adhésif, et la feuille de session (`run.yaml`) avec focus et
    photo par caméra.
-6. Le bloc du contrôle en hauteur (ArUco de 50 mm sur un support rigide de
+6. **Fait le 19/11** : `scripts/pivot_pointe.py` (pivot du stylo, pointage).
+   Reste le creux conique et le marquage des centres (étape 0a).
+7. Le bloc du contrôle en hauteur (ArUco de 50 mm sur un support rigide de
    ~100 et ~200 mm) et une procédure de relevé au robot.
-7. Les supports de caméra pour 6 à 10 positions (trépieds, bras), et les
+8. Les supports de caméra pour 6 à 10 positions (trépieds, bras), et les
    câbles USB sur des ports arrière sans hub (erreurs `-71` sinon).
 
 ## Journal

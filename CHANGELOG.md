@@ -9,6 +9,18 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — pivot du stylo et pointage au robot (19/11)
+
+- `scripts/pivot_pointe.py` : `pivot` (pointe d'outil dans le repère de la bride par
+  moindres carrés sur 6 à 10 orientations autour d'un creux fixe, résidus et
+  leave-one-out, outil écrit seulement si conforme), `pointe` (position de points
+  relevés au robot avec cet outil, CSV brut), `rejouer` (recalcul depuis les angles).
+  N'envoie au robot que `power_off` et `power_on`, jamais un mouvement. Seuils fixés
+  par simulation du bruit des codeurs (pas de 0,09°) : résidu RMS ≤ 0,8 mm, max ≤ 1,5 mm.
+- `docs/PROTOCOLE_E2_MULTIVUES.md` : étape 0a, le stylo pointe (planche, bloc du contrôle
+  en hauteur, mesuré une fois pour la session), la pince reste montée pour les images
+  (apparence d'entraînement de E3).
+
 ### Modifié — protocole E2 : intrinsèques de la session, de bout en bout (19/11)
 
 - `docs/PROTOCOLE_E2_MULTIVUES.md` amendé avant mesure : étape 0b (mire le jour
