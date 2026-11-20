@@ -1,0 +1,16 @@
+@for (toast of toasts(); track toast.id) {
+  <div class="toast" [attr.data-level]="toast.level" [style.--duration]="duration">
+    <span class="toast-icon"><app-icon [name]="icons[toast.level]" /></span>
+    <div class="toast-body">
+      <p class="toast-head">
+        <strong>Robot</strong>
+        <time>{{ toast.at | date: 'HH:mm:ss' }}</time>
+      </p>
+      <p class="toast-text">{{ toast.text }}</p>
+    </div>
+    <button type="button" class="toast-close" aria-label="Fermer la notification" (click)="dismiss(toast.id)">
+      <app-icon name="close" />
+    </button>
+    <span class="toast-progress" aria-hidden="true"></span>
+  </div>
+}

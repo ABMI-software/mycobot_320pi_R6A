@@ -1,0 +1,155 @@
+:host {
+  display: grid;
+  gap: 32px;
+}
+
+// -----------------------------------------------------------------------------
+// Indicateurs d'état
+// -----------------------------------------------------------------------------
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.kpi {
+  position: relative;
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.03), transparent), var(--surface);
+  box-shadow: var(--shadow-card);
+
+  // Barre d'accent à gauche, héritée des KpiCard de la téléop.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 16px auto 16px 0;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--accent);
+  }
+}
+
+.kpi-value {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
+  &[data-level='ok'] {
+    color: var(--ok);
+  }
+
+  &[data-level='error'] {
+    color: var(--danger);
+  }
+
+  &.is-empty {
+    color: var(--text-3);
+  }
+}
+
+.kpi-number {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.kpi-hint {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+// -----------------------------------------------------------------------------
+// Cartes des vues
+// -----------------------------------------------------------------------------
+
+.views {
+  display: grid;
+  gap: 14px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.view-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+  transition:
+    transform var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+
+  &:hover,
+  &:focus-visible {
+    border-color: rgb(230 65 122 / 0.45);
+    box-shadow:
+      var(--shadow-card),
+      0 16px 40px -20px rgb(230 65 122 / 0.55);
+    transform: translateY(-2px);
+
+    .view-arrow {
+      color: var(--accent);
+      transform: translateX(3px);
+    }
+  }
+}
+
+.view-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgb(230 65 122 / 0.3);
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, rgb(230 65 122 / 0.22), rgb(230 65 122 / 0.05));
+  color: var(--accent);
+  font-size: 1.35rem;
+}
+
+.view-text {
+  display: grid;
+  gap: 2px;
+
+  strong {
+    font-weight: 650;
+  }
+
+  span {
+    color: var(--text-2);
+    font-size: 0.875rem;
+  }
+}
+
+.view-arrow {
+  color: var(--text-3);
+  transition:
+    color var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+}

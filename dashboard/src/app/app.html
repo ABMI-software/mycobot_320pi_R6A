@@ -1,0 +1,69 @@
+<aside class="sidebar" id="sidebar">
+  <a class="brand" routerLink="/" (click)="closeMenu()">
+    <img class="logo" src="abmi-logo.jpg" alt="" width="40" height="40" />
+    <span class="brand-text">
+      <span class="brand-eyebrow">ABMI</span>
+      <span class="brand-name">MyCobot 320 Pi</span>
+    </span>
+  </a>
+
+  <p class="eyebrow nav-title">Vues</p>
+  <nav class="nav" aria-label="Vues du dashboard">
+    <a class="nav-item" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMenu()">
+      <span class="nav-icon"><app-icon name="home" /></span>
+      <span class="label">Accueil</span>
+    </a>
+    @for (view of views; track view.path) {
+      <a class="nav-item" [routerLink]="['/', view.path]" routerLinkActive="active" (click)="closeMenu()">
+        <span class="nav-icon"><app-icon [name]="view.icon" /></span>
+        <span class="label">{{ view.title }}</span>
+      </a>
+    }
+  </nav>
+
+  <div class="sidebar-foot">
+    <span class="eyebrow">rosbridge</span>
+    <code class="endpoint" [title]="robot.rosbridgeUrl">{{ robot.rosbridgeUrl }}</code>
+  </div>
+</aside>
+
+<div class="backdrop" aria-hidden="true" (click)="closeMenu()"></div>
+
+<div class="main-col">
+  <header class="topbar">
+    <button
+      type="button"
+      class="btn btn-icon menu-btn"
+      aria-controls="sidebar"
+      [attr.aria-expanded]="menuOpen()"
+      aria-label="Ouvrir le menu"
+      (click)="menuOpen.set(true)"
+    >
+      <app-icon name="menu" />
+    </button>
+
+    <nav class="crumbs" aria-label="Fil d'Ariane">
+      <a routerLink="/">Dashboard</a>
+      <app-icon name="chevron-right" />
+      <span aria-current="page">{{ currentTitle() }}</span>
+    </nav>
+
+    <app-status-pill role="status" [status]="robot.status()" />
+  </header>
+
+  @if (robot.status() === 'disconnected') {
+    <div class="offline" role="alert">
+      <app-icon name="alert" />
+      <p>
+        <strong>rosbridge injoignable.</strong>
+        Nouvelle tentative toutes les 3 s sur <code>{{ robot.rosbridgeUrl }}</code> — les commandes sont désactivées.
+      </p>
+    </div>
+  }
+
+  <main>
+    <router-outlet />
+  </main>
+</div>
+
+<app-toaster />

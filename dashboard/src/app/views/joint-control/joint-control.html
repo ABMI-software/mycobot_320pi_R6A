@@ -1,0 +1,201 @@
+<header class="page-head">
+  <p class="eyebrow">Pilotage</p>
+  <h1>Pilotage articulaire</h1>
+  <p class="lead">Réglez les six axes, vérifiez les modifications, puis envoyez la pose au robot.</p>
+</header>
+
+<div class="layout">
+  <!-- Axes -->
+  <section class="card" aria-labelledby="joints-title">
+    <header class="card-head">
+      <h2 id="joints-title" class="card-title">Angles des axes</h2>
+      <span class="keys-hint">Maj + clic sur − / + : pas de 10°</span>
+    </header>
+
+    <!-- Les curseurs ne suivent pas le bras en direct : lire sa pose avant d'envoyer. -->
+    <div class="sync" [class.is-synced]="poseReadAt()">
+      <app-icon [name]="poseReadAt() ? 'check' : 'alert'" />
+      <p class="sync-text">
+        @if (poseReadAt(); as readAt) {
+          Curseurs alignés sur la pose du robot, lue à {{ readAt | date: 'HH:mm:ss' }}.
+        } @else {
+          Les curseurs ne suivent pas le bras : lisez sa pose avant d'envoyer.
+        }
+      </p>
+      <button
+        type="button"
+        class="btn btn-secondary"
+        [class.is-loading]="reading()"
+        [disabled]="!robot.connected() || reading()"
+        (click)="readPose()"
+      >
+        <app-icon name="refresh" />Lire la pose actuelle
+      </button>
+    </div>
+
+    <div class="joints">
+      @for (row of rows(); track row.joint.name) {
+        <!-- Couleur de l'axe (--joint-N) et position du remplissage (--z : zéro, --v : valeur). -->
+        <div
+          class="joint"
+          [class.is-changed]="row.changed"
+          [style.--range-color]="'var(--joint-' + (row.index + 1) + ')'"
+          [style.--z]="row.zero"
+          [style.--v]="row.value"
+        >
+          <div class="joint-id">
+            <span class="joint-chip">{{ row.joint.name }}</span>
+            <span class="joint-meta">
+              <span class="joint-label">{{ row.joint.label }}</span>
+              @if (row.changed) {
+                <span class="joint-changed">Modifié</span>
+              } @else {
+                <span class="joint-limits mono">{{ row.joint.min }}° … {{ row.joint.max }}°</span>
+              }
+            </span>
+          </div>
+
+          <div class="joint-track">
+            <!-- min et max avant value : sinon le navigateur ramène la valeur dans [0, 100]. -->
+            <input
+              #slider
+              type="range"
+              step="1"
+              [min]="row.joint.min"
+              [max]="row.joint.max"
+              [value]="row.angle"
+              (input)="setAngle(row.index, slider.valueAsNumber)"
+              [attr.aria-label]="row.joint.name + ', curseur en degrés'"
+            />
+            <span class="zero-mark" aria-hidden="true">0°</span>
+          </div>
+
+          <div class="joint-input">
+            <button
+              type="button"
+              class="btn btn-icon"
+              title="−1° (Maj : −10°)"
+              [attr.aria-label]="'Diminuer ' + row.joint.name"
+              (click)="nudge(row.index, -1, $event)"
+            >
+              <app-icon name="minus" />
+            </button>
+            <label class="readout">
+              <input
+                #field
+                type="number"
+                step="1"
+                [min]="row.joint.min"
+                [max]="row.joint.max"
+                [value]="row.angle"
+                (change)="setAngle(row.index, field.valueAsNumber)"
+                [attr.aria-label]="row.joint.name + ', valeur en degrés'"
+              />
+              <span class="unit" aria-hidden="true">°</span>
+            </label>
+            <button
+              type="button"
+              class="btn btn-icon"
+              title="+1° (Maj : +10°)"
+              [attr.aria-label]="'Augmenter ' + row.joint.name"
+              (click)="nudge(row.index, 1, $event)"
+            >
+              <app-icon name="plus" />
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+
+  <aside class="side">
+    <!-- Commande -->
+    <section class="card" aria-labelledby="command-title">
+      <header class="card-head">
+        <h2 id="command-title" class="card-title">Commande</h2>
+        @if (changedCount(); as count) {
+          <span class="tag tag-accent pending">{{ count }} {{ count > 1 ? 'axes modifiés' : 'axe modifié' }}</span>
+        } @else {
+          <span class="tag">Aucune modification</span>
+        }
+      </header>
+
+      <div class="card-body command">
+        <div class="speed" [style.--v]="speedRatio()">
+          <div class="speed-head">
+            <label class="eyebrow" for="speed">Vitesse</label>
+            <output class="speed-value" for="speed">{{ speed() }}<small> / {{ speedLimits.max }}</small></output>
+          </div>
+          <input
+            #speedSlider
+            id="speed"
+            type="range"
+            step="1"
+            [min]="speedLimits.min"
+            [max]="speedLimits.max"
+            [value]="speed()"
+            (input)="speed.set(speedSlider.valueAsNumber)"
+          />
+          <div class="presets" role="group" aria-label="Vitesses prédéfinies">
+            @for (preset of speedLimits.presets; track preset) {
+              <button
+                type="button"
+                class="preset"
+                [class.active]="speed() === preset"
+                [attr.aria-pressed]="speed() === preset"
+                (click)="speed.set(preset)"
+              >
+                {{ preset }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-lg btn-block" [disabled]="!robot.connected()" (click)="send()">
+          <app-icon name="send" />Envoyer les angles
+        </button>
+
+        <div class="secondary-actions">
+          <button type="button" class="btn btn-secondary home" [disabled]="!robot.connected()" (click)="goHome()">
+            <app-icon name="home" />Position home
+          </button>
+          <button type="button" class="btn btn-ghost" [disabled]="!changedCount()" (click)="revert()">
+            <app-icon name="undo" />Annuler
+          </button>
+          <button type="button" class="btn btn-ghost" (click)="zero()">
+            <app-icon name="target" />Tout à 0°
+          </button>
+        </div>
+
+        @if (error(); as message) {
+          <div class="alert" role="alert">
+            <app-icon name="alert" />
+            <span>{{ message }}</span>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- Journal -->
+    <section class="card" aria-labelledby="log-title">
+      <header class="card-head">
+        <h2 id="log-title" class="card-title">Journal du robot</h2>
+        <span class="tag">{{ robot.feedbackLog().length }}</span>
+      </header>
+      <ol class="log">
+        @for (entry of robot.feedbackLog(); track entry.id) {
+          <li class="log-entry" [attr.data-level]="entry.level">
+            <span class="log-dot" aria-hidden="true"></span>
+            <time class="log-time">{{ entry.at | date: 'HH:mm:ss' }}</time>
+            <span class="log-text">{{ entry.text }}</span>
+          </li>
+        } @empty {
+          <li class="log-empty">
+            <app-icon name="activity" />
+            Les réponses de la Pi s'afficheront ici.
+          </li>
+        }
+      </ol>
+    </section>
+  </aside>
+</div>

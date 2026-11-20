@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Procédure — ajouter un écran</title>
+<style>
+  :root {
+    --bg: #0f0e23; --bg-deep: #0a0919; --surface: #171637; --surface-2: #1b1a3e;
+    --line: rgb(245 243 250 / 0.08); --line-strong: rgb(245 243 250 / 0.16);
+    --text: #f5f3fa; --text-2: #bdbad6; --text-3: #8b88ad;
+    --pink: #e6417a; --green: #2fdc89; --yellow: #ffd43b; --blue: #4dabf7; --red: #ff6b6b;
+    --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    --sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; color: var(--text); font: 16px/1.65 var(--sans);
+    background:
+      radial-gradient(900px 500px at 100% -10%, rgb(230 65 122 / 0.14), transparent 60%),
+      radial-gradient(700px 500px at -10% 30%, rgb(77 171 247 / 0.08), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px 80px; }
+
+  /* En-tête */
+  .hero { padding: 56px 0 28px; }
+  .brand { display: inline-flex; gap: 10px; align-items: center; color: var(--text-3);
+    font-size: .78rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+  .brand::before { content: ""; width: 22px; height: 3px; border-radius: 2px; background: var(--pink); }
+  h1 { margin: 14px 0 10px; font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1.1; letter-spacing: -.03em; }
+  h1 em { font-style: normal; color: var(--pink); }
+  .lead { max-width: 640px; margin: 0; color: var(--text-2); font-size: 1.1rem; }
+
+  /* Sommaire */
+  .toc { display: flex; flex-wrap: wrap; gap: 10px; margin: 28px 0 8px; padding: 0; list-style: none; }
+  .toc a { display: inline-flex; gap: 10px; align-items: center; padding: 9px 16px; border: 1px solid var(--line-strong);
+    border-radius: 999px; background: rgb(255 255 255 / .03); color: var(--text); font-weight: 600;
+    font-size: .92rem; text-decoration: none; transition: border-color .2s, background .2s, transform .2s; }
+  .toc a:hover { border-color: var(--pink); background: rgb(230 65 122 / .08); transform: translateY(-1px); }
+  .toc b { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--pink); color: #fff; font-size: .75rem; }
+
+  /* Parties */
+  section.part { margin-top: 56px; scroll-margin-top: 20px; }
+  .part-head { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .part-num { display: grid; flex: none; place-items: center; width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--pink), #b8325f); box-shadow: 0 8px 24px rgb(230 65 122 / .35);
+    font-weight: 800; font-size: 1.2rem; }
+  h2 { margin: 0; font-size: 1.6rem; letter-spacing: -.02em; }
+  .part > p.intro { margin: 0 0 22px; color: var(--text-2); }
+  h3 { margin: 30px 0 10px; font-size: 1.15rem; }
+  p { margin: 10px 0; }
+  code { padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg-deep);
+    color: #ffc2d6; font: .86em var(--mono); }
+
+  /* Étapes */
+  .steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+  .steps > li { position: relative; padding: 0 0 26px 52px; counter-increment: step; }
+  .steps > li::before { content: counter(step); position: absolute; left: 0; top: 0; display: grid; place-items: center;
+    width: 32px; height: 32px; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface-2);
+    color: var(--text); font-weight: 700; font-size: .9rem; }
+  .steps > li::after { content: ""; position: absolute; left: 15.5px; top: 38px; bottom: 6px; width: 1px; background: var(--line-strong); }
+  .steps > li:last-child::after { display: none; }
+  .steps > li > strong:first-child { display: block; padding-top: 3px; font-size: 1.05rem; }
+
+  /* Code */
+  .code { margin: 12px 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 12px;
+    background: var(--bg-deep); box-shadow: 0 12px 30px rgb(0 0 0 / .25); }
+  .code-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px 8px 14px;
+    border-bottom: 1px solid var(--line); background: rgb(255 255 255 / .03); color: var(--text-3); font: .78rem var(--mono); }
+  .copy { padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: transparent;
+    color: var(--text-2); font: 600 .75rem var(--sans); cursor: pointer; transition: all .2s; }
+  .copy:hover { border-color: var(--text-3); color: var(--text); }
+  .copy.done { border-color: var(--green); color: var(--green); }
+  pre { margin: 0; padding: 14px 0; overflow-x: auto; font: .84rem/1.6 var(--mono); color: #d9d6ee; }
+  pre code { display: block; min-width: max-content; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+  pre .ln { display: block; padding: 0 16px; }
+  pre .add { display: block; padding: 0 16px 0 13px; border-left: 3px solid var(--green); background: rgb(47 220 137 / .09); }
+  pre .c { color: var(--text-3); }
+
+  /* Encadrés */
+  .note { display: grid; grid-template-columns: auto 1fr; gap: 12px; margin: 16px 0; padding: 14px 16px;
+    border: 1px solid; border-radius: 12px; font-size: .95rem; }
+  .note::before { font-weight: 800; }
+  .note p { margin: 0; }
+  .note.info { border-color: rgb(77 171 247 / .35); background: rgb(77 171 247 / .07); }
+  .note.info::before { content: "i"; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--blue); color: var(--bg); font-size: .8rem; }
+  .note.ok { border-color: rgb(47 220 137 / .35); background: rgb(47 220 137 / .07); }
+  .note.ok::before { content: "✓"; color: var(--green); }
+  .note.warn { border-color: rgb(255 107 107 / .4); background: rgb(255 107 107 / .08); }
+  .note.warn::before { content: "!"; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--red); color: var(--bg); font-size: .85rem; }
+
+  /* Schéma du trajet d'une commande */
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 18px 0; padding: 18px;
+    border: 1px solid var(--line); border-radius: 14px; background: rgb(255 255 255 / .02); }
+  .node { padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface);
+    font-size: .85rem; line-height: 1.3; }
+  .node small { display: block; color: var(--text-3); font: .72rem var(--mono); }
+  .node.you { border-color: var(--pink); box-shadow: 0 0 0 3px rgb(230 65 122 / .15); }
+  .arrow { color: var(--text-3); }
+
+  /* Tableau */
+  table { width: 100%; margin: 12px 0; border-collapse: collapse; font-size: .92rem; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: var(--text-3); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
+
+  /* Liste de vérification */
+  .check { margin: 0; padding: 0; list-style: none; }
+  .check li { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .check li::before { content: ""; flex: none; width: 18px; height: 18px; margin-top: 4px; border: 2px solid var(--green); border-radius: 5px; }
+
+  footer { margin-top: 64px; color: var(--text-3); font-size: .85rem; }
+
+  @media (max-width: 600px) {
+    .hero { padding-top: 36px; }
+    .steps > li { padding-left: 44px; }
+    .arrow { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="brand">ABMI · MyCobot Dashboard</span>
+  <h1>Ajouter un écran<br>et le <em>brancher au robot</em></h1>
+  <p class="lead">La procédure pas à pas, avec un exemple complet : un écran « Pince » qui ouvre et ferme la pince du robot.</p>
+  <ul class="toc">
+    <li><a href="#ecran"><b>1</b> Créer l'écran</a></li>
+    <li><a href="#robot"><b>2</b> Le connecter au robot</a></li>
+    <li><a href="#tester"><b>3</b> Tester</a></li>
+  </ul>
+</header>
+
+<!-- ======================================================================= -->
+<section class="part" id="ecran">
+  <div class="part-head"><span class="part-num">1</span><h2>Créer l'écran</h2></div>
+  <p class="intro">Deux commandes et une entrée dans une liste. Le menu, l'adresse et la carte de l'accueil se créent tout seuls.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Générer le composant</strong>
+      <p>Dans un terminal, à la racine du projet <code>mycobot-dashboard</code> :</p>
+      <div class="code"><div class="code-bar"><span>terminal</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">npx ng generate component views/pince</span></code></pre></div>
+      <p>Angular crée le dossier <code>src/app/views/pince/</code> avec quatre fichiers : le code (<code>pince.ts</code>), la page (<code>pince.html</code>), le style (<code>pince.scss</code>) et le test (<code>pince.spec.ts</code>).</p>
+    </li>
+
+    <li>
+      <strong>Déclarer l'écran dans le registre</strong>
+      <p>Ouvrir <code>src/app/views/views.ts</code> et ajouter un bloc à la liste <code>VIEWS</code> (lignes en vert) :</p>
+      <div class="code"><div class="code-bar"><span>src/app/views/views.ts</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">export const VIEWS: readonly DashboardView[] = [</span><span class="ln">  {</span><span class="ln">    path: 'joints',</span><span class="ln">    <span class="c">// ... écran existant ...</span></span><span class="ln">  },</span><span class="add">  {</span><span class="add">    path: 'pince',                       <span class="c">// adresse : #/pince</span></span><span class="add">    title: 'Pince',                      <span class="c">// nom dans le menu</span></span><span class="add">    icon: 'target',                      <span class="c">// icône (liste dans shared/icon/icon.ts)</span></span><span class="add">    description: 'Ouvrir et fermer la pince du robot.',</span><span class="add">    loadComponent: () =&gt; import('./pince/pince').then((m) =&gt; m.Pince),</span><span class="add">  },</span><span class="ln">];</span></code></pre></div>
+      <div class="note ok"><p>C'est tout pour la navigation : l'écran apparaît dans le menu de gauche, sur l'accueil, et à l'adresse <code>#/pince</code>.</p></div>
+    </li>
+
+    <li>
+      <strong>Écrire le contenu de la page</strong>
+      <p>Toujours la même structure : un en-tête <code>page-head</code>, puis des cartes <code>card</code>. Les styles sont déjà prêts dans <code>src/styles.scss</code>, il n'y a rien à dessiner.</p>
+      <div class="code"><div class="code-bar"><span>src/app/views/pince/pince.html</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">&lt;header class="page-head"&gt;</span><span class="ln">  &lt;p class="eyebrow"&gt;Outil&lt;/p&gt;</span><span class="ln">  &lt;h1&gt;Pince&lt;/h1&gt;</span><span class="ln">  &lt;p class="lead"&gt;Ouvrir ou fermer la pince du robot.&lt;/p&gt;</span><span class="ln">&lt;/header&gt;</span><span class="ln"></span><span class="ln">&lt;section class="card"&gt;</span><span class="ln">  &lt;header class="card-head"&gt;</span><span class="ln">    &lt;h2 class="card-title"&gt;Commande&lt;/h2&gt;</span><span class="ln">  &lt;/header&gt;</span><span class="ln">  &lt;div class="card-body"&gt;</span><span class="ln">    &lt;button class="btn btn-primary" [disabled]="!robot.connected()" (click)="open()"&gt;Ouvrir la pince&lt;/button&gt;</span><span class="ln">    &lt;button class="btn btn-secondary" [disabled]="!robot.connected()" (click)="close()"&gt;Fermer la pince&lt;/button&gt;</span><span class="ln"></span><span class="ln">    @if (error(); as message) {</span><span class="ln">      &lt;div class="alert" role="alert"&gt;{{ message }}&lt;/div&gt;</span><span class="ln">    }</span><span class="ln">  &lt;/div&gt;</span><span class="ln">&lt;/section&gt;</span></code></pre></div>
+      <table>
+        <tr><th>Élément</th><th>Classe à utiliser</th></tr>
+        <tr><td>Bloc de contenu</td><td><code>card</code> + <code>card-head</code> / <code>card-title</code> / <code>card-body</code></td></tr>
+        <tr><td>Bouton principal (vert)</td><td><code>btn btn-primary</code></td></tr>
+        <tr><td>Autre bouton</td><td><code>btn btn-secondary</code>, <code>btn btn-ghost</code></td></tr>
+        <tr><td>Message d'erreur</td><td><code>alert</code></td></tr>
+        <tr><td>Icône</td><td><code>&lt;app-icon name="check" /&gt;</code> (pas d'emoji)</td></tr>
+      </table>
+    </li>
+  </ol>
+</section>
+
+<!-- ======================================================================= -->
+<section class="part" id="robot">
+  <div class="part-head"><span class="part-num">2</span><h2>Le connecter au robot</h2></div>
+  <p class="intro">Un écran ne parle jamais directement à ROS. Il appelle <code>RobotService</code>, qui s'occupe du reste.</p>
+
+  <div class="flow">
+    <span class="node you">Ton écran<small>pince.ts</small></span><span class="arrow">→</span>
+    <span class="node">RobotService<small>robot.service.ts</small></span><span class="arrow">→</span>
+    <span class="node">rosbridge<small>WebSocket :9090</small></span><span class="arrow">→</span>
+    <span class="node">topic /to_robot<small>JSON</small></span><span class="arrow">→</span>
+    <span class="node">Raspberry Pi<small>bridge_pi_simple.py</small></span><span class="arrow">→</span>
+    <span class="node">Bras</span>
+  </div>
+  <p>Les réponses de la Pi (« OK: … » ou « ERROR: … ») reviennent par le topic <code>/from_robot</code> et s'affichent <strong>automatiquement</strong> en notification. L'écran n'a rien à faire pour ça.</p>
+
+  <h3>Cas 1 : la commande existe déjà</h3>
+  <p><code>RobotService</code> sait déjà faire : <code>sendAngles(angles, vitesse)</code>, <code>sendCoords(coords, vitesse)</code>, <code>goHome()</code>, <code>goZero()</code>, <code>powerOn()</code>, <code>readAngles()</code> et <code>readCoords()</code> (lecture de la pose réelle). Il suffit de l'injecter et de l'appeler (voir le code de <code>pince.ts</code> plus bas, le principe est le même).</p>
+
+  <h3>Cas 2 : ajouter une nouvelle commande</h3>
+  <p>Exemple avec la pince : la Pi connaît déjà les actions <code>gripper_open</code> et <code>gripper_close</code>.</p>
+  <div class="note warn"><p>D'après la documentation du dépôt, <strong>aucune pince n'est montée sur le robot actuel</strong>. L'exemple sert à montrer la méthode : le tester avec le faux robot ou avec <code>ros2 topic echo</code>, pas sur le bras.</p></div>
+
+  <ol class="steps">
+    <li>
+      <strong>Déclarer la commande dans RobotService</strong>
+      <p>Dans <code>src/app/core/robot/robot.service.ts</code>, ajouter le format JSON de la commande et une méthode pour l'envoyer :</p>
+      <div class="code"><div class="code-bar"><span>src/app/core/robot/robot.service.ts</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">export type RobotCommand =</span><span class="ln">  | { action: 'send_angles'; angles: number[]; speed: number }</span><span class="ln">  | { action: 'go_home' }</span><span class="add">  | { action: 'gripper_open' }</span><span class="add">  | { action: 'gripper_close' };</span><span class="ln"></span><span class="ln"><span class="c">// ... plus bas, dans la classe RobotService, à côté de goHome() :</span></span><span class="ln"></span><span class="add">  /** Ouvre la pince. */</span><span class="add">  openGripper(): void {</span><span class="add">    this.send({ action: 'gripper_open' });</span><span class="add">  }</span><span class="add"></span><span class="add">  /** Ferme la pince. */</span><span class="add">  closeGripper(): void {</span><span class="add">    this.send({ action: 'gripper_close' });</span><span class="add">  }</span></code></pre></div>
+      <div class="note info"><p>Le nom de l'action et ses paramètres doivent correspondre <strong>exactement</strong> à ce qu'attend la Pi (fichier <code>bridge_pi_simple.py</code>, méthode <code>execute_json</code>). Actions disponibles : <code>send_angles</code>, <code>send_coords</code>, <code>go_home</code>, <code>go_zero</code>, <code>gripper_open</code>, <code>gripper_close</code>, <code>get_angles</code>, <code>power_on</code>, <code>power_off</code>.</p></div>
+      <div class="note warn"><p><strong>Ne pas utiliser <code>emergency_stop</code></strong> : côté Pi, cette action relâche tous les moteurs et le bras tombe.</p></div>
+      <p>Si la commande a des paramètres (angles, vitesse…), les <strong>vérifier avant l'envoi</strong> comme le fait <code>sendAngles</code> : une valeur hors limites lève une erreur et rien n'est envoyé.</p>
+    </li>
+
+    <li>
+      <strong>Appeler la commande depuis l'écran</strong>
+      <div class="code"><div class="code-bar"><span>src/app/views/pince/pince.ts</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';</span><span class="ln">import { RobotService } from '../../core/robot/robot.service';</span><span class="ln"></span><span class="ln">@Component({</span><span class="ln">  selector: 'app-pince',</span><span class="ln">  templateUrl: './pince.html',</span><span class="ln">  styleUrl: './pince.scss',</span><span class="ln">  changeDetection: ChangeDetectionStrategy.OnPush,</span><span class="ln">})</span><span class="ln">export class Pince {</span><span class="ln">  <span class="c">// Accès au robot (connexion, commandes, réponses)</span></span><span class="ln">  protected readonly robot = inject(RobotService);</span><span class="ln">  protected readonly error = signal&lt;string | null&gt;(null);</span><span class="ln"></span><span class="ln">  protected open(): void {</span><span class="ln">    this.run(() =&gt; this.robot.openGripper());</span><span class="ln">  }</span><span class="ln"></span><span class="ln">  protected close(): void {</span><span class="ln">    this.run(() =&gt; this.robot.closeGripper());</span><span class="ln">  }</span><span class="ln"></span><span class="ln">  <span class="c">/** Envoie la commande ; en cas de problème, affiche le message au lieu de planter. */</span></span><span class="ln">  private run(command: () =&gt; void): void {</span><span class="ln">    this.error.set(null);</span><span class="ln">    try {</span><span class="ln">      command();</span><span class="ln">    } catch (e) {</span><span class="ln">      this.error.set(e instanceof Error ? e.message : String(e));</span><span class="ln">    }</span><span class="ln">  }</span><span class="ln">}</span></code></pre></div>
+      <p>Les trois réflexes à garder pour chaque bouton qui commande le robot :</p>
+      <table>
+        <tr><th>Réflexe</th><th>Comment</th></tr>
+        <tr><td>Bouton grisé hors connexion</td><td><code>[disabled]="!robot.connected()"</code></td></tr>
+        <tr><td>Erreur affichée, pas de plantage</td><td>appel dans <code>try / catch</code> → signal <code>error</code></td></tr>
+        <tr><td>Aucun JSON écrit dans l'écran</td><td>toujours passer par une méthode de <code>RobotService</code></td></tr>
+      </table>
+    </li>
+
+    <li>
+      <strong>Apprendre la commande au faux robot</strong>
+      <p>Pour tester sans robot, le faux rosbridge doit savoir répondre. Dans <code>tools/mock-rosbridge.mjs</code>, fonction <code>fakePiReply</code> :</p>
+      <div class="code"><div class="code-bar"><span>tools/mock-rosbridge.mjs</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">    case 'go_home':</span><span class="ln">      return 'OK: retour home';</span><span class="add">    case 'gripper_open':</span><span class="add">      return 'OK: pince ouverte';</span><span class="add">    case 'gripper_close':</span><span class="add">      return 'OK: pince fermée';</span><span class="ln">    default:</span><span class="ln">      return `ERROR: action inconnue ${command.action}`;</span></code></pre></div>
+      <p>Sans cet ajout, le faux robot répond « ERROR: action inconnue gripper_open ». C'est normal, et ça prouve que la commande est bien partie.</p>
+    </li>
+  </ol>
+
+  <h3>Cas 3 : afficher des données du robot</h3>
+  <p>Les dernières réponses de la Pi sont déjà disponibles : <code>robot.lastFeedback()</code> (le dernier message) et <code>robot.feedbackLog()</code> (les 50 derniers). Dans la page : <code>{{ robot.lastFeedback() }}</code>.</p>
+  <p>Pour un autre topic ROS (positions, caméra…), on s'abonne avec <code>RosClient</code> et on transforme le flux en signal :</p>
+  <div class="code"><div class="code-bar"><span>exemple</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">private readonly ros = inject(RosClient);</span><span class="ln"></span><span class="ln"><span class="c">// Se met à jour tout seul à chaque message reçu sur le topic</span></span><span class="ln">protected readonly etat = toSignal(</span><span class="ln">  this.ros.subscribe&lt;MonMessage&gt;('/nom_du_topic', 'paquet/msg/Type'),</span><span class="ln">);</span></code></pre></div>
+  <div class="note info"><p>Le topic doit exister côté ROS. Pour le vérifier sur la tour : <code>ros2 topic list</code>, puis <code>ros2 topic info /nom_du_topic</code> pour connaître son type.</p></div>
+</section>
+
+<!-- ======================================================================= -->
+<section class="part" id="tester">
+  <div class="part-head"><span class="part-num">3</span><h2>Tester</h2></div>
+  <p class="intro">Trois niveaux, du plus rapide au plus réel.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Test automatique</strong>
+      <p>On remplace le vrai robot par <code>FakeRosClient</code>, qui enregistre tout ce qui est envoyé. On clique sur le bouton et on vérifie le JSON :</p>
+      <div class="code"><div class="code-bar"><span>src/app/views/pince/pince.spec.ts</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">import { TestBed } from '@angular/core/testing';</span><span class="ln">import { RosClient } from '../../core/ros/ros-client';</span><span class="ln">import { FakeRosClient } from '../../core/ros/testing/fake-ros-client';</span><span class="ln">import { Pince } from './pince';</span><span class="ln"></span><span class="ln">describe('Pince', () =&gt; {</span><span class="ln">  it('envoie gripper_open quand on clique sur « Ouvrir la pince »', async () =&gt; {</span><span class="ln">    const ros = new FakeRosClient();</span><span class="ln">    TestBed.configureTestingModule({</span><span class="ln">      imports: [Pince],</span><span class="ln">      providers: [{ provide: RosClient, useValue: ros }],</span><span class="ln">    });</span><span class="ln">    const fixture = TestBed.createComponent(Pince);</span><span class="ln">    await fixture.whenStable();</span><span class="ln"></span><span class="ln">    const buttons: HTMLButtonElement[] = Array.from(fixture.nativeElement.querySelectorAll('button'));</span><span class="ln">    buttons.find((b) =&gt; b.textContent?.includes('Ouvrir la pince'))!.click();</span><span class="ln"></span><span class="ln">    const last = ros.published.at(-1)!;</span><span class="ln">    expect(last.topic).toBe('/to_robot');</span><span class="ln">    expect(JSON.parse((last.message as { data: string }).data)).toEqual({ action: 'gripper_open' });</span><span class="ln">  });</span><span class="ln">});</span></code></pre></div>
+      <div class="code"><div class="code-bar"><span>terminal</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">npm test</span></code></pre></div>
+    </li>
+
+    <li>
+      <strong>Dans le navigateur, avec le faux robot</strong>
+      <div class="code"><div class="code-bar"><span>deux terminaux</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">npm run mock:ros     <span class="c"># terminal 1 : faux rosbridge</span></span><span class="ln">npm start            <span class="c"># terminal 2 : http://localhost:4200</span></span></code></pre></div>
+      <p>Ouvrir l'écran depuis le menu, cliquer : une notification verte « OK: pince ouverte » doit apparaître en haut à droite.</p>
+    </li>
+
+    <li>
+      <strong>Sur la tour, avec le vrai robot</strong>
+      <p>D'abord <strong>sans</strong> lancer <code>bridge_tour</code>, pour voir ce que l'écran envoie sans faire bouger le bras :</p>
+      <div class="code"><div class="code-bar"><span>tour (ROS2)</span><button class="copy">Copier</button></div>
+<pre><code><span class="ln">ros2 launch rosbridge_server rosbridge_websocket_launch.xml</span><span class="ln">ros2 topic echo /to_robot std_msgs/msg/String     <span class="c"># autre terminal</span></span></code></pre></div>
+      <p>En cliquant, on doit lire <code>data: '{"action":"gripper_open"}'</code>. Ensuite seulement, lancer <code>bridge_tour</code> et essayer sur le robot.</p>
+      <div class="note warn"><p>Avec le vrai bras : arrêt d'urgence physique à portée de main, vitesse basse (20) et petits mouvements pour commencer.</p></div>
+    </li>
+  </ol>
+</section>
+
+<!-- ======================================================================= -->
+<section class="part">
+  <div class="part-head"><span class="part-num">✓</span><h2>Récapitulatif</h2></div>
+  <ul class="check">
+    <li><span><code>npx ng generate component views/mon-ecran</code></span></li>
+    <li><span>Une entrée dans <code>views.ts</code> (adresse, titre, icône, description)</span></li>
+    <li><span>Page construite avec <code>page-head</code>, <code>card</code> et <code>btn</code></span></li>
+    <li><span>Nouvelle commande : type + méthode dans <code>RobotService</code>, réponse dans le faux robot</span></li>
+    <li><span>Boutons grisés hors connexion, erreurs affichées dans un <code>alert</code></span></li>
+    <li><span>Un test qui clique et vérifie le JSON envoyé, puis <code>npm test</code></span></li>
+  </ul>
+</section>
+
+<footer>Pour plus de détails : <code>README.md</code> à la racine du projet.</footer>
+</div>
+
+<script>
+  // Boutons « Copier » des blocs de code.
+  document.querySelectorAll('.copy').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const code = button.closest('.code').querySelector('pre');
+      const text = Array.from(code.querySelectorAll('.ln, .add')).map((line) => line.textContent).join('\n');
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = 'Copié';
+        button.classList.add('done');
+        setTimeout(() => { button.textContent = 'Copier'; button.classList.remove('done'); }, 1500);
+      } catch {
+        button.textContent = 'Échec';
+      }
+    });
+  });
+</script>
+</body>
+</html>

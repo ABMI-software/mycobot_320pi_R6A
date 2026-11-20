@@ -1,0 +1,130 @@
+:host {
+  position: fixed;
+  top: calc(var(--topbar-h) + 12px);
+  right: 20px;
+  z-index: 50;
+  display: grid;
+  gap: 10px;
+  width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  --tone: var(--info);
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 12px 14px 14px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  box-shadow: var(--shadow-pop);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+  animation: toast-in 0.32s var(--ease-out) both;
+
+  &[data-level='ok'] {
+    --tone: var(--ok);
+  }
+
+  &[data-level='error'] {
+    --tone: var(--danger);
+  }
+
+  // Liseré de couleur à gauche, selon le niveau.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: var(--tone);
+  }
+}
+
+.toast-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tone) 16%, transparent);
+  color: var(--tone);
+}
+
+.toast-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+
+  p {
+    margin: 0;
+  }
+}
+
+.toast-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.8rem;
+
+  time {
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+  }
+}
+
+.toast-text {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease-out),
+    color var(--dur) var(--ease-out);
+
+  &:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+}
+
+// Barre de temps restant avant disparition.
+.toast-progress {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: var(--tone);
+  opacity: 0.6;
+  transform-origin: left;
+  animation: toast-timer var(--duration) linear both;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(0.98);
+  }
+}
+
+@keyframes toast-timer {
+  to {
+    transform: scaleX(0);
+  }
+}

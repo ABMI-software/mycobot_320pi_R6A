@@ -9,6 +9,26 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — dashboard web Angular de pilotage du robot (20/11)
+
+- **`dashboard/`** : interface web centrale (Angular 21), reliée à ROS 2 par le WebSocket de
+  rosbridge (port 9090). Elle publie le même JSON que les autres interfaces sur `/to_robot` et
+  affiche les réponses de la Pi reçues sur `/from_robot`. Aucun nouveau topic.
+- **Pilotage articulaire** : six axes avec butées vérifiées avant l'envoi, vitesse 20 par
+  défaut, bouton « Lire la pose actuelle » (`get_angles`). Au démarrage, les curseurs sont à 0°
+  et non à la pose réelle du bras : la lire avant tout envoi.
+- **`RobotService`** expose `send_angles`, `send_coords`, `go_home`, `go_zero`, `power_on`,
+  `get_angles` et `get_coords`. **Volontairement absents** : `power_off`, `emergency_stop` et la
+  commande texte `stop`, qui appellent `release_all_servos()` (le bras tombe), ainsi que la pince
+  (aucune n'est montée).
+- **Ajout d'un écran** : une entrée dans `dashboard/src/app/views/views.ts` génère le menu, la
+  route et la carte d'accueil. Procédure pas à pas dans `dashboard/procedure.html`.
+- **Faux rosbridge** (`npm run mock:ros`) qui répond comme `bridge_pi_simple.py`, pour développer
+  sans ROS ni robot. 26 tests unitaires (`npm test`).
+- **Pas encore testé sur le robot réel.** Hors connexion, aucune commande n'est mise en file
+  d'attente. Avec la téléopération ouverte, arrêter `mycobot_teleop.py` : son
+  `trajectory_to_robot_bridge` publie jusqu'à 15 Hz sur `/to_robot` et écraserait les commandes.
+
 ### Documentation — spécification et rapport du tri à quatre objets mis à jour (30/10)
 
 - **`FOUR_OBJECT_SORTING_SPECIFICATION.docx`** : annexe E (plan et critères depuis le dépôt de la

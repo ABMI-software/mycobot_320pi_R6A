@@ -1,0 +1,394 @@
+:host {
+  display: grid;
+  gap: 24px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 350px;
+  gap: 20px;
+  align-items: start;
+}
+
+// Le panneau de commande reste visible pendant qu'on fait défiler les axes.
+.side {
+  position: sticky;
+  top: calc(var(--topbar-h) + 20px);
+  display: grid;
+  gap: 20px;
+}
+
+.keys-hint {
+  color: var(--text-3);
+  font-size: 0.78rem;
+}
+
+// -----------------------------------------------------------------------------
+// Synchronisation avec la pose réelle du bras
+// -----------------------------------------------------------------------------
+
+.sync {
+  --tone: var(--warn);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--tone) 7%, transparent);
+  transition: background var(--dur) var(--ease-out);
+
+  &.is-synced {
+    --tone: var(--ok);
+  }
+
+  > app-icon {
+    color: var(--tone);
+    font-size: 1.1rem;
+  }
+
+  .btn {
+    flex: none;
+  }
+}
+
+.sync-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.85rem;
+}
+
+.is-loading app-icon {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Axes
+// -----------------------------------------------------------------------------
+
+.joint {
+  --tick: rgb(245 243 250 / 0.45);
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  transition: background var(--dur) var(--ease-out);
+
+  &:last-child {
+    border-bottom: 0;
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
+  }
+
+  &:hover {
+    background: rgb(255 255 255 / 0.015);
+  }
+
+  &.is-changed {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--range-color) 9%, transparent), transparent 55%);
+  }
+}
+
+.joint-id {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.joint-chip {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid color-mix(in srgb, var(--range-color) 40%, transparent);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--range-color) 14%, transparent);
+  color: var(--range-color);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: box-shadow var(--dur) var(--ease-out);
+
+  .is-changed & {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--range-color) 20%, transparent),
+      0 0 18px color-mix(in srgb, var(--range-color) 40%, transparent);
+  }
+}
+
+.joint-meta {
+  display: grid;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.joint-label {
+  font-weight: 600;
+}
+
+.joint-limits {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.joint-changed {
+  color: var(--range-color);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.joint-track {
+  position: relative;
+  padding: 4px 0 18px;
+}
+
+// Repère « 0° » sous la piste, aligné sur la graduation du zéro.
+.zero-mark {
+  position: absolute;
+  bottom: 0;
+  left: calc(9px + (100% - 18px) * var(--z));
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  transform: translateX(-50%);
+}
+
+.joint-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.readout {
+  position: relative;
+  width: 92px;
+
+  input {
+    padding-right: 24px;
+    font-size: 1rem;
+  }
+}
+
+.unit {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+// -----------------------------------------------------------------------------
+// Commande
+// -----------------------------------------------------------------------------
+
+.command {
+  display: grid;
+  gap: 18px;
+}
+
+.speed {
+  display: grid;
+  gap: 10px;
+}
+
+.speed-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.speed-value {
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+
+  small {
+    color: var(--text-3);
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+}
+
+// Préréglages en contrôle segmenté.
+.presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-deep);
+}
+
+.preset {
+  height: 32px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease-out),
+    color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+
+  &:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+
+  &.active {
+    background: var(--surface-3);
+    box-shadow:
+      inset 0 0 0 1px var(--line-strong),
+      0 2px 8px rgb(0 0 0 / 0.35);
+    color: var(--text);
+  }
+}
+
+.secondary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+
+  .home {
+    grid-column: 1 / -1;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Journal
+// -----------------------------------------------------------------------------
+
+.log {
+  display: grid;
+  gap: 2px;
+  max-height: 300px;
+  margin: 0;
+  padding: 8px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.log-entry {
+  --tone: var(--info);
+  display: grid;
+  grid-template-columns: 8px auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  font-size: 0.8rem;
+  animation: view-in 0.25s var(--ease-out) both;
+  transition: background var(--dur) var(--ease-out);
+
+  &[data-level='ok'] {
+    --tone: var(--ok);
+  }
+
+  &[data-level='error'] {
+    --tone: var(--danger);
+  }
+
+  &:hover {
+    background: var(--hover);
+  }
+}
+
+.log-dot {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone);
+  box-shadow: 0 0 8px var(--tone);
+}
+
+.log-time {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.log-text {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.log-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px 12px;
+  color: var(--text-3);
+  font-size: 0.85rem;
+  text-align: center;
+
+  app-icon {
+    font-size: 1.5rem;
+    opacity: 0.6;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Écrans plus étroits
+// -----------------------------------------------------------------------------
+
+@media (max-width: 1280px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    position: static;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    align-items: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .joint {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 16px;
+  }
+
+  .joint-track {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+
+  .keys-hint {
+    display: none;
+  }
+
+  .sync {
+    flex-wrap: wrap;
+
+    .btn {
+      width: 100%;
+    }
+  }
+}

@@ -1,5 +1,16 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## Dashboard web Angular ajouté sur `feature/angular-dashboard` (20 novembre 2026)
+
+- **`dashboard/`** : interface web Angular de pilotage, par rosbridge (`/to_robot`, `/from_robot`).
+  Vue « Pilotage articulaire » complète, registre de vues pour ajouter les écrans suivants.
+- 26 tests unitaires et un faux rosbridge (`npm run mock:ros`) ; vérifié dans Chrome contre ce
+  faux rosbridge uniquement.
+- **Reste à faire** : premier essai sur le robot réel (rosbridge + `bridge_tour`, téléopération
+  arrêtée, « Lire la pose actuelle » avant tout envoi) ; confirmer les butées articulaires et
+  les limites cartésiennes de `dashboard/src/app/core/robot/robot.config.ts` ; ajouter côté Pi
+  une action `stop` (`mc.stop()`) pour un vrai bouton d'arrêt qui ne relâche pas les moteurs.
+
 ## Documentation du tri mise à jour ; test A2 en cours (30 octobre 2026, début d'après-midi)
 
 - Spécification : annexe E ajoutée (EN), **version française complète** (docx) et versions HTML

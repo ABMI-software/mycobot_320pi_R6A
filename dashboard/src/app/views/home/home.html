@@ -1,0 +1,46 @@
+<header class="page-head">
+  <p class="eyebrow">ABMI · MyCobot 320 Pi</p>
+  <h1>Tableau de bord</h1>
+  <p class="lead">Pilotez le bras et ouvrez les outils du projet depuis une seule interface.</p>
+</header>
+
+<section class="kpis" aria-label="État du système">
+  <article class="kpi">
+    <span class="eyebrow">Connexion rosbridge</span>
+    <app-status-pill [status]="robot.status()" />
+    <code class="kpi-hint">{{ robot.rosbridgeUrl }}</code>
+  </article>
+
+  <article class="kpi">
+    <span class="eyebrow">Dernier retour du robot</span>
+    @if (robot.latestFeedback(); as last) {
+      <span class="kpi-value mono" [attr.data-level]="last.level" [title]="last.text">{{ last.text }}</span>
+      <span class="kpi-hint">reçu à {{ last.at | date: 'HH:mm:ss' }}</span>
+    } @else {
+      <span class="kpi-value is-empty">—</span>
+      <span class="kpi-hint">Aucune réponse de la Pi pour l'instant</span>
+    }
+  </article>
+
+  <article class="kpi">
+    <span class="eyebrow">Vues disponibles</span>
+    <span class="kpi-value kpi-number">{{ views.length }}</span>
+    <span class="kpi-hint">déclarées dans le registre</span>
+  </article>
+</section>
+
+<section class="views" aria-labelledby="views-title">
+  <h2 id="views-title" class="eyebrow">Vues</h2>
+  <div class="cards">
+    @for (view of views; track view.path) {
+      <a class="view-card" [routerLink]="['/', view.path]">
+        <span class="view-icon"><app-icon [name]="view.icon" /></span>
+        <span class="view-text">
+          <strong>{{ view.title }}</strong>
+          <span>{{ view.description }}</span>
+        </span>
+        <app-icon class="view-arrow" name="arrow-right" />
+      </a>
+    }
+  </div>
+</section>

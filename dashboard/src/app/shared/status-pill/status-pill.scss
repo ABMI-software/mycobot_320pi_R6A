@@ -1,0 +1,62 @@
+:host {
+  --tone: var(--danger);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px 0 10px;
+  border: 1px solid color-mix(in srgb, var(--tone) 35%, transparent);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  color: var(--tone);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:host([data-status='connected']) {
+  --tone: var(--ok);
+}
+
+:host([data-status='connecting']) {
+  --tone: var(--warn);
+}
+
+.dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone);
+
+  // Onde qui s'élargit : la connexion est vivante.
+  :host([data-status='connected']) &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--tone);
+    animation: pulse 1.8s var(--ease-out) infinite;
+  }
+
+  :host([data-status='connecting']) & {
+    animation: blink 1s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.8);
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}

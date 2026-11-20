@@ -304,6 +304,10 @@ ros2 run mycobot_gateway sim_sorting_grasp --ros-args -p use_sim_time:=true \
 # Real bench — sorting the 4 painted pieces (bridge on the Pi first)
 /usr/bin/python3 scripts/lancer_pick_dashboard_final.py
 
+# Web dashboard (Angular) — needs rosbridge on :9090 and bridge_tour; see dashboard/README.md
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+cd dashboard && npm install && npm run start:lan            # http://<tower-IP>:4200
+
 # Before any physical session
 bash scripts/real_robot_preflight.sh
 ```
@@ -331,6 +335,7 @@ training/
   calibration/              intrinsics, extrinsics, metrology protocol + CSV results
   requirements.txt          training dependencies (separate environment)
 datasets/                   synthetic and real datasets (images via Git LFS)
+dashboard/                  web dashboard (Angular) — robot control over rosbridge
 scripts/                    calibration, diagnostics, dashboards, robot bridges
 teleop/                     hand-teleoperation pipeline
 tests/                      pick FSM, IK control, safety, live ArUco geometry,
