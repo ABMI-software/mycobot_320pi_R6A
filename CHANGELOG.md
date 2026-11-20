@@ -9,6 +9,12 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Modifié — `simple_gui.launch.py` lit l'adresse de la Pi dans `MYCOBOT_PI` (20/11)
+
+- La valeur par défaut de `pi_ip` n'est plus une IP écrite en dur (`.218`, puis `.219`) : elle vient
+  de la variable `MYCOBOT_PI`. Sans elle et sans `pi_ip:=…`, le lancement s'arrête au lieu de viser
+  une ancienne adresse. Lancer : `MYCOBOT_PI=<ip> ros2 launch mycobot_gateway simple_gui.launch.py`.
+
 ### Ajouté — pivot du stylo et pointage au robot (19/11)
 
 - `scripts/pivot_pointe.py` : `pivot` (pointe d'outil dans le repère de la bride par
