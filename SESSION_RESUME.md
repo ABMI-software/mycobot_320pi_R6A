@@ -88,6 +88,23 @@ Protocole : `docs/PROTOCOLE_E2_MULTIVUES.md` (amendé et relu le 19/11). « E2-a
 En attente sans intervention : la chaîne E3.9b démarre seule quand RoboPEPP libère la carte
 (`~/dream_article/E3/E3_9b/journal.txt`).
 
+### Décidé le 19/11 au soir : campagne E3.12, après RoboPEPP
+Protocole complet : `docs/ARTICLE_DREAM.md`, « Protocole de E3.12 » (relu par le metrologue).
+Viser le meilleur synthétique seul avec un plan, pas « 100k de plus de la même chose » :
+- **A** (1-2 j, sans collecte) : E3.9b, puis E3.9 sur images réelles redressées (distorsion),
+  recentrées (rotation virtuelle, hors axe < 9°) et zoomées à fx 491.
+- **A5** (~3 j) : réentraîner sur les 49 595 images avec randomisation du modèle de caméra
+  (focale courte, hors axe 25°, distorsion bornée), deux graines contre E3.9 sur deux graines.
+- **Décision prise par toi** sur des règles écrites d'avance (la chaîne s'arrête avant B) :
+  B si A5 gagne, si l'apparence ou la scène sortent comme levier, ou si un levier
+  géométrique apparaît sans que A5 suffise. À n = 100 et peu de graines, seul un levier fort
+  est détectable (metrologue).
+- **B** (~5 j) : 100k avec les leviers retenus ; **C** : 50k contre 100k ; **D** : évaluation,
+  E2 comme seul chiffre publiable, format du tableau I de DREAM.
+- `real_tri_test` et `real_montage_0901` deviennent des jeux de **développement**.
+À écrire avant de lancer : `transformer_reel.py`, l'augmentation « modèle de caméra » dans
+`train_dream_ultimate_v5_geo.py`, les options du collecteur, la chaîne `~/dream_article/E3/E3_12/`.
+
 ### Prochaines actions
 1. [ROUGE] Les étiquettes réelles de `real_tri` restent non vérifiables par recalibration :
    la question « étiquettes ou modèle ? » se tranchera sur une **nouvelle capture** (E2

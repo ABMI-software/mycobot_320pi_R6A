@@ -123,6 +123,7 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.9b | Diagnostic : les 100 poses de `real_tri_test` rejouées en Gazebo aux caméras d'étiquetage — monde d'entraînement (C), réplique du banc (A), et rendu `realistic` (B) ; étiquettes exactes | Part de l'échec réel due au cadrage, à la scène, à l'apparence du robot, au reste (protocole ci-dessous) | protocole écrit le 18/11, amendé le 19/11 (metrologue : condition C, équivalence, cadrage arducam hors domaine) ; outil `scripts/rejouer_poses_banc.py` écrit, mondes générés (`~/dream_article/E3/E3_9b/`) ; rejeu à lancer quand la carte graphique est libre (RoboPEPP en cours) |
 | E3.10 | Évaluation : E2, `real_tri_test`, test de décalage, revue du metrologue | Critère de E3 (tableau des expériences) | à faire |
 | E3.11 | Modèle de déploiement : même recette que E3.9, tous azimuts (secteur 60-100° compris), hors article | Checkpoint pour le banc, si E3.10 atteint son critère | à faire (décision du 12/11) |
+| E3.12 | Campagne sim-to-réel ciblée, décidée le 19/11 : A diagnostic sans collecte (E3.9b, distorsion, cadrage, échelle sur les images réelles), A5 réentraînement sur les 49 595 images avec randomisation du modèle de caméra, B collecte de 100k avec les leviers retenus, C 50k contre 100k, D évaluation | Le levier de l'écart sim-réel, puis le meilleur modèle synthétique seul (protocole ci-dessous) | protocole écrit le 19/11, amendé après relecture du metrologue (bootstrap par bloc, deux graines, contrôle d'identité, sous-ensemble fixe, décision de B par l'utilisateur), avant mesure ; à lancer quand RoboPEPP libère la carte graphique |
 
 E3.10 dépend de E2 (jeu réel multi-vues), qui demande une session au banc : la
 préparer pendant que la collecte et l'entraînement tournent.
@@ -246,6 +247,250 @@ préparer pendant que la collecte et l'entraînement tournent.
   protocole) ; entraîner sur ces images ; comparer C, A ou B au secteur
   synthétique tenu comme à une même distribution ; tirer de E3.9b une
   conclusion sur la justesse des étiquettes réelles.
+
+### Protocole de E3.12 — campagne sim-to-réel ciblée (rédigé le 19/11, amendé le même jour après relecture du metrologue, avant mesure)
+
+Décision de l'utilisateur du 19/11 : viser le meilleur résultat synthétique seul
+possible, avec un plan et un protocole, plutôt que des corrections au coup par
+coup ; s'il faut du temps (collecte de 100k), on le prend. Démarre quand
+l'entraînement RoboPEPP libère la carte graphique (règle : jamais deux tâches
+GPU à la fois, collecte comprise).
+
+**Pourquoi pas « 100k de plus de la même chose ».** E3.9 a appris son domaine :
+0,968 de PCK@5 sur le secteur d'azimut tenu à l'écart, avec 49 595 images,
+fonds COCO (~53 %), distracteurs, lumières, teintes (~32 %) et l'augmentation
+v5 (luminosité, teinte, gamma, flou, bruit, JPEG, masquage ; géométrie DREAM :
+rotation 15°, translation 6,25 %, échelle ± 10 %). Il échoue sur tous les jeux
+réels : PCK@5 0,068 sur `real_tri_test`, 0,16-0,19 sur `real_montage_0901`,
+≈ 0 sur les jeux de juin-juillet (étiquettes suspectes). Doubler la même
+distribution ajoute ce qu'il sait déjà. Les écarts identifiés :
+
+| Écart | Synthétique (E3.7/E3.7b) | Réel | Source |
+|---|---|---|---|
+| Focale | fixe, hfov 1,15 rad → fx ≈ 491 px | arducam 496-518, SVPRO 394-448 | SDF ; mires du 17/06 et du 19/11 |
+| Distorsion | aucune | arducam forte, SVPRO modérée | mires |
+| Cadrage hors axe | ≤ 9° (sphère de 0,34 m entière dans le champ) | arducam 15,8° | 18-19/11, `_robot_dans_le_champ` |
+| Apparence du robot | rendu d'entraînement (teintes randomisées) | coques blanches, base grise | E3.9b le mesure |
+| Scène | fonds COCO, distracteurs | planche en bois, marqueurs, cube à ArUco sur la pince | photos du banc |
+
+**Ce que la campagne peut et ne peut pas établir** (metrologue, 19/11). À
+n = 100 poses et peu de graines, elle peut distinguer un levier **fort**
+(ΔPCK@10 ≥ 0,15-0,20). Elle ne peut pas établir un « sans effet » ni un « 100k
+non limitant » : les verdicts probables seront « à trancher », et les règles
+ci-dessous le prévoient au lieu de laisser une chaîne choisir.
+
+#### Jeux, étiquettes, mesure — communs à toutes les phases
+
+- **Jeux de développement** : ils servent aux **décisions**, jamais au chiffre
+  publié.
+  - **Décisif** : `real_tri_test`, **par caméra** (SVPRO et arducam
+    séparées, 100 poses chacune), plus l'ensemble.
+  - **Indicatif** : `real_montage_0901`, **toutes ses images** (1103 par
+    caméra), bootstrap **par blocs de 20 images consécutives** (une séquence
+    filmée est corrélée), n effectif annoncé.
+- **Étiquettes figées** : la version qui a servi à E3.9 (`real_tri_test_ndds`
+  du 13/10, les `_ndds` de `montage_0901` tels quels), md5 dans `run.yaml`.
+  Elles ne sont **pas** neutres pour la comparaison : déplacer les étiquettes
+  SVPRO de 4-6 px (extrinsèque du 15/10) fait passer le PCK@10 SVPRO de E3.9 de
+  0,24 à 0,45-0,59 (diagnostic du 18/11, `~/dream_article/E3/E3_9/diag_base/`).
+  D'où : pour A5 et C, le Δ est **aussi** calculé sous la seconde version
+  SVPRO, et on ne décide que si le sens et le seuil tiennent sous les deux.
+- **Mesure** : `training/dream/eval_papier.py`, PCK au sens du papier (non
+  détecté = faux). Bootstrap apparié, 2000 tirages, graine 0, par pose
+  (`real_tri_test`) ou par bloc (`montage_0901`).
+- **On décide sur PCK@10, la cible de l'article reste PCK@5** : un levier à
+  PCK@10 ne garantit pas un gain à PCK@5. Chaque verdict donne aussi l'erreur
+  médiane et le PCK@5, à titre indicatif.
+- **Pour chaque verdict, annoncer** : n, Δ, IC95, IC90, écart-type par pose du
+  Δ, nombre de poses exclues.
+- **Verdicts** :
+  - **levier** : Δ ≥ seuil de la phase, borne basse de l'IC95 > 0,05 ;
+  - **sans effet** : IC90 dans ± 0,05 — rare à ce n ;
+  - **non démontré** : écart-type par pose du Δ > 0,30 ;
+  - sinon **à trancher**.
+- **Plafond de référence** : `vgg_tri_reel_ft_e10` évalué sur les mêmes jeux,
+  transformés ou non, après contrôle md5 qu'aucune image de `real_tri_test` n'est
+  dans son entraînement. Ce n'est pas un concurrent, c'est un repère.
+- **Ce que E2 mesurera ensuite** : la généralisation à de nouvelles poses et
+  positions **avec ces mêmes caméras**, dont A5 copie les paramètres. Ce n'est
+  pas une généralisation à de nouvelles caméras. Et E2 partage la méthode
+  d'étiquetage ArUco, valable à Z = 0.
+- **Traçabilité**, `~/dream_article/E3/E3_12/<phase>/run.yaml` :
+  - commit ;
+  - md5 des poids, des jeux et des étiquettes, avec la version d'extrinsèque ;
+  - intrinsèques exactes (`cam_3`, `cam_2`, `_camera_settings.json` de
+    `montage_0901`) ;
+  - graines ;
+  - poses exclues ;
+  - taux de refus de A5.
+
+#### Phase A — sensibilité du modèle à la géométrie, sans collecte (1 à 2 jours)
+
+E3.9 tel quel, évalué sur des images réelles transformées, avec leurs étiquettes
+transformées **de la même façon**. Ces essais mesurent la **sensibilité** du
+modèle à une géométrie corrigée, **pas la cause** de l'échec. Ils sont
+aveugles à une erreur des intrinsèques : les mêmes servent à transformer et à
+étiqueter.
+
+- **A1 — E3.9b** : son protocole, ci-dessus.
+- **Contrôles préalables, bloquants** :
+  - **identité** : la chaîne de transformation avec K inchangé, R = I et
+    distorsion nulle redonne **exactement** les chiffres de E3.9. Sinon le
+    ré-échantillonnage est un facteur, et on s'arrête ;
+  - **aller-retour synthétique** : une image Gazebo distordue avec une
+    distorsion connue puis redressée ramène ses étiquettes à ≤ 0,5 px ;
+  - **test de décalage** (`scripts/dream_test_decalage.py`, ± 10/20/40 px) sur
+    les sorties de A3 : la détection doit suivre l'image.
+- **Sous-ensemble fixe** : seules les poses dont les 7 keypoints restent à plus
+  de 4 px du bord **sous toutes les transformations** sont comptées. La liste est
+  fixée avant la première évaluation, et les exclusions sont données par caméra.
+- **A2 — distorsion** : redressement avec les intrinsèques qui ont produit les
+  étiquettes, sans changer K (alpha = 0), zones vides laissées noires et
+  hors du sous-ensemble. `cam_3` est en modèle rationnel extrême (k1 5,4,
+  k3 −48) : redressement numériquement fragile près des bords, d'où
+  l'aller-retour ci-dessus.
+- **A3 — cadrage** : rotation virtuelle `K R K⁻¹` (exacte pour une rotation pure,
+  si l'extrinsèque est juste) qui amène l'axe optique sur la projection de VISEE
+  (0,10 ; 0 ; 0,20), hors axe ramené sous 9°.
+- **A4 — échelle** : zoom autour du point principal à fx = 491 px. Lisible pour la
+  **SVPRO seulement** (facteur 1,10-1,25) ; pour l'arducam (0,95-1,0) c'est
+  quasi l'identité, donc « sans effet » garanti et sans valeur.
+- **Lecture** : A2, A3 et A4 chacun **séparément contre l'image brute**, puis
+  leur cumul. Seuil de la phase : ΔPCK@10 ≥ 0,15.
+
+#### Phase A5 — randomiser le modèle de caméra à l'entraînement (≈ 3 jours)
+
+Même recette que E3.9 (VGG ImageNet, v5_geo, encodage retenu en E3.8, mêmes
+49 595 images, même secteur tenu à l'écart), **plus** une augmentation
+géométrique appliquée à l'image **et** aux keypoints.
+
+**Ce qui est nouveau par rapport à v5_geo**, qui couvre déjà la translation
+(6,25 %, soit ≈ 40 px, ce qui couvre le point principal) et l'échelle 0,9-1,1 :
+
+| Paramètre | Tirage | Raison |
+|---|---|---|
+| Focale courte | facteur 0,78-0,90 sur fx = 491 (≈ 383-442 px) | SVPRO 394-448, hors de l'échelle ± 10 % |
+| Hors axe | rotation virtuelle `K R K⁻¹`, angle 0-25°, direction uniforme | arducam à 15,8° |
+| Distorsion radiale | k1 tiré pour un déplacement au coin de l'image de 0 à ± 25 px, k2 = 0 ; carte refusée si non monotone | le plus fort effet mesuré sur les étiquettes `cam_3` vaut 15,8 px (4,4 px médian) |
+| Probabilité | 0,5 par paramètre, indépendants | limiter les cumuls de déformations fortes |
+
+- **Bords** : un zoom arrière et une rotation créent des zones sans image. On les
+  remplit avec un **fond COCO** tiré au hasard, comme pour les fonds du jeu.
+  Jamais en noir : le réseau apprendrait le cadre noir, que le réel n'a pas.
+- **Modèle de distorsion** : la distorsion est appliquée à l'image par carte
+  inverse (`cv2.remap`). Les keypoints sont transformés par le modèle direct.
+  Aller-retour contrôlé ≤ 0,5 px sur 100 images avant l'entraînement.
+- **Refus** : un tirage qui fait sortir plus d'un keypoint à moins de 4 px du
+  bord est retiré. Si plus de 40 % des tirages sont refusés, c'est une
+  **alarme** et l'entraînement s'arrête.
+- **Graines** : **deux pour A5 et deux pour E3.9** (E3.9 réentraîné une fois avec
+  une seconde graine). L'écart d'une graine à l'autre sur un jeu réel hors
+  domaine est probablement de 0,03 à 0,08, soit la taille des effets testés.
+- **Critère « retenue »**, sur `real_tri_test` :
+  - moyenne des deux graines A5 moins moyenne des deux graines E3.9 :
+    ΔPCK@10 ≥ 0,10, caméras réunies ;
+  - pour **chaque** paire de graines, borne basse de l'IC95 > 0 ;
+  - Δ > 0 sur chaque caméra ;
+  - le sens et le seuil tiennent sous les deux versions d'étiquettes SVPRO ;
+  - secteur tenu à l'écart non inférieur : borne basse de l'IC95 du ΔPCK@5
+    ≥ −0,04.
+- **A5 est un paquet** : si elle est retenue, B reprend le paquet entier.
+  L'ablation de chacun de ses paramètres va dans E4.
+- **Ne pas faire** : régler les amplitudes sur un résultat réel. Elles sont
+  fixées ici, une fois.
+
+#### Décision avant la collecte (fixée avant mesure, prise par l'utilisateur)
+
+| Résultat | Suite |
+|---|---|
+| A5 retenue | B avec le paquet A5 |
+| A1 désigne l'apparence ou la scène (« facteur majeur » au sens de E3.9b) | B avec ce levier, que l'augmentation ne couvre pas |
+| Un levier A2-A4 sur `real_tri_test`, mais A5 non retenue | l'augmentation ne suffit pas : B avec le **rendu** des caméras (plusieurs hfov, hors axe au collecteur) |
+| Tout « à trancher » ou « non démontré » | **pas de B automatique** : chiffres présentés à l'utilisateur, qui décide ; E2 reste le test final, jamais un jeu de décision |
+
+La chaîne sans surveillance s'arrête à cette décision. Elle ne lance jamais B
+d'elle-même.
+
+#### Phase B — collecte de 100k (≈ 5 jours, carte graphique réservée)
+
+`synthetic_data_collector_v3_camera_libre.py`, mêmes règles que E3.7/E3.7b :
+- tranches de 1 000 relancées ;
+- seuls les angles interpolés au temps de l'image sont gardés ;
+- masques à jour, md5, `run.yaml` ;
+- **même secteur d'azimut 60-100° tenu à l'écart**.
+
+À 4,1 s par image, 100 000 images ≈ 114 h. Modifications, chacune selon la
+décision ci-dessus :
+
+- **Hors axe** : `_robot_dans_le_champ` accepte un axe optique jusqu'à 25° de
+  la visée, la sphère de travail pouvant sortir en partie ; `VISEE_JEU` passe
+  de 0,10 à 0,20 m.
+- **Focale** : deux à trois caméras SDF de hfov différents (≈ 1,0 ; 1,15 ;
+  1,35 rad), une par tranche.
+- **Apparence** : `robot_appearance` tiré par tranche (`original`,
+  `realistic`, teintes randomisées).
+- **Scène du banc** : ~20 % des tranches dans `real_table.sdf` (planche,
+  marqueurs 19/23/25/26) avec le cube à ArUco sur la pince.
+- **Critère de sortie** :
+  - ≥ 95 000 images valides ;
+  - secteur tenu à l'écart vérifié par `geometrie_camera.py` ;
+  - md5 sans recouvrement avec E3.7/E3.7b.
+
+#### Phase C — entraînements (≈ 2 jours)
+
+Recette retenue (A5 ou E3.9) : **C50** sur 50 000 images tirées au hasard dans B,
+**C100** sur les 100 000, même graine, même secteur tenu à l'écart.
+
+- **« 100k utile »** : ΔPCK@10 (C100 − C50) ≥ 0,10 sur `real_tri_test`, borne
+  basse de l'IC95 > 0, sous les deux versions d'étiquettes SVPRO. Sinon
+  **non démontré**.
+  - « Non limitant » n'est pas atteignable : il faudrait ≈ 450 poses
+    indépendantes.
+  - Le verdict porte la mention « conditionnel à une graine ».
+- E4 reprendra le volume sur trois graines.
+
+#### Phase D — évaluation
+
+Le meilleur modèle passe, dans l'ordre :
+
+1. le secteur tenu à l'écart (synthétique) ;
+2. les jeux de développement, par caméra ;
+3. le test de décalage ;
+4. **E2** (E3.10), une seule fois : c'est le chiffre de l'article ;
+5. le tableau au format du tableau I de Lee et al. 2020 (PCK@2,5/5/10, AUC 0-20 px,
+   ADD et son AUC 0-100 mm), avec l'outil de E1.
+
+La comparaison à DREAM porte sur le **format** et la méthode, pas sur des
+scores : le robot, les caméras et les jeux diffèrent. Des chiffres publiés de
+DREAM, RoboPose et SGTAPose, on ne prend que ceux vérifiés dans
+`training/dream/article/biblio.md` (agent `veilleur-biblio`). Chaque chiffre passe
+au metrologue, puis au registre.
+
+#### Ce qu'il faut écrire avant de lancer
+
+| Élément | Où | Phase |
+|---|---|---|
+| Transformations A2-A4 (images + étiquettes, NDDS en sortie), sous-ensemble fixe, contrôle d'identité, aller-retour | `training/dream/transformer_reel.py` | A |
+| Analyse appariée : bootstrap par pose ou par bloc, par caméra, deux versions d'étiquettes, deux graines | reprendre `~/dream_article/E3/E3_9b/analyse.py` | A, A5, C |
+| Augmentation « modèle de caméra » (focale courte, rotation virtuelle, distorsion bornée, fond COCO aux bords, refus et alarme) | option de `train_dream_ultimate_v5_geo.py` | A5 |
+| Collecteur : hors axe 25°, `VISEE_JEU`, caméra, apparence et monde par tranche | `synthetic_data_collector_v3_camera_libre.py`, `scripts/collecte_tranches.sh` | B |
+| Chaîne sans surveillance A → A5, **arrêt** sur : échec d'un contrôle préalable, alarme de refus, évaluation manquante ; arrêt final à la décision | `~/dream_article/E3/E3_12/` | A, A5 |
+
+#### Durées et ordre
+
+| Étape | Durée | Carte graphique |
+|---|---|---|
+| A1 (E3.9b) | ~1 h 30 | exclusive (Gazebo) |
+| Contrôles + A2-A4 | < 2 h | évaluations |
+| E3.9, 2e graine | ~1 jour | exclusive |
+| A5, 2 graines | ~2 jours | exclusive |
+| Décision | utilisateur | — |
+| B | ~5 jours | exclusive |
+| C50 + C100 | ~2 jours | exclusive |
+| D hors E2 | < 1 h | évaluations |
+
+Indépendant de la carte : la session E2 au banc (mardi 24/11), qui fournit le
+jeu de test final.
 
 ### Chaîne du 12/11 (absence de l'utilisateur ≥ 4 jours) — règles écrites avant les résultats
 
