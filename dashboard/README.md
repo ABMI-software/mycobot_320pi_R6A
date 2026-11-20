@@ -123,6 +123,8 @@ Pour forcer une autre adresse : `http://localhost:4200/?ros=ws://10.10.0.115:909
 
 ## Points ouverts
 
+- **Robot réel** : le pilotage en angle (`send_angles`) a été testé sur le bras le 20/11 et
+  fonctionne. `send_coords`, `go_home` et `go_zero` restent à confirmer.
 - **Pas de bouton d'arrêt d'urgence, volontairement.** Côté Pi, l'action `emergency_stop` appelle
   `release_all_servos()` : les moteurs sont relâchés et le bras tombe. Proposition : ajouter côté
   Pi une action `stop` qui appelle `mc.stop()` (arrêt du mouvement, position maintenue), puis

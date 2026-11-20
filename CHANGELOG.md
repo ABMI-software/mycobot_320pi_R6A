@@ -25,7 +25,8 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   route et la carte d'accueil. Procédure pas à pas dans `dashboard/procedure.html`.
 - **Faux rosbridge** (`npm run mock:ros`) qui répond comme `bridge_pi_simple.py`, pour développer
   sans ROS ni robot. 26 tests unitaires (`npm test`).
-- **Pas encore testé sur le robot réel.** Hors connexion, aucune commande n'est mise en file
+- **Testé sur le robot réel le 20/11 : le pilotage en angle (`send_angles`) fonctionne.** Les
+  autres commandes (`send_coords`, `go_home`, `go_zero`) n'ont pas été confirmées. Hors connexion, aucune commande n'est mise en file
   d'attente. Avec la téléopération ouverte, arrêter `mycobot_teleop.py` : son
   `trajectory_to_robot_bridge` publie jusqu'à 15 Hz sur `/to_robot` et écraserait les commandes.
 
