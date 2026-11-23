@@ -9,6 +9,15 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Corrigé — `rejouer_poses_banc.py` : capteurs du monde et sous-ensemble de poses (23/11)
+
+- `monde` ajoute le système `Sensors` au monde généré s'il n'en a pas, et les trois systèmes par
+  défaut de Gazebo si le monde n'en déclare aucun. Sans ce correctif, le monde d'entraînement
+  (`randomized.sdf`) ne rendait aucune image et l'essai E3.9b s'arrêtait. Le moteur se choisit par
+  `--moteur-rendu {ogre,ogre2}` et il est noté dans `cameras.json`.
+- `rejouer --pas N` ne rejoue qu'une pose sur N. `rejeu.csv` garde l'indice de la pose dans le jeu
+  complet, ce qui permet d'apparier les conditions. Sert au contrôle C_ogre de E3.9b.
+
 ### Modifié — `simple_gui.launch.py` lit l'adresse de la Pi dans `MYCOBOT_PI` (20/11)
 
 - La valeur par défaut de `pi_ip` n'est plus une IP écrite en dur (`.218`, puis `.219`) : elle vient

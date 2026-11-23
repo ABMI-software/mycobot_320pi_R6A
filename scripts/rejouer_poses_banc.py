@@ -64,13 +64,21 @@ def cmd_monde(args):
     arbre = ET.parse(args.base)
     monde = arbre.getroot().find('world')
     nom_monde = monde.get('name')
-    # Un monde sans aucun <plugin> reçoit la configuration par défaut de
-    # Gazebo, capteurs compris ; en déclarer un seul la supprimerait toute.
-    if (monde.find('plugin') is not None
-            and monde.find("plugin[@filename='gz-sim-sensors-system']") is None):
+    # La configuration par défaut de Gazebo (server.config) ne charge PAS les
+    # capteurs, et banc_realiste.launch.py lance l'URDF sans eux
+    # (enable_cameras:=false) : sans ce bloc, aucune image. Un monde sans
+    # <plugin> perd aussi la configuration par défaut dès qu'on en déclare un,
+    # d'où les trois systèmes par défaut remis explicitement.
+    if monde.find("plugin[@filename='gz-sim-sensors-system']") is None:
+        if monde.find('plugin') is None:
+            for fichier, nom in (('gz-sim-scene-broadcaster-system', 'SceneBroadcaster'),
+                                 ('gz-sim-user-commands-system', 'UserCommands'),
+                                 ('gz-sim-physics-system', 'Physics')):
+                monde.insert(0, ET.Element('plugin', {'filename': fichier,
+                                                      'name': f'gz::sim::systems::{nom}'}))
         capteurs = ET.Element('plugin', {'filename': 'gz-sim-sensors-system',
                                          'name': 'gz::sim::systems::Sensors'})
-        ET.SubElement(capteurs, 'render_engine').text = banc.MOTEUR_RENDU
+        ET.SubElement(capteurs, 'render_engine').text = args.moteur_rendu
         monde.insert(0, capteurs)
     cameras = {}
     for nom, fichier in (('arducam', args.arducam), ('svpro', args.svpro)):
@@ -89,7 +97,9 @@ def cmd_monde(args):
     fichier_monde = args.sortie / f'{nom_monde}.sdf'
     arbre.write(fichier_monde, encoding='utf-8', xml_declaration=True)
     (args.sortie / 'cameras.json').write_text(json.dumps(
-        {'monde': nom_monde, 'base': str(args.base.resolve()), 'md5_base': md5(args.base), **cameras},
+        {'monde': nom_monde, 'base': str(args.base.resolve()), 'md5_base': md5(args.base),
+         'moteur_rendu': monde.find("plugin[@filename='gz-sim-sensors-system']/render_engine").text,
+         **cameras},
         indent=2))
     print(f'ros2 launch mycobot_gateway banc_realiste.launch.py headless:=true '
           f'world_file:={fichier_monde.resolve()} world_name:={nom_monde} robot_appearance:=original')
@@ -138,9 +148,11 @@ def cmd_rejouer(args):
     config = json.loads((args.monde / 'cameras.json').read_text())
     cameras = {k: v for k, v in config.items() if k in ('arducam', 'svpro')}
     images, uniques = poses_du_jeu(args.reel)
-    if args.max_poses:
-        uniques = uniques[:args.max_poses]
-        images = [im for im in images if im[2] in uniques]
+    # rejeu.csv garde l'indice de la pose dans le jeu complet : analyse.py
+    # apparie les conditions par cet indice, même sur un sous-ensemble.
+    indices = list(range(len(uniques)))[:args.max_poses or None][::args.pas]
+    uniques = [uniques[i] for i in indices]
+    images = [im for im in images if im[2] in uniques]
     print(f'{len(images)} images, {len(uniques)} poses')
 
     rclpy.init()
@@ -191,7 +203,7 @@ def cmd_rejouer(args):
 
     sorties = {}
     lignes = []
-    for p, q_deg in enumerate(uniques):
+    for rang, (p, q_deg) in enumerate(zip(indices, uniques)):
         aller(np.radians(POSE_REFUGE))
         q_cmd = np.radians(q_deg)
         atteint, ecart = aller(q_cmd)
@@ -199,7 +211,7 @@ def cmd_rejouer(args):
         frais = attendre(lambda: all(secondes(dernieres[c].header.stamp) > t_repos + 0.15
                                      for c in cameras), 30.0)
         q_lu = etat['joints'].copy()
-        fk_mm = ecart_fk_mm(config['monde'], q_lu) if p < args.controle_fk else ''
+        fk_mm = ecart_fk_mm(config['monde'], q_lu) if rang < args.controle_fk else ''
         valide = atteint and frais and ecart <= args.tolerance_deg
         sorties[q_deg] = (q_lu, {c: dernieres[c] for c in cameras}, valide)
         lignes.append({'pose': p, 'ecart_max_deg': round(float(ecart), 4), 'ecart_fk_mm': fk_mm,
@@ -207,7 +219,7 @@ def cmd_rejouer(args):
                        'image_fraiche': frais, 'valide': valide,
                        **{f'j{j + 1}_cmd_deg': q_deg[j] for j in range(6)},
                        **{f'j{j + 1}_lu_deg': round(float(np.degrees(q_lu[j])), 4) for j in range(6)}})
-        print(f'pose {p + 1:3d}/{len(uniques)} écart {ecart:.3f}° {f"FK {fk_mm:.2f} mm " if fk_mm != "" else ""}'
+        print(f'pose {rang + 1:3d}/{len(uniques)} (n° {p}) écart {ecart:.3f}° {f"FK {fk_mm:.2f} mm " if fk_mm != "" else ""}'
               f'{"" if valide else "ÉCARTÉE"}',
               flush=True)
 
@@ -254,6 +266,9 @@ def main():
     m.add_argument('--svpro', type=Path, required=True)
     m.add_argument('--sortie', type=Path, required=True)
     m.add_argument('--base', type=Path, default=banc.SORTIE, help='monde de départ (défaut : la réplique du banc)')
+    m.add_argument('--moteur-rendu', default=banc.MOTEUR_RENDU, choices=['ogre', 'ogre2'],
+                   help='si le monde n a pas de capteurs ; ogre2 pour le monde d entraînement '
+                        '(celui de l URDF qui a rendu E3.7)')
     r = sous.add_parser('rejouer', help='rejoue les poses du jeu réel')
     r.add_argument('--reel', type=Path, required=True, help='jeu réel NDDS (source.angles_deg)')
     r.add_argument('--monde', type=Path, required=True, help='dossier écrit par « monde »')
@@ -264,6 +279,7 @@ def main():
     r.add_argument('--repos-s', type=float, default=1.0)
     r.add_argument('--tolerance-deg', type=float, default=0.5)
     r.add_argument('--max-poses', type=int, default=0, help='essai court : les N premières poses')
+    r.add_argument('--pas', type=int, default=1, help='une pose sur N (indices 0, N, 2N…), sous-ensemble fixe')
     r.add_argument('--controle-fk', type=int, default=10, help='poses contrôlées contre la FK (Gazebo /pose/info)')
     args = a.parse_args()
     {'monde': cmd_monde, 'rejouer': cmd_rejouer}[args.commande](args)

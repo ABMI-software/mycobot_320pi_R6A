@@ -120,7 +120,7 @@ dessus, constants sur nos modèles synthétiques. Conséquences :
 | E3.7b | Complément de E3.7 avec les poses du pick (40 % du tirage), 30 × 1 000 (porté de 10 à 30 le 12/11, voir « Chaîne du 12/11 ») | Pointe de pince à 72-115 mm sur une part nettement supérieure aux 1,7 % de E3.7 ; même format, md5 | fait le 14/11 : 30 tranches collectées puis composées (masques à jour 0,95, ~53 % de fonds, ~32 % de teintes) ; jeu E3.9 = 49 595 images d'entraînement + 6 125 du secteur tenu, 24 014 images à angles non interpolés écartées (`~/dream_article/E3/E3_9/run.yaml`, md5 des labels) |
 | E3.8 | Pilote 10k : encodage entier σ 2 contre sous-pixel σ 1 | Choix de l'encodage pour E3.9, sur PCK synthétique tenu à l'écart | fait le 13/11 : **sous-pixel σ 1 retenu** par la règle écrite d'avance (484 images à angles interpolés : Δ PCK@2,5 +0,149 [+0,132 ; +0,167], Δ PCK@5 +0,042 [+0,031 ; +0,052], pas de perte à 10 px ni en détection) ; sous-pixel σ 2 : +0,037 seulement ; 1 graine par bras (`~/dream_article/E3/E3_8/choix.txt`) ; verdict du metrologue à inscrire |
 | E3.9 | Entraînement synthétique seul (VGG ImageNet, sans `--pretrained` réel), v5_geo | Checkpoint + `run.yaml` | fait le 15/11 (`vgg_e3_9_synth_seul`) : secteur 60-100° tenu, 6 125 images, PCK 0,910/0,968/0,984, détection 0,994 ; **réel (`real_tri_test`, 200 images) : PCK 0,004/0,068/0,169, détection 0,70, ADD médiane 83 mm** (E3.0 : 0,014 à 5 px, 173 mm) — le transfert au réel reste un échec ; biais vertical constant de la base (−4 à −6 px, MAD 0,3 px, deux caméras) à expliquer avant E3.10 (`~/dream_article/E3/E3_9/`) |
-| E3.9b | Diagnostic : les 100 poses de `real_tri_test` rejouées en Gazebo aux caméras d'étiquetage — monde d'entraînement (C), réplique du banc (A), et rendu `realistic` (B) ; étiquettes exactes | Part de l'échec réel due au cadrage, à la scène, à l'apparence du robot, au reste (protocole ci-dessous) | protocole écrit le 18/11, amendé le 19/11 (metrologue : condition C, équivalence, cadrage arducam hors domaine) ; outil `scripts/rejouer_poses_banc.py` écrit, mondes générés (`~/dream_article/E3/E3_9b/`) ; rejeu à lancer quand la carte graphique est libre (RoboPEPP en cours) |
+| E3.9b | Diagnostic : les 100 poses de `real_tri_test` rejouées en Gazebo aux caméras d'étiquetage — monde d'entraînement (C), réplique du banc (A), et rendu `realistic` (B) ; étiquettes exactes | Part de l'échec réel due au cadrage, à la scène, à l'apparence du robot, au reste (protocole ci-dessous) | protocole écrit le 18/11, amendé le 19/11 (metrologue : condition C, équivalence, cadrage arducam hors domaine) ; outil `scripts/rejouer_poses_banc.py` écrit, mondes générés (`~/dream_article/E3/E3_9b/`) ; chaîne lancée le 19/11, arrêtée le 22/11 à l'essai (monde C sans système `Sensors`, corrigé le 23/11, voir « Ce qu'on a appris ») ; relancée le 23/11 avec le contrôle C_ogre (`--pas 3`, `analyse_moteur.py`), en attente de la carte (RoboPEPP run 4) |
 | E3.10 | Évaluation : E2, `real_tri_test`, test de décalage, revue du metrologue | Critère de E3 (tableau des expériences) | à faire |
 | E3.11 | Modèle de déploiement : même recette que E3.9, tous azimuts (secteur 60-100° compris), hors article | Checkpoint pour le banc, si E3.10 atteint son critère | à faire (décision du 12/11) |
 | E3.12 | Campagne sim-to-réel ciblée, décidée le 19/11 : A diagnostic sans collecte (E3.9b, distorsion, cadrage, échelle sur les images réelles), A5 réentraînement sur les 49 595 images avec randomisation du modèle de caméra, B collecte de 100k avec les leviers retenus, C 50k contre 100k, D évaluation | Le levier de l'écart sim-réel, puis le meilleur modèle synthétique seul (protocole ci-dessous) | protocole écrit le 19/11, amendé après relecture du metrologue (bootstrap par bloc, deux graines, contrôle d'identité, sous-ensemble fixe, décision de B par l'utilisateur), avant mesure ; à lancer quand RoboPEPP libère la carte graphique |
@@ -152,7 +152,7 @@ préparer pendant que la collecte et l'entraînement tournent.
 - **Ne pas faire** : départager sur `real_tri_test` ou sur E2 (ce serait choisir
   sur le test) ; prolonger un bras qui perd « pour lui laisser sa chance ».
 
-### Protocole de E3.9b (rédigé le 18/11, amendé le 19/11 après relecture du metrologue, avant mesure)
+### Protocole de E3.9b (rédigé le 18/11, amendé le 19/11 après relecture du metrologue, puis le 23/11 sur le moteur de rendu, avant mesure)
 
 - **Objectif** : dire quelle part de l'échec réel d'E3.9 (PCK@5 0,068 sur
   `real_tri_test`) tient à l'apparence du robot, à la scène du banc, au
@@ -181,9 +181,29 @@ préparer pendant que la collecte et l'entraînement tournent.
   extrinsèques **qui ont étiqueté** `real_tri_test`, intrinsèques `cam_3` et
   `cam_2` rééchelonnée en 640 × 480, **sans distorsion**) :
   - **C** = monde d'entraînement (`randomized`, celui de la collecte), sans
-    fonds COCO, teinte ni distracteurs ;
-  - **A** = réplique du banc (`banc_realiste`), `robot_appearance:=original` ;
-  - **B** = réplique du banc, `robot_appearance:=realistic`.
+    fonds COCO, teinte ni distracteurs, rendu **ogre2** comme E3.7 ;
+  - **A** = réplique du banc (`banc_realiste`), `robot_appearance:=original`,
+    rendu **ogre** ;
+  - **B** = réplique du banc, `robot_appearance:=realistic`, rendu **ogre**.
+
+  **Amendement du 23/11, avant mesure** : ogre2 plante sur les matériaux
+  des ArUco de la réplique, A et B sont donc en ogre. Décision de
+  l'utilisateur : garder C en ogre2, au plus près du rendu d'entraînement,
+  plutôt que d'aligner les trois moteurs. Conséquence : **C − A mesure la
+  scène et le moteur de rendu ensemble**, sans pouvoir les séparer. A − B
+  reste propre (même scène, même moteur).
+
+  **Contrôle C_ogre, fixé avant mesure** (proposé par le metrologue le 23/11) :
+  le monde C est aussi rendu en ogre, sur les poses d'indice multiple de 3
+  (34 poses, deux caméras, ~30 min de Gazebo). Cela donne C − C_ogre (le
+  moteur seul) et C_ogre − A (la scène seule), sur ce même sous-ensemble.
+  Bootstrap apparié par pose, graine 0 :
+  - IC à 90 % de C − C_ogre dans [−0,05 ; +0,05] → moteur écarté, C − A se
+    lit comme la scène (« non démontré » si l'écart-type par pose dépasse
+    0,26) ;
+  - borne basse de l'IC à 95 % de C − C_ogre > 0,10 → le moteur est un facteur
+    majeur ; la scène ne s'écrit que par C_ogre − A (n = 34, avec son IC) ;
+  - sinon : « moteur non borné », et on n'écrit pas « la scène ».
 
   C, A et B rendent un **sous-ensemble** du domaine d'entraînement (aucune
   randomisation d'apparence), pas « le rendu d'entraînement » tout court.
@@ -223,8 +243,11 @@ préparer pendant que la collecte et l'entraînement tournent.
   1. **Cadrage et poses** : si PCK@5(C) < 0,83 (seuil de E3), le point de vue
      ou la répartition des poses suffit à faire échouer E3.9 sans la scène ni
      l'apparence (attendu pour l'arducam, au vu du cadrage).
-  2. **Scène** : C − A ≥ 0,20 avec une borne basse d'IC à 95 % > 0,10 →
-     la scène du banc est un facteur majeur.
+  2. **Scène (et moteur de rendu)** : C − A ≥ 0,20 avec une borne basse
+     d'IC à 95 % > 0,10 → la scène du banc **ou** le passage d'ogre2 à ogre
+     est un facteur majeur ; on n'écrit « la scène » qu'après C_ogre.
+     « Écarté » (règle 4) exige en plus |C − C_ogre| dans ±0,05, pour
+     exclure que la scène et le moteur se compensent.
   3. **Apparence du robot** : A − B, même règle. Ce seuil commande une
      décision : un facteur majeur fait passer la randomisation d'apparence
      du robot (textures, coques blanches) avant la session au banc.
@@ -234,8 +257,10 @@ préparer pendant que la collecte et l'entraînement tournent.
      « non démontré », jamais « écarté ».
   5. **Reste** : si PCK@5(B) ≥ 0,83, l'écart B − réel revient à ce que la
      simulation ne modélise pas (distorsion, bruit, flou, exposition,
-     éclairage, scène réelle encombrée, cube sur la pince) **et** aux
-     étiquettes réelles, sans pouvoir les séparer.
+     éclairage, scène réelle encombrée, cube sur la pince), à l'écart de
+     moteur ogre/ogre2 avec le rendu d'entraînement **et** aux étiquettes
+     réelles, sans pouvoir les séparer. A − B, mesuré en ogre, n'est pas
+     établi pour ogre2.
 - **Ce que E3.9b ne peut pas voir** : une erreur d'extrinsèque ou
   d'intrinsèque (la simulation place la caméra à l'extrinsèque d'étiquetage
   et rend avec le même K : une erreur commune s'y annule). Le défaut
@@ -537,6 +562,24 @@ avant tout résultat de E3.8 :
 Chaque constat porte sa date. Quand un constat change, on le **corrige ici
 même** (« corrigé le JJ/MM : … ») plutôt que d'en empiler un contradictoire.
 
+- **23/11 — E3.9b arrêté à l'essai : le monde d'entraînement n'avait pas de
+  caméras actives** : la chaîne est partie le 22/11 à 15:58 et s'est arrêtée
+  sur « ni /joint_states ni les deux caméras ». `/joint_states` était bien
+  publié (~50 Hz). Les caméras ne rendaient rien, même côté Gazebo : la
+  configuration par défaut de Gazebo (`server.config`) ne charge **pas** le
+  système `Sensors`, et `banc_realiste.launch.py` lance l'URDF avec
+  `enable_cameras:=false`. `randomized.sdf` n'a aucun `<plugin>` : il
+  comptait sur celui de l'URDF. `rejouer_poses_banc.py monde` ajoute
+  désormais `Sensors`, avec les trois systèmes par défaut si le monde n'en
+  déclare aucun. Le moteur se choisit par `--moteur-rendu`. Le monde C a été
+  régénéré en **ogre2**, comme l'URDF qui a rendu E3.7. Ses caméras sont
+  identiques à celles d'avant. Le monde du banc (A, B) avait déjà ses
+  capteurs, en **ogre** (ogre2 y plante sur les matériaux des ArUco). ⚠ C
+  contre A mêle donc la scène et le moteur de rendu : à signaler au
+  metrologue avant de lire l'écart. L'échec du spawner
+  `joint_state_broadcaster` au démarrage est inoffensif (il réessaie un
+  contrôleur déjà actif). *Décidé le 23/11 : C reste en ogre2 ; le
+  protocole est amendé en conséquence (C − A = scène et moteur réunis).*
 - **18/11 — E3.9 : très bon en simulation, échec sur le réel** : le modèle
   synthétique seul (49 595 images, sous-pixel σ 1) atteint PCK@5 0,968 sur
   les 6 125 images du secteur 60-100° tenu à l'écart, mais 0,068 sur les 200
