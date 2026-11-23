@@ -1,5 +1,38 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (23 novembre 2026 — soir, E3.9b corrigé et relancé, reprise au banc mardi 24/11 sur E2)
+
+### Ce qui a été accompli aujourd'hui
+- **Point DREAM contre Osama** (`vgg_tri_reel_ft_e10`, PCK@5 0,941 sur `real_tri_test`) :
+  E3.9 synthétique seul tient 0,968 sur le secteur tenu, 0,068 sur le réel. RoboPEPP run 3
+  (`~/RoboPEPP_ws/RoboPEPP/checkpoints/E3_7_run3/LISEZMOI.md`) : ADD AUC 65,3 %, J6 effondré
+  (73°), aucune évaluation réelle. Run 4 lancé par Osama le 23/11 à 14:59, il tient la carte.
+- **E3.9b, arrêt du 22/11 expliqué et corrigé** : le monde C (`randomized.sdf`) n'avait pas de
+  système `Sensors`, donc aucune image. `rejouer_poses_banc.py monde` l'ajoute (`--moteur-rendu`).
+- **C en ogre2, A et B en ogre** (décision de l'utilisateur). Protocole amendé avant mesure
+  après relecture du metrologue : contrôle **C_ogre** (C en ogre, une pose sur trois,
+  `rejouer --pas 3`, `~/dream_article/E3/E3_9b/analyse_moteur.py`) et sa règle de décision.
+- Chaîne relancée à 17:57 avec C_ogre (étape 7) et l'analyse du moteur (étape 8). Elle attend
+  la carte. L'essai de 3 poses vérifiera le correctif des capteurs.
+
+### Décisions prises
+- C − A se lit « scène et moteur réunis » tant que C_ogre n'a pas tranché.
+
+### Prochaines actions
+1. [ROUGE] Mardi 24/11 au banc : reprise des essais E2 (`docs/PROTOCOLE_E2_MULTIVUES.md`).
+   Les actions 1 à 3 de l'entrée du 19/11 restent valables : intrinsèques et extrinsèques
+   du jour, optique bloquée, contrôle en hauteur.
+2. [JAUNE] Surveiller `~/dream_article/E3/E3_9b/journal.txt` : l'essai de 3 poses part quand
+   la carte est libre 10 min. Ne pas lancer de Gazebo pendant RoboPEPP run 4.
+3. [VERT] À la fin de la chaîne : planche, luminance, `analyse.txt` et
+   `analyse_moteur.txt`, puis le metrologue.
+
+### Commande rapide de reprise
+```bash
+tail -5 ~/dream_article/E3/E3_9b/journal.txt
+nvidia-smi --query-compute-apps=pid,process_name --format=csv
+```
+
 ## État actuel (19 novembre 2026 — soir, calibration au banc, protocole E2 prêt, reprise mardi 24/11)
 
 ### Ce qui a été accompli aujourd'hui
