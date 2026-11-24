@@ -9,6 +9,20 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — Astra S dans la chaîne E2 (24/11)
+
+- `scripts/calibrer_extrinseque_4aruco.py --astra` et `training/capture_real_tri.py
+  --extrinseque astra=…` lisent l'Astra par `oni_grabber` (`teleop/orbbec_capture.py`) et
+  **retournent l'image**, livrée en miroir (aucun ArUco ne se décode sinon).
+- `training/calibration/calibrate_camera.py --unmirror` (source `astra`) : même retournement,
+  et jusqu'à 5 relectures quand `oni_grabber` saute des images (la mire s'arrêtait au premier
+  échec).
+- `capture_real_tri.py` écrit le `_camera_settings.json` brut avec les intrinsèques de
+  l'extrinsèque (`intrinsics_stem`), celles qui projettent les labels, et non `cam_2`/`cam_3`.
+- `docs/PROTOCOLE_E2_MULTIVUES.md` amendé avant mesure : Astra caméra mobile, contrôle en
+  hauteur sur deux marqueurs (id 1 à 57 mm, id 21 à 115 mm), pointage au bout des doigts
+  faute de porte-stylo.
+
 ### Corrigé — `rejouer_poses_banc.py` : capteurs du monde et sous-ensemble de poses (23/11)
 
 - `monde` ajoute le système `Sensors` au monde généré s'il n'en a pas, et les trois systèmes par

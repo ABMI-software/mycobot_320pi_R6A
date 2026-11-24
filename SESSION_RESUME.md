@@ -1,5 +1,52 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (24 novembre 2026 — soir, session E2 au banc : intrinsèques faites, aucune image E2)
+
+### Ce qui a été accompli
+- **Intrinsèques du jour, étape 0b** (`training/calibration/*.meta.json` non commités, copie
+  `~/dream_article/E2/2026-11-24/`) :
+  - **SVPRO** `e2_20261124_svpro` : conforme (focus 88, zoom 0) ; fx 402,08 ± 0,16 %,
+    cx 317,6, cy 274,9, RMS 0,457, |Δfx| moitiés 0,04 %. Quatre mires avant (a, b, c non
+    conformes : couverture, vues de face, vues trop proches), puis compléments ciblés fusionnés.
+  - **Astra** `e2_20261124_astra_final` : conforme **de justesse** (|Δfx| moitiés 0,48 %) ;
+    fx 501,85, cx 302,0, cy 252,6. fx a bougé de 0,5 % au fil des compléments : la mire de fin
+    de session (étape 4) tranchera.
+- **Astra intégrée** : lue par `oni_grabber` avec `LD_LIBRARY_PATH` vers le SDK Orbbec 2.3
+  (la `libOpenNI2` d'Ubuntu n'a pas `liborbbec.so`) ; **image en miroir** (0 marqueur décodé
+  tel quel, 44 retourné) : `--unmirror` pour la mire, retournement d'office dans
+  `calibrer_extrinseque_4aruco.py --astra` et `capture_real_tri.py --extrinseque astra=…`.
+- **Pi** `10.10.0.218`, `gripper_bridge.py` **de la Pi** (115200 bauds ; celui du dépôt est à
+  1 000 000 bauds, écart non tranché).
+- **Étape 0a non faite** : porte-stylo cassé, stylo serré dans la pince qui glisse (pivot à
+  38 mm RMS). Pointage au bout des doigts avec `scripts/tool_offset_doigts.json` (local, XY du
+  30/09, ~2 mm) : un essai sur des points pris au hasard, **non utilisable**. La planche n'a pas
+  bougé (opérateur).
+
+### Ce qui a coûté la journée
+- Consignes de tenue de la mire données après coup au lieu d'avant (0,4-0,9 m, 35-50°, coins
+  d'abord) : quatre mires SVPRO au lieu d'une.
+- Miroir de l'Astra et chemin OpenNI trouvés en cours de route.
+- Pivot au stylo tenté sans porte-stylo ; consigne de pointage ambiguë (« les marqueurs »).
+
+### Prochaine session — aller droit aux images
+1. [ROUGE] Pointage au bout des doigts, pince verticale, coude en haut : centres de **19, 23**
+   (planche) et **1** (57 mm), **21** (115 mm), deux fois chacun (≤ 1 mm).
+2. [ROUGE] Position P01 (Astra) : 4 marqueurs ≥ 90 %, extrinsèque 60 images
+   (`--intrinsics training/calibration/e2_20261124_astra_final.meta.json --astra`), contrôle
+   en hauteur, capture 50 poses graine 2001.
+3. [JAUNE] Si une journée ne suffit pas aux 6 positions : refaire les intrinsèques le jour
+   même (elles ne valent que pour leur session), ou ne pas toucher les caméras entre les jours.
+4. [VERT] Mire de fin de session par caméra (étape 4).
+
+### Commande rapide de reprise
+```bash
+cd ~/ros_jazzy/src/mycobot_R6A && conda deactivate
+bash scripts/real_robot_preflight.sh 10.10.0.218   # puis arrêter le bridge_tour par PID
+export LD_LIBRARY_PATH=~/Downloads/Orbbec_OpenNI_v2.3.0/OpenNI_2.3.0.86_202210111154_4c8f5aa4_beta6_linux_x64/OpenNI_2.3.0.86_202210111154_4c8f5aa4_beta6_linux/sdk/libs
+export OPENNI2_REDIST=~/Osama_ws/src/mycobot_R6A/training
+MYCOBOT_PI=10.10.0.218 /usr/bin/python3 scripts/pivot_pointe.py pointe --outil scripts/tool_offset_doigts.json
+```
+
 ## État actuel (23 novembre 2026 — soir, E3.9b corrigé et relancé, reprise au banc mardi 24/11 sur E2)
 
 ### Ce qui a été accompli aujourd'hui

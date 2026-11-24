@@ -267,6 +267,26 @@ class CalibrationSample:
 _CLAHE_INSTANCE = None  # cached so we don't recreate the engine every frame
 
 
+class _Unmirrored:
+    """Horizontal flip around OrbbecCapture. Its read() fails when no new tick
+    arrives within 1 s, which oni_grabber does now and then (24/11: the run
+    stopped at view 8 with the grabber still alive), so allow a few retries."""
+
+    def __init__(self, cap, retries=5):
+        self._cap = cap
+        self._retries = retries
+
+    def read(self):
+        for _ in range(self._retries):
+            ok, frame = self._cap.read()
+            if ok:
+                return True, cv2.flip(frame, 1)
+        return False, None
+
+    def __getattr__(self, name):
+        return getattr(self._cap, name)
+
+
 def _maybe_clahe(gray: np.ndarray, enabled: bool) -> np.ndarray:
     """Optional CLAHE preprocessing. Useful for low-contrast / noisy sensors
     like the Orbbec Astra RGB stream where ArUco's adaptive thresholding
@@ -625,6 +645,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--capture-interval-s", type=float, default=0.7)
     p.add_argument("--max-view-error-px", type=float, default=1.2)
     p.add_argument("--trim-fraction", type=float, default=0.1)
+    p.add_argument("--unmirror", action="store_true",
+                   help="Flip the Astra RGB stream horizontally: oni_grabber delivers it "
+                        "mirrored, and a mirrored ArUco does not decode (checked 24/11).")
     p.add_argument("--clahe", action="store_true",
                    help="Apply CLAHE (contrast-limited adaptive histogram equalization) "
                         "to the grayscale image before ArUco detection. Helps low-contrast "
@@ -721,6 +744,8 @@ def main() -> int:
         if ow > 0 and oh > 0:
             args.width, args.height = ow, oh
         print(f"Astra capture opened — native resolution {ow}x{oh}")
+        if args.unmirror:
+            cap = _Unmirrored(cap)
     elif args.source == "svpro":
         if args.camera < 0:
             print("--camera <pi-side index> is required for --source svpro.", file=sys.stderr)

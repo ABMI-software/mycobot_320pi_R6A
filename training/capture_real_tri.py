@@ -12,7 +12,7 @@
 Suite de `capture_real_3cam.py` (memes cameras, meme `labels.csv`, meme
 `images/<camera>/NNNNNN.png`, index continu entre sessions d'un meme jeu), avec
 trois differences :
-  - arducam + SVPRO, sans Astra ;
+  - arducam + SVPRO (Astra par oni_grabber pour E2, `--extrinseque astra=...`) ;
   - les poses ne sont pas tirees sur 50 % des debattements : pince montee, le
     bras y balaierait les bacs et l'ecran, et ces poses-la ne sont pas celles
     du tri. La pointe est tiree au-dessus de la planche (`BOITE_MM`), outil
@@ -140,11 +140,44 @@ def projections(extrinseques):
     return out
 
 
+def ecrit_reglages(sortie, nom, proj, forme):
+    """Les intrinseques de l'extrinseque (intrinsics_stem), celles qui projettent
+    les labels, et non la table CALIBRATION_MAP de capture_real_3cam."""
+    _, _, K, dist = proj
+    chemin = sortie / 'images' / nom / '_camera_settings.json'
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    chemin.write_text(json.dumps({'camera_settings': [{
+        'name': nom,
+        'intrinsic_settings': {'fx': K[0, 0], 'fy': K[1, 1], 'cx': K[0, 2], 'cy': K[1, 2], 's': 0.0},
+        'captured_image_size': {'width': forme[1], 'height': forme[0]},
+        'dist_coeffs': np.asarray(dist).ravel().tolist()}]}, indent=2))
+
+
 def projette(proj, q_deg):
     rvec, tvec, K, dist = proj
     pos, _ = forward_kinematics(np.radians(q_deg))
     obj = np.array([pos[n] for n in KEYPOINT_NAMES], float)
     return cv2.projectPoints(obj, rvec, tvec, K, dist)[0].reshape(-1, 2)
+
+
+class CameraAstra:
+    """Astra S par oni_grabber (teleop/orbbec_capture.py) : read() attend une image
+    plus recente que la precedente, donc jamais une trame d'avant l'arret du bras.
+    oni_grabber la livre en miroir : retournee comme pour la mire et l'extrinseque."""
+
+    def __init__(self):
+        sys.path.insert(0, str(RACINE / 'teleop'))
+        from orbbec_capture import open_orbbec
+        self.cap = open_orbbec(auto_spawn=True, open_timeout=10.0)
+
+    def capture(self, flush=3):
+        for _ in range(flush):
+            self.cap.read()
+        ok, img = self.cap.read()
+        return cv2.flip(img, 1) if ok else None
+
+    def close(self):
+        self.cap.release()
 
 
 def index_v4l2(motif):
@@ -167,9 +200,14 @@ def main():
         a.error('--jeu e2 exige --extrinseque et --sortie (une extrinseque par position)')
     extrinseques = (dict((nom, Path(chemin)) for nom, chemin in (e.split('=', 1) for e in args.extrinseque))
                     if args.extrinseque else EXTRINSEQUES)
-    inconnues = set(extrinseques) - set(EXTRINSEQUES)
+    ouvertures = {
+        'arducam': lambda: c3.LocalCamera(index_v4l2('arducam'), 'arducam', exposure=75),
+        'svpro': lambda: c3.LocalCamera(index_v4l2('svpro'), 'svpro', fourcc='MJPG'),
+        'astra': CameraAstra,
+    }
+    inconnues = set(extrinseques) - set(ouvertures)
     if inconnues:
-        a.error(f'camera inconnue : {", ".join(sorted(inconnues))} (arducam, svpro)')
+        a.error(f'camera inconnue : {", ".join(sorted(inconnues))} ({", ".join(ouvertures)})')
     tire = pose_autour_observation if args.autour_observation else pose_tiree
 
     rng = np.random.default_rng(args.graine)
@@ -200,10 +238,6 @@ def main():
     if any(s['graine'] == args.graine for s in sessions):
         raise SystemExit(f'graine {args.graine} deja utilisee dans {sortie.name} : poses repetees')
 
-    ouvertures = {
-        'arducam': lambda: c3.LocalCamera(index_v4l2('arducam'), 'arducam', exposure=75),
-        'svpro': lambda: c3.LocalCamera(index_v4l2('svpro'), 'svpro', fourcc='MJPG'),
-    }
     proj = projections(extrinseques)
     cameras = {nom: ouvertures[nom]() for nom in extrinseques}
     ctx = fsm.Contexte()
@@ -228,7 +262,7 @@ def main():
                         print(f'[{i}] {nom} : pas d image')
                         continue
                     if not (sortie / 'images' / nom / '_camera_settings.json').exists():
-                        c3.write_camera_settings(nom, str(sortie), image.shape[1], image.shape[0])
+                        ecrit_reglages(sortie, nom, proj[nom], image.shape)
                     rel = f'images/{nom}/{i:06d}.png'
                     c3.save_image(image, str(sortie / rel))
                     csv.writer(fl).writerow([i, *[round(math.radians(v), 4) for v in q],

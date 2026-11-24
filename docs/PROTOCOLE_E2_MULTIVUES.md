@@ -5,6 +5,8 @@ Expérience E2 de [`ARTICLE_DREAM.md`](ARTICLE_DREAM.md). Méthode :
 les critères ci-dessous ne se recalent pas sur le résultat. Amendé le 19/11,
 toujours avant mesure : intrinsèques refaites **dans la session** (étape 0b), après
 avoir constaté que celles du jour ne décrivaient plus les caméras du 13/10.
+Amendé le 24/11, avant la première position : l'**Astra S** devient la caméra
+mobile (§ « Plan des positions »).
 
 ## Ce que le 19/11 a appris, et qui fixe la méthode
 
@@ -94,6 +96,29 @@ fois, avec les intrinsèques **de la session** (étape 0b), jamais `cam_2` /
 `cam_3` du registre. **Mise au point et bague de focale bloquées** (aucun
 autofocus) : sans quoi les intrinsèques ne valent plus.
 
+**Astra S, caméra mobile (amendement du 24/11, avant mesure).** Elle n'a pas de
+nœud V4L2 : l'image RGB passe par `oni_grabber` et `/dev/shm`
+(`teleop/orbbec_capture.py`), le même lecteur pour la mire (`--source astra`),
+l'extrinsèque (`calibrer_extrinseque_4aruco.py --astra`) et la capture
+(`capture_real_tri.py --extrinseque astra=…`). `OPENNI2_REDIST` désigne le dossier
+du binaire `oni_grabber`, et `LD_LIBRARY_PATH` le `sdk/libs` du SDK Orbbec OpenNI
+2.3 : la `libOpenNI2` d'Ubuntu n'a pas le pilote `liborbbec.so` et répond « no
+devices found » (constaté le 24/11). L'image arrive **en miroir** : 0 marqueur de
+la planche décodé tel quel, 44 retournée. La mire prend `--unmirror`, l'extrinsèque
+et la capture la retournent d'office ; les trois voient donc la même image. Différences avec les deux autres caméras :
+
+- **focale fixe**, sans mise au point ni bague : rien à bloquer à l'étape 0b ;
+  la mire de fin de session (étape 4) reste obligatoire ;
+- **exposition automatique** que l'on ne peut pas figer par OpenNI : consigner
+  l'éclairage à chaque position ;
+- son image RGB est peu contrastée et ArUco y a déjà manqué des marqueurs
+  (d'où le CLAHE) : le critère de l'étape 1 (4 marqueurs sur ≥ 90 % de 60
+  images) décide si une position est exploitable, sans assouplissement.
+
+Si seule l'Astra se déplace, le jeu E2 vient **d'une seule caméra** : le dire
+dans l'article. La SVPRO et l'arducam laissées sur leurs supports fixes servent
+de témoins (P0) et ne comptent pas parmi les vues jamais vues.
+
 ## Poses du bras
 
 - **Les mêmes poses à toutes les positions** : même générateur que
@@ -128,6 +153,25 @@ autofocus) : sans quoi les intrinsèques ne valent plus.
 - **Ne pas faire** : relever la planche à travers une caméra.
 
 ## Étape 0a — Le stylo comme pointeur (une fois par session)
+
+**Amendement du 24/11, avant mesure : le porte-stylo est cassé.** La pointe est
+celle d'un stylo **tenu dans la pince fermée** (pointe 3 à 4 cm sous les doigts),
+ou à défaut le bout des doigts pince fermée. Même pivot, mêmes critères ; l'outil
+s'écrit dans `scripts/tool_offset_pointe.json`, jamais dans `tool_offset.json`
+(le centre de prise du tri). Contrôle : la pince doit tenir pendant `r`
+(`power_off` relâche les servos) ; un stylo qui a glissé entre deux poses se voit
+au résidu, et le pivot est alors refait en entier. Les images restent prises
+pince montée, sans stylo.
+
+**Second amendement du 24/11, toujours avant mesure de la planche : le stylo glisse
+dans la pince** (pivot à 38 mm RMS, centre de prise variant de 90 mm en hauteur).
+Le pivot est abandonné pour la session. Le pointage se fait **pince fermée à vide,
+verticale (J5 ≈ 90)**, avec `scripts/tool_offset_doigts.json` : XY du centre de
+prise du 30/09 (juste à ~2 mm), Z indicatif. Les **hauteurs du bloc se prennent au
+réglet**. Conséquences déclarées : le contrôle de planche (≤ 2 mm) et le contrôle en
+hauteur portent une incertitude de pointage d'environ 2 mm (≈ 1 à 1,4 px) ; les
+angles bruts sont archivés et les points se recalculent si un pivot est fait plus
+tard.
 
 Pourquoi le stylo et pas la pince : une pointe est un point, la pince désigne
 un « centre de prise » ajusté sur des saisies réussies (`tool_offset.json`,
@@ -245,7 +289,11 @@ l'outil autant que le point de vue. Le stylo **pointe**, la pince **pose**.
      zénithale : toujours). Un profil plat ne vaut **pas** « passé ». Le vrai
      contrôle de la focale à la position est le marqueur en hauteur (point 2,
      sensibilité ε·d/Z) et la mire de fin de session (étape 4).
-  2. **Contrôle en hauteur** : un ArUco de 50 mm sur un bloc rigide, posé à
+  2. **Contrôle en hauteur** (amendé le 24/11, avant mesure : deux marqueurs
+     seulement, **id 1** de 50 mm à **57 mm** et **id 21** de 40 mm à **115 mm** du
+     plan du robot ; le critère ≤ 2 px porte sur l'id 21. Les keypoints montent à
+     200-280 mm : au-dessus de 115 mm, l'erreur d'étiquette n'est **pas
+     contrôlée** et le jeu E2 le déclare) : un ArUco de 50 mm sur un bloc rigide, posé à
      ~100 mm, ~200 mm et ~280 mm de haut (hauteur de `link3`-`link5`), sa
      position relevée **au stylo** à l'étape 0a (le bloc ne bouge pas de la
      session) ; on mesure l'écart entre sa projection et sa détection. Ajouté le 18/11 :

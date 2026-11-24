@@ -101,6 +101,28 @@ def capture(index, n, largeur, hauteur, exposition):
     return trames
 
 
+def capture_astra(n):
+    """Astra S : pas de noeud V4L2, l'image RGB passe par oni_grabber et /dev/shm
+    (teleop/orbbec_capture.py, le meme lecteur que la mire de calibrate_camera.py).
+    oni_grabber la livre en miroir : on la retourne, sans quoi ArUco ne decode pas."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'teleop'))
+    from orbbec_capture import open_orbbec
+    cap = open_orbbec(auto_spawn=True, open_timeout=10.0)
+    for _ in range(10):
+        cap.read()
+    trames = []
+    for _ in range(n * 4):
+        ok, img = cap.read()
+        if ok:
+            trames.append(cv2.flip(img, 1))
+        if len(trames) >= n:
+            break
+    cap.release()
+    if not trames:
+        raise SystemExit('aucune image de l Astra (oni_grabber)')
+    return trames
+
+
 def vers_plan(uv, K, dist, T, z=0.0):
     """pixel -> point du plan horizontal Z=z dans le repere base (metres)."""
     p = cv2.undistortPoints(np.array([[uv]], float), K, dist).reshape(2)
@@ -137,6 +159,8 @@ def main():
     a = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     a.add_argument('--index', type=int, default=3, help='index V4L2 de la camera')
+    a.add_argument('--astra', action='store_true',
+                   help='Astra S par oni_grabber au lieu de --index (OPENNI2_REDIST = dossier du binaire)')
     a.add_argument('--intrinsics', required=True,
                    help='.npz (mtx, dist) ou <stem>.meta.json de calibrate_camera.py ; '
                         'le stem est ecrit dans la sortie (intrinsics_stem)')
@@ -168,8 +192,12 @@ def main():
     cote_yaml = float(d.get('marker_size_mm', 50.0)) / 1000.0
     z_plan = args.table_z / 1000.0
 
-    trames = ([cv2.imread(args.image)] if args.image else
-              capture(args.index, args.frames, args.width, args.height, args.exposure))
+    if args.image:
+        trames = [cv2.imread(args.image)]
+    elif args.astra:
+        trames = capture_astra(args.frames)
+    else:
+        trames = capture(args.index, args.frames, args.width, args.height, args.exposure)
     if trames[0] is None:
         raise SystemExit(f'image introuvable : {args.image}')
 
