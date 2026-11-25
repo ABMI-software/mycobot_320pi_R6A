@@ -78,6 +78,9 @@ REPOS_S = 1.0
 # tirees entre l'observation et une pose de travail, J5 tire sur toute cette plage.
 J5_OBSERVATION_DEG = (0.0, 90.0)
 J6_ECART_DEG = 45.0
+# Au-dela de +-90 deg, le cable de la pince s'enroule et peut l'arracher (25/11) ; les
+# bridges de la Pi refusent ces ordres. Marge de 5 deg pour ne jamais les approcher.
+J6_CABLE_MAX_DEG = 85.0
 # Hors de la planche (pointe derriere ou a cote de la base : cables, potence, ecran),
 # la pointe reste haute.
 Z_HORS_PLANCHE_MIN_MM = 250.0
@@ -99,6 +102,7 @@ def pose_tiree(rng):
         R = fsm.incline(fsm.orientation(xy, roulis), azimut, theta)
         sol = fsm.resout_ik(np.array([xy[0], xy[1], z]), R)
         if (sol is None or fsm.pointe(sol[0])[2] < BOITE_MM['z'][0] - 5.0
+                or abs(sol[0][5]) > J6_CABLE_MAX_DEG
                 or fsm.marge_collision(sol[0])[0] < MARGE_COLLISION_MIN_MM):
             continue
         pos, _ = forward_kinematics(np.radians(sol[0]))
@@ -114,6 +118,7 @@ def pose_autour_observation(rng):
         q[4] = rng.uniform(*J5_OBSERVATION_DEG)
         q[5] = fsm.POSE_OBSERVATION[5] + rng.uniform(-J6_ECART_DEG, J6_ECART_DEG)
         if (np.all((q >= fsm.LIMITES[:, 0]) & (q <= fsm.LIMITES[:, 1]))
+                and abs(q[5]) <= J6_CABLE_MAX_DEG
                 and fsm.pointe(q)[2] >= BOITE_MM['z'][0]
                 and (BOITE_MM['x'][0] <= fsm.pointe(q)[0] <= BOITE_MM['x'][1]
                      and BOITE_MM['y'][0] <= fsm.pointe(q)[1] <= BOITE_MM['y'][1]

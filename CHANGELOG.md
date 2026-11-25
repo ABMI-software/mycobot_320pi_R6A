@@ -9,6 +9,19 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Sécurité — J6 limité à ±90° (câble de la pince) (25/11)
+
+- `scripts/gripper_bridge.py` et `mycobot_gateway/scripts/bridge_pi_simple.py` **refusent**
+  tout `send_angles` dont |J6| > 90° (réponse `ERROR`, jamais d'écrêtage) ; au démarrage,
+  `gripper_bridge.py` écrit aussi la limite dans le firmware (`set_joint_min/max(6, ±90)`),
+  qui couvre `send_coords`. Les copies de la Pi
+  (`~/colcon_ws/src/mycobot_ros2/mycobot_320/mycobot_320pi/mycobot_gateway/`) portent la même
+  garde, sauvegardes `*.avant_j6_20261125`. Raison : le câble de la pince s'est tordu le 25/11.
+- `training/capture_real_tri.py` ne tire plus de pose avec |J6| > 85° : le plan E2 de la
+  graine 2001 allait jusqu'à −157°.
+- Non couvert : le bras relâché à la main (`power_off`), et le tri (`pick_fsm.py`, non
+  modifié) dont un ordre au-delà de 90° sera désormais refusé par le bridge.
+
 ### Ajouté — contrôle en hauteur de E2 et marqueurs intermittents (25/11)
 
 - `scripts/controle_hauteur_e2.py` : projette un marqueur en hauteur (XY pointé au robot,

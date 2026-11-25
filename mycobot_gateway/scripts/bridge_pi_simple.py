@@ -33,6 +33,12 @@ except ImportError:
     print("⚠️ pymycobot non disponible - Mode simulation")
 
 
+# J6 limite a +-90 deg : au-dela, le cable de la pince s'enroule autour du poignet
+# et peut arracher la pince (constate le 25/11). Refus, jamais d'ecretage : une
+# pose ecretee serait executee ailleurs que demande, en silence.
+J6_LIMITE_DEG = 90.0
+
+
 class BridgePiSimple:
     """
     Serveur TCP simple qui maintient UNE SEULE connexion.
@@ -52,6 +58,8 @@ class BridgePiSimple:
                 time.sleep(1)
                 angles = self.mc.get_angles()
                 print(f"✅ Robot connecté ! Angles: {angles}")
+                print(f"🔒 J6 : send_angles refuse au-dela de +-{J6_LIMITE_DEG:.0f} deg ; "
+                      f"firmware {self.mc.get_joint_min_angle(6)} .. {self.mc.get_joint_max_angle(6)} deg")
             except Exception as e:
                 print(f"❌ Erreur robot: {e}")
                 self.mc = None
@@ -64,6 +72,12 @@ class BridgePiSimple:
         self.server_socket = None
         self.client_socket = None
         
+    def _refus_j6(self, angles):
+        if len(angles) != 6 or abs(float(angles[5])) > J6_LIMITE_DEG:
+            return (f"ERROR: J6 hors de +-{J6_LIMITE_DEG:.0f} deg (cable de la pince) : "
+                    f"ordre refuse {angles}")
+        return None
+
     def log(self, msg):
         """Afficher un message avec timestamp"""
         timestamp = time.strftime("%H:%M:%S")
@@ -169,6 +183,10 @@ class BridgePiSimple:
             if action == 'send_angles':
                 angles = cmd.get('angles', [])
                 speed = cmd.get('speed', 30)
+                refus = self._refus_j6(angles)
+                if refus:
+                    self.log(refus)
+                    return refus
                 self.mc.send_angles(angles, speed)
                 return f"OK: angles envoyés {angles}"
                 
