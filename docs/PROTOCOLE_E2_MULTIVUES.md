@@ -152,6 +152,14 @@ de témoins (P0) et ne comptent pas parmi les vues jamais vues.
   réécrite et consignée).
 - **Ne pas faire** : relever la planche à travers une caméra.
 
+**Amendement du 25/11, décidé par le responsable du banc, avant la première position :**
+- **Astra écartée de E2** : fx instable (502 le 24/11, 524 puis 531 le 25/11 ; écart entre
+  moitiés 6,1 %). Ses images ne suivent pas un modèle de caméra stable.
+- **SVPRO, caméra mobile, avec l'intrinsèque du 24/11** (`e2_20261124_svpro`, conforme),
+  sans mire complète le 25/11 : mise au point 88 et zoom 0 inchangés, câble jamais
+  débranché, et une mire du 25/11 (non conforme en couverture) donne fx 401,7 contre
+  402,1, soit 0,1 %. La mire de fin de session (étape 4) reste le contrôle.
+
 ## Étape 0a — Le stylo comme pointeur (une fois par session)
 
 **Amendement du 24/11, avant mesure : le porte-stylo est cassé.** La pointe est

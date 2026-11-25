@@ -172,6 +172,8 @@ def main():
     a.add_argument('--exposure', type=int, help='exposition manuelle V4L2')
     a.add_argument('--width', type=int, default=640)
     a.add_argument('--height', type=int, default=480)
+    a.add_argument('--taux-min', type=float, default=1.0,
+                   help='part des images ou un marqueur doit etre vu (E2 : 0.9)')
     a.add_argument('--table-z', type=float, default=0.0, help='plan de travail (mm)')
     args = a.parse_args()
 
@@ -202,12 +204,13 @@ def main():
         raise SystemExit(f'image introuvable : {args.image}')
 
     par_trame = [detecte(t) for t in trames]
-    # Un marqueur intermittent biaiserait l'ajustement entre les images qui
-    # l'ont et celles qui ne l'ont pas : on exige de le voir partout.
-    partout = set(par_trame[0])
-    for p in par_trame[1:]:
-        partout &= set(p)
-    utiles = sorted(i for i in monde if i in partout)
+    # Camera fixe : la moyenne d'un marqueur sur les images ou il est vu ne
+    # depend pas de celles ou il manque. On exige seulement qu'il soit vu sur
+    # --taux-min des images (1.0 = partout, l'ancien comportement), pour
+    # ecarter les marqueurs fantomes ou a moitie masques.
+    vus = {i: sum(i in p for p in par_trame) / len(par_trame) for i in monde}
+    utiles = sorted(i for i in monde if vus[i] >= args.taux_min)
+    print('taux de detection : ' + ', '.join(f'{i} {vus[i]:.0%}' for i in sorted(monde)))
     print(f'{len(trames)} image(s) — marqueurs connus {sorted(monde)} — '
           f'utilisables {utiles} ({len(utiles)}/{len(monde)})')
     if len(utiles) < 3:
@@ -218,7 +221,7 @@ def main():
               'tout juste determinee donc instable, et validation impossible.')
 
     # pose initiale sur les CENTRES, juste pour pouvoir retroprojeter les coins
-    centres_img = {i: np.mean([p[i] for p in par_trame], axis=0).mean(axis=0)
+    centres_img = {i: np.mean([p[i] for p in par_trame if i in p], axis=0).mean(axis=0)
                    for i in utiles}
     T0, _, _ = pose(np.array([monde[i] for i in utiles]),
                     np.array([centres_img[i] for i in utiles]), K, dist)
@@ -227,7 +230,7 @@ def main():
     obj, img, appartenance = [], [], []
     mesures = {}
     for i in utiles:
-        quad = np.mean([p[i] for p in par_trame], axis=0)
+        quad = np.mean([p[i] for p in par_trame if i in p], axis=0)
         plan = np.array([vers_plan(uv, K, dist, T0, z_plan)[:2] for uv in quad])
         yaw = float(np.arctan2(*(plan[1] - plan[0])[::-1]))
         cote = float(np.mean([np.linalg.norm(plan[k] - plan[(k + 1) % 4])

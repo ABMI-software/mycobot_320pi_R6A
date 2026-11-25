@@ -9,6 +9,17 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### Ajouté — contrôle en hauteur de E2 et marqueurs intermittents (25/11)
+
+- `scripts/controle_hauteur_e2.py` : projette un marqueur en hauteur (XY pointé au robot,
+  Z au réglet) par l'extrinsèque d'une position et mesure l'écart au centre détecté
+  (intersection des diagonales) ; critère ≤ 2 px sur le plus haut.
+- `scripts/calibrer_extrinseque_4aruco.py --taux-min` : un marqueur vu sur cette part des
+  images suffit, moyenné sur les images où il est vu (caméra fixe) ; 1.0 garde l'ancien
+  « vu partout ».
+- `docs/PROTOCOLE_E2_MULTIVUES.md` : Astra écartée (fx instable), SVPRO caméra mobile avec
+  l'intrinsèque du 24/11.
+
 ### Ajouté — Astra S dans la chaîne E2 (24/11)
 
 - `scripts/calibrer_extrinseque_4aruco.py --astra` et `training/capture_real_tri.py

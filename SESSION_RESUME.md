@@ -1,5 +1,34 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (25 novembre 2026 — après-midi, E2 : extrinsèque par la planche impossible, aucune image)
+
+### Ce qui a été accompli
+- **Astra écartée de E2** : fx instable (502 le 24/11, 524 puis 531 le 25/11, écart entre
+  moitiés 6,1 %).
+- **SVPRO caméra mobile**, intrinsèque du 24/11 reprise (décision du responsable du banc) :
+  une mire du 25/11 donne fx 401,7 contre 402,1.
+- Pointage au bout des doigts (`results/pivot/20261125_*_pointe`) : 1 à 9 mm entre deux
+  relevés d'un même point, 8 à 15 mm de la référence — trop dispersé pour contrôler la
+  planche ou la hauteur. Référence `planche_actuelle.yaml` gardée (planche inchangée).
+- `scripts/controle_hauteur_e2.py` (contrôle en hauteur de l'étape 2) ;
+  `calibrer_extrinseque_4aruco.py --taux-min` (marqueur vu sur une part des images).
+- **P01 non obtenue**, trois poses de la SVPRO :
+  - vue de côté à ~0,75 m : 23 à 8-10 px, leave-one-out **9 à 18 mm** (seuil 3 mm) ;
+  - vue rapprochée : bras coupé, 26 intermittent.
+
+### Ce qui bloque, et la décision à prendre
+Quatre marqueurs de 50 mm, coplanaires, ne suffisent pas depuis 0,7-1,45 m : petits à
+l'image, ils donnent une extrinsèque fausse de 1 à 2 cm hors du marqueur exclu, et se
+rapprocher coupe le bras. **Proposition : extrinsèque par le robot** (marqueur rigide sur la
+pince, ~20 poses, FK des codeurs ; points répartis en volume et en hauteur), script et
+essai simulé préparés avant la prochaine session.
+
+### Prochaines actions
+1. [ROUGE] Marqueur ArUco rigide ≥ 40 mm fixé sur la pince (le cube à ArUco ?).
+2. [ROUGE] Écrire l'extrinsèque par le robot (pose caméra + marqueur dans la bride),
+   la tester en simulation, amender le protocole.
+3. [JAUNE] Au banc : poser la SVPRO (bras entier dans l'image), ~20 poses, capture 50 poses.
+
 ## État actuel (24 novembre 2026 — soir, session E2 au banc : intrinsèques faites, aucune image E2)
 
 ### Ce qui a été accompli
