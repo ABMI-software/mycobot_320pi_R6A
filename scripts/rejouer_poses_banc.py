@@ -212,7 +212,7 @@ def cmd_rejouer(args):
                                      for c in cameras), 30.0)
         q_lu = etat['joints'].copy()
         fk_mm = ecart_fk_mm(config['monde'], q_lu) if rang < args.controle_fk else ''
-        valide = atteint and frais and ecart <= args.tolerance_deg
+        valide = bool(atteint and frais and ecart <= args.tolerance_deg)
         sorties[q_deg] = (q_lu, {c: dernieres[c] for c in cameras}, valide)
         lignes.append({'pose': p, 'ecart_max_deg': round(float(ecart), 4), 'ecart_fk_mm': fk_mm,
                        'atteint': atteint,

@@ -36,10 +36,11 @@ Sorties : `~/dream_article/E2/2026-11-26/eval_P02/`. Verdict : `a_preciser`.
   planche en pleine résolution. Les labels E2 sont jugés utilisables.
 
 ### Prochaines actions
-1. [ROUGE] Relancer **E3.9b** (le diagnostic de cet échec réel : cadrage, scène, apparence) :
-   arrêtée le 24/11 sur un bug trivial, `TypeError: Object of type bool_ is not JSON
-   serializable` (`~/dream_article/E3/E3_9b/essai.log`, convertir en `bool()`), puis attendre
-   la carte (un entraînement RoboPEPP E3.7 tourne dans tmux `train`).
+1. [ROUGE] **E3.9b relancée le 26/11 à 16:45** (bug `bool_` corrigé dans
+   `scripts/rejouer_poses_banc.py`). Sa garde « carte libre » interrogeait
+   `nvidia-smi --query-compute-apps`, vide ici même pendant un entraînement : elle juge
+   maintenant sur la mémoire (< 1500 Mo) et la charge (< 10 %). Elle attend la fin de
+   l'entraînement RoboPEPP (tmux `train`). Suivi : `tail ~/dream_article/E3/E3_9b/journal.txt`.
 2. [JAUNE] Selon E3.9b : corriger le générateur (biais vertical, détection distale) avant la
    collecte E3.7 ; réévaluer sur e2_P02 et `real_tri_test`.
 3. [JAUNE] Amender `docs/PROTOCOLE_E2_MULTIVUES.md` : méthode P02, précision des labels
