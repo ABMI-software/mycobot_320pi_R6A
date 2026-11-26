@@ -200,6 +200,9 @@ def main():
     a.add_argument('--extrinseque', action='append', metavar='CAMERA=YAML',
                    help='extrinseque d une camera (repetable) ; seules les cameras nommees capturent')
     a.add_argument('--sortie', type=Path, help='dossier de sortie, a la place de real_tri/<jeu>')
+    a.add_argument('--mire', action='store_true',
+                   help='SVPRO en 2592x1944 pour scripts/extrinseque_robot_mire.py (meme champ que 640x480) ;'
+                        ' ses keypoints_2d sont alors faux')
     args = a.parse_args()
     if args.jeu == 'e2' and not (args.extrinseque and args.sortie):
         a.error('--jeu e2 exige --extrinseque et --sortie (une extrinseque par position)')
@@ -207,7 +210,8 @@ def main():
                     if args.extrinseque else EXTRINSEQUES)
     ouvertures = {
         'arducam': lambda: c3.LocalCamera(index_v4l2('arducam'), 'arducam', exposure=75),
-        'svpro': lambda: c3.LocalCamera(index_v4l2('svpro'), 'svpro', fourcc='MJPG'),
+        'svpro': lambda: c3.LocalCamera(index_v4l2('svpro'), 'svpro', fourcc='MJPG',
+                                        **({'width': 2592, 'height': 1944} if args.mire else {})),
         'astra': CameraAstra,
     }
     inconnues = set(extrinseques) - set(ouvertures)

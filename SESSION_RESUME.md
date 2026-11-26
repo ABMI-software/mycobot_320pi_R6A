@@ -1,5 +1,31 @@
 # Reprise — pick adaptatif LIVE par démonstration
 
+## État actuel (26 novembre 2026 — après-midi, E2 : 50 images réelles annotées, SVPRO P02)
+
+### Ce qui a été accompli
+- **50 poses E2 capturées** depuis la SVPRO (position P02), 640×480, labels FK projetés :
+  `~/dream_article/E2/2026-11-26/e2_P02/` (graine 3007). Squelette vérifié à l'œil sur le bras.
+- **Extrinsèque P02** (`training/calibration/e2_P02_svpro_extrinsic.yaml`, non commitée) :
+  centres des 4 ArUco de `planche_actuelle.yaml`, détectés sur la SVPRO **en 2592×1944**
+  (39-110 px contre 8-26 px en 640) sur la série `mire_robot_5`. Résidu 0,47 px
+  (ajustement) ; marqueur exclu **3,7 à 12 px** (3 points restants, test pessimiste).
+  **Critère ≤ 2 px non tenu** : annotations « à quelques px », à dire dans l'article.
+- **Robot comme mire : échec pratique.** ArUco 40 mm (id 21) sur la pince décodé sur 6/20
+  poses : trop petit, collé à la prise et aux doigts noirs, noir terne. Ajustement seul :
+  10,3 px ; avec la table, les détections pince s'écartent de 6-10 px.
+- Arducam : gain 0 et focus 1 trouvés (intrinsèque à 50) → focus 50, gain 100.
+
+### Décisions prises
+- Pas de nouveau marqueur imprimé aujourd'hui (décision du responsable du banc) : on
+  avance avec l'extrinsèque par la planche en pleine résolution.
+
+### Prochaines actions
+1. [ROUGE] Évaluer DREAM (synthétique seul + borne haute `vgg_tri_reel_ft_e10`) sur e2_P02,
+   `eval_papier.py`, test de décalage d'abord.
+2. [JAUNE] Amender `docs/PROTOCOLE_E2_MULTIVUES.md` : méthode P02 et précision réelle des labels.
+3. [VERT] Si un label ≤ 2 px devient nécessaire : plaque rigide 80 mm (id 40, PDF dans
+   `~/dream_article/E2/2026-11-26/`) tenue dans les mors.
+
 ## État actuel (25 novembre 2026 — après-midi, E2 : extrinsèque par la planche impossible, aucune image)
 
 ### Ce qui a été accompli

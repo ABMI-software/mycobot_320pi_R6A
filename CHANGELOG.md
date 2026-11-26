@@ -9,6 +9,16 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Non publié]
 
+### E2 — premières images réelles annotées, SVPRO P02 (26/11)
+
+- `scripts/extrinseque_robot_mire.py` (nouveau) : extrinsèque par ajustement de faisceau
+  sur les coins d'un ArUco solidaire de la pince (FK des codeurs) ; `--planche` ajoute les
+  centres des marqueurs de la table relevés au robot ; leave-one-out par pose.
+- `training/capture_real_tri.py --mire` : SVPRO en 2592×1944, même champ que 640×480
+  (vérifié à 0,1 px), pour détecter de petits marqueurs ; les coins sont ramenés en 640×480.
+- `scripts/gripper_bridge.py` : l'échec de la limite firmware J6 ne coupe plus le robot
+  (le refus logiciel au-delà de ±90° reste la garde).
+
 ### Sécurité — J6 limité à ±90° (câble de la pince) (25/11)
 
 - `scripts/gripper_bridge.py` et `mycobot_gateway/scripts/bridge_pi_simple.py` **refusent**

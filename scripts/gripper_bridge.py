@@ -63,13 +63,20 @@ class BridgePiSimple:
                 time.sleep(1)
                 angles = self.mc.get_angles()
                 print(f"✅ Robot connecté ! Angles: {angles}")
-                self.mc.set_joint_min(6, -J6_LIMITE_DEG)
-                self.mc.set_joint_max(6, J6_LIMITE_DEG)
-                print(f"🔒 J6 limite dans le firmware : "
-                      f"{self.mc.get_joint_min_angle(6)} .. {self.mc.get_joint_max_angle(6)} deg")
             except Exception as e:
                 print(f"❌ Erreur robot: {e}")
                 self.mc = None
+        if self.mc is not None:
+            # Seconde barriere : l'echec de la limite firmware ne doit pas couper le robot,
+            # le refus logiciel de send_angles (_refus_j6) reste la garde.
+            try:
+                self.mc.set_joint_min(6, int(-J6_LIMITE_DEG))
+                self.mc.set_joint_max(6, int(J6_LIMITE_DEG))
+                print(f"🔒 J6 limite dans le firmware : "
+                      f"{self.mc.get_joint_min_angle(6)} .. {self.mc.get_joint_max_angle(6)} deg")
+            except Exception as e:
+                print(f"⚠️ Limite firmware J6 non posee ({e!r}) ; refus logiciel au-dela de "
+                      f"+-{J6_LIMITE_DEG:.0f} deg actif")
 
         # Positions prédéfinies
         self.home_angles = [0, 8, -127, 40, 0, 0]
