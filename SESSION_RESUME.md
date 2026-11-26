@@ -15,16 +15,37 @@
   10,3 px ; avec la table, les détections pince s'écartent de 6-10 px.
 - Arducam : gain 0 et focus 1 trouvés (intrinsèque à 50) → focus 50, gain 100.
 
+### Évaluation DREAM sur e2_P02 (50 images, `eval_papier.py`, seuil 0,01)
+| Modèle | Détection | PCK 5 / 10 px | AUC 0-20 px | ADD < 20 mm |
+|---|---|---|---|---|
+| `vgg_e3_9_synth_seul` | 0,61 | 0,069 / 0,126 | 0,14 | 0 |
+| `vgg_tri_reel_ft_e10` (borne haute) | 0,49 | 0,026 / 0,046 | 0,06 | 0 |
+
+Sorties : `~/dream_article/E2/2026-11-26/eval_P02/`. Verdict : `a_preciser`.
+- Synthétique seul : base 2,7 px ; link1/link3 15-22 px, **détection ~13 px au-dessus du
+  label** ; link4-6 détectés sur 40-60 % des images.
+- **Le décalage vient du modèle, pas des labels E2** : sur `real_tri_test` (labels ArUco
+  fixes, E3.9 du 15/11) le même modèle a le même biais vertical — v médian link1 −10,6 /
+  link3 −14,4 px, contre −14,8 / −14,0 sur E2. E2 reproduit l'échec réel connu de E3.9
+  (PCK@5 0,068 sur `real_tri_test`) sur un point de vue nouveau.
+- Le fine-tuning réel s'effondre (118-228 px en distal) : il récite ses deux caméras ;
+  argument pour l'entraînement synthétique multi-vues.
+
 ### Décisions prises
-- Pas de nouveau marqueur imprimé aujourd'hui (décision du responsable du banc) : on
-  avance avec l'extrinsèque par la planche en pleine résolution.
+- Pas de nouveau marqueur imprimé (décision du responsable du banc) : extrinsèque par la
+  planche en pleine résolution. Les labels E2 sont jugés utilisables.
 
 ### Prochaines actions
-1. [ROUGE] Évaluer DREAM (synthétique seul + borne haute `vgg_tri_reel_ft_e10`) sur e2_P02,
-   `eval_papier.py`, test de décalage d'abord.
-2. [JAUNE] Amender `docs/PROTOCOLE_E2_MULTIVUES.md` : méthode P02 et précision réelle des labels.
-3. [VERT] Si un label ≤ 2 px devient nécessaire : plaque rigide 80 mm (id 40, PDF dans
-   `~/dream_article/E2/2026-11-26/`) tenue dans les mors.
+1. [ROUGE] Relancer **E3.9b** (le diagnostic de cet échec réel : cadrage, scène, apparence) :
+   arrêtée le 24/11 sur un bug trivial, `TypeError: Object of type bool_ is not JSON
+   serializable` (`~/dream_article/E3/E3_9b/essai.log`, convertir en `bool()`), puis attendre
+   la carte (un entraînement RoboPEPP E3.7 tourne dans tmux `train`).
+2. [JAUNE] Selon E3.9b : corriger le générateur (biais vertical, détection distale) avant la
+   collecte E3.7 ; réévaluer sur e2_P02 et `real_tri_test`.
+3. [JAUNE] Amender `docs/PROTOCOLE_E2_MULTIVUES.md` : méthode P02, précision des labels
+   (marqueur exclu 3,7-12 px), résultats ci-dessus ; ligne E2 de `docs/ARTICLE_DREAM.md`.
+4. [VERT] Plaque 80 mm (PDF dans `~/dream_article/E2/2026-11-26/`) seulement si un label
+   ≤ 2 px devient nécessaire.
 
 ## État actuel (25 novembre 2026 — après-midi, E2 : extrinsèque par la planche impossible, aucune image)
 
