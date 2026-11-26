@@ -39,8 +39,8 @@ Sorties : `~/dream_article/E2/2026-11-26/eval_P02/`. Verdict : `a_preciser`.
 1. [ROUGE] **E3.9b relancée le 26/11 à 16:45** (bug `bool_` corrigé dans
    `scripts/rejouer_poses_banc.py`). Sa garde « carte libre » interrogeait
    `nvidia-smi --query-compute-apps`, vide ici même pendant un entraînement : elle juge
-   maintenant sur la mémoire (< 1500 Mo) et la charge (< 10 %). Elle attend la fin de
-   l'entraînement RoboPEPP (tmux `train`). Suivi : `tail ~/dream_article/E3/E3_9b/journal.txt`.
+   maintenant sur la mémoire (< 3 Go ; l'écran en prend ~1,5) et la charge (< 10 %). Relancée
+   à 16:50, RoboPEPP mis en pause. Suivi : `tail ~/dream_article/E3/E3_9b/journal.txt`.
 2. [JAUNE] Selon E3.9b : corriger le générateur (biais vertical, détection distale) avant la
    collecte E3.7 ; réévaluer sur e2_P02 et `real_tri_test`.
 3. [JAUNE] Amender `docs/PROTOCOLE_E2_MULTIVUES.md` : méthode P02, précision des labels
